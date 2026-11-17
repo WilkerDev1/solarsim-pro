@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
-import { Receipt, ChevronDown, ChevronUp, Check, Sparkles, Cloud, RefreshCw, Zap, Coins, DollarSign } from 'lucide-react';
-import { UtilityDistributor, getDistributorTariffOptions } from '../../../types/tariffs';
+import { Receipt, ChevronDown, ChevronUp, Check, Sparkles, Cloud, RefreshCw, Zap, Coins, DollarSign, AlertTriangle } from 'lucide-react';
+import { GlobalTariffMatrix, UtilityDistributor, getDistributorTariffOptions } from '../../../types/tariffs';
 import { confirmAction } from '../../common/confirmAction';
 import { DEFAULT_GRID_EXPORT_FEE_PCT } from '../../../../shared/assumptions';
+import { canAdminister } from '../../../../shared/permissions';
+import { DEFAULT_RD_TARIFF_MATRIX } from '../../../data/rdTariffs';
+import { UNVERIFIED_ESTIMATE_LABEL, factoryChargeRows } from '../../simulator/params/sections/rates/tariffPresentation';
+import { factoryTariffUpdateNotice } from '../../../data/factoryTariffMatrixVersions';
 
 interface TariffPreferencesPanelProps {
   isOpen: boolean;
@@ -22,10 +26,52 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
     resetToDefaultTariffs,
     syncTariffsWithServer,
     fetchTariffsFromServer,
-  } = useSimulationStore(useShallow((s) => ({ defaultSimulationSettings: s.defaultSimulationSettings, updateDefaultSimulationSettings: s.updateDefaultSimulationSettings, tariffMatrix: s.tariffMatrix, updateDistributorTariff: s.updateDistributorTariff, resetToDefaultTariffs: s.resetToDefaultTariffs, syncTariffsWithServer: s.syncTariffsWithServer, fetchTariffsFromServer: s.fetchTariffsFromServer })));
+    setTariffMatrix,
+    organizationTariffOutdated,
+    currentUser,
+    workspaceScope,
+  } = useSimulationStore(useShallow((s) => ({ defaultSimulationSettings: s.defaultSimulationSettings, updateDefaultSimulationSettings: s.updateDefaultSimulationSettings, tariffMatrix: s.tariffMatrix, updateDistributorTariff: s.updateDistributorTariff, resetToDefaultTariffs: s.resetToDefaultTariffs, syncTariffsWithServer: s.syncTariffsWithServer, fetchTariffsFromServer: s.fetchTariffsFromServer, setTariffMatrix: s.setTariffMatrix, organizationTariffOutdated: s.organizationTariffOutdated, currentUser: s.syncSettings.currentUser, workspaceScope: s.workspaceScope })));
   const [prefDistributorTab, setPrefDistributorTab] = useState<UtilityDistributor>('EDEESTE');
   const [isSyncingTariffs, setIsSyncingTariffs] = useState(false);
   const [tariffCurrencyMode, setTariffCurrencyMode] = useState<'USD' | 'DOP'>('USD');
+  // Matriz personalizada sustituida por la de fábrica en este panel: «Deshacer» la recupera mientras no cambie nada más.
+  const [replacedMatrix, setReplacedMatrix] = useState<{ matrix: GlobalTariffMatrix; scope: string } | null>(null);
+  const factoryNotice = factoryTariffUpdateNotice(tariffMatrix);
+  const canUndoFactoryUpdate = !!replacedMatrix && replacedMatrix.scope === workspaceScope && tariffMatrix === DEFAULT_RD_TARIFF_MATRIX;
+  // «Deshacer» deja de ofrecerse en cuanto la matriz o el espacio cambian por otra vía: un «Restablecer» posterior no debe revivirlo.
+  useEffect(() => {
+    if (replacedMatrix && (replacedMatrix.scope !== workspaceScope || tariffMatrix !== DEFAULT_RD_TARIFF_MATRIX)) setReplacedMatrix(null);
+  }, [replacedMatrix, workspaceScope, tariffMatrix]);
+
+  const handleAdoptFactoryTariffs = async () => {
+    if (!factoryNotice) return;
+    const confirmed = await confirmAction({
+      title: 'Actualizar al pliego de fábrica',
+      message: `Tu matriz (${factoryNotice.savedResolutionCode}) se sustituye por el pliego de fábrica ${factoryNotice.factoryResolutionCode}, vigente desde ${factoryNotice.factoryEffectiveDate}. Se pierden tus cambios en la matriz; las propuestas guardadas no cambian. Podrás deshacerlo mientras sigas en esta pantalla.`,
+      confirmLabel: 'Actualizar',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    setReplacedMatrix({ matrix: tariffMatrix, scope: workspaceScope });
+    resetToDefaultTariffs();
+  };
+
+  const handleUndoFactoryUpdate = () => {
+    if (!canUndoFactoryUpdate || !replacedMatrix) return;
+    setTariffMatrix(replacedMatrix.matrix);
+    setReplacedMatrix(null);
+  };
+
+  const handleUpdateOrganizationTariffs = async () => {
+    if (!organizationTariffOutdated) return;
+    const confirmed = await confirmAction({
+      title: 'Actualizar el pliego de la organización',
+      message: `La organización guarda el pliego de fábrica anterior (${organizationTariffOutdated.resolutionCode}). Se sustituye en la nube por la matriz de este equipo (${tariffMatrix.resolutionCode}) para todos sus miembros. Las propuestas guardadas no cambian.`,
+      confirmLabel: 'Subir a la organización',
+    });
+    if (!confirmed) return;
+    await handleSyncTariffsCloud();
+  };
 
   const handleSyncTariffsCloud = async () => {
     setIsSyncingTariffs(true);
@@ -82,7 +128,7 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
                 />
               </label>
               <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200/60 dark:border-[#27272a] hover:bg-slate-50 dark:hover:bg-[#222226] cursor-pointer">
-                <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Retención Oficial 25% Excedentes (SIE-007)</span>
+                <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Retención 25% Excedentes (régimen anterior)</span>
                 <input
                   type="checkbox"
                   checked={defs.defaultApplySieRetention}
@@ -90,6 +136,16 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
                   className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
                 />
               </label>
+              {/* Régimen vigente de las propuestas nuevas: cargo por uso de la red de fábrica (no es un ajuste editable aquí). */}
+              <div data-grid-use-charge-defaults className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-2.5 text-[11px] leading-snug text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                <p className="m-0 font-semibold">Las propuestas nuevas nacen en el régimen SIE-007-2026: se acredita todo lo inyectado y se cobra un cargo por uso de la red en RD$/kWh inyectado (solo tarifas de un solo precio). La retención de arriba solo aplica al régimen anterior.</p>
+                <ul className="m-0 mt-1 list-none p-0">
+                  {factoryChargeRows().map((row) => (
+                    <li key={row.distributor}>{row.distributor}: RD${row.dopPerKWh.toFixed(2)}/kWh ({row.resolutionCode}, {row.period})</li>
+                  ))}
+                </ul>
+                <p className="m-0 mt-1">{UNVERIFIED_ESTIMATE_LABEL}. Se edita en cada propuesta (Tarifas y distribuidora).</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -119,6 +175,58 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
               </div>
             </div>
           </div>
+
+          {factoryNotice && (
+            <div role="status" className="rounded-2xl p-4 border border-amber-300/70 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="text-xs text-amber-900 dark:text-amber-200">
+                  <p className="font-bold">Hay un pliego de fábrica más nuevo</p>
+                  <p className="mt-0.5">
+                    Tu matriz guardada es <span className="font-mono">{factoryNotice.savedResolutionCode}</span> (vigencia {factoryNotice.savedEffectiveDate}); la de fábrica es <span className="font-mono">{factoryNotice.factoryResolutionCode}</span> (vigencia {factoryNotice.factoryEffectiveDate}). Como tiene cambios propios, no se actualiza sola.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleAdoptFactoryTariffs}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-white shadow-2xs transition-all cursor-pointer shrink-0"
+              >
+                Actualizar al pliego de fábrica
+              </button>
+            </div>
+          )}
+
+          {canUndoFactoryUpdate && replacedMatrix && (
+            <div role="status" className="rounded-2xl p-3 border border-slate-200/80 dark:border-[#2b2b30] bg-slate-50 dark:bg-[#1f1f23] flex items-center justify-between gap-3 text-xs text-slate-700 dark:text-zinc-300">
+              <span>Se aplicó el pliego de fábrica {DEFAULT_RD_TARIFF_MATRIX.resolutionCode} en lugar de tu matriz {replacedMatrix.matrix.resolutionCode}.</span>
+              <button type="button" onClick={handleUndoFactoryUpdate} className="px-3 py-1.5 rounded-xl font-bold border border-slate-300 dark:border-[#3f3f46] hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer shrink-0">
+                Deshacer
+              </button>
+            </div>
+          )}
+
+          {organizationTariffOutdated && tariffMatrix === DEFAULT_RD_TARIFF_MATRIX && (
+            <div role="status" className="rounded-2xl p-4 border border-amber-300/70 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <p className="text-xs text-amber-900 dark:text-amber-200">
+                  La organización guarda el pliego de fábrica anterior (<span className="font-mono">{organizationTariffOutdated.resolutionCode}</span>, vigencia {organizationTariffOutdated.effectiveDate}). En este equipo se calcula con el vigente (<span className="font-mono">{DEFAULT_RD_TARIFF_MATRIX.resolutionCode}</span>).
+                  {!canAdminister(currentUser) && ' Pide a un administrador que lo actualice.'}
+                </p>
+              </div>
+              {canAdminister(currentUser) && (
+                <button
+                  type="button"
+                  onClick={handleUpdateOrganizationTariffs}
+                  disabled={isSyncingTariffs}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  Actualizar el pliego de la organización
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Encabezado de Matriz Tarifaria Oficial */}
           <div className="bg-slate-50 dark:bg-[#1f1f23] rounded-2xl p-4 border border-slate-200/80 dark:border-[#2b2b30] flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -248,7 +356,7 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
                     <th className="p-3">
                       {tariffCurrencyMode === 'USD' ? 'Demanda ($ USD/kW-mes)' : 'Demanda (RD$/kW-mes)'}
                     </th>
-                    <th className="p-3">Retención %</th>
+                    <th className="p-3" title="Solo aplica a propuestas del régimen anterior (retención %)">Retención % (anterior)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-[#222226] text-slate-700 dark:text-zinc-300">
@@ -301,7 +409,7 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
                                   <input
                                     type="number"
                                     step={0.01}
-                                    value={tariff.baseEnergyRateDOP || 0}
+                                    value={tariff.baseEnergyRateDOP || (tariff.currency === 'USD' ? Math.round(currentUSD * 60.0 * 100) / 100 : 0)}
                                     onChange={(e) => {
                                       const dopVal = parseFloat(e.target.value) || 0;
                                       const usdVal = Math.round((dopVal / 60.0) * 1000) / 1000;

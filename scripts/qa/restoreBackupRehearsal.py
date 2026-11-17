@@ -31,7 +31,7 @@ try:
         raise RuntimeError('Unrecognized backup format; no restore attempted.')
     container_id = subprocess.check_output([
         'docker', 'run', '-d', '--name', name, '--network', 'none',
-        '--label', 'solarsim.qa=restore', '--memory', '256m',
+        '--label', 'solarsim.qa=restore', '--memory', '1g',
         '--tmpfs', '/var/lib/postgresql/data', '--mount', f'type=bind,source={socket},target=/var/run/postgresql',
         '-e', 'POSTGRES_USER=solarsim_qa', '-e', 'POSTGRES_DB=solarsim_qa',
         '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', 'postgres:16-alpine',
@@ -54,7 +54,7 @@ try:
         raise RuntimeError('Restore failed; private SQL diagnostics intentionally not printed.')
     subprocess.run(['node', '--import', 'tsx', 'server/tests/backupRehearsal.ts', str(socket)], cwd=root, check=True)
     subprocess.run(['docker', 'exec', container_id, 'pg_amcheck', '--heapallindexed', '--parent-check', '--install-missing', '-U', 'solarsim_qa', '-d', 'solarsim_qa'], check=True)
-    print('PASS: backup restore, migrations 001-006 twice, contents/equipment totals/counts/orphans and pg_amcheck. No network, no production writes.')
+    print('PASS: backup restore, migrations 001-007 twice, contents/equipment totals/counts/orphans and pg_amcheck. No network, no production writes.')
 finally:
     if container_id:
         subprocess.run(['docker', 'rm', '-f', container_id], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

@@ -1,5 +1,6 @@
 // Single catalog of agent tools shared by the proposal assistant, the general assistant and the local MCP server.
-import type { AgentToolDefinition, JsonSchema } from './types';
+import type { AgentToolDefinition, JsonSchema } from './types.js';
+import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES } from '../netMetering.js';
 
 const ALL = ['app-assistant', 'proposal-assistant', 'mcp'] as const;
 const id = (description: string): JsonSchema => ({ type: 'string', minLength: 1, maxLength: 128, description });
@@ -45,6 +46,8 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
       batteries: groups('Grupos de baterías del catálogo (opcional).'),
       marginPct: { type: 'number', minimum: 0, maximum: 1000, description: 'Recargo sobre costo en %, p. ej. 28.' },
       installationUnitPriceUSD: { type: 'number', minimum: 0, maximum: 100000, description: 'Mano de obra USD/kWp.' },
+      netMeteringRegime: { type: 'string', enum: [...NET_METERING_REGIMES], description: 'Régimen de medición neta. Omítelo: las propuestas nuevas nacen en sie007_2026 (cargo por kWh inyectado); legacy_retention (retención % anterior) solo si el usuario lo pide.' },
+      gridUseChargeDOPPerKWh: { type: 'number', minimum: 0, maximum: MAX_GRID_USE_CHARGE_DOP_PER_KWH, description: 'Cargo por uso de la red en RD$/kWh inyectado. Omítelo para usar el de fábrica de la distribuidora (get_tariffs).' },
     }, ['clientName', 'distributor', 'tariffCode', 'panels', 'inverters']),
   },
   {
@@ -82,13 +85,27 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
   },
   {
     name: 'list_document_texts', title: 'Consultar textos del documento', kind: 'read', category: 'documents', surfaces: [...ALL],
-    description: 'Lista los textos editables del PDF de una propuesta (clave, etiqueta, texto actual, si está personalizado y si admite plantilla). Filtra por sección: company, client, cover, aboutUs, benefits, techIntro, projectDescription, quotation, etc.',
-    inputSchema: object({ proposalId: id('ID de la propuesta.'), section: { type: 'string', maxLength: 40 } }, ['proposalId']),
+    description: 'Lista los textos editables del PDF de una propuesta (clave, etiqueta, texto actual, si está personalizado y si admite plantilla). Filtra por sección (company, client, cover, aboutUs, benefits, techIntro, projectDescription, quotation, etc.) y/o por query, que busca en clave, etiqueta y texto sin distinguir tildes (p. ej. "garantía", "validez", "servicios").',
+    inputSchema: object({
+      proposalId: id('ID de la propuesta.'), section: { type: 'string', maxLength: 40 },
+      query: { type: 'string', maxLength: 80, description: 'Palabras a buscar en clave, etiqueta o texto.' },
+    }, ['proposalId']),
   },
   {
     name: 'set_document_text', title: 'Editar texto del documento', kind: 'draft', category: 'documents', surfaces: [...ALL],
-    description: 'Cambia un texto del PDF por su clave (p. ej. quotation.warranty.panel, client.phone, aboutUs.intro). Admite **negrita**, *cursiva* y viñetas "- " en textos enriquecidos y placeholders como {clientName}. Consulta las claves con list_document_texts.',
+    description: 'Cambia un texto del PDF por su clave (p. ej. quotation.warranty.panel, quote.validityDays, client.phone, aboutUs.intro). Admite **negrita**, *cursiva* y viñetas "- " en textos enriquecidos y placeholders como {clientName}. Consulta las claves con list_document_texts.',
     inputSchema: object({ proposalId: id('ID de la propuesta.'), key: { type: 'string', minLength: 3, maxLength: 80 }, text: { type: 'string', maxLength: 8000 } }, ['proposalId', 'key', 'text']),
+  },
+  {
+    name: 'set_document_texts', title: 'Editar textos del documento', kind: 'draft', category: 'documents', surfaces: [...ALL],
+    description: 'Cambia varios textos del PDF en un solo cambio con un único deshacer (p. ej. las cuatro garantías quotation.warranty.panel|inverter|battery|workmanship). text null restablece el predeterminado. Mismas reglas que set_document_text.',
+    inputSchema: object({
+      proposalId: id('ID de la propuesta.'),
+      texts: {
+        type: 'array', maxItems: 40,
+        items: object({ key: { type: 'string', minLength: 3, maxLength: 80 }, text: { type: 'string', maxLength: 8000, nullable: true } }, ['key', 'text']),
+      },
+    }, ['proposalId', 'texts']),
   },
   {
     name: 'reset_document_text', title: 'Restablecer texto del documento', kind: 'draft', category: 'documents', surfaces: [...ALL],
@@ -234,12 +251,12 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
   },
   {
     name: 'get_tariffs', title: 'Consultar tarifas', kind: 'read', category: 'reference', surfaces: [...ALL],
-    description: 'Consulta las referencias de tarifa y su procedencia.',
+    description: 'Consulta las referencias de tarifa y su procedencia (bloques y cargo fijo, también por rango de consumo en BTS1) y el cargo por uso de la red SIE-007-2026 (RD$/kWh inyectado) por distribuidora, con su origen: leído de una resolución o de fábrica.',
     inputSchema: object({}),
   },
   {
     name: 'propose_project_update', title: 'Editar propuesta', kind: 'draft', category: 'proposals', card: 'pending-action', surfaces: [...ALL],
-    description: 'Prepara cambios en la propuesta abierta. Grupos panels/inverters/batteries requieren [{id del catálogo,count,unitPriceUSD confirmado}]; no inventes precios. customItems/customDiscounts son listas completas con ids y descripción; en customItems conserva hideInQuotation (cobrado pero oculto en la factura) tal como lo devuelve get_project.',
+    description: 'Prepara cambios en la propuesta abierta. Grupos panels/inverters/batteries requieren [{id del catálogo,count,unitPriceUSD confirmado}]; no inventes precios. customItems/customDiscounts son listas completas con ids y descripción; en customItems conserva hideInQuotation (cobrado pero oculto en la factura) tal como lo devuelve get_project. rates.gridConnection: "grid_export" | "zero_export" | "off_grid". Solo con off_grid, rates.supplyAlternative fija contra qué se compara el ahorro: "utility_tariff" (tarifa, por defecto), "generator" (requiere rates.generatorCostPerKWh en USD/kWh, > 0; pregúntalo, no lo inventes; null lo borra) o "no_comparison" (sin ahorro, payback ni TIR/VAN). rates.netMeteringRegime: "sie007_2026" (cargo por kWh inyectado) o "legacy_retention" (retención % anterior); cámbialo solo si el usuario lo pide. rates.gridUseChargeDOPPerKWh: cargo por uso de la red en RD$/kWh inyectado (0 a '+MAX_GRID_USE_CHARGE_DOP_PER_KWH+'), solo en sie007_2026; toma el valor de get_tariffs o del usuario, no lo inventes.',
     inputSchema: object({
       id: id('ID de la propuesta abierta.'),
       title: { type: 'string', maxLength: 150, description: 'Resumen breve del cambio.' },

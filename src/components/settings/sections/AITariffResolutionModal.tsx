@@ -1,11 +1,12 @@
 import { isReaderRole } from '../../../../shared/permissions';
 import { DEFAULT_GRID_EXPORT_FEE_PCT } from '../../../../shared/assumptions';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { GlobalTariffMatrix, UtilityDistributor } from '../../../types/tariffs';
-import { getTariffSource, tariffSourceFieldLabel } from '../../../utils/aiTariffContext';
+import { getTariffSource, gridUseChargeReference, tariffSourceFieldLabel } from '../../../utils/aiTariffContext';
 import { GeminiTariffService } from '../../../services/geminiTariffService';
+import { applyTariffScanReview, describeTariffSource, PENDING_TARIFF_SOURCE, summarizeTariffScan, tariffScanRowKey, type TariffProvenanceDecision, type TariffScanReview } from '../../../utils/tariffExtraction';
 import {
   X,
   Sparkles,
@@ -40,7 +41,12 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
   const [userNotes, setUserNotes] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [extractedMatrix, setExtractedMatrix] = useState<GlobalTariffMatrix | null>(null);
+  const [review, setReview] = useState<TariffScanReview | null>(null);
+  // Procedencia que confirma el usuario cuando el documento no cita resolución (prellenada, nunca aplicada sola).
+  const [provenanceKind, setProvenanceKind] = useState<TariffProvenanceDecision['kind']>('resolution');
+  const [provenanceResolution, setProvenanceResolution] = useState('');
+  const [provenanceDate, setProvenanceDate] = useState('');
+  const [provenancePeriod, setProvenancePeriod] = useState('');
   const [selectedDistributorTab, setSelectedDistributorTab] = useState<UtilityDistributor>('EDEESTE');
   const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
   const [appliedSuccess, setAppliedSuccess] = useState<boolean>(false);
@@ -51,9 +57,24 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
   const request = useRef<AbortController | null>(null);
   useEffect(() => {
     operation.current++; request.current?.abort(); setIsProcessing(false);
-    setIsSyncingCloud(false); setExtractedMatrix(null); setReviewConfirmed(false); setAppliedSuccess(false); draftBasis.current = null;
+    setIsSyncingCloud(false); setReview(null); setReviewConfirmed(false); setAppliedSuccess(false); draftBasis.current = null;
     return () => { operation.current++; request.current?.abort(); };
   }, [isOpen, sessionGeneration]);
+
+  // Matriz que se aplicaría con la procedencia y las tarifas nuevas elegidas; un error de procedencia bloquea aplicar.
+  const { extractedMatrix, previewError } = useMemo(() => {
+    if (!review) return { extractedMatrix: null, previewError: null };
+    const decision: TariffProvenanceDecision = provenanceKind === 'resolution'
+      ? { kind: 'resolution', resolutionCode: provenanceResolution, effectiveDate: provenanceDate }
+      : { kind: 'distributor_table', period: provenancePeriod };
+    try {
+      return { extractedMatrix: applyTariffScanReview(review, decision), previewError: null };
+    } catch (error: any) {
+      return { extractedMatrix: null, previewError: String(error?.message || error) };
+    }
+  }, [review, provenanceKind, provenanceResolution, provenanceDate, provenancePeriod]);
+  // Cambiar la procedencia invalida el contraste confirmado.
+  const editReview = <T,>(setter: (value: T) => void) => (value: T) => { setter(value); setReviewConfirmed(false); setAppliedSuccess(false); };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -72,7 +93,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
     if (selected.size > 20 * 1024 * 1024) { setFile(null); setErrorMessage('El documento no puede superar 20 MB.'); return; }
     setFile(selected);
     setErrorMessage(null);
-    setExtractedMatrix(null);
+    setReview(null);
     setAppliedSuccess(false);
 
     const detectedMime = selected.type || (selected.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
@@ -112,11 +133,11 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
     draftBasis.current = tariffMatrix;
     setIsProcessing(true);
     setErrorMessage(null);
-    setExtractedMatrix(null);
+    setReview(null);
     setAppliedSuccess(false);
 
     try {
-      const matrix = await GeminiTariffService.extractTariffMatrixFromDocument({
+      const scanned = await GeminiTariffService.scanTariffDocument({
         fileBase64,
         mimeType,
         userPromptNotes: userNotes,
@@ -126,7 +147,15 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
         signal: request.current.signal,
       });
 
-      if (isCurrent()) { setExtractedMatrix(matrix); setSelectedDistributorTab(Object.keys(matrix.schedules).find((dist) => Object.values(matrix.schedules[dist as UtilityDistributor].tariffs).some((tariff) => tariff.source?.resolutionCode === matrix.resolutionCode)) as UtilityDistributor || 'EDEESTE'); }
+      if (isCurrent()) {
+        const decision = scanned.defaultDecision;
+        setProvenanceKind(decision.kind);
+        setProvenanceResolution(decision.kind === 'resolution' ? decision.resolutionCode : '');
+        setProvenanceDate(decision.kind === 'resolution' ? decision.effectiveDate : scanned.document.effectiveDate ?? '');
+        setProvenancePeriod(decision.kind === 'distributor_table' ? decision.period : scanned.document.effectiveDate?.slice(0, 7) ?? '');
+        setReview(scanned);
+        setSelectedDistributorTab(scanned.rows[0]?.distributor ?? scanned.gridUseCharges[0]?.distributor ?? 'EDEESTE');
+      }
     } catch (err: any) {
       if (isCurrent()) setErrorMessage(err.message || 'Error al procesar el pliego tarifario con Gemini IA.');
     } finally {
@@ -216,7 +245,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
           )}
 
           {/* Sección de Carga de Archivo */}
-          {!extractedMatrix && (
+          {!review && (
             <div className="flex flex-col gap-4">
               <div
                 onClick={() => fileInputRef.current?.click()}
@@ -249,7 +278,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                       Selecciona el PDF o imagen de la resolución
                     </p>
                     <p className="text-xs text-slate-400 mt-1">
-                      Resoluciones de la SIE (ej. SIE-079-2026-TF) o tarifarios de CEPM (PDF, JPG, PNG)
+                      Resoluciones de la SIE (ej. SIE-121-2026-TF), cuadros de EDEESTE, EDESUR o EDENORTE, o tarifarios de CEPM (PDF, JPG, PNG). Solo República Dominicana.
                     </p>
                   </div>
                 )}
@@ -291,37 +320,135 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
           )}
 
           {/* Visualizador de Matriz Extraída */}
-          {extractedMatrix && (
+          {review && (() => {
+            const tableMatrix = extractedMatrix ?? review.preview;
+            const rowStatus = new Map(review.rows.map((row) => [tariffScanRowKey(row), row]));
+            const unsupportedRows = review.rows.filter((row) => row.status === 'unsupported');
+            const visibleTariffs = Object.values(tableMatrix.schedules[selectedDistributorTab]?.tariffs ?? {});
+            return (
             <div className="flex flex-col gap-5 animate-fadeIn">
               {/* Resumen de la Resolución */}
               <div className="bg-slate-50 dark:bg-[#1f1f23] p-4 rounded-2xl border border-slate-200/80 dark:border-[#2b2b30] flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Receipt className="w-4 h-4 text-amber-500" />
                     <span className="text-sm font-bold text-slate-900 dark:text-white">
-                      {extractedMatrix.resolutionCode}
+                      {review.document.resolutionCode ?? 'El documento no cita resolución'}
                     </span>
                     <span className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 font-semibold font-mono">
-                      Vigencia: {extractedMatrix.effectiveDate}
+                      Vigencia: {review.document.effectiveDate ?? 'no indicada'}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-                    Publicado por: <span className="font-semibold text-slate-700 dark:text-zinc-300">{extractedMatrix.publishedBy}</span>
+                    Publicado por: <span className="font-semibold text-slate-700 dark:text-zinc-300">{review.document.publishedBy ?? 'no indicado'}</span>
                   </p>
-                  {extractedMatrix.notes && (
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5" data-testid="tariff-scan-origin">
+                    Origen: {review.origin.country ?? 'país no indicado'} · {review.origin.regulator ? `regulador ${review.origin.regulator}` : 'regulador no citado'} · {review.origin.currency ?? 'moneda por tarifa'}
+                  </p>
+                  {review.notes && (
                     <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 italic">
-                      {extractedMatrix.notes}
+                      {review.notes}
                     </p>
                   )}
                 </div>
 
                 <button
-                  onClick={() => setExtractedMatrix(null)}
+                  onClick={() => setReview(null)}
                   className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer self-start md:self-auto"
                 >
                   Volver a escanear
                 </button>
               </div>
+
+              <div
+                data-testid="tariff-scan-summary"
+                className={`rounded-xl border p-3 text-xs ${review.priceChanges ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200' : 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200'}`}
+              >
+                {summarizeTariffScan(review)}
+              </div>
+
+              {review.provenanceRequired && (
+                <fieldset className="rounded-xl border border-slate-200 dark:border-[#27272a] p-3 text-xs text-slate-700 dark:text-zinc-300 flex flex-col gap-2" data-testid="tariff-scan-provenance" aria-describedby="tariff-provenance-help">
+                  <legend className="px-1 font-semibold">Procedencia del cuadro (obligatoria)</legend>
+                  <p id="tariff-provenance-help" className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    El documento no {review.document.resolutionCode ? 'indica una fecha de inicio válida' : 'cita la resolución'}. Indica la resolución que lo respalda o márcalo como cuadro de la distribuidora sin resolución citada. Nada se aplica hasta que lo confirmes.
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="tariff-provenance" aria-describedby={review.suggestion ? 'tariff-provenance-suggestion' : undefined} checked={provenanceKind === 'resolution'} onChange={() => editReview(setProvenanceKind)('resolution')} />
+                      <span>Resolución que lo respalda</span>
+                    </label>
+                    <div className="pl-6 flex flex-col sm:flex-row gap-2">
+                      <div className="flex-1 flex flex-col gap-1">
+                        <label htmlFor="tariff-provenance-resolution" className="text-[11px] text-slate-500 dark:text-zinc-400">Resolución</label>
+                        <input
+                          id="tariff-provenance-resolution"
+                          type="text"
+                          placeholder="Ej: SIE-121-2026-TF"
+                          aria-describedby={review.suggestion ? 'tariff-provenance-suggestion' : undefined}
+                          value={provenanceResolution}
+                          disabled={provenanceKind !== 'resolution'}
+                          onChange={(event) => editReview(setProvenanceResolution)(event.target.value)}
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] font-mono disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label htmlFor="tariff-provenance-date" className="text-[11px] text-slate-500 dark:text-zinc-400">Fecha de inicio</label>
+                        <input
+                          id="tariff-provenance-date"
+                          type="date"
+                          aria-describedby={review.suggestion ? 'tariff-provenance-suggestion' : undefined}
+                          value={provenanceDate}
+                          disabled={provenanceKind !== 'resolution'}
+                          onChange={(event) => editReview(setProvenanceDate)(event.target.value)}
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] font-mono disabled:opacity-50"
+                        />
+                      </div>
+                    </div>
+                    {review.suggestion && (
+                      <p id="tariff-provenance-suggestion" className="pl-6 text-[11px] text-slate-500 dark:text-zinc-400">
+                        Sugerida: <span className="font-mono">{review.suggestion.resolutionCode}</span> ({review.suggestion.reason}). Compruébala antes de aplicar.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="tariff-provenance" aria-describedby="tariff-provenance-period-help" checked={provenanceKind === 'distributor_table'} onChange={() => editReview(setProvenanceKind)('distributor_table')} />
+                      <span>Cuadro de la distribuidora sin resolución citada</span>
+                    </label>
+                    <div className="pl-6 flex flex-col gap-1">
+                      <label htmlFor="tariff-provenance-period" className="text-[11px] text-slate-500 dark:text-zinc-400">Vigencia (mes y año, obligatoria)</label>
+                      <input
+                        id="tariff-provenance-period"
+                        type="month"
+                        aria-describedby="tariff-provenance-period-help"
+                        value={provenancePeriod}
+                        disabled={provenanceKind !== 'distributor_table'}
+                        onChange={(event) => editReview(setProvenancePeriod)(event.target.value)}
+                        className="w-full sm:w-48 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] font-mono disabled:opacity-50"
+                      />
+                      <p id="tariff-provenance-period-help" className="text-[11px] text-slate-500 dark:text-zinc-400">
+                        Se guarda como «Cuadro de la distribuidora sin resolución citada (AAAA-MM)», vigente desde el día 1 de ese mes.
+                      </p>
+                    </div>
+                  </div>
+                </fieldset>
+              )}
+
+              {previewError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">{previewError}</div>
+              )}
+
+              {unsupportedRows.length > 0 && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200 flex flex-col gap-1" data-testid="tariff-scan-unsupported">
+                  <span className="font-semibold">Tarifa no soportada todavía por SolarSim: no se incorpora</span>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {unsupportedRows.map((row) => (
+                      <li key={tariffScanRowKey(row)}><span className="font-mono font-semibold">{tariffScanRowKey(row)}</span>{row.name !== row.code ? ` · ${row.name}` : ''}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">Solo las tarifas documentadas se actualizan. Las restantes conservan su fuente anterior; la fecha de inicio no garantiza vigencia actual.</div>
               {/* Tabs por Distribuidora */}
@@ -342,7 +469,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
               </div>
 
               {/* Tabla de Tarifas de la Distribuidora Seleccionada */}
-              {extractedMatrix.schedules[selectedDistributorTab] && (
+              {tableMatrix.schedules[selectedDistributorTab] && (
                 <div className="border border-slate-200/80 dark:border-[#27272a] rounded-2xl overflow-hidden bg-white dark:bg-[#121214]">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 dark:bg-[#1a1a1e] border-b border-slate-200 dark:border-[#27272a] text-slate-500 dark:text-zinc-400 font-semibold">
@@ -356,11 +483,16 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-[#222226] text-slate-700 dark:text-zinc-300">
-                      {Object.values(extractedMatrix.schedules[selectedDistributorTab].tariffs).map((tariff) => (
+                      {visibleTariffs.map((tariff) => {
+                        const scanned = rowStatus.get(`${selectedDistributorTab}/${tariff.code}`);
+                        return (
                         <tr key={tariff.code} className="hover:bg-slate-50/60 dark:hover:bg-[#1a1a1e]/60">
                           <td className="p-3 font-semibold">
                             <span className="font-mono text-emerald-600 dark:text-emerald-400">{tariff.code}</span>
                             <span className="block text-[10px] text-slate-400 font-normal">{tariff.name}</span>
+                            <span className="block text-[10px] font-normal mt-0.5">
+                              {!scanned ? 'No figura en el documento' : scanned.status === 'unchanged' ? 'Sin cambios de precio' : `Cambia: ${scanned.changedFields.map(tariffSourceFieldLabel).join(', ')}`}
+                            </span>
                           </td>
                           <td className="p-3 font-mono font-medium">
                             {tariff.currency === 'USD' ? (
@@ -378,6 +510,13 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                             {tariff.currency === 'USD'
                               ? `$${tariff.fixedChargeUSD?.toFixed(2) || '0.00'} USD`
                               : `RD$ ${tariff.fixedChargeDOP?.toFixed(2) || '0.00'}`}
+                            {tariff.fixedChargeTiersDOP && tariff.fixedChargeTiersDOP.length > 0 && (
+                              <ul className="mt-1 space-y-0.5 text-[10px] font-sans text-amber-600 dark:text-amber-400" aria-label="Cargo fijo por rango de consumo">
+                                {tariff.fixedChargeTiersDOP.map((tier) => (
+                                  <li key={tier.minKWh}>{tier.maxKWh === null ? `≥ ${tier.minKWh} kWh` : `${tier.minKWh}–${tier.maxKWh} kWh`}: RD$ {tier.chargeDOP.toFixed(2)}</li>
+                                ))}
+                              </ul>
+                            )}
                           </td>
                           <td className="p-3 font-mono">
                             {tariff.demandChargePerKWDOP
@@ -392,27 +531,47 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                             </span>
                             {tariff.source?.fields && !tariff.source.fields.includes('netMeteringRetentionPct') && <span className="block text-[10px] mt-1">Política conservada; no extraída</span>}
                           </td>
-                          <td className="p-3 text-xs">{getTariffSource(extractedMatrix, tariff).resolutionCode}<br />{getTariffSource(extractedMatrix, tariff).effectiveDate}{getTariffSource(extractedMatrix,tariff).fieldSources && <ul className="mt-2 space-y-1">{Object.entries(getTariffSource(extractedMatrix,tariff).fieldSources!).map(([field,source])=><li key={field}>{tariffSourceFieldLabel(field)}: {source.resolutionCode} · {source.effectiveDate}</li>)}</ul>}</td>
+                          <td className="p-3 text-xs">{describeTariffSource(getTariffSource(tableMatrix, tariff))}{getTariffSource(tableMatrix,tariff).fieldSources && <ul className="mt-2 space-y-1">{Object.entries(getTariffSource(tableMatrix,tariff).fieldSources!).map(([field,source])=><li key={field}>{tariffSourceFieldLabel(field)}: {describeTariffSource(source)}</li>)}</ul>}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
 
-              <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-zinc-300"><input type="checkbox" checked={reviewConfirmed} onChange={(event) => setReviewConfirmed(event.target.checked)} />He contrastado cargos, moneda, bloques y fechas con el documento.</label>
+              {tableMatrix.schedules[selectedDistributorTab] && (() => {
+                const charge = gridUseChargeReference(tableMatrix, selectedDistributorTab);
+                const fromDocument = charge.origin === 'matrix' && tableMatrix.schedules[selectedDistributorTab].gridUseChargeSource?.resolutionCode === tableMatrix.resolutionCode;
+                return (
+                  <div className="rounded-xl border border-slate-200 dark:border-[#27272a] p-3 text-xs text-slate-700 dark:text-zinc-300" data-testid="grid-use-charge-review">
+                    <span className="font-semibold">Cargo por uso de la red (SIE-007-2026) · {selectedDistributorTab}: </span>
+                    <span className="font-mono">RD$ {charge.dopPerKWh.toFixed(2)}/kWh inyectado</span>
+                    <span className="block text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                      {fromDocument
+                        ? `Leído del documento (${charge.resolutionCode === PENDING_TARIFF_SOURCE ? 'procedencia pendiente' : charge.resolutionCode}). Contrástalo con la tabla de la resolución.`
+                        : charge.origin === 'matrix'
+                          ? `No figura en este documento; se conserva el leído de ${charge.resolutionCode}.`
+                          : `No figura en este documento; se mantiene el de fábrica (${charge.resolutionCode}, ${charge.period}).`}
+                      {' '}Solo aplica a tarifas de un solo precio; cada propuesta guarda su propio cargo.
+                    </span>
+                  </div>
+                );
+              })()}
+
+              <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-zinc-300"><input type="checkbox" checked={reviewConfirmed} disabled={!extractedMatrix} onChange={(event) => setReviewConfirmed(event.target.checked)} />He contrastado cargos, rangos de cargo fijo, cargo por uso de la red, moneda, bloques, fechas y procedencia con el documento.</label>
               {/* Botones de Aplicación */}
               <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-[#27272a]">
                 <button
                   onClick={handleApplyLocal}
-                  disabled={isSyncingCloud || !reviewConfirmed}
+                  disabled={isSyncingCloud || !reviewConfirmed || !extractedMatrix}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-300 dark:border-[#3f3f46] text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-[#27272a] transition-all cursor-pointer"
                 >
                   Aplicar tarifas revisadas
                 </button>
                 <button
                   onClick={handleApplyAndSyncCloud}
-                  disabled={isSyncingCloud || !reviewConfirmed || !syncSettings.authToken || isReaderRole(syncSettings.currentUser?.role)}
+                  disabled={isSyncingCloud || !reviewConfirmed || !extractedMatrix || !syncSettings.authToken || isReaderRole(syncSettings.currentUser?.role)}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                 >
                   {isSyncingCloud ? (
@@ -429,7 +588,8 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                 </button>
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>

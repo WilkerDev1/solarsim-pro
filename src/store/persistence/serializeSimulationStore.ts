@@ -16,6 +16,7 @@ export function serializeSimulationStore(state: SimulationStore) {
     organizationFeaturePolicies: state.organizationFeaturePolicies,
     geminiApiKey: state.geminiApiKey,
     geminiModel: state.geminiModel,
+    geminiModelChosenByUser: state.geminiModelChosenByUser,
     syncSettings: state.syncSettings,
     equipmentCatalog: state.equipmentCatalog,
     deletedEquipmentIds: state.deletedEquipmentIds,

@@ -1,3 +1,4 @@
+import { supplyPresentation, supplySummaryText } from '../../../shared/offGridSupply';
 import {
   ProposalGroupControls,
   useProposalLinkDrop,
@@ -20,6 +21,7 @@ import { ProjectActionsMenu } from "./ProjectActionsMenu";
 import { ProposalClientBadge } from "../clients/ProposalClientLink";
 import { projectSyncLabel, projectType } from "./projectPresentation";
 import { ProposalDates } from "./ProposalDates";
+import { LegacyRegimeBadge } from "../../features/proposals/LegacyRegimeBadge";
 
 export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
   project,
@@ -76,6 +78,7 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
         </button>
       </h3>
       <ProposalClientBadge project={project} />
+      <LegacyRegimeBadge project={project} className="mt-2" />
       <p className="mt-2 flex items-start gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
         <MapPin className="h-3.5 w-3.5 shrink-0" />
         {project.client.province || project.client.location || "Sin ubicación"}
@@ -97,9 +100,9 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
           </dd>
         </div>
         <div>
-          <dt className="text-slate-500 dark:text-zinc-400">Distribuidora</dt>
+          <dt className="text-slate-500 dark:text-zinc-400">{supplyPresentation(project.rates).kind === 'utility' ? 'Distribuidora' : 'Suministro'}</dt>
           <dd className="mt-1.5 font-medium text-slate-800 dark:text-zinc-200">
-            {project.rates.distributor}
+            {supplySummaryText(project.rates, project.rates.distributor)}
           </dd>
         </div>
         <div>

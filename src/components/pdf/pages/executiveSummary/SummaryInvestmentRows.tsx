@@ -12,7 +12,7 @@ interface RowsProps {
 }
 
 export const SummaryInvestmentRows: React.FC<RowsProps> = ({ project, summary, activeTheme, model }) => {
-  const { grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffDOP, tariffCode, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD } = model;
+  const { grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffDOP, tariffCode, tariffPrice,supplyKind, showsGeneratorCost, generatorCostUSD, generatorCostDOP, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD } = model;
   return (
     <>
           {/* FILA 03: INVERSIÓN BRUTA Y PARÁMETROS COMERCIALES (DARK CARD) */}
@@ -45,13 +45,34 @@ export const SummaryInvestmentRows: React.FC<RowsProps> = ({ project, summary, a
                 <span className="text-[10px] text-slate-400 block"><EditableText k="executiveSummary.row3.exchangeRateNote" /></span>
               </div>
 
+              {showsGeneratorCost ? (
+                <div className="bg-slate-800/90 p-2.5 border border-slate-700" data-savings-reference="generator">
+                  <span className="text-[10.5px] text-slate-400 font-medium block"><EditableText k="executiveSummary.row3.generatorCost" /></span>
+                  <span className="text-sm font-black text-white font-mono block mt-0.5">
+                    {generatorCostDOP === null ? <EditableText k="executiveSummary.row3.generatorCostMissing" /> : `RD$ ${generatorCostDOP.toFixed(2)}`}
+                  </span>
+                  <span className="text-[10px] text-emerald-400 block font-semibold">
+                    {generatorCostUSD === null ? <EditableText k="executiveSummary.row3.generatorCostNote" /> : `US$ ${generatorCostUSD.toFixed(3)} / kWh`}
+                  </span>
+                </div>
+              ) : supplyKind === 'no_grid' ? (
+                <div className="bg-slate-800/90 p-2.5 border border-slate-700" data-savings-reference="no_grid">
+                  <span className="text-sm font-black text-white block mt-0.5"><EditableText k="executiveSummary.row3.noGrid" /></span>
+                  <span className="text-[10px] text-emerald-400 block font-semibold"><EditableText k="executiveSummary.row3.noGridNote" /></span>
+                </div>
+              ) : (
               <div className="bg-slate-800/90 p-2.5 border border-slate-700">
-                <span className="text-[10.5px] text-slate-400 font-medium block"><EditableText k="executiveSummary.row3.tariff" /></span>
+                <span className="text-[10.5px] text-slate-400 font-medium block">{tariffPrice.method === 'block_billing' ? <EditableText k="executiveSummary.row3.tariffAverage" /> : <EditableText k="executiveSummary.row3.tariff" />}</span>
                 <span className="text-sm font-black text-white font-mono block mt-0.5">
-                  RD$ {tariffDOP.toFixed(2)}
+                  {tariffPrice.method === 'block_billing'
+                    ? (tariffPrice.averageDOPPerKWh === undefined ? '—' : `RD$ ${tariffPrice.averageDOPPerKWh.toFixed(2)}`)
+                    : `RD$ ${tariffDOP.toFixed(2)}`}
                 </span>
-                <span className="text-[10px] text-emerald-400 block font-semibold">Tarifa {tariffCode}</span>
+                <span className="text-[10px] text-emerald-400 block font-semibold">
+                  Tarifa {tariffCode}{tariffPrice.method === 'block_billing' && <>{' • '}<EditableText k="executiveSummary.row3.tariffBlocksNote" /></>}
+                </span>
               </div>
+              )}
 
               <div className="bg-amber-500 p-2.5 border border-amber-400 flex flex-col justify-center text-slate-950">
                 <span className="text-[10.5px] text-amber-950 font-bold block"><EditableText k="executiveSummary.row3.gross" /></span>

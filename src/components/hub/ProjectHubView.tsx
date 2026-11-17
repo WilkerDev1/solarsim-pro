@@ -5,6 +5,7 @@ import { useSimulationStore } from "../../store/useSimulationStore";
 import { useShallow } from 'zustand/react/shallow';
 import { useEnergyCalculationMode } from "../../features/application/useApplicationFeatures";
 import { calculateProjectFinancialSummary } from "../../engine/financeEngine";
+import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis, supplyPresentation, supplySummaryText } from "../../../shared/offGridSupply";
 import { ProposalCommercialPanel } from "../../features/proposals/ProposalCommercialPanel";
 import { ProposalClientSection } from "../clients/ProposalClientLink";
 import {
@@ -16,6 +17,7 @@ import {
 } from "../../utils/equipmentSpecsUtils";
 import { projectSyncLabel } from "../dashboard/projectPresentation";
 import { ProposalDates } from "../dashboard/ProposalDates";
+import { LegacyRegimeBadge } from "../../features/proposals/LegacyRegimeBadge";
 import { ProposalHistory } from "./components/ProposalHistory";
 import { ProposalEnergyOverview } from "./components/ProposalEnergyOverview";
 import "./project-summary.css";
@@ -47,6 +49,11 @@ export const ProjectHubView = () => {
   const [section, setSection] = useState<"overview" | "finance" | "history">(
     "overview",
   );
+  // Sistema aislado sin comparación (o generador sin costo): estado explícito en vez de ceros.
+  const savingsBasis = resolveSavingsBasis(project?.rates);
+  const comparable = hasSavingsComparison(savingsBasis);
+  const noSavingsLabel = savingsBasis === "generator_missing_cost" ? "Falta costo del generador" : "Sin comparación";
+
   if (!project || !summary)
     return (
       <div className="project-summary summary-empty">
@@ -95,6 +102,8 @@ export const ProjectHubView = () => {
           <div className="summary-title">
             <h1>{project.client.name || "Propuesta sin nombre"}</h1>
             <span>{project.client.projectId || "Sin código"}</span>
+            {/* Envuelta: `.summary-title > span` pisaría el color y el tamaño de la insignia. */}
+            <div><LegacyRegimeBadge project={project} /></div>
           </div>
           <p>
             <MapPin size={14} />
@@ -149,14 +158,16 @@ export const ProjectHubView = () => {
         </div>
         <div>
           <span>Ahorro estimado · año 1</span>
-          <strong>
-            {money(summary.year1SavingsUSD)} <small>USD</small>
+          <strong data-savings-state={comparable ? undefined : savingsBasis} title={comparable ? undefined : noSavingsNote(savingsBasis)}>
+            {comparable ? <>{money(summary.year1SavingsUSD)} <small>USD</small></> : noSavingsLabel}
           </strong>
         </div>
         <div>
           <span>Retorno simple estimado</span>
           <strong>
-            {Number.isFinite(summary.paybackYears) && summary.paybackYears > 0
+            {!comparable
+              ? noSavingsLabel
+              : Number.isFinite(summary.paybackYears) && summary.paybackYears > 0
               ? `${summary.paybackYears.toFixed(1)} años`
               : "No alcanzado"}
           </strong>
@@ -241,9 +252,10 @@ export const ProjectHubView = () => {
                     ["Cliente", project.client.name],
                     ["Empresa", project.client.company || "No registrada"],
                     ["Provincia", project.client.province],
+                    // Aislado con generador o sin comparación: no se nombra la distribuidora ni su tarifa.
                     [
-                      "Distribuidora / tarifa",
-                      `${project.rates.distributor} · ${project.rates.tariffCode}`,
+                      supplyPresentation(project.rates).kind === "utility" ? "Distribuidora / tarifa" : "Suministro actual",
+                      supplySummaryText(project.rates, `${project.rates.distributor} · ${project.rates.tariffCode}`),
                     ],
                     [
                       "Autor de la propuesta",
@@ -308,7 +320,7 @@ export const ProjectHubView = () => {
                   <h2>Rentabilidad proyectada</h2>
                 </header>
                 <dl className="summary-facts">
-                  {[
+                  {(comparable ? [
                     ["TIR", `${summary.irrPct.toFixed(1)}%`],
                     ["VAN", `${money(summary.npvUSD)} USD`],
                     ["ROI a 25 años", `${summary.roi25YrPct.toFixed(1)}%`],
@@ -316,7 +328,9 @@ export const ProjectHubView = () => {
                       "Ahorro acumulado a 25 años",
                       `${money(summary.total25YearSavingsUSD)} USD`,
                     ],
-                  ].map(([label, value]) => (
+                  ] : [
+                    ["TIR, VAN y ROI", noSavingsLabel],
+                  ]).map(([label, value]) => (
                     <div key={label}>
                       <dt>{label}</dt>
                       <dd>{value}</dd>

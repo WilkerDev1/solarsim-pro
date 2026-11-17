@@ -4,11 +4,13 @@ import type { ExtractedInvoiceData } from '../types/aiInvoice';
 import type { GlobalTariffMatrix } from '../types/tariffs';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { resolveAITariffSelection } from './aiTariffContext';
-import { getReferenceEnergyRateUSD } from '../data/rdTariffs';
+import { getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTariffs';
+import { tariffMatrixKey } from '../../shared/tariffRules';
 import { resolveSystemLossesPct, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
 import { assumptionFields, resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
 import { DEFAULT_TARGET_MARGIN_PCT } from '../store/defaultSimulationSettings';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
+import { NEW_PROPOSAL_NET_METERING_REGIME, reconcileGridUseCharge } from '../../shared/netMetering';
 import { editEquipment, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { migrateLegacySpecs } from '../../shared/equipment';
 import { detachedCatalogIdentity, withoutInheritedPanelDegradation } from './equipmentGroups';
@@ -85,11 +87,45 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
     const fx=resolveAssumption('dopExchangeRate',data.dopExchangeRate,base.rates.usdExchangeRate,base.specs.dopExchangeRate);
     const tariff=resolveAITariffSelection(tariffMatrix,data.distributor,data.tariffCode);
     const reference=tariff?getReferenceEnergyRateUSD(tariffMatrix,data.distributor,tariff.code,data.averageMonthlyKWh,fx):undefined;
-    const energy=data.energyCostPerKWhDOP!==undefined?data.energyCostPerKWhDOP/fx:data.energyCostPerKWhUSD ?? reference;
-    const rates={...base.rates,usdExchangeRate:fx,targetCoveragePct:coverage,distributor:data.distributor,tariffCode:tariff?.code || data.tariffCode,
-      ...(energy!==undefined?{energyCostPerKWh:energy}:createNewProject?{energyCostPerKWh:0}:{}),
+    // Precio y procedencia (fase 3), regla única del borrador:
+    // - precio explícito (DOP de factura o USD) sin procedencia de referencia: manda y marca su procedencia real
+    //   (`invoice` para DOP, `manual` para USD, o la que traiga el borrador);
+    // - referencia (pedida, o sin precio en un borrador nuevo o con cambio de tarifa/distribuidora): el escalar es la
+    //   referencia de la matriz, coherente con la fila que se guarda (`billingTariff`);
+    // - sin precio sobre una propuesta existente con la misma tarifa (distribuidora y código normalizados): no se tocan
+    //   precio ni procedencia; con otra tarifa sin referencia en la matriz, el escalar queda como dato sin procedencia
+    //   ni fila (se valora con el escalar);
+    // - un precio explícito suelta la fila de referencia.
+    // Un borrador nuevo parte sin la procedencia, la fila ni el cargo de la plantilla.
+    const explicitDOP=data.energyRateSource==='reference'?undefined:data.energyCostPerKWhDOP;
+    const explicitUSD=data.energyRateSource==='reference'?undefined:data.energyCostPerKWhUSD;
+    const distributorKey=(value:unknown)=>typeof value==='string'?value.trim().toUpperCase():'';
+    const draftDistributor=distributorKey(data.distributor);
+    const sameTariff=!createNewProject&&draftDistributor===distributorKey(base.rates.distributor)
+      &&(tariff?.code ?? tariffMatrixKey(draftDistributor,data.tariffCode))===tariffMatrixKey(draftDistributor,base.rates.tariffCode);
+    let pricing:Partial<ProjectSimulation['rates']>={};
+    if(explicitDOP!==undefined||explicitUSD!==undefined){
+      pricing={energyCostPerKWh:explicitDOP!==undefined?explicitDOP/fx:explicitUSD,energyRateSource:data.energyRateSource==='manual'||data.energyRateSource==='invoice'?data.energyRateSource:explicitDOP!==undefined?'invoice':'manual',billingTariff:undefined};
+    } else if(data.energyRateSource==='reference'||!sameTariff){
+      // Sin fila en la matriz local, el precio de referencia que calculó el borrador (su contexto de tarifas).
+      const price=reference ?? (data.energyCostPerKWhDOP!==undefined?data.energyCostPerKWhDOP/fx:data.energyCostPerKWhUSD);
+      pricing=price!==undefined
+        ?{energyCostPerKWh:price,energyRateSource:'reference',billingTariff:reference!==undefined&&tariff?referenceBillingTariff(tariffMatrix,data.distributor,tariff.code):undefined}
+        :createNewProject?{energyCostPerKWh:0}:!sameTariff?{energyRateSource:undefined,billingTariff:undefined}:{};
+    }
+    // Base única: un borrador nuevo parte de la plantilla sin procedencia, fila ni cargo por uso de la red.
+    const {energyRateSource:_templateSource,billingTariff:_templateTariff,gridUseChargeDOPPerKWh:_templateCharge,...templateRates}=base.rates;
+    const startRates=createNewProject?templateRates as typeof base.rates:base.rates;
+    const draftRates={...startRates,usdExchangeRate:fx,targetCoveragePct:coverage,distributor:data.distributor,tariffCode:tariff?.code || data.tariffCode,
+      ...pricing,
       ...(tariff?{gridExportFeePct:tariff.netMeteringRetentionPct}:{}),
+      // Régimen de medición neta: el borrador nuevo nace en SIE-007-2026 salvo que indique otro; sobre una propuesta
+      // existente solo cambia si el borrador lo indica explícitamente.
+      ...(data.netMeteringRegime?{netMeteringRegime:data.netMeteringRegime}:createNewProject?{netMeteringRegime:NEW_PROPOSAL_NET_METERING_REGIME}:{}),
     };
+    // Cargo por uso de la red: la misma regla que la edición (cargo explícito, cambio de distribuidora, siembra en SIE-007).
+    // Un borrador nuevo no hereda el cargo de la plantilla base: parte sin él.
+    const rates=reconcileGridUseCharge(startRates,draftRates,{distributor:data.distributor,gridUseChargeDOPPerKWh:data.gridUseChargeDOPPerKWh});
   return {...base,specs:enforceAutomatedPricing(specs),rates,client:{...base.client,province},monthlyConsumption:[...data.monthlyConsumptionKWh],financials:{...base.financials,...(data.commercial?.pricePerWattUSD!==undefined?{pricePerWattUSD:data.commercial.pricePerWattUSD}:{}),...(data.commercial?.customItems!==undefined?{customItems:structuredClone(data.commercial.customItems)}:{}),...(data.commercial?.customDiscounts!==undefined?{customDiscounts:structuredClone(data.commercial.customDiscounts)}:{})}};
 }
 

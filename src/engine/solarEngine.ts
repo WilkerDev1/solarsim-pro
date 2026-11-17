@@ -4,6 +4,33 @@ import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
 import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
 import { batteryBank, readEquipment } from '../../shared/equipment';
+import { exportsToGrid, isGridConnectionMode, type GridConnectionMode } from '../../shared/gridConnection';
+import { calculateBillingYear, calculateMonthlyBill, type BillingTariff } from '../../shared/tariffBilling';
+
+/**
+ * Cargo por uso de la red del régimen SIE-007-2026 (`shared/netMetering.ts`): con él, la medición neta acredita el 100 %
+ * de lo inyectado y se descuenta `kWh inyectados × usdPerKWh` del ahorro. Sin él, el régimen anterior (retención %).
+ */
+export interface GridUseChargeInput {
+  /** Cargo aplicado en USD por kWh inyectado (0 en tarifas con potencia o con inyección cero). */
+  usdPerKWh: number;
+}
+
+/**
+ * Facturación por bloques del régimen SIE-007-2026 (`shared/tariffBilling.ts`): el ahorro de cada mes es la factura sin
+ * sistema menos la factura con sistema (bloques, cargo fijo, neteo con arrastre del crédito y cargo por uso de la red),
+ * y el crédito que sobra al cierre del año se liquida en diciembre. Solo cambia la valoración en dinero: la energía
+ * (autoconsumo, inyección) sale del mismo modelo.
+ */
+export interface BlockBillingInput {
+  tariff: BillingTariff;
+  /** RD$ por US$ con que se convierten las facturas. */
+  dopPerUSD: number;
+  /** Cargo por uso de la red que se cobra (RD$/kWh inyectado); 0 si no aplica. */
+  gridUseChargeDOPPerKWh: number;
+  /** Precio de liquidación del crédito anual sobrante (RD$/kWh). */
+  settlementDOPPerKWh: number;
+}
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -133,9 +160,17 @@ export function calculateMonthlySolarProduction(
   gridExportFeePct: number,
   customMonthlyHSP?: number[],
   tariffCode?: string,
-  isZeroExport?: boolean,
-  calculationMode: EnergyCalculationMode = 'legacy'
+  /** Tipo de conexión (`resolveGridConnection`); un booleano es el `isZeroExport` heredado (true = inyección cero). */
+  gridConnection?: GridConnectionMode | boolean,
+  calculationMode: EnergyCalculationMode = 'legacy',
+  gridUseCharge?: GridUseChargeInput,
+  blockBilling?: BlockBillingInput
 ): MonthlyEnergyResult[] {
+  // Misma lectura que resolveGridConnection: un valor desconocido no es inyección cero; `true` es el isZeroExport heredado.
+  const connection: GridConnectionMode = isGridConnectionMode(gridConnection) ? gridConnection : gridConnection === true ? 'zero_export' : 'grid_export';
+  // Inyección cero y sistema aislado no exportan: el excedente se recorta y no hay retención.
+  const isZeroExport = !exportsToGrid(connection);
+  const isOffGrid = connection === 'off_grid';
   const dcCapacityKWp = calculateTotalDCCapacityKWp(specs);
   const province = getProvinceHSP(provinceName);
 
@@ -145,10 +180,11 @@ export function calculateMonthlySolarProduction(
 
   const generationFactors=getMonthlySolarProductionFactors(provinceName,systemLossesPct,customMonthlyHSP);
 
-  // SIE-007-2026-REG / Net Metering Regulations:
-  // - Grid export fee / retention (~25%) applies to all exported energy across all tariffs (BTS1, BTS2, BTD, MTD1, MTD2, etc.).
-  // - Zero-Export systems (antivertido) do not inject to grid, resulting in 0 exported kWh and 0 export fees.
-  const effectiveGridExportFeePct = !isZeroExport ? resolveAssumption('gridExportFeePct', gridExportFeePct) : 0;
+  // Régimen anterior (`legacy_retention`): retención % (~25 %) de toda la energía exportada, en cualquier tarifa.
+  // Régimen SIE-007-2026 (`gridUseCharge`): sin retención; cargo por kWh inyectado (ver abajo).
+  // Inyección cero (antivertido): no se exporta, sin retención ni cargo.
+  const usdPerInjectedKWh = gridUseCharge && Number.isFinite(gridUseCharge.usdPerKWh) && gridUseCharge.usdPerKWh > 0 && !isZeroExport ? gridUseCharge.usdPerKWh : 0;
+  const effectiveGridExportFeePct = !isZeroExport && !gridUseCharge ? resolveAssumption('gridExportFeePct', gridExportFeePct) : 0;
 
   // BESS battery specifications
   const bank = batteryBank(readEquipment(specs));
@@ -222,8 +258,11 @@ export function calculateMonthlySolarProduction(
 
     // Monthly battery contribution to self-consumption
     // Disabled experimental parameters never influence the historical model.
+    const legacySelfConsumed = Math.min(consumption, Math.round(production * (specs.hasBattery ? 0.90 : 0.75) * 10) / 10);
+    // El factor clásico supone que la red absorbe el desfase día/noche. Sin red (aislado) no puede servirse más
+    // de lo que el balance físico permite (solar directo + ciclo de batería), así que se toma el menor de ambos.
     const solarSelfConsumed = calculationMode === 'legacy'
-      ? Math.min(consumption, Math.round(production * (specs.hasBattery ? 0.90 : 0.75) * 10) / 10)
+      ? (isOffGrid ? Math.min(legacySelfConsumed, physicalSelfConsumed) : legacySelfConsumed)
       : physicalSelfConsumed;
     const batteryContributionKWh = calculationMode === 'legacy' ? 0 : Math.round(bessDischargeDaily * days * 10) / 10;
 
@@ -249,10 +288,18 @@ export function calculateMonthlySolarProduction(
 
     // Energy savings = (Self consumed in-situ + net export credit recognized) * energy cost
     const effectiveSavedKWh = Math.round((solarSelfConsumed + netExportCreditKWh) * 10) / 10;
-    const savingsUSD = Math.round(effectiveSavedKWh * energyCostPerKWh * 100) / 100;
+    // SIE-007-2026: el cargo por uso de la red se descuenta del ahorro (kWh inyectados × cargo).
+    const gridUseChargeUSD = Math.round(gridExported * usdPerInjectedKWh * 100) / 100;
+    const savingsUSD = gridUseCharge
+      ? Math.round((Math.round(effectiveSavedKWh * energyCostPerKWh * 100) / 100 - gridUseChargeUSD) * 100) / 100
+      : Math.round(effectiveSavedKWh * energyCostPerKWh * 100) / 100;
 
+    // Sin acometida, el costo de referencia es el de la energía que el sistema evita (tarifa del proyecto) y el
+    // «saldo» es el valor de la energía no servida, que deberá cubrir un respaldo externo.
     const originalBillUSD = Math.round(consumption * energyCostPerKWh * 100) / 100;
     const netBillUSD = Math.max(0, Math.round((originalBillUSD - savingsUSD) * 100) / 100);
+    // Sistema aislado: lo que ni el sol ni la batería cubren no se importa de la red; es energía no servida.
+    const offGridFields = isOffGrid ? { unservedKWh: Math.max(0, Math.round((consumption - solarSelfConsumed) * 10) / 10) } : {};
 
     results.push({
       month: MONTH_NAMES[i],
@@ -270,8 +317,52 @@ export function calculateMonthlySolarProduction(
       savingsUSD,
       netBillUSD,
       originalBillUSD,
+      ...offGridFields,
+      ...(gridUseCharge ? { gridUseChargeUSD } : {}),
     });
   }
 
-  return results;
+  // Sistema aislado: sin factura de la distribuidora (se valora contra su alternativa de suministro).
+  return blockBilling && !isOffGrid ? withBlockBilling(results, blockBilling) : results;
+}
+
+const usd2 = (dop: number, dopPerUSD: number) => Math.round((dop / dopPerUSD) * 100) / 100;
+const kWh1 = (kWh: number) => Math.round(kWh * 10) / 10;
+
+/** Revalora el balance energético con las facturas por bloques (sin y con sistema) del año. */
+function withBlockBilling(results: MonthlyEnergyResult[], billing: BlockBillingInput): MonthlyEnergyResult[] {
+  // Tasa no válida: la por defecto compartida (ADR 0003), nunca 1:1.
+  const fx = resolveAssumption('dopExchangeRate', billing.dopPerUSD);
+  const year = calculateBillingYear(
+    billing.tariff,
+    // Sin redondeo: solo se limpia el ruido de coma flotante de la resta (los dos términos ya vienen a 0.1 kWh).
+    results.map((m) => ({ withdrawnKWh: Math.max(0, Math.round((m.consumptionKWh - m.solarSelfConsumedKWh) * 1e9) / 1e9), injectedKWh: m.gridExportedKWh })),
+    { gridUseChargeDOPPerKWh: billing.gridUseChargeDOPPerKWh, settlementDOPPerKWh: billing.settlementDOPPerKWh },
+  );
+  const settlementUSD = usd2(year.settlement.amountDOP, fx);
+  return results.map((m, i) => {
+    const withSystem = year.months[i];
+    const originalBillUSD = usd2(calculateMonthlyBill({ tariff: billing.tariff, withdrawnKWh: m.consumptionKWh }).totalDOP, fx);
+    const netBillUSD = usd2(withSystem.totalDOP, fx);
+    const isClosingMonth = i === results.length - 1;
+    const settlement = isClosingMonth ? { creditSettlementKWh: kWh1(year.settlement.creditKWh), creditSettlementUSD: settlementUSD } : {};
+    return {
+      ...m,
+      originalBillUSD,
+      netBillUSD,
+      savingsUSD: Math.round((originalBillUSD - netBillUSD + (isClosingMonth ? settlementUSD : 0)) * 100) / 100,
+      gridUseChargeUSD: usd2(withSystem.gridUseChargeDOP, fx),
+      // Se redondea solo al presentar (0.1 kWh); el cálculo y el arrastre van sin redondear.
+      tariffBill: {
+        withdrawnKWh: kWh1(withSystem.withdrawnKWh),
+        netBilledKWh: kWh1(withSystem.netKWh),
+        creditInKWh: kWh1(withSystem.creditInKWh),
+        creditAppliedKWh: kWh1(withSystem.creditAppliedKWh),
+        creditCarriedKWh: kWh1(withSystem.creditCarriedKWh),
+        energyChargeUSD: usd2(withSystem.energyChargeDOP, fx),
+        fixedChargeUSD: usd2(withSystem.fixedChargeDOP, fx),
+        ...settlement,
+      },
+    };
+  });
 }

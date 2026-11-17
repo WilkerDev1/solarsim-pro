@@ -10,6 +10,7 @@ import { executiveSummaryModel } from './executiveSummary/executiveSummaryModel'
 import { SummaryEquipmentRows } from './executiveSummary/SummaryEquipmentRows';
 import { SummaryInvestmentRows } from './executiveSummary/SummaryInvestmentRows';
 import { SummaryPaybackRow } from './executiveSummary/SummaryPaybackRow';
+import { SummaryEnergyRow } from './executiveSummary/SummaryEnergyRow';
 
 interface PDFExecutiveSummaryPageProps {
   project: ProjectSimulation;
@@ -60,7 +61,9 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
         <div className="space-y-4 flex-1 flex flex-col justify-center py-3">
           <SummaryEquipmentRows project={project} summary={summary} activeTheme={activeTheme} model={model} />
           <SummaryInvestmentRows project={project} summary={summary} activeTheme={activeTheme} model={model} />
-          <SummaryPaybackRow project={project} summary={summary} activeTheme={activeTheme} model={model} />
+          {model.hasComparison
+            ? <SummaryPaybackRow project={project} summary={summary} activeTheme={activeTheme} model={model} />
+            : <SummaryEnergyRow model={model} />}
         </div>
 
         {/* Nota Institucional Inferior */}

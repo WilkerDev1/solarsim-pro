@@ -5,12 +5,13 @@ import type { LegacyProjectSpecs } from '../../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../../data/defaultEquipmentCatalog';
 import { normalizeStoredTariffMatrix } from '../../utils/tariffExtraction';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../../data/rdTariffs';
+import { upgradeRetiredFactoryTariffMatrix } from '../../data/factoryTariffMatrixVersions';
 import { normalizeBrandName, inferBrandFromText } from '../../utils/equipmentBrandUtils';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
-import { normalizeFeatureSettings, featureScope, isFeatureSettings } from '../../../shared/applicationFeatures';
 import { migrateDefaultSimulationSettings } from '../defaultSimulationSettings';
 import { normalizeAgentPolicy } from '../slices/agentSlice';
 import { migrateLegacySpecs } from '../../../shared/equipment';
+import { migrateStoredGeminiModel } from '../slices/aiSlice';
 
 /** FNV-1a de 32 bits en hexadecimal: identifica una URL sin escribirla en el código. */
 export function serverUrlFingerprint(url: string): string {
@@ -196,6 +197,14 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
       }
     }
 
+    // Datos de fábrica, no del usuario: una matriz que es exactamente una de fábrica anterior (nadie la editó, escaneó
+    // ni descargó distinta) pasa a la vigente, aquí y en los espacios archivados de otras organizaciones. Cualquier otra
+    // se conserva tal cual; Ajustes → Tarifas avisa si hay un pliego de fábrica más nuevo. Ver docs/AI_TARIFF_CONTEXT.md.
+    state.tariffMatrix = upgradeRetiredFactoryTariffMatrix(state.tariffMatrix);
+    for (const workspace of Object.values(state.organizationWorkspaces || {})) {
+      if (workspace?.tariffMatrix) workspace.tariffMatrix = upgradeRetiredFactoryTariffMatrix(workspace.tariffMatrix);
+    }
+
     try {
       state.tariffMatrix = normalizeStoredTariffMatrix(state.tariffMatrix);
     } catch {
@@ -216,6 +225,7 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
     state.agentPolicy = normalizeAgentPolicy(state.agentPolicy);
     if (!Array.isArray(state.agentActivity)) state.agentActivity = [];
     state.pendingAgentActions = [];
+    Object.assign(state, migrateStoredGeminiModel(state.geminiModel, state.geminiModelChosenByUser));
     if (state.defaultSimulationSettings) state.defaultSimulationSettings = migrateDefaultSimulationSettings(state.defaultSimulationSettings);
     for (const workspace of Object.values(state.organizationWorkspaces || {})) {
       if (workspace?.defaultSimulationSettings) workspace.defaultSimulationSettings = migrateDefaultSimulationSettings(workspace.defaultSimulationSettings);

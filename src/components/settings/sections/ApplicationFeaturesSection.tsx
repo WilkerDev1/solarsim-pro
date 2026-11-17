@@ -46,7 +46,7 @@ export function ApplicationFeaturesSection() {
         <div className="max-w-2xl">
           <div className="flex flex-wrap items-center gap-2"><h4 id={`feature-title-${feature.id}`} className="text-sm font-semibold text-slate-900 dark:text-white">{feature.title}</h4><span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">{({ stable: 'Estable', beta: 'Beta', experimental: 'Experimental' })[feature.stage]}</span></div>
           <p id={`feature-description-${feature.id}`} className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-zinc-400">{feature.description}</p>
-          <p className="mt-3 text-xs text-slate-500 dark:text-zinc-400">Desactivada: cálculo clásico de autoconsumo (75% sin baterías, 90% con baterías), sin perfil diurno en los parámetros.</p>
+          <p className="mt-3 text-xs text-slate-500 dark:text-zinc-400">{feature.disabledNote}{feature.available ? '' : ' No disponible en esta versión.'}</p>
         </div>
         <button type="button" role="switch" aria-checked={settings[feature.id]} aria-labelledby={`feature-title-${feature.id}`} aria-describedby={`feature-description-${feature.id}`} disabled={!canEdit || !feature.available}
           onClick={() => {

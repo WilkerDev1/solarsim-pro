@@ -1,4 +1,7 @@
 import { DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_QUOTE_VALIDITY_DAYS } from '../assumptions.js';
+import type { GridConnectionMode } from '../gridConnection.js';
+import type { SupplyAlternative } from '../offGridSupply.js';
+import type { NetMeteringRegime } from '../netMetering.js';
 
 /**
  * Datos de la propuesta que necesitan los textos dinámicos (nombre del cliente, equipos, tarifa…).
@@ -23,7 +26,22 @@ export interface DocumentTextContext {
   distributor: string;
   tariffCode: string;
   isZeroExport: boolean;
+  /** Tipo de conexión; se lee con `resolveGridConnection(ctx)` (ausente = se deriva de `isZeroExport`). */
+  gridConnection?: GridConnectionMode;
+  /** Sistema aislado: alternativa de suministro (`resolveSavingsBasis(ctx)`; ausente = tarifa de distribuidora). */
+  supplyAlternative?: SupplyAlternative;
+  /** Costo por kWh del generador (USD) cuando la alternativa es `generator`. */
+  generatorCostPerKWh?: number;
   gridExportFeePct: number;
+  /**
+   * 'legacy': nota regulatoria tal como la mostraban los enlaces publicados antes de distinguir el tipo de
+   * tarifa (el visor la usa cuando el enlace no trae la nota publicada). Ausente: texto vigente.
+   */
+  regulatoryNoteEdition?: 'legacy';
+  /** Régimen de medición neta de la propuesta (`shared/netMetering.ts`). Ausente: el anterior (retención %). */
+  netMeteringRegime?: NetMeteringRegime;
+  /** Cargo por uso de la red de la propuesta (RD$/kWh inyectado), usado en el régimen `sie007_2026`. */
+  gridUseChargeDOPPerKWh?: number;
   hasBattery: boolean;
   /** Hay baterías con capacidad (> 0 kWh) en la propuesta. */
   hasBatteryStorage: boolean;

@@ -14,8 +14,14 @@
  *   usuario (`DefaultSimulationSettings`) solo siembran propuestas NUEVAS (`assumptionFields`).
  * - La resolución ocurre al leer; no hay migración de datos.
  *
- * TypeScript puro, sin dependencias (lo compilan el cliente, el servidor con NodeNext y el Worker).
+ * Régimen de medición neta y cargo por uso de la red: sus reglas viven en `shared/netMetering.ts`; aquí se exponen
+ * en los supuestos efectivos (un dato que falta resuelve al régimen anterior, `legacy_retention`). Igual el método de
+ * valoración del ahorro (factura por bloques o precio escalar) y el precio de liquidación anual (`shared/tariffBilling.ts`).
+ *
+ * TypeScript puro, sin dependencias fuera de `shared/` (lo compilan el cliente, el servidor con NodeNext y el Worker).
  */
+import { resolveNetMetering, type NetMeteringRegime } from './netMetering.js';
+import { resolveAnnualCreditSettlementDOPPerKWh, resolveEnergyValuationMethod, type EnergyValuationMethod } from './tariffBilling.js';
 
 // ── Valores por defecto ──
 /** Tasa RD$ por US$. */
@@ -121,6 +127,15 @@ export interface AssumptionsProjectInput {
     targetCoveragePct?: Maybe;
     gridExportFeePct?: Maybe;
     annualEnergyInflationPct?: Maybe;
+    distributor?: string | null;
+    tariffCode?: string | null;
+    isZeroExport?: boolean | null;
+    netMeteringRegime?: unknown;
+    gridUseChargeDOPPerKWh?: Maybe;
+    gridConnection?: unknown;
+    energyRateSource?: unknown;
+    billingTariff?: unknown;
+    annualCreditSettlementDOPPerKWh?: unknown;
   } | null;
   financials?: {
     discountRatePct?: Maybe;
@@ -145,6 +160,16 @@ export interface ResolvedAssumptions {
   saleMarginMultiplier: number;
   installationUsdPerKwp: number;
   co2FactorKgPerKWh: number;
+  /** Régimen de medición neta; sin dato, `legacy_retention` (lo guardado no cambia). */
+  netMeteringRegime: NetMeteringRegime;
+  /** Cargo por uso de la red guardado o de fábrica de la distribuidora (RD$/kWh inyectado). */
+  gridUseChargeDOPPerKWh: number;
+  /** Cargo que se cobra (RD$/kWh): 0 fuera de `sie007_2026`, en tarifas con potencia y con inyección cero. */
+  appliedGridUseChargeDOPPerKWh: number;
+  /** Cómo se valora el ahorro: factura por bloques (SIE-007, precio de referencia y fila guardada) o precio escalar. */
+  energyValuationMethod: EnergyValuationMethod;
+  /** Precio de liquidación del crédito anual sobrante (RD$/kWh); de fábrica 0 (no confirmado). */
+  annualCreditSettlementDOPPerKWh: number;
 }
 
 /**
@@ -170,6 +195,7 @@ export function resolveAnnualDegradation(specs: AssumptionsProjectInput['specs']
 /** Supuestos efectivos de una propuesta, guardada o nueva. Nunca lee los ajustes del usuario (regla de precedencia). */
 export function resolveAssumptions(project: AssumptionsProjectInput | null | undefined): ResolvedAssumptions {
   const { client, specs, rates, financials } = project || {};
+  const netMetering = resolveNetMetering(rates);
   return {
     // Cambio: el de los costos del proyecto; si falta, el de las tarifas; si falta, el default.
     dopExchangeRate: resolveAssumption('dopExchangeRate', specs?.dopExchangeRate, rates?.usdExchangeRate),
@@ -187,6 +213,11 @@ export function resolveAssumptions(project: AssumptionsProjectInput | null | und
     saleMarginMultiplier: resolveAssumption('saleMarginMultiplier', specs?.saleMarginMultiplier),
     installationUsdPerKwp: resolveAssumption('installationUsdPerKwp', specs?.installationUnitPriceUSD),
     co2FactorKgPerKWh: resolveAssumption('co2FactorKgPerKWh', financials?.co2FactorKgPerKWh),
+    netMeteringRegime: netMetering.regime,
+    gridUseChargeDOPPerKWh: netMetering.gridUseChargeDOPPerKWh,
+    appliedGridUseChargeDOPPerKWh: netMetering.appliedGridUseChargeDOPPerKWh,
+    energyValuationMethod: resolveEnergyValuationMethod(rates),
+    annualCreditSettlementDOPPerKWh: resolveAnnualCreditSettlementDOPPerKWh(rates),
   };
 }
 

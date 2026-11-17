@@ -51,6 +51,7 @@ flowchart LR
 | `shared/` | TypeScript puro que comparten la aplicación, la API y el Worker: equipos (`equipment/`), supuestos (`assumptions.ts`), reglas fiscales, permisos y textos del documento. |
 | `server/` | API de sincronización con Hono y PostgreSQL 16 en Docker: JWT, organizaciones y roles, control de versiones (CAS), migraciones y versión mínima de cliente. |
 | `workers/share-viewer/` | Cloudflare Worker que publica copias inmutables de las propuestas web. |
+| `mcp-remote/` | Servidor MCP remoto (opcional) para ChatGPT, Claude.ai y agentes en la nube, sobre la API ([docs/MCP_REMOTE.md](docs/MCP_REMOTE.md)). |
 | `docs/` | Especificaciones, procedimientos y decisiones de arquitectura (`docs/adr/`). |
 | `scripts/` | Pruebas, releases y QA (ensayo de restauración, compatibilidad de despliegue). |
 

@@ -50,8 +50,24 @@ assert.equal(proposal.monthlyConsumption.length, 12);
 assert.equal(store.getState().activeView, 'dashboard', 'agents do not navigate the user away');
 assert.equal(created.cards?.[0].type, 'proposal');
 assert.deepEqual((created.data as { warnings: string[] }).warnings, [], 'priced equipment: no warnings');
+// Régimen de medición neta: la propuesta nueva nace en SIE-007-2026 con el cargo de fábrica de su distribuidora.
+assert.equal(proposal.rates.netMeteringRegime, 'sie007_2026');
+assert.equal(proposal.rates.gridUseChargeDOPPerKWh, 4.02);
 assert.equal(store.getState().undoAgentActivity(created.activityId).success, true);
 assert.equal(store.getState().projects.find((p) => p.id === proposalId)?.isDeleted, true, 'undoing a creation moves it to the trash');
+
+// 2a. Régimen explícito: el anterior sin cargo, o SIE-007 con un cargo propio.
+for (const [args, regime, charge] of [
+  [{ netMeteringRegime: 'legacy_retention' }, 'legacy_retention', undefined],
+  [{ netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.5 }, 'sie007_2026', 3.5],
+] as const) {
+  const result = await executeAgentTool({ name: 'create_proposal', args: { clientName: `Régimen ${regime}`, distributor: 'EDESUR', tariffCode: 'BTS1', averageMonthlyKWh: 500,
+    panels: [{ catalogItemId: panel.id, count: 8 }], inverters: [{ catalogItemId: inverter.id, count: 1 }], ...args } }, ctx());
+  assert(result.status === 'applied', JSON.stringify(result));
+  const made = store.getState().projects.find((p) => p.id === (result.data as { proposalId: string }).proposalId)!;
+  assert.equal(made.rates.netMeteringRegime, regime);
+  assert.equal(made.rates.gridUseChargeDOPPerKWh, charge);
+}
 
 // 2b. Equipment without supplier prices is reported in the result (seen in the Claude Code end-to-end test).
 const unpricedPanel = catalog.find((e) => e.type === 'panel' && e.id !== panel.id && !e.supplierPrices?.length)!;

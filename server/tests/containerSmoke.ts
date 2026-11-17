@@ -126,7 +126,10 @@ try {
     headers,
     body: JSON.stringify({
       baseVersion: policy.version,
-      settings: { selfConsumptionProjection: true },
+      settings: {
+        selfConsumptionProjection: true,
+        netMeteringRegimeSelector: true,
+      },
     }),
   });
   assert.equal(changed.status, 200);

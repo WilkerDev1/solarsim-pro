@@ -1,9 +1,10 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
-import { resolveAnnualDegradation, resolveAssumptions } from '../../shared/assumptions';
+import { resolveAnnualDegradation, resolveAssumptions, type ResolvedAssumptions } from '../../shared/assumptions';
 import { DEFAULT_PRICE_PER_WATT_USD, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
-import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
+import { calculateDCCapacityKWp, calculateMonthlySolarProduction, type BlockBillingInput, type GridUseChargeInput } from './solarEngine';
+import { proposalBillingTariff, type TariffBillingRatesInput } from '../../shared/tariffBilling';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -11,6 +12,8 @@ import {
   calculateTotalDCCapacityKWp,
 } from '../utils/equipmentSpecsUtils';
 import { batteryAutonomyHours, batteryBank, readEquipment } from '../../shared/equipment';
+import { resolveGridConnection, type GridConnectionMode } from '../../shared/gridConnection';
+import { hasSavingsComparison, resolveSavingsBasis, savingsValuationCostPerKWh } from '../../shared/offGridSupply';
 
 /**
  * Calculates internal cost matrix, sale price multiplier, and net profit matching Excel spreadsheet.
@@ -544,21 +547,33 @@ export function calculateFinancialSummary(
   const netInvestmentUSD = Math.round((contractPriceUSD - ley5707CreditUSD) * 100) / 100;
 
   // Monthly energy balance calculation dynamically based on location-specific solar radiation (HSP)
+  const gridConnection = resolveGridConnection(rates);
+  // Sistema aislado: el ahorro se valora contra la alternativa de suministro (tarifa, generador o sin comparación).
+  // Con red, o sin el campo, es exactamente la tarifa del proyecto (`shared/offGridSupply.ts`).
+  const savingsBasis = resolveSavingsBasis(rates);
+  const comparable = hasSavingsComparison(savingsBasis);
   const monthlyResults = calculateMonthlySolarProduction(
     provinceName,
     specs,
     monthlyConsumptionKWh,
-    rates.energyCostPerKWh,
+    savingsValuationCostPerKWh(rates),
     assumptions.gridExportFeePct,
     customMonthlyHSP,
     rates.tariffCode,
-    rates.isZeroExport,
-    calculationMode
+    gridConnection,
+    calculationMode,
+    engineGridUseCharge(assumptions, gridConnection),
+    engineBlockBilling(assumptions, rates)
   );
 
   const annualConsumptionKWh = monthlyResults.reduce((sum, m) => sum + m.consumptionKWh, 0);
   const annualProductionKWh = monthlyResults.reduce((sum, m) => sum + m.productionKWh, 0);
   const year1SavingsUSD = monthlyResults.reduce((sum, m) => sum + m.savingsUSD, 0);
+  // Facturación por bloques: el crédito que sobra al cierre del año (ya sumado en diciembre).
+  const closingBill = monthlyResults[monthlyResults.length - 1]?.tariffBill;
+  const settlementFields = closingBill
+    ? { annualCreditSettlementKWh: closingBill.creditSettlementKWh ?? 0, annualCreditSettlementUSD: closingBill.creditSettlementUSD ?? 0 }
+    : {};
   const energyCoveragePct = annualConsumptionKWh > 0
     ? Math.round((annualProductionKWh / annualConsumptionKWh) * 1000) / 10
     : 0;
@@ -584,7 +599,8 @@ export function calculateFinancialSummary(
   let paybackYears = 25.0;
   let paybackFound = false;
 
-  for (let year = 1; year <= assumptions.projectLifespanYears; year++) {
+  // Sin comparación (o generador sin costo) no hay gasto actual: ni ahorro, ni flujo, ni payback/TIR/VAN/ROI.
+  for (let year = 1; comparable && year <= assumptions.projectLifespanYears; year++) {
     const degradationFactor = Math.pow(1 - (annualDegradationPct / 100), year - 1);
     const inflationFactor = Math.pow(1 + (annualInflationPct / 100), year - 1);
 
@@ -633,13 +649,17 @@ export function calculateFinancialSummary(
   npvUSD = Math.round(npvUSD * 100) / 100;
 
   // IRR (TIR) Calculation
-  const irrPct = calculateIRR(initialOutflowUSD, annualNetCashFlows);
+  const irrPct = comparable ? calculateIRR(initialOutflowUSD, annualNetCashFlows) : 0;
 
   // 25-Year ROI % Calculation
   const totalNetReturns = annualNetCashFlows.reduce((sum, cf) => sum + cf, 0);
-  const roi25YrPct = initialOutflowUSD > 0
+  const roi25YrPct = comparable && initialOutflowUSD > 0
     ? Math.round(((totalNetReturns - initialOutflowUSD) / initialOutflowUSD) * 10000) / 100
     : 0;
+  if (!comparable) {
+    paybackYears = 0;
+    npvUSD = 0;
+  }
 
   // CO2 avoided calculation (tons/year)
   const co2AvoidedTonsPerYear = Math.round((annualProductionKWh * assumptions.co2FactorKgPerKWh / 1000) * 10) / 10;
@@ -671,12 +691,16 @@ export function calculateFinancialSummary(
     ley5707CreditUSD,
     netInvestmentUSD,
     year1SavingsUSD: Math.round(year1SavingsUSD * 100) / 100,
+    ...settlementFields,
     total25YearSavingsUSD,
     paybackYears,
     irrPct,
     npvUSD,
     roi25YrPct,
     co2AvoidedTonsPerYear,
+    ...(gridConnection === 'off_grid'
+      ? { annualUnservedKWh: Math.round(monthlyResults.reduce((sum, m) => sum + (m.unservedKWh ?? 0), 0) * 10) / 10 }
+      : {}),
     monthlyBreakdown: monthlyResults,
     cashFlow25Years,
     costMatrix,
@@ -692,6 +716,34 @@ export function calculateFinancialSummary(
     equipmentDiscountUSD,
     customDiscountsList: customDiscounts,
   };
+}
+
+/**
+ * Cargo por uso de la red que recibe el motor de energía: solo en el régimen SIE-007-2026, convertido a USD con la
+ * tasa efectiva de la propuesta. En el régimen anterior no hay cargo (rige la retención %).
+ */
+export function engineGridUseCharge(
+  assumptions: Pick<ResolvedAssumptions, 'netMeteringRegime' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate'>,
+  /** Sistema aislado: sin red no hay inyección, retención ni cargo; el régimen no cambia nada (cifras iguales). */
+  gridConnection?: GridConnectionMode,
+): GridUseChargeInput | undefined {
+  return assumptions.netMeteringRegime === 'sie007_2026' && gridConnection !== 'off_grid'
+    ? { usdPerKWh: assumptions.appliedGridUseChargeDOPPerKWh / assumptions.dopExchangeRate }
+    : undefined;
+}
+
+/**
+ * Facturación por bloques que recibe el motor de energía: solo cuando los supuestos efectivos la eligen
+ * (`energyValuationMethod`, regla de `shared/tariffBilling.ts`); si no, el ahorro se valora con el precio escalar.
+ */
+export function engineBlockBilling(
+  assumptions: Pick<ResolvedAssumptions, 'energyValuationMethod' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate' | 'annualCreditSettlementDOPPerKWh'>,
+  rates: TariffBillingRatesInput,
+): BlockBillingInput | undefined {
+  const tariff = assumptions.energyValuationMethod === 'block_billing' ? proposalBillingTariff(rates) : undefined;
+  return tariff
+    ? { tariff, dopPerUSD: assumptions.dopExchangeRate, gridUseChargeDOPPerKWh: assumptions.appliedGridUseChargeDOPPerKWh, settlementDOPPerKWh: assumptions.annualCreditSettlementDOPPerKWh }
+    : undefined;
 }
 
 /**

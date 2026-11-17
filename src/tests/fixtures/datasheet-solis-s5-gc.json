@@ -1,0 +1,37 @@
+{
+  "equipmentType": "inverter",
+  "brand": "Solis",
+  "modelSeries": "S5-GC50K/60K",
+  "documentTitle": "Solis S5-GC50K/60K",
+  "category": "Inversor de cadena trifásico",
+  "familySpecs": {
+    "maxEfficiencyPct": 98.7,
+    "voltageMPPT": "180-1000V",
+    "dimensions": "691 x 578 x 338 mm",
+    "weightKg": 53.7
+  },
+  "variants": [
+    {
+      "modelCode": "S5-GC50K",
+      "displayName": "Inversor Solis S5-GC50K (50.0Kw)",
+      "powerKW": 50,
+      "maxAcPowerKW": 55,
+      "mpptCount": 5,
+      "mpptMaxCurrentA": 32,
+      "dcRatedVoltageV": 600,
+      "maxPvPowerKW": null,
+      "maxPvPowerPct": null
+    },
+    {
+      "modelCode": "S5-GC60K",
+      "displayName": "Inversor Solis S5-GC60K (60.0Kw)",
+      "powerKW": 60,
+      "maxAcPowerKW": 66,
+      "mpptCount": 6,
+      "mpptMaxCurrentA": 32,
+      "dcRatedVoltageV": 600,
+      "maxPvPowerKW": null,
+      "maxPvPowerPct": null
+    }
+  ]
+}

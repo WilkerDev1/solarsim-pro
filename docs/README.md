@@ -5,7 +5,7 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 ## Arquitectura y contratos
 
 - [Arquitectura modular](ARCHITECTURE.md): límites, dependencias permitidas y puntos de entrada.
-- [Decisiones de arquitectura (ADR)](adr/0001-equipment-model-sin-espejo.md): EquipmentModel sin espejo heredado; [banco de baterías](adr/0002-banco-de-baterias.md): un solo módulo para energía útil y autonomía; [supuestos resueltos](adr/0003-supuestos-resueltos.md): un solo módulo para los supuestos efectivos de la propuesta; [edición de proyecto](adr/0004-edicion-de-proyecto.md): un solo módulo puro para aplicar una edición, y mirar nunca escribe. Vocabulario en el [glosario](../GLOSSARY.md).
+- [Decisiones de arquitectura (ADR)](adr/0001-equipment-model-sin-espejo.md): EquipmentModel sin espejo heredado; [banco de baterías](adr/0002-banco-de-baterias.md): un solo módulo para energía útil y autonomía; [supuestos resueltos](adr/0003-supuestos-resueltos.md): un solo módulo para los supuestos efectivos de la propuesta; [edición de proyecto](adr/0004-edicion-de-proyecto.md): un solo módulo puro para aplicar una edición, y mirar nunca escribe; [régimen de medición neta](adr/0005-regimen-medicion-neta-sie007.md): `legacy_retention` y `sie007_2026`, postura provisional. Vocabulario en el [glosario](../GLOSSARY.md).
 - [Funciones y modos de cálculo](APPLICATION_FEATURES.md): legacy predeterminado, proyección experimental, política de organización, supuestos y edición de propuestas.
 - [Motor financiero](FINANCIAL_ENGINE_SPECIFICATION.md): supuestos efectivos y sus defaults, matriz de costos, Ley 57-07, flujo de caja e indicadores.
 - [Balance energético físico](ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md): autoconsumo y despacho BESS del modelo opcional (energía útil del banco).
@@ -19,14 +19,16 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 - [Subsistema IA](AI_SCANNERS_SPECIFICATION.md) y [tarifas en el flujo IA](AI_TARIFF_CONTEXT.md).
 - [Agentes y herramientas de IA](AGENT_TOOLS.md): registro común, permisos, actividad y deshacer, precios automáticos.
 - [Servidor MCP local](MCP_LOCAL.md): conexión de Claude Code y Codex, token, guardas y modelo de amenazas.
+- [Servidor MCP remoto](MCP_REMOTE.md): servicio `mcp-remote` sobre la API para ChatGPT, Claude.ai y agentes en la nube; tokens personales, OAuth 2.1, herramientas, amenazas y despliegue en el CT dedicado.
 - [Visor de propuestas (Worker)](../workers/share-viewer/README.md).
 - Reglas de exportación PDF: [.agents/rules/html2canvas_pdf_export_rules.md](../.agents/rules/html2canvas_pdf_export_rules.md).
 
 ## Operaciones
 
-- [Verificación y QA](QA.md): pruebas automatizadas y guardas de arquitectura, ensayos de staging y matriz manual.
+- [Verificación y QA](QA.md): pruebas automatizadas y guardas de arquitectura, integración continua, ensayos de staging, matriz manual, proceso de revisión de PR y revisión con Claude (suscripción o API).
+- [Guía de revisión](../REVIEW.md): qué comprobar en cada PR (contratos, API, motor financiero, PDF, pruebas sin producción); la usan el revisor automático y la revisión manual.
 - [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md): ramas, gates, versión mínima de cliente, publicación firmada y actualizaciones.
-- [Infraestructura y despliegue](INFRASTRUCTURE_ARCHITECTURE.md): topología, despliegue protegido de la API, rollback, recuperación de respaldos y rotación de secretos.
+- [Infraestructura y despliegue](INFRASTRUCTURE_ARCHITECTURE.md): topología, despliegue protegido de la API, rollback, recuperación de respaldos, rotación de secretos, respaldo diario con aviso de caída y conmutación a naski.
 
 ## Producto y diseño
 

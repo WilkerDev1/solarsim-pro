@@ -2,7 +2,7 @@ import { executeAgentTool } from '../../../../features/agentTools/registry';
 import { assistantOwner } from '../../../../features/assistant/tools';
 import { createAIProposalBase, prepareProposalDraftProject, proposalReconciliationIssues } from '../../../../utils/proposalDraftProject';
 import { BENCHMARK_PROJECT } from '../../../../engine/referenceCase';
-import { calculateProjectFinancialSummary } from '../../../../engine/financeEngine';
+import { calculateProjectFinancialSummary, engineGridUseCharge } from '../../../../engine/financeEngine';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -15,7 +15,10 @@ import { normalizeProposalDraft, AIProposalContext } from '../../../../../shared
 import { resolveAssumption, resolveAssumptions } from '../../../../../shared/assumptions';
 import { buildAITariffContext } from '../../../../utils/aiTariffContext';
 import { useEnergyCalculationMode } from '../../../../features/application/useApplicationFeatures';
+import { draftDocumentTextCatalog } from '../../../../utils/draftDocumentTexts';
 import { aiWorkspaceKey, proposalFileType, readProposalFile, PROPOSAL_FILES_LIMIT } from '../workspace';
+import { blocksPreview, buildIssueModel } from '../reviewIssues';
+import { restoreComposerText } from '../../../../features/assistant/chatUi';
 
 export interface ProposalMessage { role: 'user' | 'assistant'; text: string; files?: string[]; kind?: 'error' }
 export function useAIInvoiceScanner() {
@@ -34,6 +37,8 @@ export function useAIInvoiceScanner() {
   const [useCurrentProject, setUseCurrentProject] = useState(false);
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [draftScope, setDraftScope] = useState('');
+  // Cuenta los borradores generados: lo usa la revisión para reiniciar el progreso de avisos.
+  const [draftGeneration, setDraftGeneration] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
   const controller = useRef<AbortController>();
@@ -70,7 +75,12 @@ export function useAIInvoiceScanner() {
   };
   useEffect(() => { reset(); }, [workspace]);
   useEffect(() => {
-    if (scope !== previousScope.current) { previousScope.current = scope; reset(); setErrorMsg('Cambió el destino. Prepara otro borrador antes de aplicar.'); }
+    if (scope !== previousScope.current) {
+      // El aviso solo tiene sentido si se descarta trabajo: sin borrador ni conversación, cambiar de propuesta o de sesión no pierde nada.
+      const hadWork = extractedData !== null || messages.length > 0;
+      previousScope.current = scope; reset();
+      if (hadWork) setErrorMsg('Cambió el destino. Prepara otro borrador antes de aplicar.');
+    }
   }, [scope]);
   useEffect(() => {
     const urls = files.map(f => f.url);
@@ -100,16 +110,21 @@ export function useAIInvoiceScanner() {
     setIsProcessing(true); setErrorMsg(null); setReviewConfirmed(false);
     const userMessage:ProposalMessage={role:'user',text:prompt.trim() || 'Analizar los documentos adjuntos',files:files.map(f=>f.name)};
     setMessages(previous=>[...previous,userMessage]);
+    // El texto enviado sale del compositor al enviar (ya vive en la conversación); solo vuelve si el envío falla antes de salir.
+    const sentPrompt = prompt;
+    let dispatched = false;
+    setPrompt('');
     const isCurrent = () => sequence.current === id && useSimulationStore.getState().isAIInvoiceModalOpen
       && aiWorkspaceKey(useSimulationStore.getState()) === capturedWorkspace
       && (!capturedTarget || useSimulationStore.getState().activeProjectId === capturedTarget);
     try {
       const attachments = await Promise.all(files.map(async f => ({ fileBase64: await readProposalFile(f.file), mimeType:f.type, fileName:f.name })));
       if (!isCurrent()) return;
+      dispatched = true;
       const payload = { apiKey:geminiApiKey, model:geminiModel, files:attachments,
         projectRequirementsText:prompt.trim() || 'Analiza los documentos adjuntos conservando los acuerdos del borrador.',
         equipmentCatalog, dopExchangeRate: extractedData?.dopExchangeRate ?? resolveAssumption('dopExchangeRate', target?.specs.dopExchangeRate, target?.rates.usdExchangeRate),
-        context: { ...context, reviewNotes:attentionIssues.map(i=>i.message),conversation:[...messages.filter(m=>!m.kind),userMessage].slice(-20).map(m=>({role:m.role,text:m.text.slice(-1800)})), currentDraft: validatedDraft || undefined, currentClient: target?.client },
+        context: { ...context, documentTexts: draftDocumentTextCatalog(useSimulationStore.getState(), target, context.province || ''), reviewNotes:attentionIssues.map(i=>i.message),conversation:[...messages.filter(m=>!m.kind),userMessage].slice(-20).map(m=>({role:m.role,text:m.text.slice(-1800)})), currentDraft: validatedDraft || undefined, currentClient: target?.client },
       };
       let result: ExtractedInvoiceData;
       if (window.electronAPI?.parseInvoiceWithAI) {
@@ -122,10 +137,9 @@ export function useAIInvoiceScanner() {
       } else result = await parseProposalWithAI(payload, controller.current.signal);
       if (!isCurrent()) return;
       if (result.province) result.province = getProvinceHSP(result.province).name;
-      if(result.responseKind!=='discussion'){setExtractedData(result);setDraftScope(scope);}
-      setPrompt('');
+      if(result.responseKind!=='discussion'){setExtractedData(result);setDraftScope(scope);setDraftGeneration(n=>n+1);}
       setMessages(previous => [...previous,{role:'assistant',text:result.assistantMessage || result.aiReasoningSummary || 'Preparé un borrador. Revisemos los datos antes de aplicarlo.'}]);
-    } catch (error) { if (isCurrent()) {const text=(error as Error).message || 'No se pudo analizar la entrada. Reintenta.';setErrorMsg(text);setMessages(previous=>[...previous,{role:'assistant',kind:'error',text}]);} }
+    } catch (error) { if (isCurrent()) {if(!dispatched)setPrompt(current=>restoreComposerText(current,sentPrompt));const text=(error as Error).message || 'No se pudo analizar la entrada. Reintenta.';setErrorMsg(text);setMessages(previous=>[...previous,{role:'assistant',kind:'error',text}]);} }
     finally { if (isCurrent()) setIsProcessing(false); }
   };
   const validatedDraft = useMemo(() => extractedData ? normalizeProposalDraft(extractedData, equipmentCatalog, context) : null, [extractedData, equipmentCatalog, context]);
@@ -133,20 +147,23 @@ export function useAIInvoiceScanner() {
     if(!validatedDraft || validatedDraft.monthlyConsumptionKWh.length!==12 || !validatedDraft.panels?.length || validatedDraft.panels.some(g=>!g.id||!Number.isFinite(g.powerW)||g.powerW<=0||!Number.isInteger(g.count)||g.count<=0))return null;
     const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
     const project=prepareProposalDraftProject(base,{...validatedDraft,commercial:{}},tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:equipmentCatalog});
-    return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,project.rates.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode).map(m=>m.productionKWh);
+    const assumptions=resolveAssumptions(project); // ADR 0003: retención y cargo efectivos
+    return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,assumptions.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode,engineGridUseCharge(assumptions)).map(m=>m.productionKWh);
   },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog]);
   const draftPreview=useMemo(()=>{
-    if(!validatedDraft || validatedDraft.validationIssues?.some(i=>i.severity==='error' && /extra|discount|customItems|customDiscounts|commercial|markup|margin|installation|pricing|surplus|price|count|spec|source_totals|exchange/.test(i.code)))return null;
+    if(!validatedDraft || blocksPreview(validatedDraft.validationIssues || []))return null;
     const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
     const project=prepareProposalDraftProject(base,validatedDraft,tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:equipmentCatalog});
     const financial=calculateProjectFinancialSummary({...project,monthlyConsumption:project.monthlyConsumption.length===12?project.monthlyConsumption:Array(12).fill(0)},mode);
     return {project,financial};
   },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog]);
-  const attentionIssues=[...(validatedDraft?.validationIssues || []),...(validatedDraft&&draftPreview?proposalReconciliationIssues(validatedDraft,draftPreview.financial):[])];
+  const attentionIssues=useMemo(()=>[...(validatedDraft?.validationIssues || []),...(validatedDraft&&draftPreview?proposalReconciliationIssues(validatedDraft,draftPreview.financial):[])],[validatedDraft,draftPreview]);
+  // Modelo único de avisos: lo consumen la revisión, el resumen del chat y el pie (reviewIssues.ts).
+  const issueModel=useMemo(()=>buildIssueModel(attentionIssues,validatedDraft || undefined),[attentionIssues,validatedDraft]);
   const reviewSnapshot = JSON.stringify(validatedDraft);
   useEffect(() => { setReviewConfirmed(false); }, [reviewSnapshot]);
-  const blockingIssues = validatedDraft?.validationIssues?.filter(issue => issue.severity === 'error') || [];
-  const canApply = !!validatedDraft && !blockingIssues.length && reviewConfirmed && draftScope === scope && !isProcessing;
+  const blockingIssues = issueModel.byTier.blocking;
+  const canApply = !!validatedDraft && !issueModel.blocksCreation && reviewConfirmed && draftScope === scope && !isProcessing;
   // Applies through the shared agent registry: same permissions, activity log, undo and pricing policy as every agent.
   const apply = async (createNew: boolean) => {
     const current = useSimulationStore.getState();
@@ -163,7 +180,7 @@ export function useAIInvoiceScanner() {
     isProcessing, cancel, reset, prompt, setPrompt, messages, errorMsg, processSmartProposal,
     extractedData:validatedDraft, draftPreview, draftEnergy, updateDraft, equipmentCatalog, tariffMatrix, context, useCurrentProject,
     setUseCurrentProject:(value:boolean)=>{cancel();setUseCurrentProject(value);setExtractedData(null);setReviewConfirmed(false);setMessages([]);},
-    reviewConfirmed, setReviewConfirmed, blockingIssues, attentionIssues, canApply,
+    draftGeneration, reviewConfirmed, setReviewConfirmed, blockingIssues, attentionIssues, issueModel, canApply,
     handleApplyAsNew:()=>apply(true), handleApplyToActive:()=>apply(false),
   };
 }

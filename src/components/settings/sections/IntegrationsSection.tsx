@@ -7,6 +7,7 @@ import {
   fetchAvailableGeminiModels,
   DEFAULT_POPULAR_MODELS,
 } from '../../../services/geminiInvoiceService';
+import { DEFAULT_GEMINI_MODEL } from '../../../../shared/geminiTransport';
 import { GeminiModelInfo } from '../../../types/aiInvoice';
 import {
   Sparkles,
@@ -40,7 +41,7 @@ export const IntegrationsSection: React.FC = () => {
   const [aiShowKey, setAiShowKey] = useState(false);
   const [aiTesting, setAiTesting] = useState(false);
   const [aiValidationResult, setAiValidationResult] = useState<{ tested: boolean; success: boolean; message: string } | null>(null);
-  const [aiSelectedModel, setAiSelectedModel] = useState<string>(geminiModel || 'gemini-3.5-flash-lite');
+  const [aiSelectedModel, setAiSelectedModel] = useState<string>(geminiModel || DEFAULT_GEMINI_MODEL);
   const [aiIsCustomMode, setAiIsCustomMode] = useState<boolean>(false);
   const [customModelInput, setCustomModelInput] = useState<string>('');
   const [availableModelsList, setAvailableModelsList] = useState<GeminiModelInfo[]>(DEFAULT_POPULAR_MODELS);
@@ -60,11 +61,12 @@ export const IntegrationsSection: React.FC = () => {
   const [syncFeedbackMessage, setSyncFeedbackMessage] = useState<string | null>(null);
 
   // Auto-detect available models from Gemini API
-  const handleAutoDetectModels = async (keyToUse?: string) => {
+  /** Lists the account's models with the key in the x-goog-api-key header; true when the key was accepted. */
+  const handleAutoDetectModels = async (keyToUse?: string): Promise<boolean> => {
     const key = (keyToUse || aiKeyInput).trim();
     if (!key || key.length < 10) {
       setAiValidationResult({ tested: true, success: false, message: 'Por favor ingresa una API Key de Gemini primero.' });
-      return;
+      return false;
     }
 
     setIsDetectingModels(true);
@@ -103,12 +105,14 @@ export const IntegrationsSection: React.FC = () => {
           success: true,
           message: `¡Se detectaron ${result.models.length} modelos disponibles en tu cuenta de Google AI Studio!`,
         });
+        return true;
       } else {
         setAiValidationResult({
           tested: true,
           success: false,
           message: result.error || 'No se pudieron consultar los modelos con esta clave.',
         });
+        return false;
       }
     } catch (err: any) {
       setAiValidationResult({
@@ -116,6 +120,7 @@ export const IntegrationsSection: React.FC = () => {
         success: false,
         message: err?.message || 'Error al conectar con Google AI Studio.',
       });
+      return false;
     } finally {
       setIsDetectingModels(false);
     }
@@ -157,22 +162,11 @@ export const IntegrationsSection: React.FC = () => {
     };
   }, [availableModelsList, aiSelectedModel]);
 
-  const popularShortcuts = useMemo(() => {
-    const presets = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-pro'];
-    const list: GeminiModelInfo[] = [];
-    presets.forEach((pId) => {
-      const found = availableModelsList.find((m) => m.id === pId || m.id.includes(pId));
-      if (found) {
-        list.push(found);
-      } else {
-        list.push({
-          id: pId,
-          name: pId === 'gemini-2.5-flash' ? 'Gemini 2.5 Flash' : pId === 'gemini-3.5-flash-lite' ? 'Gemini 3.5 Flash Lite' : 'Gemini 2.5 Pro',
-        });
-      }
-    });
-    return list;
-  }, [availableModelsList]);
+  // Atajos = presets documentados, con los metadatos que haya devuelto la cuenta.
+  const popularShortcuts = useMemo(
+    () => DEFAULT_POPULAR_MODELS.map((preset) => availableModelsList.find((m) => m.id === preset.id) || preset),
+    [availableModelsList]
+  );
 
   // Handlers
   const handleValidateAiKey = async () => {
@@ -186,14 +180,10 @@ export const IntegrationsSection: React.FC = () => {
     if (modelToUse) setGeminiModel(modelToUse);
 
     try {
-      await handleAutoDetectModels(aiKeyInput.trim());
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${aiKeyInput.trim()}`);
+      // The model listing already proves the key (sent in a header); a second request would put it in the URL.
+      const valid = await handleAutoDetectModels(aiKeyInput.trim());
       setAiTesting(false);
-      if (res.ok) {
-        setAiValidationResult({ tested: true, success: true, message: '¡API Key válida y modelos sincronizados con éxito!' });
-      } else {
-        setAiValidationResult({ tested: true, success: false, message: 'API Key inválida o sin cuota disponible.' });
-      }
+      if (valid) setAiValidationResult({ tested: true, success: true, message: '¡API Key válida y modelos sincronizados con éxito!' });
     } catch {
       setAiTesting(false);
       setAiValidationResult({ tested: true, success: false, message: 'Error al conectar con Google AI Studio.' });
@@ -417,7 +407,7 @@ export const IntegrationsSection: React.FC = () => {
                       setGeminiModel(val);
                       setAiSelectedModel(val);
                     }}
-                    placeholder="ej. gemini-2.5-flash o gemini-2.5-pro"
+                    placeholder={`ej. ${DEFAULT_GEMINI_MODEL}`}
                     className="flex-1 px-3.5 py-2.5 rounded-xl text-xs border border-purple-300 dark:border-purple-700 bg-white dark:bg-[#121214] text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:ring-2 focus:ring-purple-500"
                   />
                   <button

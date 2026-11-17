@@ -1,4 +1,6 @@
 import { GlobalTariffMatrix, UtilityDistributor, UtilityTariffDetails } from '../types/tariffs';
+import { tariffMatrixKey } from '../../shared/tariffRules';
+import { factoryGridUseCharge, isValidGridUseCharge } from '../../shared/netMetering';
 
 export const TARIFF_DISTRIBUTORS: UtilityDistributor[] = ['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'];
 
@@ -18,6 +20,37 @@ export function getTariffSource(matrix: GlobalTariffMatrix, tariff: UtilityTarif
   };
 }
 
+/** Periodo de vigencia de los pliegos conocidos: pasado el último día, el contexto IA pide confirmar tarifas. */
+const KNOWN_TARIFF_PERIODS: Record<string, { start: string; end: string; label: string }> = {
+  'SIE-176-2025-TF': { start: '2026-01-01', end: '2026-03-31', label: 'enero-marzo 2026' },
+  'SIE-121-2026-TF': { start: '2026-10-01', end: '2026-12-31', label: 'octubre-diciembre 2026' },
+  'SIE-147-2026-TF': { start: '2026-09-01', end: '2026-09-30', label: 'septiembre 2026 (CEPM)' },
+};
+
+/** Periodo conocido de un pliego (inicio y fin, AAAA-MM-DD), o `undefined` si no está en la lista. */
+export function knownTariffPeriod(resolutionCode: string): { start: string; end: string; label: string } | undefined {
+  return KNOWN_TARIFF_PERIODS[resolutionCode];
+}
+
+export interface GridUseChargeReference {
+  dopPerKWh: number;
+  resolutionCode: string;
+  period: string;
+  /** `matrix`: leído de una resolución con el escáner y guardado en la matriz; `factory`: el de fábrica (`shared/netMetering.ts`). */
+  origin: 'matrix' | 'factory';
+}
+
+/** Cargo por uso de la red (RD$/kWh inyectado) de una distribuidora: el de la matriz si trae uno válido; si no, el de fábrica. */
+export function gridUseChargeReference(matrix: GlobalTariffMatrix, distributor: UtilityDistributor): GridUseChargeReference {
+  const schedule = matrix.schedules[distributor];
+  const scanned = schedule?.gridUseChargeDOPPerKWh;
+  if (isValidGridUseCharge(scanned)) {
+    const source = schedule.gridUseChargeSource ?? { resolutionCode: matrix.resolutionCode, effectiveDate: matrix.effectiveDate };
+    return { dopPerKWh: scanned, resolutionCode: source.resolutionCode, period: `vigente desde ${source.effectiveDate}`, origin: 'matrix' };
+  }
+  return { ...factoryGridUseCharge(distributor), origin: 'factory' };
+}
+
 /** Compact, deterministic reference. These rows are application data, never a prompt to infer new rates. */
 export function buildAITariffContext(matrix: GlobalTariffMatrix, now = new Date()) {
   const warnings: string[] = [
@@ -28,8 +61,9 @@ export function buildAITariffContext(matrix: GlobalTariffMatrix, now = new Date(
     distributor,
     tariffs: Object.entries(matrix.schedules[distributor]?.tariffs || {}).filter(([key, tariff]) => key === tariff.code || !matrix.schedules[distributor].tariffs[tariff.code]).map(([, tariff]) => tariff).sort((a, b) => a.code.localeCompare(b.code)).map((tariff) => {
       const source = getTariffSource(matrix, tariff);
-      if (source.resolutionCode === 'SIE-176-2025-TF' && now.toISOString().slice(0, 10) > '2026-03-31' && distributor !== 'CEPM') {
-        const warning = 'El pliego base SIE-176-2025-TF corresponde a enero-marzo 2026; confirmar tarifas para el período solicitado.';
+      const period = KNOWN_TARIFF_PERIODS[source.resolutionCode];
+      if (period && now.toISOString().slice(0, 10) > period.end) {
+        const warning = `El pliego base ${source.resolutionCode} corresponde a ${period.label}; confirmar tarifas para el período solicitado.`;
         if (!warnings.includes(warning)) warnings.push(warning);
       }
       if (source.effectiveDate > now.toISOString().slice(0, 10)) {
@@ -48,23 +82,30 @@ export function buildAITariffContext(matrix: GlobalTariffMatrix, now = new Date(
         demandChargePerKW: tariff.currency === 'USD' ? tariff.demandChargePerKWUSD : tariff.demandChargePerKWDOP,
         peakEnergyRateDOP: tariff.peakEnergyRateDOP,
         offPeakEnergyRateDOP: tariff.offPeakEnergyRateDOP,
+        fixedChargeTiersDOP: tariff.fixedChargeTiersDOP?.map((tier) => ({ minKWh: tier.minKWh, maxKWh: tier.maxKWh, chargeDOP: tier.chargeDOP })),
         retentionPct: tariff.netMeteringRetentionPct,
         blocksDOP: tariff.blocks?.map((block) => ({ fromKWh: block.minKWh, toKWh: Number.isFinite(block.maxKWh) ? block.maxKWh : null, rateDOP: block.rateDOP })),
         source,
       };
     }),
   }));
-  return { resolutionCode: matrix.resolutionCode, effectiveDate: matrix.effectiveDate, schedules, warnings };
+  // Cargo por uso de la red SIE-007-2026 (RD$/kWh inyectado) con su procedencia: el que el escáner leyó de una resolución y
+  // guardó en la matriz de la organización y, si no hay, el de fábrica (`shared/netMetering.ts`). Solo tarifas de un solo precio.
+  const gridUseCharges = TARIFF_DISTRIBUTORS.map((distributor) => ({
+    distributor,
+    ...gridUseChargeReference(matrix, distributor),
+    appliesTo: 'tarifas de un solo precio (BTS-1, BTS-2, RBT-1); 0 con potencia o inyección cero',
+  }));
+  return { resolutionCode: matrix.resolutionCode, effectiveDate: matrix.effectiveDate, schedules, gridUseCharges, warnings };
 }
 
 /** Unknown distributor/code returns null: callers must request confirmation, never silently choose BTS2. */
 export function resolveAITariffSelection(matrix: GlobalTariffMatrix, distributor: string, code: string): UtilityTariffDetails | null {
   if (!TARIFF_DISTRIBUTORS.includes(distributor as UtilityDistributor)) return null;
-  const normalized = code.toUpperCase().trim();
-  const canonical = distributor === 'CEPM' ? ({ BTS1: 'RBT-1', BTS2: 'RBT-1', BTD: 'RBT-2', MTD1: 'RMT-1', MTD2: 'RMT-1' } as Record<string, string>)[normalized] || normalized : normalized;
-  return matrix.schedules[distributor as UtilityDistributor]?.tariffs[canonical] || null;
+  // BTS-1, «bts 1» y BTS1 son la misma fila; en CEPM los códigos de las EDE se resuelven a su alias.
+  return matrix.schedules[distributor as UtilityDistributor]?.tariffs[tariffMatrixKey(distributor, code)] || null;
 }
 
 export function tariffSourceFieldLabel(field: string): string {
-  return ({baseEnergyRateDOP:"Energía (RD$)",baseEnergyRateUSD:"Energía (USD)",fixedChargeDOP:"Cargo fijo (RD$)",fixedChargeUSD:"Cargo fijo (USD)",demandChargePerKWDOP:"Demanda (RD$)",demandChargePerKWUSD:"Demanda (USD)",blocks:"Bloques",peakEnergyRateDOP:"Energía punta",offPeakEnergyRateDOP:"Energía fuera de punta",netMeteringRetentionPct:"Retención"} as Record<string,string>)[field] || field;
+  return ({baseEnergyRateDOP:"Energía (RD$)",baseEnergyRateUSD:"Energía (USD)",fixedChargeDOP:"Cargo fijo (RD$)",fixedChargeUSD:"Cargo fijo (USD)",demandChargePerKWDOP:"Demanda (RD$)",demandChargePerKWUSD:"Demanda (USD)",blocks:"Bloques",peakEnergyRateDOP:"Energía punta",offPeakEnergyRateDOP:"Energía fuera de punta",netMeteringRetentionPct:"Retención",fixedChargeTiersDOP:"Cargo fijo por rango"} as Record<string,string>)[field] || field;
 }

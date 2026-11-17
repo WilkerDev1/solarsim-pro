@@ -15,7 +15,7 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 | GET /api/health | Consulta BD y devuelve 503 si no está disponible. Abierta: no exige versión de cliente. |
 | POST /api/auth/login, register, refresh | Credenciales o token según ruta; sin log de secretos. |
 | GET /api/auth/me | Usuario actual; estado/rol desde BD. |
-| GET/PATCH /api/organization/features | GET autenticado; PATCH ADMIN con `{settings,baseVersion}`. Política `{organizationId,version,settings}`. 409 si cambió. |
+| GET/PATCH /api/organization/features | GET autenticado; PATCH ADMIN con `{settings,baseVersion}`. Política `{organizationId,version,settings}` con `settings = {selfConsumptionProjection, netMeteringRegimeSelector}` (booleanos). GET completa la clave que falte con su valor por defecto y responde según `X-SolarSim-Client`: solo `selfConsumptionProjection` a clientes anteriores a `FEATURE_POLICY_V2_CLIENT_VERSION` (o sin encabezado válido), las dos a los demás; igual en `featurePolicy` de las autorizaciones de publicación. PATCH (rol ADMIN actual en base de datos) exige la forma completa (400 con una sola clave o claves desconocidas). 409 si cambió. |
 | POST /api/auth/share-authorization | Introspección JWT para publicación, rol escritor y política actual. |
 | GET/POST /api/organizations | Listado y creación de organizaciones; creador obtiene ADMIN. |
 | POST /api/auth/switch-organization | Cambio de tenant activo para el usuario actual. |
@@ -36,6 +36,14 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 | GET /api/clients | Clientes activos de la organización y `deletedIds`; también lectores. |
 | PUT /api/clients/:id | Escritores; `{...cliente, baseVersion}` CAS (0 = crear). 409 con `client` actual o `null` si está borrado. |
 | DELETE /api/clients/:id | `?baseVersion=N`; borrado lógico que quita `clientId` de las propuestas y sube su versión. |
+| GET /api/projects | `?query=&clientId=&limit=` (máx. 50): resumen de propuestas fuera de la papelera, sin el documento completo. También lectores. |
+| GET /api/projects/:id | Propuesta canónica del tenant; con sesión de escritorio incluye la papelera (`isDeleted`), con token de agente una propuesta en papelera responde 404. 404 si es ajena. |
+| PUT /api/projects/:id/client-link | Escritores; `{clientId: string \| null, baseVersion}` CAS. Solo cambia el enlace; el cliente debe existir y no estar borrado (404); 409 si la versión cambió o la propuesta está en la papelera. |
+| GET /api/agent-access/status | Sesión de escritorio: `{enabled, oauthEnabled, mcpUrl?}` del [MCP remoto](MCP_REMOTE.md). |
+| GET/POST/DELETE /api/agent-access/grants | Sesión de escritorio: accesos propios; POST `{name, scope:'read'\|'write', expiresInDays:30\|90\|365}` devuelve el token una sola vez (LECTOR solo `read`; 20 activos máx.). Revalida membresía, rol y `auth_version` dentro de la transacción (`lockCurrentMembership`). DELETE revoca (propio o, siendo ADMIN, de su organización); terminal e idempotente, sin baseVersion. 404 `agent_access_disabled` si está apagado. |
+| GET /api/agent-access/activity | Actividad de los propios agentes; ADMIN con `?scope=organization` ve la de toda la organización (200 últimas, retención 180 días). |
+| GET /api/agent-access/whoami | Solo tokens de agente: `{scope, role, userName, organizationName}`. |
+| /.well-known/oauth-authorization-server, POST /oauth/register, GET/POST /oauth/authorize, POST /oauth/token, POST /oauth/revoke | Servidor de autorización OAuth 2.1 del MCP remoto, solo con `MCP_OAUTH_ENABLED`. Fuera de `/api`: no exigen versión de cliente. |
 
 Push devuelve una confirmación por entrada. Proyectos: `{id,originalId?,status:'created'|'updated'|'forked',version,project}` o `{id,status:'conflict',reason,serverVersion,serverProject?}`; `reason:'invalid_client'` indica un `clientId` malformado, ajeno o borrado (los ids desconocidos se aceptan). Equipos: `{id,status:'created'|'updated',version,item}` o `{id,status:'conflict',reason,serverVersion?,serverItem?}`. Un HTTP200 con conflicto no marca datos como sincronizados. Cliente rechaza confirmaciones incompletas, repetidas o sin documento/versiones.
 
@@ -58,9 +66,13 @@ La migración aditiva 004 incorpora `project_folders` y `equipment_assets`. Las 
 
 La migración aditiva 005 incorpora `clients` (PK `(organization_id, id)`, versión, autoría y `deleted_at`) y los índices `clients(id)`, `clients(organization_id, tax_id)` y `projects(organization_id, data_json->>'clientId')`. El enlace vive en `data_json.clientId` de la propuesta. Es independiente de los datos impresos y la restauración de historial lo conserva. Contrato completo: [directorio de clientes](CLIENTS.md).
 
+## Tokens de agente (MCP remoto)
+
+Un `Authorization: Bearer ssm_…` no es un JWT: lo resuelve una compuerta previa a las rutas (`server/src/modules/agentAccess/routes.ts`) contra `agent_grants`/`agent_tokens` (migración aditiva 008, con `oauth_clients`, `oauth_codes` y `agent_activity`). Solo pasa por las rutas de `AGENT_ROUTES` (`shared/agentAccess.ts`), con el alcance del acceso (`read` actúa como LECTOR) y los permisos actuales de la cuenta; cada petición queda en `agent_activity`. Las rutas `/api/auth/*` nunca aceptan estos tokens. Con `MCP_REMOTE_ENABLED` ausente cualquier `ssm_` recibe 401 y las rutas de gestión 404. Detalle en [MCP_REMOTE.md](MCP_REMOTE.md).
+
 ## Versión mínima de cliente
 
-Cada cliente se identifica con `X-SolarSim-Client: <nombre>/<versión>` (por ejemplo `desktop/2.7.2`, `share-viewer/2.7.2`); la versión sale de `package.json` en la compilación. El servidor MCP local no llama a la API: sus herramientas pasan por el renderer, que se presenta como `desktop`. Un middleware (`server/src/clientVersionGate.ts`, registrado después de CORS) rechaza **toda ruta `/api/*` de datos** cuando el encabezado falta, está malformado (solo se acepta `nombre/semver`) o su versión es menor que `MIN_CLIENT_VERSION`:
+Cada cliente se identifica con `X-SolarSim-Client: <nombre>/<versión>` (por ejemplo `desktop/2.7.2`, `share-viewer/2.7.2`); la versión sale de `package.json` en la compilación. El servidor MCP local no llama a la API: sus herramientas pasan por el renderer, que se presenta como `desktop`. El servicio MCP remoto se presenta como `mcp-remote/<versión>` y pasa por la misma compuerta: si la API sube el mínimo por encima de su versión, sus herramientas responden `service_outdated` hasta desplegar la versión nueva del servicio (las rutas `/oauth/*` y `/.well-known/*` están fuera de `/api` y no la exigen). Un middleware (`server/src/clientVersionGate.ts`, registrado después de CORS) rechaza **toda ruta `/api/*` de datos** cuando el encabezado falta, está malformado (solo se acepta `nombre/semver`) o su versión es menor que `MIN_CLIENT_VERSION`:
 
 ```json
 HTTP 426 Upgrade Required

@@ -46,6 +46,8 @@ export interface AgentActivityEntry {
   targetId: string;
   title: string;
   changes: AgentChange[];
+  /** Propuesta afectada (cambios de textos del documento), con la marca de «no era la abierta» al aplicarlos. */
+  subject?: { proposalId: string; label: string; outsideOpen: boolean };
   status: 'applied' | 'undone';
   /**
    * `fields` (default): restore the touched sections if they still match the fingerprint taken right after the change;

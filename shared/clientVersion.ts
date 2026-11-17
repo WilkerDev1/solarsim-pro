@@ -11,6 +11,13 @@ export const CLIENT_HEADER = 'X-SolarSim-Client';
 export const CLIENT_OUTDATED = 'client_outdated';
 /** Mínimo por defecto cuando `MIN_CLIENT_VERSION` no está definida: la primera versión sin espejo heredado. */
 export const DEFAULT_MIN_CLIENT_VERSION = '2.7.1';
+/**
+ * Primera versión que entiende la política de funciones de dos claves (`netMeteringRegimeSelector`, régimen
+ * SIE-007-2026). La API devuelve la forma de una clave a los clientes anteriores (y sin encabezado válido) y las dos
+ * a esta versión o posteriores. Debe ser la versión de la release que incluye el cambio; cuando `MIN_CLIENT_VERSION`
+ * alcance este valor, la distinción deja de tener efecto.
+ */
+export const FEATURE_POLICY_V2_CLIENT_VERSION = '2.8.0';
 
 export interface ClientIdentity {
   name: string;

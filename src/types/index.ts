@@ -1,5 +1,9 @@
+import type { NetMeteringRegime } from '../../shared/netMetering';
+import type { BillingTariff, EnergyRateSource } from '../../shared/tariffBilling';
 import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
 import type { LegacyEquipmentFields } from '../../shared/equipment';
+import type { GridConnectionMode } from '../../shared/gridConnection';
+import type { SupplyAlternative } from '../../shared/offGridSupply';
 
 export interface ClientInfo {
   nic?: string;
@@ -131,8 +135,30 @@ export interface UtilityRates {
   currency: 'USD' | 'DOP';
   usdExchangeRate: number;      // RD$ per USD e.g. 60.0
   gridExportFeePct: number;     // SIE-007-2026-REG fee (e.g. 25%)
-  isZeroExport?: boolean;       // Inyección Cero / Antivertido (Zero-Export)
+  isZeroExport?: boolean;       // Inyección Cero / Antivertido (Zero-Export). Se mantiene coherente con `gridConnection` (true = no exporta)
+  /** Tipo de conexión con la red (`shared/gridConnection.ts`); se lee siempre con `resolveGridConnection`. Ausente = se deriva de `isZeroExport`. */
+  gridConnection?: GridConnectionMode;
+  /** Solo sistemas aislados: con qué se compara el ahorro (`shared/offGridSupply.ts`); se lee con `resolveSupplyAlternative`. Ausente = tarifa de distribuidora. */
+  supplyAlternative?: SupplyAlternative;
+  /** Costo por kWh del generador (USD/kWh) cuando `supplyAlternative` es `generator`; sin default (`resolveGeneratorCostPerKWh`). */
+  generatorCostPerKWh?: number;
   annualEnergyInflationPct: number; // e.g. 3.5%
+  /**
+   * Régimen de medición neta (`shared/netMetering.ts`). Ausente = `legacy_retention` (retención % de lo exportado):
+   * así quedan las propuestas guardadas antes de la fase 2. Las nuevas nacen en `sie007_2026`.
+   */
+  netMeteringRegime?: NetMeteringRegime;
+  /** Cargo por uso de la red SIE-007-2026 en RD$/kWh inyectado (editable). Ausente o no válido = el de fábrica de la distribuidora. */
+  gridUseChargeDOPPerKWh?: number;
+  /**
+   * De dónde salió `energyCostPerKWh` (`shared/tariffBilling.ts`): `reference` (tarifa de la matriz), `invoice` (factura)
+   * o `manual` (tecleado). Ausente = escalar, como antes de la fase 3. Lo escribe `applyProjectEdit` y la siembra.
+   */
+  energyRateSource?: EnergyRateSource;
+  /** Fila de la tarifa (bloques y cargo fijo) guardada al fijar el precio de referencia; con ella se factura en SIE-007-2026. */
+  billingTariff?: BillingTariff;
+  /** Precio de liquidación del crédito anual sobrante (RD$/kWh). Ausente = el de fábrica (no confirmado, 0). */
+  annualCreditSettlementDOPPerKWh?: number;
 }
 
 export interface CustomQuotationItem {
@@ -244,9 +270,33 @@ export interface MonthlyEnergyResult {
   retainedExportKWh: number;  // kWh retenidos por distribuidora (peaje SIE-007)
   effectiveSavedKWh: number;  // Total kWh ahorrados/reconocidos (solarSelfConsumedKWh + netExportCreditKWh)
   batteryContributionKWh?: number; // Aporte de baterías BESS al autoconsumo (kWh)
+  unservedKWh?: number; // Solo sistemas aislados: consumo que no cubren el sol ni la batería (energía no servida o respaldo externo)
   savingsUSD: number;
   netBillUSD: number;
   originalBillUSD: number;
+  /** Cargo por uso de la red SIE-007-2026 del mes (USD). Solo en el régimen `sie007_2026`; ausente en el anterior. */
+  gridUseChargeUSD?: number;
+  /**
+   * Desglose de la factura con sistema cuando el ahorro se valora por bloques (`energyValuationMethod: 'block_billing'`);
+   * ausente con el precio escalar. Entonces `originalBillUSD`/`netBillUSD` son las facturas sin y con sistema (con cargo
+   * fijo) y `savingsUSD = originalBillUSD − netBillUSD + creditSettlementUSD`.
+   */
+  tariffBill?: MonthlyTariffBill;
+}
+
+export interface MonthlyTariffBill {
+  /** Energía retirada de la red (kWh). */
+  withdrawnKWh: number;
+  /** Consumo neto facturado (kWh). */
+  netBilledKWh: number;
+  creditInKWh: number;
+  creditAppliedKWh: number;
+  creditCarriedKWh: number;
+  energyChargeUSD: number;
+  fixedChargeUSD: number;
+  /** Solo diciembre: remanente de crédito liquidado al cierre del año (kWh y USD). */
+  creditSettlementKWh?: number;
+  creditSettlementUSD?: number;
 }
 
 export interface CashFlowYear {
@@ -279,12 +329,17 @@ export interface FinancialSummaryResult {
   ley5707CreditUSD: number;
   netInvestmentUSD: number;
   year1SavingsUSD: number;
+  /** Solo con facturación por bloques: crédito que sobra al cierre del año y su liquidación (incluida en `year1SavingsUSD`). */
+  annualCreditSettlementKWh?: number;
+  annualCreditSettlementUSD?: number;
   total25YearSavingsUSD: number;
   paybackYears: number;
   irrPct: number;
   npvUSD: number;
   roi25YrPct: number;
   co2AvoidedTonsPerYear: number;
+  /** Solo sistemas aislados (`off_grid`): energía anual no servida (kWh). */
+  annualUnservedKWh?: number;
   monthlyBreakdown: MonthlyEnergyResult[];
   cashFlow25Years: CashFlowYear[];
   costMatrix: CostMatrixSummary;

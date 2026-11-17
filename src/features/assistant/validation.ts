@@ -1,4 +1,8 @@
+import { normalizeTariffCode } from '../../../shared/tariffRules';
+import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES, isValidGridUseCharge } from '../../../shared/netMetering';
 import type { AssistantEdit, AssistantSection } from './types';
+import { GRID_CONNECTION_MODES } from '../../../shared/gridConnection';
+import { GENERATOR_COST_RULE_MESSAGE, isValidGeneratorCost, SUPPLY_ALTERNATIVES } from '../../../shared/offGridSupply';
 // Explicit surface: no ids, roles, authorship, remote endpoints, assets or arbitrary store writes.
 const fields: Record<AssistantSection, string[]> = {
   client: [
@@ -66,7 +70,12 @@ const fields: Record<AssistantSection, string[]> = {
     'usdExchangeRate',
     'gridExportFeePct',
     'isZeroExport',
+    'gridConnection',
+    'supplyAlternative',
+    'generatorCostPerKWh',
     'annualEnergyInflationPct',
+    'netMeteringRegime',
+    'gridUseChargeDOPPerKWh',
   ],
   financials: [
     'customItems',
@@ -129,10 +138,13 @@ const booleanFields = new Set([
 const textFields = new Set([
   ...fields.client.filter((f) => f !== 'quoteValidityDays'),
   'pricingMode',
+  'gridConnection',
+  'supplyAlternative',
   'installationServicesDesc',
   'directPriceSurplusTarget',
   'loadProfilePreset',
   'currency',
+  'netMeteringRegime',
   'brand',
   'modelSeries',
   'displayName',
@@ -149,6 +161,9 @@ const enums: Record<string, string[]> = {
   directPriceSurplusTarget: ['margin', 'labor'],
   loadProfilePreset: ['residential', 'commercial', 'industrial', 'custom'],
   currency: ['USD', 'DOP'],
+  gridConnection: [...GRID_CONNECTION_MODES],
+  supplyAlternative: [...SUPPLY_ALTERNATIVES],
+  netMeteringRegime: [...NET_METERING_REGIMES],
 };
 const percentages = new Set([
   'systemLosses',
@@ -168,6 +183,27 @@ const percentages = new Set([
   'discountRatePct',
 ]);
 export const editableAssistantFields = fields;
+export interface AssistantEditIssue {
+  /** Posición del cambio en la lista recibida (desde 0). */
+  index: number;
+  /** `sección.campo` cuando el cambio lo declara. */
+  field?: string;
+  message: string;
+}
+/** Todos los cambios inválidos de un lote: nada se aplica si hay alguno (todo o nada). */
+export class AssistantEditsError extends Error {
+  constructor(readonly errors: AssistantEditIssue[], total: number) {
+    super(
+      total === 1 && errors.length === 1
+        ? errors[0].message
+        : `${errors.length} de ${total} cambios no son válidos; no se aplicó ninguno. Corrige todos en el mismo intento:\n${errors
+            .map((e) => `- Cambio ${e.index + 1}${e.field ? ` (${e.field})` : ''}: ${e.message}`)
+            .join('\n')}`
+    );
+    this.name = 'AssistantEditsError';
+  }
+}
+/** Valida cada cambio y, si alguno falla, lanza `AssistantEditsError` con todos los errores (sin aplicar ninguno). */
 export function validateAssistantEdits(
   input: unknown,
   kind: 'project' | 'equipment'
@@ -175,7 +211,29 @@ export function validateAssistantEdits(
   if (!Array.isArray(input) || !input.length || input.length > 24)
     throw new Error('El cambio debe contener entre 1 y 24 campos.');
   const keys = new Set<string>();
-  return input.map((raw) => {
+  const errors: AssistantEditIssue[] = [];
+  const edits: AssistantEdit[] = [];
+  input.forEach((raw, index) => {
+    try {
+      edits.push(validateEdit(raw, kind, keys));
+    } catch (error) {
+      const { section, field } = (raw && typeof raw === 'object' ? raw : {}) as Partial<AssistantEdit>;
+      errors.push({
+        index,
+        ...(typeof section === 'string' && typeof field === 'string' ? { field: `${section}.${field}` } : {}),
+        message: error instanceof Error ? error.message : 'Cambio inválido.',
+      });
+    }
+  });
+  if (errors.length) throw new AssistantEditsError(errors, input.length);
+  return edits;
+}
+function validateEdit(
+  raw: unknown,
+  kind: 'project' | 'equipment',
+  keys: Set<string>
+): AssistantEdit {
+  {
     if (!raw || typeof raw !== 'object') throw new Error('Cambio inválido.');
     const { section, field, value } = raw as AssistantEdit;
     if (
@@ -292,6 +350,10 @@ export function validateAssistantEdits(
         )
       )
         throw new Error('Indica los doce consumos mensuales válidos.');
+    } else if (field === 'generatorCostPerKWh') {
+      // Costo del generador (sistema aislado): mismo predicado que motor, edición y Worker; `null` lo borra.
+      if (value !== null && !isValidGeneratorCost(value))
+        throw new Error(`generatorCostPerKWh: ${GENERATOR_COST_RULE_MESSAGE}`);
     } else if (booleanFields.has(field)) {
       if (typeof value !== 'boolean')
         throw new Error(`${field} requiere sí/no.`);
@@ -306,7 +368,7 @@ export function validateAssistantEdits(
       )
         throw new Error(`${field} requiere texto válido.`);
       if (enums[field] && !enums[field].includes(value))
-        throw new Error(`Valor no permitido para ${field}.`);
+        throw new Error(`Valor no permitido para ${field}: usa ${enums[field].join(", ")}.`);
     } else {
       if (
         typeof value !== 'number' ||
@@ -345,9 +407,18 @@ export function validateAssistantEdits(
         value <= 0
       )
         throw new Error('La capacidad nominal debe ser mayor que cero.');
+      if (field === 'gridUseChargeDOPPerKWh' && !isValidGridUseCharge(value))
+        throw new Error(`El cargo por uso de la red debe estar entre 0 y ${MAX_GRID_USE_CHARGE_DOP_PER_KWH} RD$/kWh.`);
       if (field === 'saleMarginMultiplier' && value < 1)
         throw new Error('El factor de venta debe ser al menos 1.');
     }
+    // Código de tarifa en la forma de la matriz (BTS-1 → BTS1): mismo normalizador que la IA y el dock.
+    if (field === 'tariffCode') {
+      if (typeof value !== 'string') throw new Error('El código de tarifa no es válido.');
+      const code = normalizeTariffCode(value);
+      if (!code) throw new Error('El código de tarifa no es válido.');
+      return { section, field, value: code };
+    }
     return { section, field, value };
-  });
+  }
 }

@@ -1,9 +1,12 @@
-import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD } from '../../../../../data/rdTariffs';
+import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../../../../../data/rdTariffs';
+import { proposalBillingTariff } from '../../../../../../shared/tariffBilling';
+import { resolveNetMeteringRegime } from '../../../../../../shared/netMetering';
 import { getRecommendedLoadProfile } from '../../../../../engine/solarEngine';
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { mapTariffCodeOnDistributorChange, type UtilityDistributor } from '../../../../../types/tariffs';
 import { detectLoadProfilePreset, type LoadProfilePreset } from '../../logic/loadProfilePreview';
 import { resolveAssumption } from '../../../../../../shared/assumptions';
+import { exportsToGrid, resolveGridConnection, type GridConnectionFields } from '../../../../../../shared/gridConnection';
 import { DEFAULT_MONTHLY_CONSUMPTION_KWH, resolveDopRate } from '../../logic/dockDefaults';
 
 type TariffMatrix = Parameters<typeof getReferenceEnergyRateUSD>[0];
@@ -39,6 +42,31 @@ export function referenceRate(input: ReferenceInput, distributor: UtilityDistrib
   );
 }
 
+/**
+ * Precio de referencia con su procedencia y la fila de la tarifa (bloques y cargo fijo) de la matriz activa: con ellos la
+ * propuesta se factura por bloques en el régimen SIE-007-2026 (`shared/tariffBilling.ts`). Sin fila exacta, `billingTariff`
+ * queda vacío y se valora con el escalar.
+ */
+export function referenceRatesPatch(input: ReferenceInput, distributor: UtilityDistributor | string, tariffCode: string): Pick<UtilityRates, 'energyCostPerKWh' | 'energyRateSource' | 'billingTariff'> {
+  return {
+    energyCostPerKWh: referenceRate(input, distributor, tariffCode),
+    energyRateSource: 'reference',
+    billingTariff: referenceBillingTariff(input.matrix || DEFAULT_RD_TARIFF_MATRIX, distributor, tariffCode),
+  };
+}
+
+/**
+ * ¿Está aplicada la tarifa oficial? En SIE-007-2026 con red manda la procedencia (`reference` con su fila válida), que es
+ * lo que decide la factura por bloques: un precio tecleado que coincide por casualidad no cuenta, y la referencia sigue
+ * aplicada aunque cambien el consumo medio o la tasa. En el resto (régimen anterior, aislado), la igualdad numérica.
+ */
+export function isReferenceApplied(rates: Partial<UtilityRates>, reference: number): boolean {
+  if (resolveNetMeteringRegime(rates.netMeteringRegime) === 'sie007_2026' && resolveGridConnection(rates) !== 'off_grid') {
+    return rates.energyRateSource === 'reference' && proposalBillingTariff(rates) !== undefined;
+  }
+  return isMatchingReference(rates.energyCostPerKWh, reference);
+}
+
 export const isMatchingReference = (energyCostPerKWh: number | undefined, reference: number): boolean =>
   Math.abs((energyCostPerKWh || 0) - reference) < 0.001;
 
@@ -65,7 +93,7 @@ const shouldRecommendProfile = (ctx: ChangeContext) => ctx.canWriteSpecs && ctx.
 export function planDistributorChange(ctx: ChangeContext, newDistributor: UtilityDistributor): TariffChangePlan {
   const mappedCode = mapTariffCodeOnDistributorChange(currentDistributor(ctx.rates), newDistributor, currentTariffCode(ctx.rates));
   return {
-    rates: { distributor: newDistributor, tariffCode: mappedCode, energyCostPerKWh: referenceRate(ctx, newDistributor, mappedCode) },
+    rates: { distributor: newDistributor, tariffCode: mappedCode, ...referenceRatesPatch(ctx, newDistributor, mappedCode) },
     specs: shouldRecommendProfile(ctx) ? profileSpecs(mappedCode, ctx.avgMonthlyConsumption) : null,
   };
 }
@@ -73,14 +101,19 @@ export function planDistributorChange(ctx: ChangeContext, newDistributor: Utilit
 /** Al cambiar la tarifa: recalcula la referencia y el perfil recomendado (salvo perfil manual). */
 export function planTariffChange(ctx: ChangeContext, newCode: string): TariffChangePlan {
   return {
-    rates: { tariffCode: newCode, energyCostPerKWh: referenceRate(ctx, currentDistributor(ctx.rates), newCode) },
+    rates: { tariffCode: newCode, ...referenceRatesPatch(ctx, currentDistributor(ctx.rates), newCode) },
     specs: shouldRecommendProfile(ctx) ? profileSpecs(newCode, ctx.avgMonthlyConsumption) : null,
   };
 }
 
-/** Valor del cargo de exportación que muestra el campo: 0 con inyección cero. */
-export const exportFeeValue = (rates: { isZeroExport?: boolean; gridExportFeePct?: number }, effectiveFeePct?: number): number =>
-  rates.isZeroExport ? 0 : (effectiveFeePct ?? resolveAssumption('gridExportFeePct', rates.gridExportFeePct));
+/** «Aplicar tarifa oficial»: precio de referencia de la distribuidora y tarifa actuales, con su fila. */
+export function planApplyReference(ctx: ChangeContext): Partial<UtilityRates> {
+  return referenceRatesPatch(ctx, currentDistributor(ctx.rates), currentTariffCode(ctx.rates));
+}
+
+/** Valor del cargo de exportación que muestra el campo: 0 si el sistema no exporta (inyección cero o aislado). */
+export const exportFeeValue = (rates: GridConnectionFields & { gridExportFeePct?: number }, effectiveFeePct?: number): number =>
+  !exportsToGrid(resolveGridConnection(rates)) ? 0 : (effectiveFeePct ?? resolveAssumption('gridExportFeePct', rates.gridExportFeePct));
 
 /** Perfil de carga activo: el preset explícito manda (incluido «Manual»); solo sin preset se infiere del porcentaje (35/75/90). */
 export function activeLoadPreset(preset: string | undefined, daytimeRatio: number): LoadProfilePreset {

@@ -20,6 +20,9 @@ export interface NativeExecution {
   data?: unknown;
   cards?: AgentCard[];
   undo?: AgentActivityEntry['undo'];
+  /** Cambios tal como quedaron al aplicar (antes → después reales); sustituyen a los de la preparación en el registro. */
+  changes?: AgentChange[];
+  subject?: AgentActivityEntry['subject'];
 }
 
 /** A mutation prepared by a tool. `execute` revalidates everything because confirmation may happen minutes later. */
@@ -27,6 +30,8 @@ export interface NativePlan {
   title: string;
   changes: AgentChange[];
   targetType: 'project' | 'equipment' | 'client';
+  /** Texto de la tarjeta de confirmación cuando el genérico por tipo de destino no basta. */
+  impact?: string;
   execute(): NativeExecution;
 }
 

@@ -1,3 +1,5 @@
+import { newProposalNetMeteringFields } from '../../../shared/netMetering';
+import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../../data/rdTariffs';
 import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
@@ -46,6 +48,16 @@ function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | un
   specs = editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { powerW: defs?.defaultPanelPowerW || 620, brandModel: defs?.defaultPanelModel || referencePanelModel } });
   specs = editEquipment(specs, 'inverter', { type: 'update', index: 0, patch: { brandModel: defs?.defaultInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)', powerKW: defs?.defaultInverterPowerKW || 8.0, count: 1 } });
   return editEquipment(specs, 'battery', { type: 'update', index: 0, patch: { capacityKWh: defs?.defaultBatteryCapacityKWh || DEFAULT_BATTERY_CAPACITY_KWH, dodPct: defs?.defaultBatteryDOD || DEFAULT_BATTERY_DOD_PCT } });
+}
+
+/** Precio de referencia, procedencia y fila de facturación con que nace una propuesta nueva. */
+function newProposalReferenceRates(activeMatrix: Parameters<typeof getReferenceEnergyRateUSD>[0] | undefined, distributor: string, tariffCode: string, monthlyConsumption: readonly number[], dopPerUSD: number) {
+  // Matriz aún sin cargar o sin pliegos (`{}` o `schedules` vacío): la de fábrica, la misma que usa el dock como respaldo.
+  const matrix = activeMatrix?.schedules && Object.keys(activeMatrix.schedules).length > 0 ? activeMatrix : DEFAULT_RD_TARIFF_MATRIX;
+  const billingTariff = referenceBillingTariff(matrix, distributor, tariffCode);
+  if (!billingTariff) return {};
+  const average = monthlyConsumption.length ? monthlyConsumption.reduce((a, b) => a + b, 0) / monthlyConsumption.length : 0;
+  return { energyCostPerKWh: getReferenceEnergyRateUSD(matrix, distributor, tariffCode, average, dopPerUSD), energyRateSource: 'reference' as const, billingTariff };
 }
 
 export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
@@ -245,6 +257,11 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
         tariffCode,
         currency: defs?.currency || 'USD',
         annualEnergyInflationPct: assumptions.rates.annualEnergyInflationPct,
+        // Las propuestas nuevas nacen en el régimen SIE-007-2026 con el cargo de fábrica de su distribuidora.
+        ...newProposalNetMeteringFields(distributor),
+        // …y con el precio de referencia de su tarifa y la fila de la matriz activa: se facturan por bloques
+        // (`shared/tariffBilling.ts`) hasta que el usuario teclee otro precio.
+        ...newProposalReferenceRates(get().tariffMatrix, distributor, tariffCode, BENCHMARK_PROJECT.monthlyConsumption, assumptions.specs.dopExchangeRate),
       },
       financials: {
         applyLey5707: defs?.applyLey5707 !== undefined ? defs.applyLey5707 : true,

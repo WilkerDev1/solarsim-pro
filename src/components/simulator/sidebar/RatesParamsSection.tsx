@@ -1,6 +1,5 @@
 import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
+import { useEnergyCalculationMode, useNetMeteringRegimeSelector } from '../../../features/application/useApplicationFeatures';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../types';
 import { RatesFields } from '../params/sections/rates/RatesFields';
@@ -14,8 +13,11 @@ interface RatesParamsSectionProps {
 
 /** Cuerpo de «Tarifas y distribuidora»: conecta el store con `RatesFields`. */
 export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({ project, updateRates, updateSpecs }) => {
-  const projectionEnabled = useSelfConsumptionProjection();
-  const { tariffMatrix } = useSimulationStore(useShallow(state => ({ tariffMatrix: state.tariffMatrix })));
+  const calculationMode = useEnergyCalculationMode();
+  const projectionEnabled = calculationMode === 'self_consumption';
+  const tariffMatrix = useSimulationStore(state => state.tariffMatrix);
+  // Política de la organización (o local sin sesión): visible por defecto.
+  const showRegimeSelector = useNetMeteringRegimeSelector();
   return (
     <RatesFields
       project={project}
@@ -23,6 +25,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({ project,
       projectionEnabled={projectionEnabled}
       updateRates={updateRates}
       updateSpecs={updateSpecs}
+      showRegimeSelector={showRegimeSelector}
     />
   );
 };

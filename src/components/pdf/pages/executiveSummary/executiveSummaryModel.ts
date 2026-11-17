@@ -1,5 +1,8 @@
 import type { FinancialSummaryResult, ProjectSimulation } from '../../../../types';
 import { resolveAssumptions } from '../../../../../shared/assumptions';
+import { resolveGridConnection } from '../../../../../shared/gridConnection';
+import { tariffPricePresentation } from '../../../../../shared/tariffBilling';
+import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, supplyPresentation } from '../../../../../shared/offGridSupply';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -51,7 +54,9 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const inverters = getProjectInverters(project.specs);
   const totalInverterPowerKW = calculateTotalInverterPowerKW(project.specs);
   const invertersSummary = formatInvertersSummary(project.specs);
-  const isZeroExport = project.rates.isZeroExport || false;
+  const gridConnection = resolveGridConnection(project.rates);
+  const isZeroExport = gridConnection !== 'grid_export';
+  const isOffGrid = gridConnection === 'off_grid';
   const hasBattery = project.specs.hasBattery && calculateTotalBatteryCapacityKWh(project.specs) > 0;
   const batteries = getProjectBatteries(project.specs);
   const totalBatteryKWh = calculateTotalBatteryCapacityKWh(project.specs);
@@ -67,6 +72,8 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const tariffUSD = project.rates.energyCostPerKWh || 0.18;
   const tariffDOP = tariffUSD * exchangeRate;
   const tariffCode = project.rates.tariffCode || 'BTS2';
+  // Con facturación por bloques el precio de la energía es el medio de la factura, no el escalar (regla en shared/tariffBilling).
+  const tariffPrice = tariffPricePresentation(project.rates, summary.monthlyBreakdown.map((m) => m.consumptionKWh));
 
   // --- 4. Datos Ley 57-07 ---
   const isLeyEligible = project.financials.applyLey5707 !== false;
@@ -92,7 +99,20 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const freePct = Math.max(0, 100 - paybackPct);
   const freeYears = Math.max(0, Math.round(25 - paybackYearsRaw));
 
-  return { panels, primaryPanel, totalPanels, systemCapacityKWp, lossesPercent, performanceRatio, inverters, totalInverterPowerKW, invertersSummary, isZeroExport, hasBattery, batteries, totalBatteryKWh, batteriesSummary, grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffUSD, tariffDOP, tariffCode, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD, paybackYearsRaw, totalPaybackMonths, paybackYearsInt, paybackMonthsInt, paybackText, paybackPct, freePct, freeYears };
+  // Sistema aislado sin comparación de ahorro: la fila 6 presenta energía entregada, no servida y autonomía.
+  const savingsBasis = resolveSavingsBasis(project.rates);
+  const hasComparison = hasSavingsComparison(savingsBasis);
+  const annualServedKWh = Math.round(summary.monthlyBreakdown.reduce((sum, m) => sum + m.solarSelfConsumedKWh, 0));
+  const annualUnservedKWh = Math.round(summary.annualUnservedKWh ?? 0);
+  const autonomyHours = summary.batteryBackupAutonomyHours;
+  // Generador: la fila 3 muestra el costo de generación propia (la base del ahorro), no la tarifa de la distribuidora.
+  // Sin comparación: «Sin conexión a la red», sin distribuidora ni tarifa.
+  const supplyKind = supplyPresentation(project.rates).kind;
+  const showsGeneratorCost = supplyKind === 'generator';
+  const generatorCostUSD = resolveGeneratorCostPerKWh(project.rates);
+  const generatorCostDOP = generatorCostUSD === null ? null : generatorCostUSD * exchangeRate;
+
+  return { savingsBasis, hasComparison, supplyKind, showsGeneratorCost, generatorCostUSD, generatorCostDOP, annualServedKWh, annualUnservedKWh, autonomyHours, panels, primaryPanel, totalPanels, systemCapacityKWp, lossesPercent, performanceRatio, inverters, totalInverterPowerKW, invertersSummary, isZeroExport, isOffGrid, hasBattery, batteries, totalBatteryKWh, batteriesSummary, grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffUSD, tariffDOP, tariffCode, tariffPrice, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD, paybackYearsRaw, totalPaybackMonths, paybackYearsInt, paybackMonthsInt, paybackText, paybackPct, freePct, freeYears };
 }
 
 export type ExecutiveSummaryModel = ReturnType<typeof executiveSummaryModel>;

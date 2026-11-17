@@ -1,6 +1,6 @@
 import { orderProposalFamilies } from '../../features/proposals/proposalGroups';
 import { PROPOSAL_DECISIONS, commercialState } from '../../../shared/proposalCommercial';
-import { ProposalSalesSummary } from '../../features/proposals/ProposalSalesSummary';
+import { ProposalDecisionFilter, ProposalResultsLine, useSalesPerformance } from '../../features/proposals/ProposalSalesSummary';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -11,13 +11,10 @@ import {
   Folder,
   FolderPlus,
   X,
-  Sparkles,
   FileText,
   Zap,
-  Clock,
   ArrowDownUp,
   User,
-  Check,
   RotateCcw,
   EyeOff,
   LayoutGrid,
@@ -27,10 +24,12 @@ import { ProposalFamilyCards } from '../../features/proposals/ProposalFamilyCard
 import { ProjectDocumentList } from './ProjectDocumentList';
 import { FoldersResumeGrid } from './FoldersResumeGrid';
 import { CreateFolderModal } from './sidebar/CreateFolderModal';
-import { calculateTotalDCCapacityKWp, calculateTotalPanelCount } from '../../utils/equipmentSpecsUtils';
+import { calculateTotalDCCapacityKWp } from '../../utils/equipmentSpecsUtils';
 import { hiddenFolderIdSet, isProjectInFolderView } from '../../utils/folderVisibility';
+import { resolveGridConnection } from '../../../shared/gridConnection';
 
-export const DashboardView: React.FC = () => {
+/** `initialStatusFilter` solo fija la decisión comercial inicial (pruebas y fixtures); por defecto, todas. */
+export const DashboardView: React.FC<{ initialStatusFilter?: string }> = ({ initialStatusFilter = 'All' }) => {
   const {
     projects,
     searchQuery,
@@ -42,12 +41,10 @@ export const DashboardView: React.FC = () => {
     setActiveTeamMemberFilter,
     folders,
     syncSettings,
-    sidebarTheme,
     dashboardViewMode,
     setDashboardViewMode,
-  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, searchQuery: s.searchQuery, setSearchQuery: s.setSearchQuery, openNewProjectModal: s.openNewProjectModal, activeFolderId: s.activeFolderId, setActiveFolderId: s.setActiveFolderId, activeTeamMemberFilter: s.activeTeamMemberFilter, setActiveTeamMemberFilter: s.setActiveTeamMemberFilter, folders: s.folders, syncSettings: s.syncSettings, sidebarTheme: s.sidebarTheme, dashboardViewMode: s.dashboardViewMode, setDashboardViewMode: s.setDashboardViewMode })));
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, searchQuery: s.searchQuery, setSearchQuery: s.setSearchQuery, openNewProjectModal: s.openNewProjectModal, activeFolderId: s.activeFolderId, setActiveFolderId: s.setActiveFolderId, activeTeamMemberFilter: s.activeTeamMemberFilter, setActiveTeamMemberFilter: s.setActiveTeamMemberFilter, folders: s.folders, syncSettings: s.syncSettings, dashboardViewMode: s.dashboardViewMode, setDashboardViewMode: s.setDashboardViewMode })));
 
-  const isDark = sidebarTheme === 'dark';
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const filtersRef = useRef<HTMLDivElement>(null);
@@ -55,9 +52,9 @@ export const DashboardView: React.FC = () => {
   // Filter States
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'power_desc' | 'power_asc'>('newest');
   const [distributorFilter, setDistributorFilter] = useState<string>('All');
-  const [projectTypeFilter, setProjectTypeFilter] = useState<'All' | 'hybrid' | 'injection' | 'zero_export'>('All');
+  const [projectTypeFilter, setProjectTypeFilter] = useState<'All' | 'hybrid' | 'injection' | 'zero_export' | 'off_grid'>('All');
   const [memberFilter, setMemberFilter] = useState<string>('All');
-  const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
 
   // Close filter popover when clicking outside
   useEffect(() => {
@@ -88,12 +85,11 @@ export const DashboardView: React.FC = () => {
     return Array.from(memberSet);
   }, [projects, syncSettings.currentUser]);
 
-  // Count active filters (excluding defaults)
+  // Filtros activos dentro del popover «Filtros» (la decisión comercial tiene su propio selector en la barra)
   const activeFiltersCount =
     (distributorFilter !== 'All' ? 1 : 0) +
     (projectTypeFilter !== 'All' ? 1 : 0) +
     (memberFilter !== 'All' ? 1 : 0) +
-    (statusFilter !== 'All' ? 1 : 0) +
     (sortBy !== 'newest' ? 1 : 0);
 
   const resetAllFilters = () => {
@@ -149,9 +145,11 @@ export const DashboardView: React.FC = () => {
       if (projectTypeFilter === 'hybrid') {
         matchesType = !!project.specs.hasBattery;
       } else if (projectTypeFilter === 'zero_export') {
-        matchesType = !!project.rates.isZeroExport;
+        matchesType = resolveGridConnection(project.rates) === 'zero_export';
+      } else if (projectTypeFilter === 'off_grid') {
+        matchesType = resolveGridConnection(project.rates) === 'off_grid';
       } else if (projectTypeFilter === 'injection') {
-        matchesType = !project.specs.hasBattery && !project.rates.isZeroExport;
+        matchesType = !project.specs.hasBattery && resolveGridConnection(project.rates) === 'grid_export';
       }
 
       return matchesSearch && matchesFolder && matchesTeam && matchesDistributor && matchesType;
@@ -199,6 +197,8 @@ export const DashboardView: React.FC = () => {
     hiddenFolderIds,
   ]);
 
+  const { counts: commercialCounts, sellers } = useSalesPerformance(commercialPool);
+
   const activeFolder = activeFolderId ? folders.find((f) => f.id === activeFolderId) : null;
   const activeFolderName = activeFolder?.name || null;
 
@@ -237,9 +237,9 @@ export const DashboardView: React.FC = () => {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 md:flex-1 md:justify-end">
             {/* Buscador Integrado */}
-            <div className="relative w-full sm:w-72">
+            <div className="relative w-full sm:w-auto sm:min-w-48 sm:max-w-72 sm:flex-1">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                 <Search className="w-4 h-4" />
               </div>
@@ -247,7 +247,8 @@ export const DashboardView: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar cliente, código o provincia…"
+                placeholder="Buscar propuestas…"
+                title="Busca por cliente, empresa, código, cotización o provincia"
                 aria-label="Buscar propuestas"
                 className="placeholder:text-slate-500 dark:placeholder:text-zinc-400 w-full pl-10 pr-4 py-2.5 rounded-lg text-xs border border-slate-200/90 dark:border-[#272f3e] bg-white dark:bg-[#181d27] text-slate-900 dark:text-zinc-100 shadow-2xs focus:outline-hidden focus:border-emerald-500"
               />
@@ -261,6 +262,9 @@ export const DashboardView: React.FC = () => {
                 </button>
               )}
             </div>
+
+            {/* Decisión comercial: conteos sobre la vista actual, sin aplicar este mismo filtro */}
+            <ProposalDecisionFilter counts={commercialCounts} value={statusFilter} onChange={setStatusFilter} />
 
             {/* Botón Filters con Popover Desplegable */}
             <div className="relative" ref={filtersRef}>
@@ -367,6 +371,7 @@ export const DashboardView: React.FC = () => {
                         { id: 'hybrid', label: 'Híbrido (Batería)' },
                         { id: 'injection', label: 'Inyección a Red' },
                         { id: 'zero_export', label: 'Inyección Cero' },
+                        { id: 'off_grid', label: 'Aislado (modo isla)' },
                       ].map((type) => (
                         <button
                           key={type.id}
@@ -401,28 +406,6 @@ export const DashboardView: React.FC = () => {
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  {/* 5. Estado de la Propuesta */}
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-2">
-                      Estado de la Propuesta
-                    </label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {['All', ...Object.keys(PROPOSAL_DECISIONS)].map((st) => (
-                        <button
-                          key={st}
-                          onClick={() => setStatusFilter(st)}
-                          className={`px-2 py-1.5 rounded-xl text-[11px] font-semibold transition-all text-center truncate cursor-pointer ${
-                            statusFilter === st
-                              ? 'bg-emerald-600 text-white shadow-2xs'
-                              : 'bg-slate-50 dark:bg-[#1f2532] text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#252c3c]'
-                          }`}
-                        >
-                          {st === 'All' ? 'Todos' : PROPOSAL_DECISIONS[st as keyof typeof PROPOSAL_DECISIONS]}
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
                   {/* Footer del Popover */}
@@ -463,8 +446,11 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-zinc-800">
-          <p className="text-xs text-slate-600 dark:text-zinc-400" aria-live="polite">{filteredAndSortedProjects.length} {filteredAndSortedProjects.length === 1 ? 'propuesta' : 'propuestas'}{activeTeamMemberFilter ? ` · ${activeTeamMemberFilter}` : ''}</p>
+        <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-zinc-800">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+            <p className="text-xs text-slate-600 dark:text-zinc-400" aria-live="polite">{filteredAndSortedProjects.length} {filteredAndSortedProjects.length === 1 ? 'propuesta' : 'propuestas'}{activeTeamMemberFilter ? ` · ${activeTeamMemberFilter}` : ''}</p>
+            <ProposalResultsLine counts={commercialCounts} sellers={sellers} />
+          </div>
           <div role="group" aria-label="Vista de propuestas" className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
             {([{ mode: 'cards', label: 'Tarjetas', Icon: LayoutGrid }, { mode: 'list', label: 'Lista', Icon: List }] as const).map(({ mode, label, Icon }) => (
               <button key={mode} type="button" aria-pressed={dashboardViewMode === mode} onClick={() => setDashboardViewMode(mode)} className={`flex min-h-8 items-center gap-2 rounded-md px-3 text-xs font-medium transition-colors ${dashboardViewMode === mode ? 'bg-slate-100 text-slate-900 dark:bg-zinc-700 dark:text-white' : 'text-slate-600 hover:bg-slate-50 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}><Icon className="h-3.5 w-3.5" />{label}</button>
@@ -472,8 +458,7 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
 
-        <ProposalSalesSummary projects={commercialPool} value={statusFilter} onChange={setStatusFilter}/>
-        <p className="mt-4 text-xs leading-relaxed text-slate-600 dark:text-zinc-400">Para enlazar, mantén una propuesta sobre otra y suéltala al resaltarse. Clic derecho para organizar el grupo.</p>
+        <p className="-mt-2 text-xs leading-relaxed text-slate-500 dark:text-zinc-400">Para enlazar, mantén una propuesta sobre otra y suéltala al resaltarse. Clic derecho para organizar el grupo.</p>
 
         {/* 📌 Banner de Filtro Activo (si se seleccionó una carpeta, distribuidora, autor o estado) */}
         {(activeFolderName ||
@@ -517,6 +502,8 @@ export const DashboardView: React.FC = () => {
                     ? 'Híbrido'
                     : projectTypeFilter === 'zero_export'
                     ? 'Inyección Cero'
+                    : projectTypeFilter === 'off_grid'
+                    ? 'Aislado'
                     : 'Inyección'}
                 </span>
               )}
@@ -554,7 +541,7 @@ export const DashboardView: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {(activeFiltersCount > 0 || searchQuery || activeFolderId || activeTeamMemberFilter) && (
+              {(activeFiltersCount > 0 || statusFilter !== 'All' || searchQuery || activeFolderId || activeTeamMemberFilter) && (
                 <button
                   onClick={resetAllFilters}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#202634] transition-all cursor-pointer"
