@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import { MAIN_WINDOW_DEFAULT_SIZE, MAIN_WINDOW_MIN_SIZE } from './windowLayout';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -29,10 +30,11 @@ export function getMainWindow(): BrowserWindow | null {
 
 export function createMainWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 700,
+    width: MAIN_WINDOW_DEFAULT_SIZE.width,
+    height: MAIN_WINDOW_DEFAULT_SIZE.height,
+    // Cabe en media pantalla / un cuadrante: Snap de Windows y tiling de GNOME/KDE con sus atajos de teclado.
+    minWidth: MAIN_WINDOW_MIN_SIZE.width,
+    minHeight: MAIN_WINDOW_MIN_SIZE.height,
     title: 'SolarSim Pro - Simulador Fotovoltaico',
     icon: app.isPackaged
       ? path.join(process.resourcesPath, 'electsun-emblem-transparent.png')

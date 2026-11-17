@@ -114,13 +114,13 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
           {offGridUnservedNote(summary.annualUnservedKWh, summary.annualConsumptionKWh)}
         </p>
       )}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] [&>*]:min-w-0 [&>*]:[overflow-wrap:anywhere] gap-3 shrink-0">
         {/* Card 1: CAPACIDAD INSTALADA */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
             CAPACIDAD INSTALADA
           </span>
-          <div className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
             <span className="text-xs text-slate-500 font-semibold">kWp</span>
           </div>
@@ -134,7 +134,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
             GENERACIÓN ANUAL
           </span>
-          <div className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
             <span className="text-xs text-slate-500 font-semibold">kWh</span>
           </div>
@@ -148,7 +148,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
             CONSUMO ANUAL
           </span>
-          <div className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-xl font-bold text-slate-900">{summary.annualConsumptionKWh.toLocaleString()}</span>
             <span className="text-xs text-slate-500 font-semibold">kWh</span>
           </div>
@@ -163,14 +163,14 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
             {labels.cardTitle}
           </span>
           {comparable ? (
-            <div className="flex items-baseline gap-1">
+            <div className="flex flex-wrap items-baseline gap-x-1">
               <span className="text-xl font-bold text-emerald-700">
                 ${summary.year1SavingsUSD.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
               </span>
               <span className="text-xs text-slate-500 font-semibold">USD</span>
             </div>
           ) : (
-            <div className="flex items-baseline gap-1" data-savings-state={savingsBasis} title={noSavingsNote(savingsBasis)}>
+            <div className="flex flex-wrap items-baseline gap-x-1" data-savings-state={savingsBasis} title={noSavingsNote(savingsBasis)}>
               <span className="text-xl font-bold text-slate-900">{Math.round(totalSelfConsumedKWh).toLocaleString()}</span>
               <span className="text-xs text-slate-500 font-semibold">kWh</span>
               <span className="text-[10px] font-bold text-amber-700 ml-1">
@@ -203,11 +203,11 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
         </div>
 
         {/* Card 5: IMPACTO AMBIENTAL */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm col-span-2 sm:col-span-1">
+        <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
             IMPACTO AMBIENTAL
           </span>
-          <div className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-xl font-bold text-emerald-800">-{summary.co2AvoidedTonsPerYear}</span>
             <span className="text-xs text-slate-500 font-semibold">Tons CO₂</span>
           </div>
@@ -290,7 +290,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
 
       {/* TABLA DE DETALLE MENSUAL EDITABLE CON INGENIERÍA TRANSPARENTE */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
-        <div className="bg-[#14532d] text-white px-4 py-2.5 font-bold text-xs uppercase tracking-wider flex justify-between items-center">
+        <div className="bg-[#14532d] text-white px-4 py-2.5 font-bold text-xs uppercase tracking-wider flex flex-wrap justify-between items-center gap-2">
           <span>{labels.heading}</span>
           <button
             onClick={openAIInvoiceModal}

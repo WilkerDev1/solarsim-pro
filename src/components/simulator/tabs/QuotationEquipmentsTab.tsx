@@ -39,7 +39,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
   return (
     <div className="space-y-6 shrink-0">
       {/* Top Metrics Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] [&>*]:min-w-0 [&>*]:[overflow-wrap:anywhere] gap-3 shrink-0">
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">N° COTIZACIÓN</span>
           <span className="text-lg font-bold text-slate-900">{project.client.quoteNumber || SAMPLE_QUOTE_NUMBER}</span>

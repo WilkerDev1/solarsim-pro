@@ -53,7 +53,7 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
   const activeTheme = layout.theme;
   return (
     <aside
-      className={`w-[340px] flex flex-col h-full shrink-0 transition-colors z-20 ${
+      className={`w-[min(340px,40vw)] min-w-[260px] flex flex-col h-full shrink-0 transition-colors z-20 ${
         isDark
           ? 'bg-[#18181f] border-r border-[#2a2a36] text-zinc-100 shadow-2xl'
           : 'bg-white border-r border-slate-300 shadow-md'
