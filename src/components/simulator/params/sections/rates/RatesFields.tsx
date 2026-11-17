@@ -12,6 +12,8 @@ import {
 import { AlertTriangle } from 'lucide-react';
 import { SelfConsumptionPanel } from './SelfConsumptionPanel';
 import { NetMeteringFields } from './NetMeteringFields';
+import { TariffValuationPanel } from './TariffValuationPanel';
+import type { EnergyCalculationMode } from '../../../../../../shared/applicationFeatures';
 import {
   averageMonthlyConsumption,
   currentDistributor,
@@ -54,6 +56,8 @@ const parseOptionalNumber = (raw: string): number | undefined => {
 };
 
 export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs, showRegimeSelector = true }) => {
+  // Un solo origen: `projectionEnabled` (modo `self_consumption`) decide también con qué modo se estima la factura.
+  const calculationMode: EnergyCalculationMode = projectionEnabled ? 'self_consumption' : 'legacy';
   const { rates } = project;
   // El valor que se muestra es el que usa el cálculo: supuestos efectivos del proyecto completo (ADR 0003).
   const assumptions = resolveAssumptions(project);
@@ -206,6 +210,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
       {!offGrid && (
         <NetMeteringFields rates={rates} assumptions={assumptions} showRegimeSelector={showRegimeSelector} exportTip={exportTip} updateRates={updateRates} />
       )}
+      {!offGrid && <TariffValuationPanel project={project} calculationMode={calculationMode} updateRates={updateRates} />}
       {projectionEnabled && (
         <SelfConsumptionPanel project={project} tariffCode={tariffCode} avgMonthlyConsumption={avgMonthlyConsumption} updateSpecs={updateSpecs} />
       )}
