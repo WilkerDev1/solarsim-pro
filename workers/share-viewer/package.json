@@ -16,7 +16,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260819.1",
     "tsx": "^4.23.15",
-    "typescript": "^5.5.4",
+    "typescript": "^7.0.2",
     "wrangler": "^4.124.0"
   },
   "overrides": {
