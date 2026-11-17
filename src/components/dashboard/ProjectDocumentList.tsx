@@ -21,6 +21,7 @@ import {
 import { ProjectActionsMenu } from "./ProjectActionsMenu";
 import { projectType, projectSyncLabel } from "./projectPresentation";
 import { ProposalDates } from "./ProposalDates";
+import { LegacyRegimeBadge } from "../../features/proposals/LegacyRegimeBadge";
 
 export function ProjectDocumentList({
   projects,
@@ -122,6 +123,7 @@ function ProjectDocumentRow({ project }: { project: ProjectSimulation }) {
               {project.client.projectId || "Sin código"} ·{" "}
               {project.client.province || "Sin provincia"}
             </p>
+            <LegacyRegimeBadge project={project} className="mt-1" />
             <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400 xl:hidden">
               {supplySummaryText(project.rates, project.rates.distributor)} · {projectType(project)} ·{" "}
               <ProposalDates project={project} labels="short" />
