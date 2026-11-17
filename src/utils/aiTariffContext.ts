@@ -21,11 +21,16 @@ export function getTariffSource(matrix: GlobalTariffMatrix, tariff: UtilityTarif
 }
 
 /** Periodo de vigencia de los pliegos conocidos: pasado el último día, el contexto IA pide confirmar tarifas. */
-const KNOWN_TARIFF_PERIODS: Record<string, { end: string; label: string }> = {
-  'SIE-176-2025-TF': { end: '2026-03-31', label: 'enero-marzo 2026' },
-  'SIE-121-2026-TF': { end: '2026-12-31', label: 'octubre-diciembre 2026' },
-  'SIE-147-2026-TF': { end: '2026-09-30', label: 'septiembre 2026 (CEPM)' },
+const KNOWN_TARIFF_PERIODS: Record<string, { start: string; end: string; label: string }> = {
+  'SIE-176-2025-TF': { start: '2026-01-01', end: '2026-03-31', label: 'enero-marzo 2026' },
+  'SIE-121-2026-TF': { start: '2026-10-01', end: '2026-12-31', label: 'octubre-diciembre 2026' },
+  'SIE-147-2026-TF': { start: '2026-09-01', end: '2026-09-30', label: 'septiembre 2026 (CEPM)' },
 };
+
+/** Periodo conocido de un pliego (inicio y fin, AAAA-MM-DD), o `undefined` si no está en la lista. */
+export function knownTariffPeriod(resolutionCode: string): { start: string; end: string; label: string } | undefined {
+  return KNOWN_TARIFF_PERIODS[resolutionCode];
+}
 
 export interface GridUseChargeReference {
   dopPerKWh: number;
