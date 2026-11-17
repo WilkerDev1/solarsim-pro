@@ -177,8 +177,15 @@ assert.equal(formatDOP(1234.5), 'RD$1,234.50');
   assert.match(html, /Sin sistema/);
   assert.match(html, /Con sistema/);
   assert.match(html, /id="pd-rates-settlement"/, 'el precio de liquidación es editable');
-  assert.equal((html.match(new RegExp(UNVERIFIED_ESTIMATE_LABEL, 'g')) ?? []).length >= 4, true, 'cada supuesto lleva «estimado, no verificado con facturas»');
-  for (const title of ['Precio de liquidación anual del crédito', 'Rango del cargo fijo', 'Bloques sobre consumo neto', 'Cargo sobre inyección bruta']) assert.match(html, new RegExp(title), title);
+  assert.match(html, /data-tariff-unverified/, 'los supuestos van en una sola línea discreta con ⓘ');
+  assert.doesNotMatch(html, /data-unverified-assumption|<ul[^>]*data-tariff-unverified/, 'ya no hay una tarjeta por supuesto');
+  assert.doesNotMatch(html, /bg-pd-warn-bg/, 'sin recuadros ámbar de aviso en la sección Tarifas');
+  assert.match(html, /Supuestos estimados, no verificados con facturas/, 'la línea discreta');
+  assert.equal((html.match(/data-tariff-unverified/g) ?? []).length, 1, 'una sola línea');
+  assert.ok(html.includes(UNVERIFIED_ESTIMATE_LABEL), 'el tooltip conserva «estimado, no verificado con facturas»');
+  for (const title of ['Precio de liquidación anual del crédito', 'Rango del cargo fijo', 'Bloques sobre consumo neto', 'Cargo sobre inyección bruta']) assert.match(html, new RegExp(title), `${title}: sigue en el tooltip`);
+  assert.match(html, /role="tooltip"/, 'los textos van en tooltips accesibles (InfoTip)');
+  assert.match(html, /Cargo por uso de la red estimado, no verificado con facturas/, 'el aviso del cargo pasó al ⓘ del campo');
 
   const flat = render(h(RatesFields, { project: project({ energyRateSource: 'manual' }), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never));
   assert.match(flat, /Precio por kWh de la propuesta/);

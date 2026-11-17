@@ -17,7 +17,7 @@ export const InfoTip: React.FC<InfoTipProps> = ({ text }) => {
       <span
         role="tooltip"
         id={id}
-        className="invisible absolute bottom-full right-0 z-20 mb-1.5 w-56 rounded-md border border-pd-border bg-pd-panel px-2.5 py-2 text-left text-xs font-normal leading-snug text-pd-text shadow-lg group-focus-within:visible group-hover:visible"
+        className="invisible absolute bottom-full right-0 z-20 mb-1.5 w-64 rounded-md border border-pd-border bg-pd-panel px-2.5 py-2 whitespace-pre-line text-left text-xs font-normal leading-snug text-pd-text shadow-lg group-focus-within:visible group-hover:visible"
       >
         {text}
       </span>
