@@ -4,7 +4,7 @@ import { normalizeProposalDraft, buildProposalRequest, robustParseJson, draftFor
 import { calculateMonthlyBill, resolveEnergyValuationMethod, tariffPricePresentation } from '../../shared/tariffBilling';
 import { averageBlockEnergyRateDOP } from '../../shared/tariffRules';
 import { issueTarget, issueTier } from '../components/common/ai-invoice/reviewIssues';
-import { blockValuationNote } from '../components/simulator/params/sections/rates/tariffPresentation';
+import { blockValuationNote, draftEnergyRateDisplayDOP } from '../components/simulator/params/sections/rates/tariffPresentation';
 import { DEFAULT_RD_TARIFF_MATRIX, referenceBillingTariff } from '../data/rdTariffs';
 import { prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { requestGeminiJson, GeminiRequestError, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
@@ -266,11 +266,18 @@ useSimulationStore.getState().applyExtractedInvoice(normalized,true);assert.stri
   assert.deepEqual(prepared.rates.billingTariff,bts1,'la propuesta guarda la fila oficial');
   assert.equal(resolveEnergyValuationMethod(prepared.rates),'block_billing');
   // Revisión: bajo «Tarifa de energía» se explica la facturación por bloques con el precio medio resultante.
-  const note=blockValuationNote(prepared.rates,prepared.monthlyConsumption)!;
-  assert.match(note,/bloques oficiales de BTS1/);assert.match(note,/SIE-121-2026-TF/);
+  // El campo muestra el precio por bloques del mes promedio redondeado a 2 decimales (el escalar guardado conserva precisión).
+  const fieldDOP=draftEnergyRateDisplayDOP(stepped)!;
+  assert.equal(fieldDOP,6.05);
+  assert.equal(draftEnergyRateDisplayDOP({energyRateSource:'reference',energyCostPerKWhDOP:10.433712}),10.43,'referencia: 2 decimales (EDENORTE 10.4337… → 10.43)');
+  assert.equal(draftEnergyRateDisplayDOP({energyRateSource:'manual',energyCostPerKWhDOP:11.1234}),11.1234,'un precio tecleado se muestra tal cual');
+  assert.equal(draftEnergyRateDisplayDOP({energyRateSource:'reference'}),undefined);
+  const note=blockValuationNote(prepared.rates,prepared.monthlyConsumption,fieldDOP)!;
   const expectedAverage=tariffPricePresentation(prepared.rates,prepared.monthlyConsumption).averageDOPPerKWh!;
-  assert(note.includes(`RD$${expectedAverage.toFixed(2)}/kWh`),'muestra el precio medio resultante de los bloques');
-  assert.equal(blockValuationNote({...prepared.rates,energyRateSource:'invoice'},prepared.monthlyConsumption),null,'precio único: sin nota de bloques');
+  assert.equal(expectedAverage.toFixed(2),'7.95','energía anual por bloques mes a mes / kWh anuales (consumo concentrado)');
+  assert.equal(note,'Se valora mes a mes con los bloques oficiales de BTS1 (SIE-121-2026-TF). Precio medio de la energía en el año: RD$7.95/kWh (sin cargo fijo). El campo de arriba (RD$6.05/kWh) es el precio por bloques del mes promedio y solo sirve de referencia.');
+  assert.equal(blockValuationNote(prepared.rates,prepared.monthlyConsumption),'Se valora mes a mes con los bloques oficiales de BTS1 (SIE-121-2026-TF). Precio medio de la energía en el año: RD$7.95/kWh (sin cargo fijo).','sin precio en el campo, solo las dos primeras frases');
+  assert.equal(blockValuationNote({...prepared.rates,energyRateSource:'invoice'},prepared.monthlyConsumption,fieldDOP),null,'precio único: sin nota de bloques');
   useSimulationStore.setState({tariffMatrix:DEFAULT_RD_TARIFF_MATRIX,syncSettings:{...useSimulationStore.getState().syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
   useSimulationStore.getState().applyExtractedInvoice(stepped,true);
   const applied=useSimulationStore.getState().getActiveProject();
