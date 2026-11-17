@@ -1,0 +1,52 @@
+{
+  "equipmentType": "inverter",
+  "brand": "WeCo",
+  "variants": [
+    {
+      "displayName": "Inversor WeCo XTS-8K (8.0Kw)",
+      "modelCode": "XTS-8K",
+      "powerKW": 8.0,
+      "powerW": 8000,
+      "vmp": 51.2,
+      "voltageV": 51.2,
+      "weightKg": 44,
+      "widthMm": 450
+    },
+    {
+      "displayName": "Inversor WeCo XTS-10K (10.0Kw)",
+      "modelCode": "XTS-10K",
+      "powerKW": 10.0,
+      "powerW": 10000,
+      "vmp": 51.2,
+      "voltageV": 51.2,
+      "weightKg": 44,
+      "widthMm": 450
+    },
+    {
+      "displayName": "Inversor WeCo XTS-12K (12.0Kw)",
+      "modelCode": "XTS-12K",
+      "powerKW": 12.0,
+      "powerW": 12000,
+      "vmp": 51.2,
+      "voltageV": 51.2,
+      "weightKg": 44,
+      "widthMm": 450
+    }
+  ],
+  "category": "Split Phase Hybrid Inverter",
+  "documentTitle": "XTS SERIES SPLIT PHASE INVERTER",
+  "familySpecs": {
+    "batteryVoltageRange": "40-60V",
+    "dimensions": "450 x 846 x 280 mm",
+    "heightMm": 846,
+    "lengthMm": 280,
+    "maxChargeCurrentA": 210,
+    "maxEfficiencyPct": 98.0,
+    "mpptCount": 3,
+    "voltageMPPT": "70-540V",
+    "voltageV": 51.2,
+    "weightKg": 44,
+    "widthMm": 450
+  },
+  "modelSeries": "XTS SERIES"
+}

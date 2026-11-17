@@ -48,6 +48,23 @@ const fractionToPercent = new Set([
   "efficiencyPct",
   "maxEfficiencyPct",
 ]);
+/** Specs that make sense for each equipment type; the model sometimes echoes battery voltage as an inverter's Vmp. */
+const relevantNumeric: Record<string, Set<string>> = {
+  panel: new Set(["powerW", "powerKW", "efficiencyPct", "tempCoeff", "annualDegradation", "voc", "isc", "vmp", "imp", "weightKg"]),
+  inverter: new Set(["powerKW", "powerW", "maxAcPowerKW", "maxPvPowerKW", "maxEfficiencyPct", "mpptCount", "weightKg"]),
+  battery: new Set(["capacityKWh", "capacityAh", "voltageV", "dodPct", "batteryEfficiencyPct", "cycles", "maxChargeCurrentA", "weightKg"]),
+};
+const relevantText: Record<string, Set<string>> = {
+  panel: new Set(["dimensions"]),
+  inverter: new Set(["dimensions", "voltageMPPT", "batteryVoltageRange"]),
+  battery: new Set(["dimensions", "chemistry"]),
+};
+/** Fields a datasheet of each type almost always carries; if the model leaves one empty the user is told. */
+const expectedFields: Record<string, [keyof ExtractedEquipmentVariant, string][]> = {
+  panel: [["efficiencyPct", "eficiencia"], ["tempCoeff", "coeficiente de temperatura"], ["voc", "Voc"], ["vmp", "Vmp"], ["isc", "Isc"], ["imp", "Imp"], ["dimensions", "dimensiones"]],
+  inverter: [["maxAcPowerKW", "potencia AC máxima"], ["maxPvPowerKW", "FV máxima"], ["maxEfficiencyPct", "eficiencia máxima"], ["mpptCount", "número de MPPT"], ["voltageMPPT", "rango MPPT"], ["dimensions", "dimensiones"]],
+  battery: [["voltageV", "tensión nominal"], ["dodPct", "DoD"], ["cycles", "ciclos"], ["dimensions", "dimensiones"]],
+};
 const dimensionKeys = ["lengthMm", "widthMm", "heightMm"] as const;
 
 const isPresent = (value: unknown) =>
@@ -79,6 +96,95 @@ function normalizeDimensionsText(text: string) {
     (n) => parseLocaleNumber(n) * unit,
   );
   return formatDimensions(a, b, c);
+}
+
+function dimensionNumbers(text: unknown): [number, number, number] | null {
+  if (typeof text !== "string") return null;
+  const normalized = normalizeDimensionsText(text);
+  const match = normalized.match(/^(\d+(?:\.\d+)?) x (\d+(?:\.\d+)?) x (\d+(?:\.\d+)?) mm$/);
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+}
+
+const measure = (value: unknown) => {
+  if (!isPresent(value)) return undefined;
+  const n = typeof value === "string" ? parseLocaleNumber(value) : Number(value);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
+
+/**
+ * Length/width/height combine key by key: the variant's own measure wins, the rest comes from the family.
+ * The family's text only stands in when the variant defines no measure, or when it holds the very same
+ * numbers (it keeps the sheet's order; models often mislabel axes). It also completes missing axes.
+ */
+function combineDimensions(
+  own: Record<string, unknown>,
+  family: Record<string, unknown>,
+): { text?: string; partial?: boolean } {
+  if (isPresent(own.dimensions) && dimensionNumbers(own.dimensions))
+    return { text: normalizeDimensionsText(String(own.dimensions)) };
+  const familyNumbers = dimensionNumbers(family.dimensions);
+  const ownMeasures = dimensionKeys.map((key) => measure(own[key]));
+  if (ownMeasures.every((n) => n === undefined)) {
+    if (familyNumbers) return { text: formatDimensions(...familyNumbers) };
+    const fromFamily = dimensionKeys.map((key) => measure(family[key]));
+    if (fromFamily.every((n) => n !== undefined))
+      return { text: formatDimensions(fromFamily[0]!, fromFamily[1]!, fromFamily[2]!) };
+    return { partial: fromFamily.some((n) => n !== undefined) };
+  }
+  const merged = dimensionKeys.map(
+    (key, i) => ownMeasures[i] ?? measure(family[key]),
+  );
+  if (merged.every((n) => n !== undefined)) {
+    const sorted = (list: number[]) => [...list].sort((a, b) => a - b).join(",");
+    return {
+      text:
+        familyNumbers && sorted(familyNumbers) === sorted(merged as number[])
+          ? formatDimensions(...familyNumbers)
+          : formatDimensions(merged[0]!, merged[1]!, merged[2]!),
+    };
+  }
+  if (familyNumbers) {
+    // Fill the gaps with the family's numbers the variant did not already use.
+    const pool = [...familyNumbers];
+    for (const n of merged)
+      if (n !== undefined) {
+        const at = pool.indexOf(n);
+        if (at >= 0) pool.splice(at, 1);
+      }
+    const missing = merged.filter((n) => n === undefined).length;
+    if (pool.length === missing) {
+      const filled = merged.map((n) => n ?? pool.shift()!);
+      return { text: formatDimensions(filled[0], filled[1], filled[2]) };
+    }
+  }
+  return { partial: true };
+}
+
+function missingFieldWarnings(
+  equipmentType: string,
+  variants: ExtractedEquipmentVariant[],
+) {
+  const notices: string[] = [];
+  const tail = "complétalo a mano si la ficha lo trae";
+  const common: string[] = [];
+  const perVariant = new Map<string, string[]>();
+  for (const [key, label] of expectedFields[equipmentType] || []) {
+    const missing = variants.filter((v) => v[key] === undefined);
+    if (!missing.length) continue;
+    if (missing.length === variants.length) common.push(label);
+    else
+      for (const v of missing) {
+        const name = v.modelCode || v.displayName;
+        perVariant.set(name, [...(perVariant.get(name) || []), label]);
+      }
+  }
+  if (common.length)
+    notices.push(
+      `La IA no extrajo${variants.length > 1 ? " en ninguna variante" : ""}: ${common.join(", ")}; ${tail}.`,
+    );
+  for (const [name, labels] of perVariant)
+    notices.push(`La IA no extrajo en ${name}: ${labels.join(", ")}; ${tail}.`);
+  return notices;
 }
 
 /** Product name for the dialog heading: manufacturer + series, never the datasheet file code. */
@@ -137,12 +243,6 @@ export function normalizeDatasheetResponse(
         if (isPresent(value)) v[key] = value;
       for (const [key, value] of Object.entries(own))
         if (isPresent(value)) v[key] = value;
-      // The variant's own dimensions (text or per-axis) win over the family's text.
-      if (
-        !isPresent(own.dimensions) &&
-        dimensionKeys.some((key) => isPresent(own[key]))
-      )
-        delete v.dimensions;
       const modelCode =
         typeof own.modelCode === "string" ? own.modelCode.trim() : "";
       const label = modelCode || `variante ${index + 1}`;
@@ -171,6 +271,7 @@ export function normalizeDatasheetResponse(
         return n;
       };
       for (const key of numericFields) {
+        if (!relevantNumeric[equipmentType].has(key)) continue;
         let n = readNumber(key);
         if (n === undefined) continue;
         if (fractionToPercent.has(key) && n > 0 && n <= 1) n *= 100;
@@ -194,19 +295,19 @@ export function normalizeDatasheetResponse(
         result[key] = Number(n.toFixed(6));
       }
       for (const key of textFields)
-        if (typeof v[key] === "string" && v[key].trim())
+        if (
+          relevantText[equipmentType].has(key) &&
+          key !== "dimensions" &&
+          typeof v[key] === "string" &&
+          v[key].trim()
+        )
           result[key] = v[key].trim();
-      if (result.dimensions) {
-        result.dimensions = normalizeDimensionsText(result.dimensions);
-      } else {
-        const mm = dimensionKeys.map(readNumber);
-        if (mm.every((n) => n !== undefined && n > 0))
-          result.dimensions = formatDimensions(mm[0]!, mm[1]!, mm[2]!);
-        else if (mm.some((n) => n !== undefined))
-          warnings.push(
-            `Dimensiones incompletas de ${label}: faltan largo, ancho o alto.`,
-          );
-      }
+      const dimensions = combineDimensions(own, family);
+      if (dimensions.text) result.dimensions = dimensions.text;
+      else if (dimensions.partial)
+        warnings.push(
+          `Dimensiones incompletas de ${label}: faltan largo, ancho o alto.`,
+        );
       if (
         equipmentType === "panel" &&
         result.powerW === undefined &&
@@ -219,6 +320,8 @@ export function normalizeDatasheetResponse(
         result.powerW !== undefined
       )
         result.powerKW = result.powerW / 1000;
+      if (equipmentType === "inverter") delete result.powerW;
+      if (equipmentType === "panel") delete result.powerKW;
       if (equipmentType === "inverter" && result.maxPvPowerKW === undefined) {
         // Many sheets state the PV input as a percentage of the rated AC power (200 %, 150 %).
         // Runs after the W → kW conversion so a sheet that only gives watts still resolves.
@@ -249,6 +352,7 @@ export function normalizeDatasheetResponse(
       return result;
     },
   );
+  warnings.push(...missingFieldWarnings(equipmentType, variants));
   return {
     equipmentType,
     brand,

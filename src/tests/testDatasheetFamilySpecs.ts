@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { parseDatasheetWithGemini, DATASHEET_RESPONSE_SCHEMA } from "../services/geminiDatasheetService";
 import { normalizeDatasheetResponse, planDatasheetImport, datasheetTitle } from "../utils/datasheetImport";
 import type { GeminiTransport } from "../../shared/geminiTransport";
@@ -105,7 +106,7 @@ for (const v of weco.variants) {
   assert.equal(v.dimensions, "450 x 846 x 280 mm");
 }
 assert.equal(datasheetTitle(weco), "WeCo XTS");
-assert.equal(weco.warnings, undefined, "sin descartes no hay avisos");
+assert(!weco.warnings?.some((w) => /descart|inválid/i.test(w)), "sin descartes no hay avisos de descarte");
 
 // El prompt le indica al modelo cómo repartir y convertir.
 const prompt = bodies.at(-1).systemInstruction.parts[0].text as string;
@@ -149,7 +150,7 @@ const blank = normalizeDatasheetResponse({
 assert.equal(blank.variants[0].isc, undefined, "una cadena en blanco no es 0");
 assert.equal(blank.variants[0].tempCoeff, undefined);
 assert.equal(blank.variants[0].imp, 13.5, "se recorta antes de leer");
-assert.equal(blank.warnings, undefined);
+assert(!blank.warnings?.some((w) => /descart|inválid/i.test(w)));
 
 const dimPrecedence = normalizeDatasheetResponse({
   equipmentType: "panel", brand: "QA", modelSeries: "S",
@@ -161,5 +162,66 @@ const dimPrecedence = normalizeDatasheetResponse({
 });
 assert.equal(dimPrecedence.variants[0].dimensions, "2465 x 1134 x 30 mm", "las dimensiones propias de la variante prevalecen");
 assert.equal(dimPrecedence.variants[1].dimensions, "2000 x 1000 x 30 mm");
+
+// Respuestas CRUDAS reales de Gemini (fichas públicas Jinko Tiger Neo y WeCo XTS).
+const fixture = (name: string) =>
+  JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8"));
+const realJinko = normalizeDatasheetResponse(fixture("datasheet-jinko.json"));
+assert.equal(realJinko.variants.length, 6);
+for (const v of realJinko.variants) {
+  assert.equal(v.dimensions, "2465 x 1134 x 30 mm", "ancho de la variante + largo/alto de la familia");
+  assert.equal(v.tempCoeff, -0.29);
+  assert.equal(v.annualDegradation, 0.4);
+  assert(v.voc && v.vmp);
+}
+const missingJinko = realJinko.warnings?.find((w) => /La IA no extrajo/.test(w));
+assert(missingJinko, "lo que el modelo no devolvió no se pierde en silencio");
+for (const label of ["Isc", "Imp", "eficiencia"])
+  assert(missingJinko!.includes(label), label);
+assert(/complétalo a mano/.test(missingJinko!));
+assert(!/Voc|Vmp|dimensiones/i.test(missingJinko!), "solo lo ausente");
+assert.equal(realJinko.warnings?.some((w) => /incompletas/.test(w)), false);
+
+const realWeco = normalizeDatasheetResponse(fixture("datasheet-weco.json"));
+assert.equal(realWeco.variants.length, 3);
+for (const v of realWeco.variants) {
+  assert.equal(v.dimensions, "450 x 846 x 280 mm", "medidas combinadas clave a clave con la familia");
+  assert.equal(v.vmp, undefined, "la tensión de batería no es el Vmp de un inversor");
+  assert.equal(v.voltageV, undefined);
+  assert.equal(v.maxChargeCurrentA, undefined);
+  assert.equal(v.batteryVoltageRange, "40-60V");
+  assert.equal(v.maxEfficiencyPct, 98);
+  assert.equal(v.mpptCount, 3);
+  assert.equal(v.voltageMPPT, "70-540V");
+}
+assert.equal(realWeco.warnings?.some((w) => /incompletas/.test(w)), false, "sin aviso de dimensiones incompletas");
+const missingWeco = realWeco.warnings?.find((w) => /La IA no extrajo/.test(w));
+assert(missingWeco && /AC máxima/.test(missingWeco) && /FV máxima/.test(missingWeco));
+
+// Dimensiones: clave a clave; el texto de la familia completa lo que falta.
+const dims = normalizeDatasheetResponse({
+  equipmentType: "panel", brand: "QA", modelSeries: "S",
+  familySpecs: { dimensions: "2000 x 1000 x 30 mm", lengthMm: 2000, widthMm: 1000, heightMm: 30 },
+  variants: [
+    { modelCode: "A", powerW: 500, lengthMm: 2100 },
+    { modelCode: "B", powerW: 500 },
+  ],
+});
+assert.equal(dims.variants[0].dimensions, "2100 x 1000 x 30 mm", "la medida de la variante prevalece individualmente");
+assert.equal(dims.variants[1].dimensions, "2000 x 1000 x 30 mm");
+const dimsPartial = normalizeDatasheetResponse({
+  equipmentType: "panel", brand: "QA", modelSeries: "S",
+  variants: [{ modelCode: "A", powerW: 500, lengthMm: 2100 }],
+});
+assert(dimsPartial.warnings?.some((w) => /incompletas/.test(w)), "avisa solo si sigue incompleto");
+
+// El esquema nombra y describe los campos que el modelo tendía a omitir.
+const variantProps = (DATASHEET_RESPONSE_SCHEMA.properties as any).variants.items;
+for (const key of ["efficiencyPct", "isc", "imp", "maxAcPowerKW", "maxPvPowerKW", "maxPvPowerPct"]) {
+  assert(variantProps.properties[key].description, `${key} tiene descripción`);
+  assert(variantProps.required.includes(key), `${key} es obligatorio (null si no está)`);
+  assert.equal(variantProps.properties[key].nullable, true);
+}
+assert(/Max\. AC Output Power|Max\. AC/i.test(variantProps.properties.maxAcPowerKW.description));
 
 console.log("testDatasheetFamilySpecs: OK");
