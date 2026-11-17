@@ -125,14 +125,13 @@ async function main() {
       }),
     /tipo/,
   );
-  assert.throws(
-    () =>
-      normalizeDatasheetResponse({
-        equipmentType: "battery",
-        variants: [{ modelCode: "B1", capacityKWh: 10, dodPct: 200 }],
-      }),
-    /inválido/,
-  );
+  const discarded = normalizeDatasheetResponse({
+    equipmentType: "battery",
+    variants: [{ modelCode: "B1", capacityKWh: 10, dodPct: 200 }],
+  });
+  assert.equal(discarded.variants[0].dodPct, undefined, "an invalid optional value is discarded");
+  assert.equal(discarded.variants[0].capacityKWh, 10);
+  assert(discarded.warnings?.some((w) => /dodPct/.test(w)));
   const empty = normalizeDatasheetResponse({
     equipmentType: "battery",
     brand: "QA",

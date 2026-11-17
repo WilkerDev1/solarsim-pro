@@ -112,6 +112,8 @@ export interface ExtractedDatasheetData {
   documentTitle?: string;
   category?: string;
   specsSummary?: string;
+  /** Campos leídos de la ficha que no se pudieron usar (valores inválidos descartados, signos corregidos). */
+  warnings?: string[];
   variants: ExtractedEquipmentVariant[];
 }
 
@@ -137,6 +139,7 @@ export interface ExtractedEquipmentVariant {
   maxEfficiencyPct?: number;
   voltageMPPT?: string;
   mpptCount?: number;
+  batteryVoltageRange?: string;
 
   // Baterías
   capacityKWh?: number;

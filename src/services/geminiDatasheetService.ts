@@ -60,10 +60,32 @@ REGLAS DE EXTRACCIÓN CRÍTICAS:
      * chemistry: Química de celdas (string ej: "LFP (LiFePO4)").
      * maxChargeCurrentA: Corriente máxima de carga continua (A ej: 165).
 
+6. REPARTO POR VARIANTE Y VALORES COMUNES (MUY IMPORTANTE):
+   - Las tablas de la ficha tienen una columna por modelo: lee la columna de CADA variante y completa TODOS sus campos (en paneles Voc, Isc, Vmp, Imp y eficiencia del módulo; en inversores potencia nominal AC, potencia máxima AC y FV máxima). No dejes un campo vacío si la ficha lo publica para esa variante.
+   - Si un valor es único para toda la ficha (ej. coeficiente de temperatura de Pmax, degradación anual, dimensiones, peso, número de MPPT, eficiencia máxima, rango MPPT), colócalo UNA vez en "familySpecs"; se aplicará a todas las variantes. Si difiere entre variantes, ponlo en cada variante (el valor de la variante prevalece).
+   - Si la ficha da un rango ("13.80–14.10 A") con un valor por columna, usa el de cada columna; nunca repitas un extremo del rango en todas.
+   - Unidades: porcentajes como número en % (22.4, no 0.224; 98.0, no 0.98). tempCoeff en %/°C y negativo para Pmax (-0.29, no -0.0029). Dimensiones en milímetros: "dimensions" como "largo x ancho x alto mm" (ej. "2465 x 1134 x 30 mm") o bien lengthMm, widthMm y heightMm por separado. Si la ficha da pulgadas o cm, conviértelas a mm.
+   - Inversores: maxAcPowerKW es la potencia AC máxima publicada (ej. 8.8). Si la entrada FV máxima se da como porcentaje de la potencia nominal (ej. 200 % o 150 %), devuélvela en maxPvPowerPct (200, 150) sin calcularla; si se da en kW, usa maxPvPowerKW. mpptCount es el número de seguidores MPPT. batteryVoltageRange: rango de tensión de batería compatible si la ficha lo publica.
+   - Identidad: "brand" es el fabricante; "modelSeries" es el nombre comercial de la serie/producto (ej. "Tiger Neo JKM625-650N-78HL4-BDV" o "XTS"), NUNCA el nombre del archivo ni un código de documento (ej. "F9-EN", "datasheet_v3"). "documentTitle" es el título del producto, tampoco el nombre del archivo.
+   - Si un dato no está en la ficha (garantías, tensión FV máxima, fase/tensión nominal), no lo incluyas: el esquema no tiene campos para ellos.
+
 La respuesta se valida contra el esquema JSON de la solicitud: devuelve sólo esos campos.`;
 
 const NUMBER = { type: "NUMBER" } as const;
 const STRING = { type: "STRING" } as const;
+// Specs a variant can carry. `familySpecs` accepts the same keys (minus identity) for values common to the whole sheet.
+const SPEC_PROPERTIES: Record<string, { readonly type: "NUMBER" | "STRING" }> = {
+  ...Object.fromEntries(
+    ["powerW", "powerKW", "efficiencyPct", "tempCoeff", "annualDegradation", "voc", "isc", "vmp", "imp",
+      "maxAcPowerKW", "maxPvPowerKW", "maxPvPowerPct", "maxEfficiencyPct", "mpptCount", "capacityKWh", "capacityAh", "voltageV",
+      "dodPct", "batteryEfficiencyPct", "cycles", "maxChargeCurrentA", "weightKg", "lengthMm", "widthMm", "heightMm"].map((key) => [key, NUMBER]),
+  ),
+  voltageMPPT: STRING,
+  batteryVoltageRange: STRING,
+  chemistry: STRING,
+  dimensions: STRING,
+};
+const { powerW: _p, powerKW: _k, capacityKWh: _c, capacityAh: _a, ...FAMILY_SPEC_PROPERTIES } = SPEC_PROPERTIES;
 /** Structured output: the model can only return these keys; unknown values are simply omitted. */
 export const DATASHEET_RESPONSE_SCHEMA = {
   type: "OBJECT",
@@ -74,6 +96,7 @@ export const DATASHEET_RESPONSE_SCHEMA = {
     documentTitle: STRING,
     category: STRING,
     specsSummary: STRING,
+    familySpecs: { type: "OBJECT", properties: FAMILY_SPEC_PROPERTIES },
     variants: {
       type: "ARRAY",
       items: {
@@ -81,14 +104,7 @@ export const DATASHEET_RESPONSE_SCHEMA = {
         properties: {
           modelCode: STRING,
           displayName: STRING,
-          ...Object.fromEntries(
-            ["powerW", "powerKW", "efficiencyPct", "tempCoeff", "annualDegradation", "voc", "isc", "vmp", "imp",
-              "maxAcPowerKW", "maxPvPowerKW", "maxEfficiencyPct", "mpptCount", "capacityKWh", "capacityAh", "voltageV",
-              "dodPct", "batteryEfficiencyPct", "cycles", "maxChargeCurrentA", "weightKg"].map((key) => [key, NUMBER]),
-          ),
-          voltageMPPT: STRING,
-          chemistry: STRING,
-          dimensions: STRING,
+          ...SPEC_PROPERTIES,
         },
         required: ["displayName"],
       },

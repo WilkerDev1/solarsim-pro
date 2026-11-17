@@ -28,7 +28,12 @@ const numericFields = [
   "mpptCount",
   "weightKg",
 ] as const;
-const textFields = ["chemistry", "voltageMPPT", "dimensions"] as const;
+const textFields = [
+  "chemistry",
+  "voltageMPPT",
+  "dimensions",
+  "batteryVoltageRange",
+] as const;
 const percentFields = new Set([
   "dodPct",
   "batteryEfficiencyPct",
@@ -36,6 +41,52 @@ const percentFields = new Set([
   "maxEfficiencyPct",
   "annualDegradation",
 ]);
+/** Efficiency-like values can never be <= 1 %, so a value in (0, 1] is a fraction that the catalog stores as %. */
+const fractionToPercent = new Set([
+  "dodPct",
+  "batteryEfficiencyPct",
+  "efficiencyPct",
+  "maxEfficiencyPct",
+]);
+const dimensionKeys = ["lengthMm", "widthMm", "heightMm"] as const;
+
+const isPresent = (value: unknown) =>
+  value !== undefined && value !== null && value !== "";
+
+function formatDimensions(a: number, b: number, c: number) {
+  const f = (n: number) => String(Number(n.toFixed(2)));
+  return `${f(a)} x ${f(b)} x ${f(c)} mm`;
+}
+
+/** "2465×1134×30 mm" / "2465 * 1134 * 30" → "2465 x 1134 x 30 mm" (the catalog format, in mm). */
+function normalizeDimensionsText(text: string) {
+  const match = text.match(
+    /(\d+(?:[.,]\d+)?)\s*(?:x|×|\*|X)\s*(\d+(?:[.,]\d+)?)\s*(?:x|×|\*|X)\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/,
+  );
+  if (!match) return text.trim();
+  const unit = match[4] === "cm" ? 10 : match[4] === "m" ? 1000 : 1;
+  const [a, b, c] = [match[1], match[2], match[3]].map(
+    (n) => Number(n.replace(",", ".")) * unit,
+  );
+  return formatDimensions(a, b, c);
+}
+
+/** Product name for the dialog heading: manufacturer + series, never the datasheet file code. */
+export function datasheetTitle(
+  data: Pick<ExtractedDatasheetData, "brand" | "modelSeries" | "documentTitle">,
+) {
+  const brand = data.brand?.trim() || "";
+  const series = data.modelSeries?.trim() || "";
+  if (series) {
+    return brand && !series.toLowerCase().includes(brand.toLowerCase())
+      ? `${brand} ${series}`
+      : series;
+  }
+  return (
+    [brand, data.documentTitle?.trim()].filter(Boolean).join(" ") ||
+    "Ficha analizada"
+  );
+}
 
 /** Unknown values stay unknown: datasheet extraction must not invent engineering specifications. */
 export function normalizeDatasheetResponse(
@@ -60,37 +111,97 @@ export function normalizeDatasheetResponse(
     data.equipmentType as ExtractedDatasheetData["equipmentType"];
   const brand =
     normalizeBrandName(typeof data.brand === "string" ? data.brand : "") || "";
+  const family =
+    data.familySpecs && typeof data.familySpecs === "object"
+      ? (data.familySpecs as Record<string, unknown>)
+      : {};
+  const warnings: string[] = [];
   const variants = data.variants.map(
     (entry, index): ExtractedEquipmentVariant => {
       if (!entry || typeof entry !== "object")
         throw new Error(`La variante ${index + 1} no es válida.`);
-      const v = entry as Record<string, unknown>;
+      // Common family values fill what the variant leaves out; the variant's own value wins.
+      const own = entry as Record<string, unknown>;
+      const v: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(family))
+        if (isPresent(value)) v[key] = value;
+      for (const [key, value] of Object.entries(own))
+        if (isPresent(value)) v[key] = value;
       const modelCode =
-        typeof v.modelCode === "string" ? v.modelCode.trim() : "";
+        typeof own.modelCode === "string" ? own.modelCode.trim() : "";
+      const label = modelCode || `variante ${index + 1}`;
       const result: ExtractedEquipmentVariant = {
         id: `var-${crypto.randomUUID()}`,
         modelCode,
         displayName:
-          typeof v.displayName === "string" ? v.displayName.trim() : "",
+          typeof own.displayName === "string" ? own.displayName.trim() : "",
         selected: true,
       };
-      for (const key of numericFields) {
+      const discard = (key: string, value: unknown) =>
+        warnings.push(
+          `Se descartó ${key} de ${label}: el valor leído (${String(value)}) no es válido.`,
+        );
+      const readNumber = (key: string) => {
         const value = v[key];
-        if (value === undefined || value === null || value === "") continue;
-        const n = Number(value);
+        if (!isPresent(value)) return undefined;
+        const n =
+          typeof value === "string"
+            ? Number(value.replace(",", "."))
+            : Number(value);
+        if (!Number.isFinite(n)) {
+          discard(key, value);
+          return undefined;
+        }
+        return n;
+      };
+      for (const key of numericFields) {
+        let n = readNumber(key);
+        if (n === undefined) continue;
+        if (fractionToPercent.has(key) && n > 0 && n <= 1) n *= 100;
+        if (key === "tempCoeff") {
+          // %/°C: a fraction (-0.0029) becomes -0.29, and Pmax never improves with heat.
+          if (n !== 0 && Math.abs(n) < 0.02) n *= 100;
+          if (equipmentType === "panel" && n > 0) {
+            warnings.push(
+              `Se interpretó el coeficiente de temperatura de ${label} como negativo (${-n} %/°C).`,
+            );
+            n = -n;
+          }
+        }
         if (
-          !Number.isFinite(n) ||
           (key !== "tempCoeff" && n < 0) ||
           (percentFields.has(key) && n > 100)
-        )
-          throw new Error(
-            `Valor inválido en ${modelCode || index + 1}: ${key}.`,
-          );
-        result[key] = n;
+        ) {
+          discard(key, v[key]);
+          continue;
+        }
+        result[key] = Number(n.toFixed(6));
       }
       for (const key of textFields)
         if (typeof v[key] === "string" && v[key].trim())
           result[key] = v[key].trim();
+      if (result.dimensions) {
+        result.dimensions = normalizeDimensionsText(result.dimensions);
+      } else {
+        const mm = dimensionKeys.map(readNumber);
+        if (mm.every((n) => n !== undefined && n > 0))
+          result.dimensions = formatDimensions(mm[0]!, mm[1]!, mm[2]!);
+        else if (mm.some((n) => n !== undefined))
+          warnings.push(
+            `Dimensiones incompletas de ${label}: faltan largo, ancho o alto.`,
+          );
+      }
+      if (equipmentType === "inverter" && result.maxPvPowerKW === undefined) {
+        // Many sheets state the PV input as a percentage of the rated AC power (200 %, 150 %).
+        const pct = readNumber("maxPvPowerPct");
+        const ac = result.powerKW ?? result.maxAcPowerKW;
+        if (pct !== undefined && pct > 0 && ac !== undefined)
+          result.maxPvPowerKW = Number(((ac * pct) / 100).toFixed(4));
+        else if (pct !== undefined)
+          warnings.push(
+            `No se pudo calcular la FV máxima de ${label}: falta la potencia AC nominal.`,
+          );
+      }
       if (
         equipmentType === "panel" &&
         result.powerW === undefined &&
@@ -128,6 +239,7 @@ export function normalizeDatasheetResponse(
     specsSummary:
       typeof data.specsSummary === "string" ? data.specsSummary : undefined,
     variants,
+    ...(warnings.length ? { warnings } : {}),
   };
 }
 

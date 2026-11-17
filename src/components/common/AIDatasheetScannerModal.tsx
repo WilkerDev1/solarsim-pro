@@ -17,6 +17,7 @@ import {
 } from "../../types/equipment";
 import { parseDatasheetWithGemini } from "../../services/geminiDatasheetService";
 import { findCatalogMatchForVariant } from "../../utils/equipmentMatchingUtils";
+import { datasheetTitle } from "../../utils/datasheetImport";
 import { attachImportedDatasheet, saveDatasheetLocally, type DatasheetImportReceipt } from "../../services/datasheetImportService";
 
 const technicalFields = {
@@ -424,9 +425,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
                 </label>
                 <div className="self-end">
                   <p className="text-sm font-medium">
-                    {data.documentTitle ||
-                      data.modelSeries ||
-                      "Ficha analizada"}
+                    {datasheetTitle(data)}
                   </p>
                   <p
                     className={`mt-1 text-sm ${dark ? "text-zinc-400" : "text-slate-600"}`}
@@ -440,6 +439,22 @@ export const AIDatasheetScannerModal: React.FC = () => {
                   </p>
                 </div>
               </div>
+              {!!data.warnings?.length && (
+                <div
+                  role="status"
+                  className={`rounded-lg p-3 text-sm ${dark ? "bg-[#30291c] text-amber-100" : "bg-amber-50 text-amber-950"}`}
+                >
+                  <p className="font-medium">
+                    Algunos datos de la ficha no se pudieron usar:
+                  </p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                    {data.warnings.map((warning, i) => (
+                      <li key={i}>{warning}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-1">Revísalos y complétalos a mano si hace falta.</p>
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -557,21 +572,23 @@ export const AIDatasheetScannerModal: React.FC = () => {
                               />
                             </label>
                           ))}
-                        {["dimensions", "voltageMPPT", "chemistry"]
+                        {["dimensions", "voltageMPPT", "batteryVoltageRange", "chemistry"]
                           .filter(
                             (key) =>
                               key === "dimensions" ||
-                              (key === "voltageMPPT"
+                              (key === "voltageMPPT" || key === "batteryVoltageRange"
                                 ? data.equipmentType === "inverter"
                                 : data.equipmentType === "battery"),
                           )
                           .map((key) => (
                             <label key={key}>
                               {key === "dimensions"
-                                ? "Dimensiones"
+                                ? "Dimensiones (mm)"
                                 : key === "chemistry"
                                   ? "Química"
-                                  : "Rango MPPT"}
+                                  : key === "batteryVoltageRange"
+                                    ? "Tensión de batería"
+                                    : "Rango MPPT"}
                               <input
                                 value={String(
                                   v[key as keyof ExtractedEquipmentVariant] ??
