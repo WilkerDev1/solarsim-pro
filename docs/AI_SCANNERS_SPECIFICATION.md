@@ -42,7 +42,7 @@ Los proveedores se cotejan por nombre exacto, eliminación de ciertos sufijos y 
 
 ## Tarifas y procedencia
 
-Véase [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md). El contexto compacto incluye distribuidora, código, moneda, cargos, bloques y fuente. Una tasa leída de la factura se diferencia de la referencia histórica. Dividir el total facturado entre kWh no demuestra el precio de energía porque el total puede contener demanda, cargos fijos y otros conceptos.
+Véase [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md). El contexto compacto incluye distribuidora, código, moneda, cargos, bloques y fuente. Una tasa leída de la factura se diferencia de la referencia histórica. Dividir el total facturado entre kWh no demuestra el precio de energía porque el total puede contener demanda, cargos fijos y otros conceptos. El escáner de facturas lee la medición neta (energía retirada, inyectada, crédito acumulado, cargo por uso de la red, régimen y si ya hay generación distribuida) solo si la factura la trae, y el de resoluciones el cargo fijo por rango y el cargo por uso de la red por distribuidora; detalle y reglas en [Cargo por uso de la red](AI_TARIFF_CONTEXT.md#cargo-por-uso-de-la-red-sie-007-2026).
 
 La extracción de resoluciones es parcial y requiere revisión documental explícita. Conserva filas y cargos no extraídos con procedencia por campo; no convierte su conservación en evidencia de vigencia. JSON transforma el último límite infinito en `null`; hidratación/descarga lo restauran con validación. Los aliases CEPM apuntan a la fila canónica actual.
 

@@ -88,7 +88,7 @@ export function issueTarget(issue: AIProposalIssue, draft?: ExtractedInvoiceData
   if (code === 'missing_tariff' || code === 'unknown_tariff') return client('tariffCode', 'Tarifa');
   if (code === 'missing_energy_rate' || code === 'reference_energy_rate') return client('energyRate', 'Tarifa de energía');
   if (code === 'invalid_exchange') return client('exchange', 'Cambio RD$ por USD');
-  if (/consumption$/.test(code)) return { tab: 'consumption', anchor: reviewAnchor.field('months'), label: 'Consumo mensual' };
+  if (/consumption$/.test(code) || code === 'existing_distributed_generation' || code === 'invalid_metering_value') return { tab: 'consumption', anchor: reviewAnchor.field('months'), label: 'Consumo mensual' };
   if (code === 'pv_overload') return equipmentTarget(issue, 'inverters', draft);
   if (/^battery_/.test(code)) return equipmentTarget(issue, 'batteries', draft);
   if (code === 'conflicting_group_prices') return { tab: 'equipment', anchor: reviewAnchor.field('equipment'), label: 'Equipos' };

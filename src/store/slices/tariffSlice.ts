@@ -59,6 +59,11 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
         ...updates,
         code: tariffCode,
       } as UtilityTariffDetails;
+      // Cambiar el cargo fijo sin traer rangos: el último rango (abierto) sigue siendo ese cargo.
+      const tiers = currentTariff.fixedChargeTiersDOP;
+      if (updates.fixedChargeDOP !== undefined && updates.fixedChargeTiersDOP === undefined && tiers?.length) {
+        updatedTariff.fixedChargeTiersDOP = tiers.map((tier, index) => (index === tiers.length - 1 ? { ...tier, chargeDOP: updates.fixedChargeDOP as number } : tier));
+      }
 
       const updatedSchedule = {
         ...currentSchedule,
