@@ -1,6 +1,7 @@
 import type { FinancialSummaryResult, ProjectSimulation } from '../../../../types';
 import { resolveAssumptions } from '../../../../../shared/assumptions';
 import { resolveGridConnection } from '../../../../../shared/gridConnection';
+import { tariffPricePresentation } from '../../../../../shared/tariffBilling';
 import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, supplyPresentation } from '../../../../../shared/offGridSupply';
 import {
   getProjectPanels,
@@ -71,6 +72,8 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const tariffUSD = project.rates.energyCostPerKWh || 0.18;
   const tariffDOP = tariffUSD * exchangeRate;
   const tariffCode = project.rates.tariffCode || 'BTS2';
+  // Con facturación por bloques el precio de la energía es el medio de la factura, no el escalar (regla en shared/tariffBilling).
+  const tariffPrice = tariffPricePresentation(project.rates, summary.monthlyBreakdown.map((m) => m.consumptionKWh));
 
   // --- 4. Datos Ley 57-07 ---
   const isLeyEligible = project.financials.applyLey5707 !== false;
@@ -109,7 +112,7 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const generatorCostUSD = resolveGeneratorCostPerKWh(project.rates);
   const generatorCostDOP = generatorCostUSD === null ? null : generatorCostUSD * exchangeRate;
 
-  return { savingsBasis, hasComparison, supplyKind, showsGeneratorCost, generatorCostUSD, generatorCostDOP, annualServedKWh, annualUnservedKWh, autonomyHours, panels, primaryPanel, totalPanels, systemCapacityKWp, lossesPercent, performanceRatio, inverters, totalInverterPowerKW, invertersSummary, isZeroExport, isOffGrid, hasBattery, batteries, totalBatteryKWh, batteriesSummary, grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffUSD, tariffDOP, tariffCode, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD, paybackYearsRaw, totalPaybackMonths, paybackYearsInt, paybackMonthsInt, paybackText, paybackPct, freePct, freeYears };
+  return { savingsBasis, hasComparison, supplyKind, showsGeneratorCost, generatorCostUSD, generatorCostDOP, annualServedKWh, annualUnservedKWh, autonomyHours, panels, primaryPanel, totalPanels, systemCapacityKWp, lossesPercent, performanceRatio, inverters, totalInverterPowerKW, invertersSummary, isZeroExport, isOffGrid, hasBattery, batteries, totalBatteryKWh, batteriesSummary, grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffUSD, tariffDOP, tariffCode, tariffPrice, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD, paybackYearsRaw, totalPaybackMonths, paybackYearsInt, paybackMonthsInt, paybackText, paybackPct, freePct, freeYears };
 }
 
 export type ExecutiveSummaryModel = ReturnType<typeof executiveSummaryModel>;

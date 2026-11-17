@@ -327,7 +327,30 @@ export function resolveEnergyValuationMethod(rates: TariffBillingRatesInput | nu
   return proposalBillingTariff(rates) ? 'block_billing' : 'flat_rate';
 }
 
-export const ENERGY_VALUATION_METHOD_LABELS: Record<EnergyValuationMethod, string> = {
+export interface TariffPricePresentation {
+  method: EnergyValuationMethod;
+  /**
+   * Solo con `block_billing`: precio medio de la energía de la factura sin sistema (RD$ por kWh consumido en el año,
+   * bloques y regla de 701 kWh por mes). `undefined` sin consumo.
+   */
+  averageDOPPerKWh?: number;
+}
+
+/**
+ * Cómo presentar el precio de la energía en el documento: con facturación por bloques no hay un precio escalar, sino un
+ * precio medio resultante de los bloques; en los demás casos, el precio escalar de la propuesta. Es la misma decisión
+ * del motor (`resolveEnergyValuationMethod`); los componentes no la repiten.
+ */
+export function tariffPricePresentation(rates: TariffBillingRatesInput | null | undefined, monthlyConsumptionKWh: readonly number[]): TariffPricePresentation {
+  const tariff = resolveEnergyValuationMethod(rates) === 'block_billing' ? proposalBillingTariff(rates) : undefined;
+  if (!tariff) return { method: 'flat_rate' };
+  const total = monthlyConsumptionKWh.reduce((sum, kWh) => sum + kWhOf(kWh), 0);
+  if (!(total > 0)) return { method: 'block_billing' };
+  const chargeDOP = monthlyConsumptionKWh.reduce((sum, kWh) => sum + energyChargeDOP(tariff, kWhOf(kWh)), 0);
+  return { method: 'block_billing', averageDOPPerKWh: chargeDOP / total };
+}
+
+export const ENERGY_VALUATION_METHOD_LABELS:Record<EnergyValuationMethod, string> = {
   block_billing: 'Factura por bloques de la tarifa',
   flat_rate: 'Precio por kWh de la propuesta',
 };
