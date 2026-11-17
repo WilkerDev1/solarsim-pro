@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseDatasheetWithGemini, DATASHEET_RESPONSE_SCHEMA } from "../services/geminiDatasheetService";
-import { normalizeDatasheetResponse, planDatasheetImport, datasheetTitle, estimateMaxPvPowerKW } from "../utils/datasheetImport";
+import { normalizeDatasheetResponse, planDatasheetImport, datasheetTitle, estimateMaxPvPowerKW, refreshMaxPvEstimate } from "../utils/datasheetImport";
 import type { GeminiTransport } from "../../shared/geminiTransport";
 
 // Fichas de familia con transporte sintético: cada variante recibe sus valores; los comunes se reparten.
@@ -271,5 +271,59 @@ assert.equal(fromSheet.creates[0].item.maxPvPowerSource, undefined);
 // El esquema pide los datos de entrada DC.
 for (const key of ["mpptMaxCurrentA", "dcRatedVoltageV"])
   assert(variantProps.properties[key]?.description, key);
+
+// Revisión 3: la estimación se recalcula al editar en el diálogo.
+const base = solis.variants[0]; // 50 kW, 5 MPPT, 32 A, 600 V → 65 kW
+const asEstimated = { ...base, maxPvPowerKW: 65, maxPvPowerSource: "estimated" as const };
+const lowerAc = refreshMaxPvEstimate({ ...asEstimated, powerKW: 40 }, "inverter");
+assert.equal(lowerAc.maxPvPowerEstimateKW, 52, "1.3 × 40");
+assert.equal(lowerAc.maxPvPowerKW, 52, "una estimación aceptada sigue a la AC corregida");
+assert.equal(lowerAc.maxPvPowerSource, "estimated");
+const fewerMppt = refreshMaxPvEstimate({ ...asEstimated, mpptCount: 2 }, "inverter");
+assert.equal(fewerMppt.maxPvPowerKW, 38.4, "2×32×600");
+const cleared = refreshMaxPvEstimate({ ...asEstimated, mpptCount: undefined }, "inverter");
+assert.equal(cleared.maxPvPowerEstimateKW, undefined);
+assert.equal(cleared.maxPvPowerKW, undefined, "deja de poder estimarse: se limpia");
+assert.equal(cleared.maxPvPowerSource, undefined);
+const completed = refreshMaxPvEstimate({ ...base, mpptCount: undefined, maxPvPowerEstimateKW: undefined }, "inverter");
+assert.equal(completed.maxPvPowerEstimateKW, undefined);
+const filledIn = refreshMaxPvEstimate({ ...completed, mpptCount: 5 }, "inverter");
+assert.equal(filledIn.maxPvPowerEstimateKW, 65, "completar un dato que faltaba ofrece la estimación");
+assert.equal(filledIn.maxPvPowerKW, undefined, "ofrecida, nunca aplicada sola");
+const manual = refreshMaxPvEstimate({ ...base, powerKW: 40, maxPvPowerKW: 70 }, "inverter");
+assert.equal(manual.maxPvPowerKW, 70, "un valor manual no se toca");
+assert.equal(manual.maxPvPowerSource, undefined);
+const publishedAfter = refreshMaxPvEstimate({ ...published.variants[0], mpptCount: 4 }, "inverter");
+assert.equal(publishedAfter.maxPvPowerEstimateKW, undefined, "lo publicado en la ficha nunca ofrece estimación");
+assert.equal(publishedAfter.maxPvPowerKW, 75);
+assert.equal(refreshMaxPvEstimate({ ...base, powerKW: 40 }, "panel").maxPvPowerEstimateKW, base.maxPvPowerEstimateKW, "solo inversores");
+// Corriente y tensión DC editables en el diálogo.
+assert.equal(refreshMaxPvEstimate({ ...base, mpptMaxCurrentA: 16 }, "inverter").maxPvPowerEstimateKW, 48, "5×16×600");
+
+// Revisión 3: esquema anulable y obligatorio para las entradas DC.
+for (const key of ["mpptMaxCurrentA", "dcRatedVoltageV"]) {
+  assert.equal(variantProps.properties[key].nullable, true, `${key} anulable`);
+  assert(variantProps.required.includes(key));
+}
+
+// Revisión 3: dimensiones con 0 o parciales.
+const zeroDims = normalizeDatasheetResponse({
+  equipmentType: "panel", brand: "QA", modelSeries: "S",
+  variants: [{ modelCode: "Z", powerW: 500, dimensions: "0 x 1134 x 30 mm" }],
+});
+assert.equal(zeroDims.variants[0].dimensions, undefined, "una medida 0 no es válida");
+const partialDims = normalizeDatasheetResponse({
+  equipmentType: "panel", brand: "QA", modelSeries: "S",
+  familySpecs: { dimensions: "2000 x 1000 x 30 mm" },
+  variants: [
+    { modelCode: "P", powerW: 500, dimensions: "2465 x 1134 mm" },
+    { modelCode: "Q", powerW: 500, dimensions: "2465 x 1134 mm", lengthMm: 2465, widthMm: 1134, heightMm: 30 },
+    { modelCode: "R", powerW: 500, dimensions: "n/d" },
+  ],
+});
+assert.equal(partialDims.variants[0].dimensions, undefined, "no hereda en silencio las de la familia");
+assert(partialDims.warnings?.some((w) => /Dimensiones incompletas de P/.test(w)));
+assert.equal(partialDims.variants[1].dimensions, "2465 x 1134 x 30 mm", "las medidas propias completan el texto parcial");
+assert.equal(partialDims.variants[2].dimensions, "2000 x 1000 x 30 mm", "sin dígitos equivale a ausente");
 
 console.log("testDatasheetFamilySpecs: OK");

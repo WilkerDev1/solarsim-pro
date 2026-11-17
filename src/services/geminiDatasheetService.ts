@@ -96,7 +96,7 @@ const SPEC_DESCRIPTIONS: Record<string, string> = {
   mpptCount: "INVERSOR: número de seguidores MPPT (entero).",
   voltageV: "BATERÍA: tensión nominal en V. En inversores no se usa.",
 };
-const NULLABLE_REQUIRED = ["efficiencyPct", "isc", "imp", "maxAcPowerKW", "maxPvPowerKW", "maxPvPowerPct"];
+const NULLABLE_REQUIRED = ["efficiencyPct", "isc", "imp", "maxAcPowerKW", "maxPvPowerKW", "maxPvPowerPct", "mpptMaxCurrentA", "dcRatedVoltageV"];
 const SPEC_PROPERTIES: Record<string, SpecProperty> = {
   ...Object.fromEntries(
     ["powerW", "powerKW", "efficiencyPct", "tempCoeff", "annualDegradation", "voc", "isc", "vmp", "imp",

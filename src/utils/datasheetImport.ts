@@ -121,11 +121,36 @@ export function estimateMaxPvPowerKW(input: {
   return Math.round(Math.min(byInput, byRatio) * 10) / 10;
 }
 
+/**
+ * Recompute the optional estimate after the user edits power, MPPT count or the DC inputs.
+ * An accepted estimate follows the new inputs (or is cleared when it can no longer be computed);
+ * a value published on the datasheet or typed by hand is never touched.
+ */
+export function refreshMaxPvEstimate<T extends ExtractedEquipmentVariant>(
+  variant: T,
+  equipmentType: string,
+): T {
+  if (equipmentType !== "inverter" || variant.maxPvPowerPublished) return variant;
+  const estimate = estimateMaxPvPowerKW(variant);
+  const next: T = { ...variant, maxPvPowerEstimateKW: estimate };
+  if (estimate === undefined) delete next.maxPvPowerEstimateKW;
+  if (variant.maxPvPowerSource === "estimated") {
+    if (estimate !== undefined) next.maxPvPowerKW = estimate;
+    else {
+      delete next.maxPvPowerKW;
+      delete next.maxPvPowerSource;
+    }
+  }
+  return next;
+}
+
 function dimensionNumbers(text: unknown): [number, number, number] | null {
   if (typeof text !== "string") return null;
   const normalized = normalizeDimensionsText(text);
   const match = normalized.match(/^(\d+(?:\.\d+)?) x (\d+(?:\.\d+)?) x (\d+(?:\.\d+)?) mm$/);
-  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+  if (!match) return null;
+  const numbers: [number, number, number] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  return numbers.every((n) => n > 0) ? numbers : null;
 }
 
 const measure = (value: unknown) => {
@@ -147,6 +172,13 @@ function combineDimensions(
     return { text: normalizeDimensionsText(String(own.dimensions)) };
   const familyNumbers = dimensionNumbers(family.dimensions);
   const ownMeasures = dimensionKeys.map((key) => measure(own[key]));
+  // A partial or malformed text of the variant ("2465 x 1134 mm") must not fall back to the family's silently.
+  const unreadableOwnText =
+    isPresent(own.dimensions) && /\d/.test(String(own.dimensions));
+  if (unreadableOwnText)
+    return ownMeasures.every((n) => n !== undefined)
+      ? { text: formatDimensions(ownMeasures[0]!, ownMeasures[1]!, ownMeasures[2]!) }
+      : { partial: true };
   if (ownMeasures.every((n) => n === undefined)) {
     if (familyNumbers) return { text: formatDimensions(...familyNumbers) };
     const fromFamily = dimensionKeys.map((key) => measure(family[key]));
@@ -373,15 +405,8 @@ export function normalizeDatasheetResponse(
           if (n > 0) result[key] = n;
           else discard(key, v[key]);
         }
-        if (result.maxPvPowerKW === undefined) {
-          const estimate = estimateMaxPvPowerKW({
-            powerKW: result.powerKW,
-            mpptCount: result.mpptCount,
-            mpptMaxCurrentA: result.mpptMaxCurrentA,
-            dcRatedVoltageV: result.dcRatedVoltageV,
-          });
-          if (estimate !== undefined) result.maxPvPowerEstimateKW = estimate;
-        }
+        if (result.maxPvPowerKW !== undefined) result.maxPvPowerPublished = true;
+        else Object.assign(result, refreshMaxPvEstimate(result, "inverter"));
       }
       if (
         equipmentType === "battery" &&

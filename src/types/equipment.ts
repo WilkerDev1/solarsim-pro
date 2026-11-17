@@ -145,6 +145,8 @@ export interface ExtractedEquipmentVariant {
   mpptMaxCurrentA?: number;
   dcRatedVoltageV?: number;
   maxPvPowerEstimateKW?: number;
+  /** La ficha publicó la FV máxima (kW o %): nunca se ofrece estimación. */
+  maxPvPowerPublished?: boolean;
   maxPvPowerSource?: 'estimated';
 
   // Baterías

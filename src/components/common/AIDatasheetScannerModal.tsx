@@ -17,7 +17,7 @@ import {
 } from "../../types/equipment";
 import { parseDatasheetWithGemini } from "../../services/geminiDatasheetService";
 import { findCatalogMatchForVariant } from "../../utils/equipmentMatchingUtils";
-import { datasheetTitle } from "../../utils/datasheetImport";
+import { datasheetTitle, refreshMaxPvEstimate } from "../../utils/datasheetImport";
 import { attachImportedDatasheet, saveDatasheetLocally, type DatasheetImportReceipt } from "../../services/datasheetImportService";
 
 const technicalFields = {
@@ -37,6 +37,8 @@ const technicalFields = {
     ["maxPvPowerKW", "Máxima FV (kW)"],
     ["maxEfficiencyPct", "Eficiencia (%)"],
     ["mpptCount", "Seguidores MPPT"],
+    ["mpptMaxCurrentA", "Corriente máx. por MPPT (A)"],
+    ["dcRatedVoltageV", "Tensión nominal DC (V)"],
   ],
   battery: [
     ["capacityKWh", "Capacidad (kWh)"],
@@ -232,7 +234,10 @@ export const AIDatasheetScannerModal: React.FC = () => {
         ? {
             ...old,
             variants: old.variants.map((v) =>
-              v.id === id ? { ...v, ...updates } : v,
+              v.id === id
+                ? // Editing power, MPPT or DC inputs refreshes the optional FV máxima estimate.
+                  refreshMaxPvEstimate({ ...v, ...updates }, old.equipmentType)
+                : v,
             ),
           }
         : old,
