@@ -26,6 +26,9 @@ export const UNVERIFIED_ESTIMATE_LABEL = 'Estimado, no verificado con facturas';
 
 // ── Método de valoración vigente ──
 
+/** ¿La tarifa tiene escalones de energía? Una de precio único es un solo tramo abierto desde 0. */
+const hasEnergyBlocks = (tariff: { energyBlocks: readonly unknown[] }): boolean => tariff.energyBlocks.length > 1;
+
 export interface ValuationMethodView {
   method: EnergyValuationMethod;
   label: string;
@@ -39,7 +42,11 @@ export function describeValuationMethod(rates: UtilityRates): ValuationMethodVie
   const label = ENERGY_VALUATION_METHOD_LABELS[method];
   if (method === 'block_billing') {
     const tariff = proposalBillingTariff(rates);
-    return { method, label, detail: `Factura sin sistema menos factura con sistema, con los bloques y el cargo fijo de ${tariff?.tariffCode ?? 'la tarifa'} (${tariff?.resolutionCode ?? 'fila guardada'}).` };
+    const code = tariff?.tariffCode ?? 'la tarifa';
+    const source = tariff?.resolutionCode ?? 'fila guardada';
+    // Tarifa de precio único (BTD, MTD…): un solo tramo; el cargo de potencia queda fuera del ahorro (`shared/tariffBilling.ts`).
+    if (tariff && !hasEnergyBlocks(tariff)) return { method, label, detail: `Factura sin sistema menos factura con sistema, con el precio único de energía y el cargo fijo de ${code} (${source}). El cargo por potencia no entra en el ahorro.` };
+    return { method, label, detail: `Factura sin sistema menos factura con sistema, con los bloques y el cargo fijo de ${code} (${source}).` };
   }
   let detail: string;
   if (resolveGridConnection(rates) === 'off_grid') detail = 'Sistema aislado: se compara contra su alternativa de suministro, sin factura de la distribuidora.';
@@ -94,7 +101,7 @@ export function buildBillBreakdown(project: ProjectSimulation, calculationMode: 
   const before = monthly.map((m) => calculateMonthlyBill({ tariff, withdrawnKWh: m.consumptionKWh }));
   const lines: BillBreakdownLine[] = [
     { id: 'fixed', label: 'Cargo fijo', beforeDOP: average(before.map((b) => b.fixedChargeDOP)), afterDOP: average(year.months.map((b) => b.fixedChargeDOP)) },
-    { id: 'energy', label: 'Energía por bloques', beforeDOP: average(before.map((b) => b.energyChargeDOP)), afterDOP: average(year.months.map((b) => b.energyChargeDOP)) },
+    { id: 'energy', label: hasEnergyBlocks(tariff) ? 'Energía por bloques' : 'Energía (precio único)', beforeDOP: average(before.map((b) => b.energyChargeDOP)), afterDOP: average(year.months.map((b) => b.energyChargeDOP)) },
     { id: 'gridUse', label: 'Cargo por uso de la red', beforeDOP: 0, afterDOP: average(year.months.map((b) => b.gridUseChargeDOP)) },
   ];
   const totalBeforeDOP = average(before.map((b) => b.totalDOP));

@@ -71,6 +71,16 @@ const project = (rates: Partial<UtilityRates> = {}): ProjectSimulation => ({
   assert.match(describeValuationMethod(project({ billingTariff: undefined }).rates).detail, /no guarda la fila/);
   assert.match(describeValuationMethod(project({ ...gridConnectionFields('off_grid') }).rates).detail, /aislado/);
   assert.match(describeValuationMethod(project({ energyRateSource: undefined }).rates).detail, /anterior/);
+  // Tarifa de precio único con cargo de potencia: no se presenta como «bloques» y se avisa que la potencia queda fuera.
+  const btdPatch = referenceRatesPatch({ matrix: DEFAULT_RD_TARIFF_MATRIX, avgMonthlyConsumption: 250, dopExchangeRate: 60 }, 'EDESUR', 'BTD');
+  const btd = project({ ...btdPatch, distributor: 'EDESUR', tariffCode: 'BTD' });
+  const btdMethod = describeValuationMethod(btd.rates);
+  assert.equal(btdMethod.method, 'block_billing', 'BTD con fila guardada se valora por factura');
+  assert.match(btdMethod.detail, /precio único/);
+  assert.match(btdMethod.detail, /potencia no entra en el ahorro/);
+  assert.doesNotMatch(btdMethod.detail, /con los bloques/);
+  assert.equal(buildBillBreakdown(btd)?.lines.find((l) => l.id === 'energy')?.label, 'Energía (precio único)');
+  assert.equal(buildBillBreakdown(project())?.lines.find((l) => l.id === 'energy')?.label, 'Energía por bloques');
 }
 
 // 2. Desglose: coincide con lo que valora el motor (misma energía y mismas funciones puras).
