@@ -47,8 +47,6 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
   const [provenanceResolution, setProvenanceResolution] = useState('');
   const [provenanceDate, setProvenanceDate] = useState('');
   const [provenancePeriod, setProvenancePeriod] = useState('');
-  // Tarifas que la matriz no tiene (p. ej. BTS-VE): solo entran si el usuario las activa.
-  const [includedNewTariffs, setIncludedNewTariffs] = useState<string[]>([]);
   const [selectedDistributorTab, setSelectedDistributorTab] = useState<UtilityDistributor>('EDEESTE');
   const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
   const [appliedSuccess, setAppliedSuccess] = useState<boolean>(false);
@@ -70,12 +68,12 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
       ? { kind: 'resolution', resolutionCode: provenanceResolution, effectiveDate: provenanceDate }
       : { kind: 'distributor_table', period: provenancePeriod };
     try {
-      return { extractedMatrix: applyTariffScanReview(review, decision, includedNewTariffs), previewError: null };
+      return { extractedMatrix: applyTariffScanReview(review, decision), previewError: null };
     } catch (error: any) {
       return { extractedMatrix: null, previewError: String(error?.message || error) };
     }
-  }, [review, provenanceKind, provenanceResolution, provenanceDate, provenancePeriod, includedNewTariffs]);
-  // Cambiar la procedencia o las tarifas nuevas invalida el contraste confirmado.
+  }, [review, provenanceKind, provenanceResolution, provenanceDate, provenancePeriod]);
+  // Cambiar la procedencia invalida el contraste confirmado.
   const editReview = <T,>(setter: (value: T) => void) => (value: T) => { setter(value); setReviewConfirmed(false); setAppliedSuccess(false); };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -155,7 +153,6 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
         setProvenanceResolution(decision.kind === 'resolution' ? decision.resolutionCode : '');
         setProvenanceDate(decision.kind === 'resolution' ? decision.effectiveDate : scanned.document.effectiveDate ?? '');
         setProvenancePeriod(decision.kind === 'distributor_table' ? decision.period : scanned.document.effectiveDate?.slice(0, 7) ?? '');
-        setIncludedNewTariffs([]);
         setReview(scanned);
         setSelectedDistributorTab(scanned.rows[0]?.distributor ?? scanned.gridUseCharges[0]?.distributor ?? 'EDEESTE');
       }
@@ -326,12 +323,8 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
           {review && (() => {
             const tableMatrix = extractedMatrix ?? review.preview;
             const rowStatus = new Map(review.rows.map((row) => [tariffScanRowKey(row), row]));
-            const newRows = review.rows.filter((row) => row.status === 'new');
-            const visibleTariffs = Object.values(tableMatrix.schedules[selectedDistributorTab]?.tariffs ?? {}).filter((tariff) => {
-              const key = `${selectedDistributorTab}/${tariff.code}`;
-              return rowStatus.get(key)?.status !== 'new' || includedNewTariffs.includes(key);
-            });
-            const toggleNewTariff = editReview((key: string) => setIncludedNewTariffs((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
+            const unsupportedRows = review.rows.filter((row) => row.status === 'unsupported');
+            const visibleTariffs = Object.values(tableMatrix.schedules[selectedDistributorTab]?.tariffs ?? {});
             return (
             <div className="flex flex-col gap-5 animate-fadeIn">
               {/* Resumen de la Resolución */}
@@ -380,51 +373,60 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                   <p className="text-[11px] text-slate-500 dark:text-zinc-400">
                     El documento no {review.document.resolutionCode ? 'indica una fecha de inicio válida' : 'cita la resolución'}. Indica la resolución que lo respalda o márcalo como cuadro de la distribuidora sin resolución citada. Nada se aplica hasta que lo confirmes.
                   </p>
-                  <label className="flex items-start gap-2">
-                    <input type="radio" name="tariff-provenance" checked={provenanceKind === 'resolution'} onChange={() => editReview(setProvenanceKind)('resolution')} />
-                    <span className="flex-1 flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="tariff-provenance" checked={provenanceKind === 'resolution'} onChange={() => editReview(setProvenanceKind)('resolution')} />
                       <span>Resolución que lo respalda</span>
-                      <span className="flex flex-col sm:flex-row gap-2">
+                    </label>
+                    <div className="pl-6 flex flex-col sm:flex-row gap-2">
+                      <div className="flex-1 flex flex-col gap-1">
+                        <label htmlFor="tariff-provenance-resolution" className="text-[11px] text-slate-500 dark:text-zinc-400">Resolución</label>
                         <input
+                          id="tariff-provenance-resolution"
                           type="text"
-                          aria-label="Resolución"
                           placeholder="Ej: SIE-121-2026-TF"
+                          aria-describedby={review.suggestion ? 'tariff-provenance-suggestion' : undefined}
                           value={provenanceResolution}
                           disabled={provenanceKind !== 'resolution'}
                           onChange={(event) => editReview(setProvenanceResolution)(event.target.value)}
-                          className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] font-mono disabled:opacity-50"
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] font-mono disabled:opacity-50"
                         />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label htmlFor="tariff-provenance-date" className="text-[11px] text-slate-500 dark:text-zinc-400">Fecha de inicio</label>
                         <input
+                          id="tariff-provenance-date"
                           type="date"
-                          aria-label="Fecha de inicio"
                           value={provenanceDate}
                           disabled={provenanceKind !== 'resolution'}
                           onChange={(event) => editReview(setProvenanceDate)(event.target.value)}
                           className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] font-mono disabled:opacity-50"
                         />
-                      </span>
-                      {review.suggestion && (
-                        <span className="text-[11px] text-slate-500 dark:text-zinc-400">
-                          Sugerida: <span className="font-mono">{review.suggestion.resolutionCode}</span> ({review.suggestion.reason}). Compruébala antes de aplicar.
-                        </span>
-                      )}
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-2">
-                    <input type="radio" name="tariff-provenance" checked={provenanceKind === 'distributor_table'} onChange={() => editReview(setProvenanceKind)('distributor_table')} />
-                    <span className="flex-1 flex flex-col gap-1.5">
+                      </div>
+                    </div>
+                    {review.suggestion && (
+                      <p id="tariff-provenance-suggestion" className="pl-6 text-[11px] text-slate-500 dark:text-zinc-400">
+                        Sugerida: <span className="font-mono">{review.suggestion.resolutionCode}</span> ({review.suggestion.reason}). Compruébala antes de aplicar.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="tariff-provenance" checked={provenanceKind === 'distributor_table'} onChange={() => editReview(setProvenanceKind)('distributor_table')} />
                       <span>Cuadro de la distribuidora sin resolución citada</span>
+                    </label>
+                    <div className="pl-6 flex flex-col gap-1">
+                      <label htmlFor="tariff-provenance-period" className="text-[11px] text-slate-500 dark:text-zinc-400">Vigencia (mes y año, obligatoria)</label>
                       <input
+                        id="tariff-provenance-period"
                         type="month"
-                        aria-label="Vigencia (mes y año)"
                         value={provenancePeriod}
                         disabled={provenanceKind !== 'distributor_table'}
                         onChange={(event) => editReview(setProvenancePeriod)(event.target.value)}
                         className="w-full sm:w-48 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] font-mono disabled:opacity-50"
                       />
-                      <span className="text-[11px] text-slate-500 dark:text-zinc-400">Vigencia (mes y año) obligatoria.</span>
-                    </span>
-                  </label>
+                    </div>
+                  </div>
                 </fieldset>
               )}
 
@@ -432,22 +434,14 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                 <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">{previewError}</div>
               )}
 
-              {newRows.length > 0 && (
-                <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200 flex flex-col gap-2" data-testid="tariff-scan-new">
-                  <span className="font-semibold">Tarifas nuevas (la matriz no las tiene; no se aplican salvo que las actives)</span>
-                  {newRows.map((row) => {
-                    const key = tariffScanRowKey(row);
-                    return (
-                      <label key={key} className="flex items-start gap-2">
-                        <input type="checkbox" checked={includedNewTariffs.includes(key)} onChange={() => toggleNewTariff(key)} />
-                        <span>
-                          <span className="font-mono font-semibold">{key}</span> · {row.tariff.name} ·{' '}
-                          {row.tariff.currency === 'USD' ? `$${row.tariff.baseEnergyRateUSD?.toFixed(4)} USD/kWh` : `RD$ ${row.tariff.baseEnergyRateDOP.toFixed(2)}/kWh`}
-                          <span className="block text-[10px] opacity-80">Incorporarla la hace seleccionable en propuestas; el cargo por uso de la red la trata como tarifa sin clasificar.</span>
-                        </span>
-                      </label>
-                    );
-                  })}
+              {unsupportedRows.length > 0 && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200 flex flex-col gap-1" data-testid="tariff-scan-unsupported">
+                  <span className="font-semibold">Tarifa no soportada todavía por SolarSim: no se incorpora</span>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {unsupportedRows.map((row) => (
+                      <li key={tariffScanRowKey(row)}><span className="font-mono font-semibold">{tariffScanRowKey(row)}</span>{row.name !== row.code ? ` · ${row.name}` : ''}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
@@ -492,7 +486,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                             <span className="font-mono text-emerald-600 dark:text-emerald-400">{tariff.code}</span>
                             <span className="block text-[10px] text-slate-400 font-normal">{tariff.name}</span>
                             <span className="block text-[10px] font-normal mt-0.5">
-                              {!scanned ? 'No figura en el documento' : scanned.status === 'unchanged' ? 'Sin cambios de precio' : scanned.status === 'new' ? 'Nueva (activada)' : `Cambia: ${scanned.changedFields.map(tariffSourceFieldLabel).join(', ')}`}
+                              {!scanned ? 'No figura en el documento' : scanned.status === 'unchanged' ? 'Sin cambios de precio' : `Cambia: ${scanned.changedFields.map(tariffSourceFieldLabel).join(', ')}`}
                             </span>
                           </td>
                           <td className="p-3 font-mono font-medium">

@@ -1,6 +1,6 @@
 import { DEFAULT_GRID_EXPORT_FEE_PCT } from '../../shared/assumptions';
 import { isValidGridUseCharge, MAX_GRID_USE_CHARGE_DOP_PER_KWH } from '../../shared/netMetering';
-import { normalizeTariffCode } from '../../shared/tariffRules';
+import { normalizeTariffCode, tariffMatrixKey } from '../../shared/tariffRules';
 import { FixedChargeTier, GlobalTariffMatrix, UtilityDistributor, UtilityTariffDetails } from '../types/tariffs';
 import { getTariffSource, gridUseChargeReference, knownTariffPeriod, TARIFF_DISTRIBUTORS } from './aiTariffContext';
 
@@ -114,42 +114,54 @@ export function mergeExtractedTariffs(raw: unknown, current: GlobalTariffMatrix)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
-// Revisión del escáner de resoluciones: origen, procedencia, comparación con la matriz y tarifas nuevas.
+// Revisión del escáner de resoluciones: origen, procedencia, comparación con la matriz y tarifas no soportadas.
 // ---------------------------------------------------------------------------------------------------------------------------
 
 const fold = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 const optionalText = (value: unknown, max = 500) => (typeof value === 'string' && value.trim() && value.length <= max ? value.trim() : null);
+/** Lo observado nunca se pierde por largo: una cadena no vacía cuenta como observada (y se valida entera). */
+const observedText = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+const shown = (value: string) => (value.length > 120 ? `${value.slice(0, 120)}…` : value);
 const isIsoDate = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
 const DOMINICAN_COUNTRIES = new Set(['do', 'dom', 'rd', 'republica dominicana', 'dominican republic']);
-/** Reguladores dominicanos: Superintendencia de Electricidad (SIE) y Comisión Nacional de Energía (CNE). */
-const DOMINICAN_REGULATOR = /\b(sie|cne)\b|superintendencia de electricidad|comision nacional de energia/;
+/**
+ * Reguladores claramente extranjeros (Argentina, Colombia, México, Perú, Centroamérica, Uruguay, Brasil…). Un regulador o emisor
+ * dominicano distinto de SIE/CNE (Ministerio de Energía y Minas, la propia distribuidora, «Dirección Comercial») no rechaza.
+ */
+const FOREIGN_REGULATOR = /\b(enre|enrege|enargas|epre|ersep|creg|cre|osinergmin|aresep|siget|cnee|asep|ursea|aneel|ofgem|ferc|cnmc)\b|ente nacional regulador|comision reguladora de energia|comision de regulacion de energia/;
+/** Palabras con las que se escribe una moneda dominicana o el dólar (DOP, USD, RD$, pesos dominicanos, dólares). */
+const DOMINICAN_CURRENCY_WORDS = /\b(dop|usd|pesos?|dominicanos?|dolar(es)?|estadounidenses?|americanos?|de|los|eeuu|ee\.uu\.)\b|rd\$|us\$|\$|[()\-.,/]/g;
+const isDominicanCurrency = (value: string) => fold(value).replace(DOMINICAN_CURRENCY_WORDS, '').trim() === '';
 /** Familias de códigos del pliego dominicano (EDE: BTS, BTD, BTH, MTD, MTH, VMT…; CEPM: RBT, RMT, ESTRBT). Ya normalizados. */
 const DOMINICAN_TARIFF_CODE = /^(BTS|BTD|BTH|MTD|MTH|MTS|ATD|ATH|VMT|RBT|RMT|ESTRBT)/;
+/** Código de resolución real (SIE-121-2026-TF, CNE-…); excluye marcadores internos de procedencia. */
+const REAL_RESOLUTION = /^(SIE|CNE)-\d{1,4}-\d{4}(?:-[A-Z]{2,4})?$/i;
 
 export interface TariffScanOrigin { country: string | null; regulator: string | null; currency: string | null }
 
 /**
  * El escáner solo acepta pliegos de República Dominicana. La extracción declara país, regulador y moneda observados (`null` si
- * el documento no los muestra); se rechaza cualquier otro país, un regulador que no sea la SIE o la CNE, una moneda distinta de
- * DOP o USD y códigos que no casan con los dominicanos, aunque la distribuidora se llame igual (EDESUR existe en Argentina).
+ * el documento no los muestra). Se rechaza otro país, un regulador claramente extranjero (ENRE, ENReGE, CREG, CRE…), una moneda
+ * que no sea DOP o USD y códigos que no casan con los dominicanos, aunque la distribuidora se llame igual (EDESUR existe en
+ * Argentina). Un regulador dominicano distinto de SIE/CNE no rechaza.
  */
 export function assertDominicanTariffOrigin(raw: unknown): TariffScanOrigin {
   if (!record(raw)) throw new Error('La extracción no contiene distribuidoras válidas.');
-  const currency = optionalText(raw.currency, 20)?.toUpperCase() ?? null;
-  const origin: TariffScanOrigin = { country: optionalText(raw.country, 100), regulator: optionalText(raw.regulator, 200), currency };
+  const origin: TariffScanOrigin = { country: observedText(raw.country), regulator: observedText(raw.regulator), currency: observedText(raw.currency) };
   const problems: string[] = [];
-  if (origin.country && !DOMINICAN_COUNTRIES.has(fold(origin.country))) problems.push(`país «${origin.country}»`);
-  if (origin.regulator && !DOMINICAN_REGULATOR.test(fold(origin.regulator))) problems.push(`regulador «${origin.regulator}»`);
+  const foreignCountry = !!origin.country && !DOMINICAN_COUNTRIES.has(fold(origin.country));
+  if (foreignCountry) problems.push(`país «${shown(origin.country!)}»`);
+  if (origin.regulator && (foreignCountry || FOREIGN_REGULATOR.test(fold(origin.regulator)))) problems.push(`regulador «${shown(origin.regulator)}»`);
   const schedules = record(raw.schedules) ? Object.entries(raw.schedules) : [];
   const tariffs = schedules.flatMap(([, schedule]) => (record(schedule) && record(schedule.tariffs) ? Object.entries(schedule.tariffs) : []));
-  const currencies = new Set([currency, ...tariffs.map(([, tariff]) => (record(tariff) && typeof tariff.currency === 'string' ? tariff.currency.trim().toUpperCase() : null))]
-    .filter((value): value is string => !!value && value !== 'DOP' && value !== 'USD'));
-  if (currencies.size) problems.push(`moneda ${[...currencies].map((value) => `«${value}»`).join(', ')}`);
+  const currencies = new Set([origin.currency, ...tariffs.map(([, tariff]) => (record(tariff) ? observedText(tariff.currency) : null))]
+    .filter((value): value is string => !!value && !isDominicanCurrency(value)));
+  if (currencies.size) problems.push(`moneda ${[...currencies].map((value) => `«${shown(value)}»`).join(', ')}`);
   const foreignCodes = tariffs.map(([code]) => code).filter((code) => !DOMINICAN_TARIFF_CODE.test(normalizeTariffCode(code)));
   if (foreignCodes.length) problems.push(`códigos ${foreignCodes.slice(0, 5).join(', ')}${foreignCodes.length > 5 ? '…' : ''} que no son del pliego dominicano`);
   if (problems.length) {
     const names = schedules.map(([name]) => name).slice(0, 4);
-    throw new Error(`El documento no es un pliego tarifario de República Dominicana (${problems.join('; ')})${names.length ? `, aunque la distribuidora figure como ${names.map((name) => `«${name}»`).join(', ')}` : ''}. Solo se aceptan resoluciones de la SIE o la CNE y cuadros de EDEESTE, EDESUR, EDENORTE o CEPM con precios en DOP o USD. No se aplicó nada.`);
+    throw new Error(`El documento no es un pliego tarifario de República Dominicana (${problems.join('; ')})${names.length ? `, aunque la distribuidora figure como ${names.map((name) => `«${name}»`).join(', ')}` : ''}. Solo se aceptan resoluciones y cuadros de EDEESTE, EDESUR, EDENORTE o CEPM con precios en DOP o USD. No se aplicó nada.`);
   }
   return origin;
 }
@@ -161,20 +173,22 @@ export type TariffProvenanceDecision =
 
 export interface TariffScanRow {
   distributor: UtilityDistributor;
+  /** Clave de la matriz (normalizada) o, en una tarifa no soportada, el código tal como figura. */
   code: string;
-  /** `new`: la matriz no tiene esa tarifa; solo se aplica si el usuario la activa. */
-  status: 'unchanged' | 'changed' | 'new';
+  name: string;
+  /** `unsupported`: SolarSim todavía no la soporta (la matriz no tiene esa tarifa); se muestra y se descarta, nunca se incorpora. */
+  status: 'unchanged' | 'changed' | 'unsupported';
   changedFields: string[];
-  /** Fila validada tal como quedaría (para mostrarla en la revisión). */
-  tariff: UtilityTariffDetails;
+  /** Fila validada tal como quedaría (no existe en las no soportadas, que no se validan). */
+  tariff?: UtilityTariffDetails;
 }
 
 export interface TariffScanReview {
   /** Matriz sobre la que se extrajo; aplicar sobre otra exige volver a escanear. */
   basis: GlobalTariffMatrix;
-  /** Vista previa con todas las filas (también las nuevas) y procedencia provisional. Solo para mostrar; nunca se aplica. */
+  /** Vista previa con procedencia provisional. Solo para mostrar; nunca se aplica. */
   preview: GlobalTariffMatrix;
-  /** Borrador validado con los códigos casados con las filas de la matriz. */
+  /** Borrador validado, solo con tarifas soportadas y con sus claves normalizadas. */
   draft: Record<string, unknown> & { schedules: Record<string, Record<string, unknown>> };
   origin: TariffScanOrigin;
   document: { resolutionCode: string | null; effectiveDate: string | null; publishedBy: string | null };
@@ -187,6 +201,8 @@ export interface TariffScanReview {
   gridUseCharges: Array<{ distributor: UtilityDistributor; dopPerKWh: number; status: 'unchanged' | 'changed' }>;
   /** `false`: todas las cifras documentadas de tarifas existentes coinciden con la matriz («sin cambios de precio»). */
   priceChanges: boolean;
+  /** Hay algo soportado que aplicar (tarifas existentes o cargo por uso de la red). */
+  applicable: boolean;
 }
 
 const PENDING = 'Procedencia pendiente de revisión';
@@ -195,24 +211,35 @@ const sameRanges = (a: Array<{ minKWh: number; maxKWh: number | null }> | undefi
   !!a && !!b && a.length === b.length && a.every((item, index) => sameNumber(item.minKWh, b[index].minKWh) && (item.maxKWh ?? Infinity) === (b[index].maxKWh ?? Infinity) && sameNumber(rate(item), rate(b[index])));
 const RESOLUTION_IN_TEXT = /\b(SIE|CNE)-\d{1,4}-\d{4}(?:-[A-Z]{2,4})?\b/i;
 
+/** Clave de la fila de la matriz para un código escrito de cualquier forma (BTS-1, «bts 1», RBT1), o `null` si no existe. */
+function matrixRowKey(distributor: UtilityDistributor, code: string, existing: Record<string, UtilityTariffDetails>): string | null {
+  for (const key of [normalizeTariffCode(code), tariffMatrixKey(distributor, code)]) if (key && existing[key]) return key;
+  return null;
+}
+
 /**
- * Prepara la revisión de una extracción sin aplicarla: comprueba el origen, valida filas y bloques con las mismas reglas que
- * `mergeExtractedTariffs`, casa los códigos con las filas de la matriz (BTS-1 → BTS1), compara las cifras con la matriz vigente
- * y, si el documento no cita resolución, sugiere una (nota del usuario, valores idénticos a una resolución de la matriz o
- * periodo conocido) sin aplicarla.
+ * Prepara la revisión de una extracción sin aplicarla: comprueba el origen, casa los códigos con las filas de la matriz (siempre
+ * normalizados), separa las tarifas que SolarSim no soporta todavía (se muestran y se descartan), valida las demás con las mismas
+ * reglas que `mergeExtractedTariffs`, compara sus cifras con la matriz vigente y, si el documento no cita resolución, sugiere una
+ * resolución real (nota del usuario, valores idénticos o periodo conocido de la matriz) sin aplicarla.
  */
 export function prepareTariffScanReview(raw: unknown, current: GlobalTariffMatrix, userNotes?: string): TariffScanReview {
   const origin = assertDominicanTariffOrigin(raw);
   const source = raw as Record<string, unknown>;
   if (!record(source.schedules)) throw new Error('La extracción no contiene distribuidoras válidas.');
   const schedules: Record<string, Record<string, unknown>> = {};
+  const unsupported: TariffScanRow[] = [];
   for (const [distributor, schedule] of Object.entries(source.schedules)) {
     if (!TARIFF_DISTRIBUTORS.includes(distributor as UtilityDistributor)) throw new Error(`Distribuidora no reconocida: ${distributor}.`);
     if (!record(schedule) || (schedule.tariffs != null && !record(schedule.tariffs))) throw new Error(`Tarifas inválidas de ${distributor}.`);
-    const existing = current.schedules[distributor as UtilityDistributor].tariffs;
+    const dist = distributor as UtilityDistributor;
     const tariffs: Record<string, unknown> = {};
     for (const [code, value] of Object.entries((schedule.tariffs ?? {}) as Record<string, unknown>)) {
-      const key = existing[normalizeTariffCode(code)] ? normalizeTariffCode(code) : code;
+      const key = matrixRowKey(dist, code, current.schedules[dist].tariffs);
+      if (!key) {
+        unsupported.push({ distributor: dist, code: code.trim().slice(0, 40), name: record(value) && typeof value.name === 'string' ? value.name.slice(0, 200) : code.trim().slice(0, 40), status: 'unsupported', changedFields: [] });
+        continue;
+      }
       if (key in tariffs) throw new Error(`La tarifa ${distributor}/${key} aparece repetida en la extracción.`);
       tariffs[key] = record(value) && 'code' in value ? { ...value, code: key } : value;
     }
@@ -224,23 +251,28 @@ export function prepareTariffScanReview(raw: unknown, current: GlobalTariffMatri
     publishedBy: optionalText(source.publishedBy),
   };
   const draft = { ...source, schedules };
-  // Valida todo (también las tarifas nuevas) con una procedencia provisional que nunca se aplica.
-  const preview = mergeExtractedTariffs({ ...draft, resolutionCode: document.resolutionCode ?? PENDING, effectiveDate: document.effectiveDate ?? '2000-01-01', publishedBy: document.publishedBy ?? PENDING }, current);
+  const supportedCount = Object.values(schedules).reduce((count, schedule) => count + Object.keys(schedule.tariffs as object).length, 0);
+  const hasCharges = Object.values(schedules).some((schedule) => schedule.gridUseChargeDOPPerKWh != null);
+  const applicable = supportedCount > 0 || hasCharges;
+  // Valida lo soportado con una procedencia provisional que nunca se aplica.
+  const preview = applicable
+    ? mergeExtractedTariffs({ ...draft, resolutionCode: document.resolutionCode ?? PENDING, effectiveDate: document.effectiveDate ?? '2000-01-01', publishedBy: document.publishedBy ?? PENDING }, current)
+    : current;
 
   const rows: TariffScanRow[] = [];
   for (const [distributor, schedule] of Object.entries(schedules) as Array<[UtilityDistributor, Record<string, unknown>]>) {
     for (const [code, value] of Object.entries(schedule.tariffs as Record<string, Record<string, unknown>>)) {
       const tariff = preview.schedules[distributor].tariffs[code];
       const old = current.schedules[distributor].tariffs[code];
-      if (!old) { rows.push({ distributor, code, status: 'new', changedFields: [], tariff }); continue; }
       const changedFields = old.currency !== tariff.currency ? ['currency'] : [
         ...numericFields.filter((field) => value[field] != null && !sameNumber(old[field], tariff[field])),
         ...(value.blocks != null && !sameRanges(old.blocks, tariff.blocks, (block) => block.rateDOP) ? ['blocks'] : []),
         ...(value.fixedChargeTiersDOP != null && !sameRanges(old.fixedChargeTiersDOP, tariff.fixedChargeTiersDOP, (tier) => tier.chargeDOP) ? ['fixedChargeTiersDOP'] : []),
       ];
-      rows.push({ distributor, code, status: changedFields.length ? 'changed' : 'unchanged', changedFields, tariff });
+      rows.push({ distributor, code, name: tariff.name, status: changedFields.length ? 'changed' : 'unchanged', changedFields, tariff });
     }
   }
+  rows.push(...unsupported);
   const gridUseCharges = (Object.entries(schedules) as Array<[UtilityDistributor, Record<string, unknown>]>)
     .filter(([, schedule]) => schedule.gridUseChargeDOPPerKWh != null)
     .map(([distributor, schedule]) => {
@@ -253,50 +285,54 @@ export function prepareTariffScanReview(raw: unknown, current: GlobalTariffMatri
   if (!document.resolutionCode) {
     const fromUser = userNotes?.match(RESOLUTION_IN_TEXT)?.[0];
     const fromNotes = typeof source.notes === 'string' ? source.notes.match(RESOLUTION_IN_TEXT)?.[0] : undefined;
-    const compared = rows.filter((row) => row.status !== 'new');
+    const compared = rows.filter((row) => row.status !== 'unsupported');
     const matchedSources = new Set(compared.map((row) => getTariffSource(current, current.schedules[row.distributor].tariffs[row.code]).resolutionCode));
+    const matched = matchedSources.size === 1 ? [...matchedSources][0] : undefined;
     const periodSource = document.effectiveDate && [...new Set(Object.keys(schedules).flatMap((distributor) => Object.values(current.schedules[distributor as UtilityDistributor].tariffs).map((tariff) => getTariffSource(current, tariff).resolutionCode)))]
-      .find((code) => { const period = knownTariffPeriod(code); return !!period && document.effectiveDate! >= period.start && document.effectiveDate! <= period.end; });
+      .find((code) => { const period = knownTariffPeriod(code); return REAL_RESOLUTION.test(code) && !!period && document.effectiveDate! >= period.start && document.effectiveDate! <= period.end; });
     if (fromUser) suggestion = { resolutionCode: fromUser.toUpperCase(), reason: 'indicada en tu nota' };
     else if (fromNotes) suggestion = { resolutionCode: fromNotes.toUpperCase(), reason: 'mencionada en las notas de la extracción' };
-    else if (compared.length && !priceChanges && matchedSources.size === 1) suggestion = { resolutionCode: [...matchedSources][0], reason: `los valores coinciden con ${[...matchedSources][0]} de la matriz vigente` };
+    else if (compared.length && !priceChanges && matched && REAL_RESOLUTION.test(matched)) suggestion = { resolutionCode: matched, reason: `los valores coinciden con ${matched} de la matriz vigente` };
     else if (periodSource) suggestion = { resolutionCode: periodSource, reason: `es la resolución de la matriz para ese periodo (${knownTariffPeriod(periodSource)!.label})` };
   }
   const resolutionCode = document.resolutionCode ?? suggestion?.resolutionCode;
   const defaultDecision: TariffProvenanceDecision = resolutionCode
     ? { kind: 'resolution', resolutionCode, effectiveDate: document.effectiveDate ?? '' }
     : { kind: 'distributor_table', period: document.effectiveDate?.slice(0, 7) ?? '' };
-  return { basis: current, preview, draft, origin, document, provenanceRequired: !document.resolutionCode || !document.effectiveDate, suggestion, defaultDecision, rows, gridUseCharges, priceChanges };
+  return { basis: current, preview, draft, origin, document, provenanceRequired: !document.resolutionCode || !document.effectiveDate, suggestion, defaultDecision, rows, gridUseCharges, priceChanges, applicable };
 }
 
-/** Clave de una tarifa en la lista de tarifas nuevas activadas: `DISTRIBUIDORA/CÓDIGO`. */
+/** Clave de una fila de la revisión: `DISTRIBUIDORA/CÓDIGO`. */
 export const tariffScanRowKey = (row: Pick<TariffScanRow, 'distributor' | 'code'>) => `${row.distributor}/${row.code}`;
 
-/** Resumen en una o dos frases para la revisión: cambios de precio frente a la matriz vigente y tarifas nuevas. */
+/** Resumen en una o dos frases para la revisión: cambios de precio frente a la matriz vigente y tarifas no soportadas. */
 export function summarizeTariffScan(review: TariffScanReview): string {
   const count = (status: TariffScanRow['status']) => review.rows.filter((row) => row.status === status).length;
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const unchanged = count('unchanged');
   const changed = count('changed');
-  const fresh = review.rows.filter((row) => row.status === 'new');
+  const unsupported = review.rows.filter((row) => row.status === 'unsupported');
   const reference = `la matriz vigente (${review.basis.resolutionCode})`;
-  const parts = [!review.priceChanges
-    ? unchanged
-      ? `Sin cambios de precio: ${plural(unchanged, 'tarifa')} ${unchanged === 1 ? 'coincide' : 'coinciden'}${review.gridUseCharges.length ? ', igual que el cargo por uso de la red,' : ''} con ${reference}.`
-      : `Sin cambios de precio en las tarifas que ya tiene ${reference}.`
-    : `${plural(changed, 'tarifa')} con cambios de precio y ${unchanged} sin cambios frente a ${reference}${review.gridUseCharges.some((charge) => charge.status === 'changed') ? '; cambia el cargo por uso de la red' : ''}.`];
-  if (fresh.length) {
-    const one = fresh.length === 1;
-    parts.push(`${one ? '1 tarifa nueva' : `${fresh.length} tarifas nuevas`} que la matriz no tiene (${fresh.map(tariffScanRowKey).join(', ')}): no se ${one ? 'aplica salvo que la actives' : 'aplican salvo que las actives'}.`);
+  const parts = [!review.applicable
+    ? 'Nada que aplicar: el documento solo trae tarifas no soportadas todavía por SolarSim.'
+    : !review.priceChanges
+      ? unchanged
+        ? `Sin cambios de precio: ${plural(unchanged, 'tarifa')} ${unchanged === 1 ? 'coincide' : 'coinciden'}${review.gridUseCharges.length ? ', igual que el cargo por uso de la red,' : ''} con ${reference}.`
+        : `Sin cambios de precio en las tarifas que ya tiene ${reference}.`
+      : `${plural(changed, 'tarifa')} con cambios de precio y ${unchanged} sin cambios frente a ${reference}${review.gridUseCharges.some((charge) => charge.status === 'changed') ? '; cambia el cargo por uso de la red' : ''}.`];
+  if (unsupported.length) {
+    const one = unsupported.length === 1;
+    parts.push(`${one ? 'Tarifa no soportada todavía por SolarSim' : 'Tarifas no soportadas todavía por SolarSim'} (${unsupported.map(tariffScanRowKey).join(', ')}): no se ${one ? 'incorpora' : 'incorporan'}.`);
   }
   return parts.join(' ');
 }
 
 /**
- * Aplica la revisión con la procedencia confirmada por el usuario. Las tarifas nuevas solo entran si están en `includeNew`
- * (claves `DISTRIBUIDORA/CÓDIGO`). Una procedencia tecleada o un cuadro sin resolución quedan declarados en las notas.
+ * Aplica la revisión con la procedencia confirmada por el usuario. Las tarifas no soportadas nunca entran. Una procedencia
+ * tecleada o un cuadro sin resolución quedan declarados en las notas.
  */
-export function applyTariffScanReview(review: TariffScanReview, decision: TariffProvenanceDecision, includeNew: readonly string[] = []): GlobalTariffMatrix {
+export function applyTariffScanReview(review: TariffScanReview, decision: TariffProvenanceDecision): GlobalTariffMatrix {
+  if (!review.applicable) throw new Error('Nada que aplicar: el documento solo trae tarifas no soportadas todavía por SolarSim.');
   let resolutionCode: string;
   let effectiveDate: string;
   const declared: string[] = [];
@@ -313,16 +349,10 @@ export function applyTariffScanReview(review: TariffScanReview, decision: Tariff
     effectiveDate = `${decision.period}-01`;
     declared.push(`Cuadro de la distribuidora sin resolución citada; vigencia ${decision.period} indicada por el usuario.`);
   }
-  const included = new Set(includeNew);
-  const skipped = new Set(review.rows.filter((row) => row.status === 'new' && !included.has(tariffScanRowKey(row))).map(tariffScanRowKey));
-  const schedules = Object.fromEntries(Object.entries(review.draft.schedules).map(([distributor, schedule]) => [distributor, {
-    ...schedule,
-    tariffs: Object.fromEntries(Object.entries((schedule.tariffs ?? {}) as Record<string, unknown>).filter(([code]) => !skipped.has(`${distributor}/${code}`))),
-  }]));
-  const remaining = review.rows.length - skipped.size;
-  if (!remaining && !review.gridUseCharges.length) throw new Error('No queda nada que aplicar: el documento solo trae tarifas nuevas y no activaste ninguna.');
+  const unsupported = review.rows.filter((row) => row.status === 'unsupported').map(tariffScanRowKey);
+  if (unsupported.length) declared.push(`Descartadas por no estar soportadas todavía por SolarSim: ${unsupported.join(', ')}.`);
   const notes = [...declared, typeof review.draft.notes === 'string' ? review.draft.notes : ''].filter(Boolean).join('\n');
-  return mergeExtractedTariffs({ ...review.draft, schedules, resolutionCode, effectiveDate, publishedBy: review.document.publishedBy ?? 'Emisor no indicado en el documento', notes }, review.basis);
+  return mergeExtractedTariffs({ ...review.draft, resolutionCode, effectiveDate, publishedBy: review.document.publishedBy ?? 'Emisor no indicado en el documento', notes }, review.basis);
 }
 
 /**

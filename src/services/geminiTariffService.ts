@@ -32,14 +32,15 @@ export class GeminiTariffService {
   }
 
   /**
-   * Ruta estricta (sin revisión interactiva): exige resolución y fecha del documento y no incorpora tarifas nuevas.
+   * Ruta estricta (sin revisión interactiva): exige resolución, fecha y emisor del documento y descarta las tarifas que
+   * SolarSim no soporta todavía.
    */
   static async extractTariffMatrixFromDocument(params: ExtractTariffResolutionParams): Promise<GlobalTariffMatrix> {
     const raw = await GeminiTariffService.requestExtraction(params);
     const current = params.currentMatrix ?? DEFAULT_RD_TARIFF_MATRIX;
     const review = prepareTariffScanReview(raw, current, params.userPromptNotes);
-    // Sin resolución o fecha del documento, el mismo error de siempre (la revisión del modal permite indicarlas).
-    if (review.provenanceRequired) mergeExtractedTariffs(raw, current);
+    // Sin resolución, fecha o emisor del documento, el mismo error de siempre (la revisión del modal permite indicar la procedencia).
+    if (review.provenanceRequired || !review.document.publishedBy) mergeExtractedTariffs(raw, current);
     return applyTariffScanReview(review, review.defaultDecision);
   }
 

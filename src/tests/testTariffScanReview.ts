@@ -6,7 +6,8 @@ import type { GeminiTransport } from '../../shared/geminiTransport';
 
 /**
  * Escáner de resoluciones: cuadros de la distribuidora sin resolución citada (revisión con procedencia pedida, nada se aplica
- * sin confirmación), comparación con la matriz vigente («sin cambios de precio»), tarifas nuevas opt-in y rechazo por origen
+ * sin confirmación), comparación con la matriz vigente («sin cambios de precio»), tarifas no soportadas (se muestran y se
+ * descartan) y rechazo por origen
  * de documentos de otro país aunque la distribuidora se llame igual. Transporte sintético; nunca red real.
  */
 
@@ -227,4 +228,4 @@ assert.throws(() => assertDominicanTariffOrigin({ ...edesurCuadro, country: 'AR'
   assert.equal(strict.schedules.EDESUR.tariffs['BTS-VE'], undefined);
 }
 
-console.log('PASS escáner de resoluciones: cuadro sin resolución, sin cambios, tarifas nuevas opt-in y rechazo por origen');
+console.log('PASS escáner de resoluciones: cuadro sin resolución, sin cambios, tarifas no soportadas descartadas y rechazo por origen');
