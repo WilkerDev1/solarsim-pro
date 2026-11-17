@@ -18,6 +18,7 @@ import { useEnergyCalculationMode } from '../../../../features/application/useAp
 import { draftDocumentTextCatalog } from '../../../../utils/draftDocumentTexts';
 import { aiWorkspaceKey, proposalFileType, readProposalFile, PROPOSAL_FILES_LIMIT } from '../workspace';
 import { blocksPreview, buildIssueModel } from '../reviewIssues';
+import { restoreComposerText } from '../../../../features/assistant/chatUi';
 
 export interface ProposalMessage { role: 'user' | 'assistant'; text: string; files?: string[]; kind?: 'error' }
 export function useAIInvoiceScanner() {
@@ -109,12 +110,17 @@ export function useAIInvoiceScanner() {
     setIsProcessing(true); setErrorMsg(null); setReviewConfirmed(false);
     const userMessage:ProposalMessage={role:'user',text:prompt.trim() || 'Analizar los documentos adjuntos',files:files.map(f=>f.name)};
     setMessages(previous=>[...previous,userMessage]);
+    // El texto enviado sale del compositor al enviar (ya vive en la conversación); solo vuelve si el envío falla antes de salir.
+    const sentPrompt = prompt;
+    let dispatched = false;
+    setPrompt('');
     const isCurrent = () => sequence.current === id && useSimulationStore.getState().isAIInvoiceModalOpen
       && aiWorkspaceKey(useSimulationStore.getState()) === capturedWorkspace
       && (!capturedTarget || useSimulationStore.getState().activeProjectId === capturedTarget);
     try {
       const attachments = await Promise.all(files.map(async f => ({ fileBase64: await readProposalFile(f.file), mimeType:f.type, fileName:f.name })));
       if (!isCurrent()) return;
+      dispatched = true;
       const payload = { apiKey:geminiApiKey, model:geminiModel, files:attachments,
         projectRequirementsText:prompt.trim() || 'Analiza los documentos adjuntos conservando los acuerdos del borrador.',
         equipmentCatalog, dopExchangeRate: extractedData?.dopExchangeRate ?? resolveAssumption('dopExchangeRate', target?.specs.dopExchangeRate, target?.rates.usdExchangeRate),
@@ -132,9 +138,8 @@ export function useAIInvoiceScanner() {
       if (!isCurrent()) return;
       if (result.province) result.province = getProvinceHSP(result.province).name;
       if(result.responseKind!=='discussion'){setExtractedData(result);setDraftScope(scope);setDraftGeneration(n=>n+1);}
-      setPrompt('');
       setMessages(previous => [...previous,{role:'assistant',text:result.assistantMessage || result.aiReasoningSummary || 'Preparé un borrador. Revisemos los datos antes de aplicarlo.'}]);
-    } catch (error) { if (isCurrent()) {const text=(error as Error).message || 'No se pudo analizar la entrada. Reintenta.';setErrorMsg(text);setMessages(previous=>[...previous,{role:'assistant',kind:'error',text}]);} }
+    } catch (error) { if (isCurrent()) {if(!dispatched)setPrompt(current=>restoreComposerText(current,sentPrompt));const text=(error as Error).message || 'No se pudo analizar la entrada. Reintenta.';setErrorMsg(text);setMessages(previous=>[...previous,{role:'assistant',kind:'error',text}]);} }
     finally { if (isCurrent()) setIsProcessing(false); }
   };
   const validatedDraft = useMemo(() => extractedData ? normalizeProposalDraft(extractedData, equipmentCatalog, context) : null, [extractedData, equipmentCatalog, context]);

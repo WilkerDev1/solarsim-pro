@@ -117,7 +117,8 @@ const isNativePlan = (plan: unknown): plan is NativePlan => !!plan && typeof (pl
 function runNativePlan(plan: NativePlan, meta: PlanMeta) {
   const execution = plan.execute();
   const activityId = store().recordAgentActivity({
-    ...meta, targetType: plan.targetType, targetId: execution.targetId, title: plan.title, changes: plan.changes, undo: execution.undo,
+    ...meta, targetType: plan.targetType, targetId: execution.targetId, title: plan.title, changes: execution.changes ?? plan.changes, undo: execution.undo,
+    ...(execution.subject ? { subject: execution.subject } : {}),
   });
   return { activityId, execution };
 }
@@ -299,7 +300,7 @@ export async function executeForAssistant(call: AgentToolCall, ctx: AgentToolCon
     const action: AssistantAction = isNativePlan(pending.plan)
       // Native plans are shown with their human-readable changes; confirmation always goes through the queue by id.
       ? { id: pending.id, kind: pending.plan.targetType === 'equipment' ? 'equipment' : 'project', targetType: pending.plan.targetType,
-          impact: nativeImpact(pending.tool, pending.plan.targetType), targetId: '', title: pending.title, fingerprint: '', owner: ctx.owner,
+          impact: pending.plan.impact ?? nativeImpact(pending.tool, pending.plan.targetType), targetId: '', title: pending.title, fingerprint: '', owner: ctx.owner,
           edits: pending.changes.map((c) => ({ section: 'client' as const, field: c.label, value: c.value })) }
       : (pending.plan as AssistantAction);
     return { data: { status: 'pending_confirmation', changes: pending.changes }, cards, action };

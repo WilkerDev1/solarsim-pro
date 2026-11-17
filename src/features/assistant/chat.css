@@ -217,6 +217,17 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.assistant-subject {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+.assistant-subject[data-outside] {
+  padding: 6px 8px;
+  border: 1px solid #d9a441;
+  border-radius: 8px;
+  background: rgba(217, 164, 65, 0.14);
+  color: #f6d58e;
+}
 .assistant-preview {
   max-width: 100%;
   max-height: 220px;
