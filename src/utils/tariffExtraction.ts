@@ -43,7 +43,7 @@ export function mergeExtractedTariffs(raw: unknown, current: GlobalTariffMatrix)
   let chargesUpdated = 0;
   for (const [distributor, schedule] of Object.entries(raw.schedules)) {
     if (!TARIFF_DISTRIBUTORS.includes(distributor as UtilityDistributor)) throw new Error(`Distribuidora no reconocida: ${distributor}.`);
-    if (!record(schedule) || (schedule.tariffs !== undefined && !record(schedule.tariffs))) throw new Error(`Tarifas inválidas de ${distributor}.`);
+    if (!record(schedule) || (schedule.tariffs != null && !record(schedule.tariffs))) throw new Error(`Tarifas inválidas de ${distributor}.`);
     const target = schedules[distributor as UtilityDistributor];
     // Cargo por uso de la red (RD$/kWh inyectado): ausente o null = no documentado (conserva el anterior y su fuente).
     const charge = schedule.gridUseChargeDOPPerKWh;
@@ -53,7 +53,7 @@ export function mergeExtractedTariffs(raw: unknown, current: GlobalTariffMatrix)
       target.gridUseChargeSource = { resolutionCode, effectiveDate, publishedBy };
       chargesUpdated++;
     }
-    for (const [code, value] of Object.entries(schedule.tariffs ?? {})) {
+    for (const [code, value] of Object.entries((schedule.tariffs ?? {}) as Record<string, unknown>)) {
       if (!/^[A-Z][A-Z0-9-]{1,20}$/.test(code) || !record(value)) throw new Error('Código de tarifa inválido.');
       if (value.currency !== 'DOP' && value.currency !== 'USD') throw new Error(`La tarifa ${distributor}/${code} no indica moneda válida.`);
       const currency = value.currency;
@@ -112,11 +112,38 @@ export function mergeExtractedTariffs(raw: unknown, current: GlobalTariffMatrix)
   };
 }
 
+/**
+ * Lo guardado nunca rompe la lectura (ADR 0003): unos rangos de cargo fijo incoherentes con `fixedChargeDOP` (p. ej. se editó el
+ * cargo a mano) se alinean (el último rango toma el cargo fijo) y, si aun así no son válidos, se descartan; un cargo por uso de
+ * la red fuera de rango se descarta. La validación estricta es solo para lo que entra del escáner.
+ */
+function healStoredTariffExtras(matrix: GlobalTariffMatrix): GlobalTariffMatrix {
+  const healed = structuredClone(matrix);
+  for (const dist of TARIFF_DISTRIBUTORS) {
+    const schedule = healed.schedules[dist];
+    if (schedule.gridUseChargeDOPPerKWh !== undefined && !isValidGridUseCharge(schedule.gridUseChargeDOPPerKWh)) {
+      delete schedule.gridUseChargeDOPPerKWh;
+      delete schedule.gridUseChargeSource;
+    }
+    for (const tariff of Object.values(schedule.tariffs)) {
+      if (tariff.fixedChargeTiersDOP === undefined || tariff.fixedChargeTiersDOP === null) continue;
+      const fixed = tariff.currency === 'USD' ? tariff.fixedChargeUSD : tariff.fixedChargeDOP;
+      const attempt = (tiers: unknown) => { try { return parseFixedChargeTiers(tiers, tariff.currency, fixed as number, ''); } catch { return undefined; } };
+      const last = Array.isArray(tariff.fixedChargeTiersDOP) ? tariff.fixedChargeTiersDOP[tariff.fixedChargeTiersDOP.length - 1] : undefined;
+      const aligned = Array.isArray(tariff.fixedChargeTiersDOP) && record(last) ? [...tariff.fixedChargeTiersDOP.slice(0, -1), { ...last, chargeDOP: fixed }] : undefined;
+      const tiers = attempt(tariff.fixedChargeTiersDOP) ?? attempt(aligned);
+      if (tiers) tariff.fixedChargeTiersDOP = tiers;
+      else delete tariff.fixedChargeTiersDOP;
+    }
+  }
+  return healed;
+}
+
 /** JSON persistence converts Infinity to null. Restore only the last open block, with full validation. */
 export function normalizeStoredTariffMatrix(raw: unknown): GlobalTariffMatrix {
   if (!record(raw) || !record(raw.schedules) || TARIFF_DISTRIBUTORS.some((dist) => !record((raw.schedules as Record<string, unknown>)[dist]))) throw new Error('El pliego guardado está incompleto.');
   const matrix = raw as unknown as GlobalTariffMatrix;
-  const validated = mergeExtractedTariffs(matrix, matrix);
+  const validated = mergeExtractedTariffs(healStoredTariffExtras(matrix), matrix);
   for (const dist of TARIFF_DISTRIBUTORS) {
     for (const [code, tariff] of Object.entries(validated.schedules[dist].tariffs)) {
       tariff.code = matrix.schedules[dist].tariffs[code].code;

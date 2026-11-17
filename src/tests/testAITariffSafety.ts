@@ -180,4 +180,46 @@ assert.equal(getReferenceEnergyRateUSD(updatedCEPM,'CEPM','BTS1',900,60),.5,'Leg
   assert.equal(viaService.schedules.EDESUR.gridUseChargeDOPPerKWh, 3.9);
   assert.deepEqual(viaService.schedules.EDESUR.tariffs.BTS1.fixedChargeTiersDOP, bts1.fixedChargeTiersDOP);
 }
+
+// Revisión de la fase 5: lo guardado nunca rompe la lectura y editar el cargo fijo mantiene coherentes los rangos.
+{
+  const tiersOf = (m: any) => m.schedules.EDESUR.tariffs.BTS1.fixedChargeTiersDOP;
+  // Matriz guardada con rangos desfasados (el cargo fijo se editó a mano y los rangos quedaron con el importe viejo).
+  const stale = JSON.parse(JSON.stringify(DEFAULT_RD_TARIFF_MATRIX));
+  stale.schedules.EDESUR.tariffs.BTS1.fixedChargeDOP = 140;
+  const healed = normalizeStoredTariffMatrix(stale);
+  assert.equal(healed.schedules.EDESUR.tariffs.BTS1.fixedChargeDOP, 140, 'el cargo editado manda');
+  assert.deepEqual(tiersOf(healed).map((t: any) => t.chargeDOP), [42.1, 140], 'el último rango toma el cargo fijo; no lanza');
+  assert.equal(tiersOf(healed)[1].maxKWh, null);
+  // Rangos corruptos guardados: se descartan, no lanzan.
+  const broken = JSON.parse(JSON.stringify(DEFAULT_RD_TARIFF_MATRIX));
+  broken.schedules.EDESUR.tariffs.BTS1.fixedChargeTiersDOP = [{ minKWh: 5, maxKWh: 10, chargeDOP: 'x' }];
+  assert.equal(normalizeStoredTariffMatrix(broken).schedules.EDESUR.tariffs.BTS1.fixedChargeTiersDOP, undefined);
+  // Hidratación real del store con la matriz desfasada.
+  const durableStale = JSON.parse(JSON.stringify(serializeSimulationStore({ ...useSimulationStore.getState(), projects: [], tariffMatrix: stale })));
+  hydrateSimulationStore(durableStale);
+  assert.equal(durableStale.tariffMatrix.schedules.EDESUR.tariffs.BTS1.fixedChargeDOP, 140);
+  // El escáner sigue siendo estricto.
+  assert.throws(() => mergeExtractedTariffs({ resolutionCode: 'X', effectiveDate: '2026-10-01', publishedBy: 'Y', schedules: { EDESUR: { tariffs: { BTS1: { currency: 'DOP', baseEnergyRateDOP: 1, fixedChargeDOP: 99, fixedChargeTiersDOP: [{ minKWh: 0, maxKWh: null, chargeDOP: 128.59 }] } } } } }, DEFAULT_RD_TARIFF_MATRIX), Error);
+
+  // Editar el cargo fijo en Ajustes (updateDistributorTariff) mantiene coherente el último rango abierto.
+  let s: any = { tariffMatrix: structuredClone(DEFAULT_RD_TARIFF_MATRIX) };
+  const setS = (update: any) => { s = { ...s, ...(typeof update === 'function' ? update(s) : update) }; };
+  Object.assign(s, createTariffSlice(setS, () => s, {} as any));
+  s.updateDistributorTariff('EDESUR', 'BTS1', { fixedChargeDOP: 150 });
+  assert.deepEqual(tiersOf(s.tariffMatrix).map((t: any) => t.chargeDOP), [42.1, 150]);
+  assert.equal(tiersOf(DEFAULT_RD_TARIFF_MATRIX)[1].chargeDOP, 128.59, 'no muta la matriz de fábrica');
+  normalizeStoredTariffMatrix(JSON.parse(JSON.stringify(s.tariffMatrix)));
+  s.updateDistributorTariff('EDESUR', 'BTS1', { fixedChargeDOP: 150, baseEnergyRateDOP: 14 });
+  assert.deepEqual(tiersOf(s.tariffMatrix).map((t: any) => t.chargeDOP), [42.1, 150], 'sin cambio del cargo fijo no se toca');
+  s.updateDistributorTariff('EDESUR', 'BTS1', { fixedChargeDOP: 160, fixedChargeTiersDOP: [{ minKWh: 0, maxKWh: 50, chargeDOP: 1 }, { minKWh: 51, maxKWh: null, chargeDOP: 160 }] });
+  assert.equal(tiersOf(s.tariffMatrix).length, 2, 'si trae rangos propios, se respetan');
+  assert.equal(tiersOf(s.tariffMatrix)[0].maxKWh, 50);
+  s.updateDistributorTariff('EDESUR', 'BTD', { fixedChargeDOP: 5 });
+  assert.equal(s.tariffMatrix.schedules.EDESUR.tariffs.BTD.fixedChargeTiersDOP, undefined, 'una tarifa sin rangos no los gana');
+
+  // `tariffs: null` con solo el cargo por uso de la red es válido (ausente).
+  const chargeOnly = mergeExtractedTariffs({ resolutionCode: 'QA-N', effectiveDate: '2026-10-01', publishedBy: 'Y', schedules: { EDESUR: { gridUseChargeDOPPerKWh: 3.9, tariffs: null } } }, DEFAULT_RD_TARIFF_MATRIX);
+  assert.equal(chargeOnly.schedules.EDESUR.gridUseChargeDOPPerKWh, 3.9);
+}
 console.log('PASS AI tariff scanner: fixed charge tiers and grid use charge per distributor');

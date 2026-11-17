@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describeIssues, groupIssues, pendingByTab, reviewAnchor, issueTier, firstPendingTarget, buildIssueModel, blocksPreview, applyBarCounts, requestedRowAlert, confirmRequestedRow } from '../components/common/ai-invoice/reviewIssues';
+import { describeIssues, issueModelFromViews, groupIssues, pendingByTab, reviewAnchor, issueTier, firstPendingTarget, buildIssueModel, blocksPreview, applyBarCounts, requestedRowAlert, confirmRequestedRow } from '../components/common/ai-invoice/reviewIssues';
 import { proposalReconciliationIssues } from '../utils/proposalDraftProject';
 import { ProposalApplyBar } from '../components/common/ai-invoice/components/ProposalApplyBar';
 import { ReviewIssueDigest } from '../components/common/ai-invoice/components/ReviewIssueDigest';
@@ -249,5 +249,14 @@ assert.match(review, /aria-invalid="true"/);
     }
   }
   assert.equal(cases, 256);
+}
+
+// Avisos de la medición neta de la factura: destino en la revisión (pestaña de consumo).
+for (const code of ['existing_distributed_generation', 'invalid_metering_value']) {
+  const view = describeIssues([{ code, severity: 'warning', message: 'x' }], draft)[0];
+  assert.deepEqual([view.target?.tab, view.target?.anchor, view.target?.label], ['consumption', reviewAnchor.field('months'), 'Consumo mensual'], code);
+  assert.equal(view.tier, 'confirm', `${code} pide revisión`);
+  assert.equal(issueModelFromViews([view]).byTab.consumption, 1);
+  assert.equal(firstPendingTarget([view])?.anchor, reviewAnchor.field('months'), 'el botón de revisión tiene a dónde ir');
 }
 console.log('PASS: review issues are tiered, linked to fields, counted per tab and flagged inline.');
