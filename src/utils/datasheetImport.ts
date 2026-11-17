@@ -51,7 +51,16 @@ const fractionToPercent = new Set([
 const dimensionKeys = ["lengthMm", "widthMm", "heightMm"] as const;
 
 const isPresent = (value: unknown) =>
-  value !== undefined && value !== null && value !== "";
+  value !== undefined &&
+  value !== null &&
+  (typeof value !== "string" || value.trim() !== "");
+
+/** "2,465" (thousands comma) → 2465; "13,5" (decimal comma) → 13.5; "1,234.5" → 1234.5. */
+function parseLocaleNumber(text: string) {
+  const t = text.trim();
+  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) return Number(t.replace(/,/g, ""));
+  return Number(t.replace(",", "."));
+}
 
 function formatDimensions(a: number, b: number, c: number) {
   const f = (n: number) => String(Number(n.toFixed(2)));
@@ -61,12 +70,13 @@ function formatDimensions(a: number, b: number, c: number) {
 /** "2465×1134×30 mm" / "2465 * 1134 * 30" → "2465 x 1134 x 30 mm" (the catalog format, in mm). */
 function normalizeDimensionsText(text: string) {
   const match = text.match(
-    /(\d+(?:[.,]\d+)?)\s*(?:x|×|\*|X)\s*(\d+(?:[.,]\d+)?)\s*(?:x|×|\*|X)\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/,
+    /(\d+(?:[.,]\d+)*)\s*[x×*]\s*(\d+(?:[.,]\d+)*)\s*[x×*]\s*(\d+(?:[.,]\d+)*)\s*(mm|cm|m)?/i,
   );
   if (!match) return text.trim();
-  const unit = match[4] === "cm" ? 10 : match[4] === "m" ? 1000 : 1;
+  const unitText = match[4]?.toLowerCase();
+  const unit = unitText === "cm" ? 10 : unitText === "m" ? 1000 : 1;
   const [a, b, c] = [match[1], match[2], match[3]].map(
-    (n) => Number(n.replace(",", ".")) * unit,
+    (n) => parseLocaleNumber(n) * unit,
   );
   return formatDimensions(a, b, c);
 }
@@ -127,6 +137,12 @@ export function normalizeDatasheetResponse(
         if (isPresent(value)) v[key] = value;
       for (const [key, value] of Object.entries(own))
         if (isPresent(value)) v[key] = value;
+      // The variant's own dimensions (text or per-axis) win over the family's text.
+      if (
+        !isPresent(own.dimensions) &&
+        dimensionKeys.some((key) => isPresent(own[key]))
+      )
+        delete v.dimensions;
       const modelCode =
         typeof own.modelCode === "string" ? own.modelCode.trim() : "";
       const label = modelCode || `variante ${index + 1}`;
@@ -146,7 +162,7 @@ export function normalizeDatasheetResponse(
         if (!isPresent(value)) return undefined;
         const n =
           typeof value === "string"
-            ? Number(value.replace(",", "."))
+            ? parseLocaleNumber(value)
             : Number(value);
         if (!Number.isFinite(n)) {
           discard(key, value);
@@ -191,17 +207,6 @@ export function normalizeDatasheetResponse(
             `Dimensiones incompletas de ${label}: faltan largo, ancho o alto.`,
           );
       }
-      if (equipmentType === "inverter" && result.maxPvPowerKW === undefined) {
-        // Many sheets state the PV input as a percentage of the rated AC power (200 %, 150 %).
-        const pct = readNumber("maxPvPowerPct");
-        const ac = result.powerKW ?? result.maxAcPowerKW;
-        if (pct !== undefined && pct > 0 && ac !== undefined)
-          result.maxPvPowerKW = Number(((ac * pct) / 100).toFixed(4));
-        else if (pct !== undefined)
-          warnings.push(
-            `No se pudo calcular la FV máxima de ${label}: falta la potencia AC nominal.`,
-          );
-      }
       if (
         equipmentType === "panel" &&
         result.powerW === undefined &&
@@ -214,6 +219,22 @@ export function normalizeDatasheetResponse(
         result.powerW !== undefined
       )
         result.powerKW = result.powerW / 1000;
+      if (equipmentType === "inverter" && result.maxPvPowerKW === undefined) {
+        // Many sheets state the PV input as a percentage of the rated AC power (200 %, 150 %).
+        // Runs after the W → kW conversion so a sheet that only gives watts still resolves.
+        const pct = readNumber("maxPvPowerPct");
+        const ac = result.powerKW ?? result.maxAcPowerKW;
+        if (pct !== undefined && pct <= 0)
+          warnings.push(
+            `Se descartó maxPvPowerPct de ${label}: el porcentaje debe ser positivo (${pct}).`,
+          );
+        else if (pct !== undefined && ac !== undefined)
+          result.maxPvPowerKW = Number(((ac * pct) / 100).toFixed(4));
+        else if (pct !== undefined)
+          warnings.push(
+            `No se pudo calcular la FV máxima de ${label}: falta la potencia AC nominal.`,
+          );
+      }
       if (
         equipmentType === "battery" &&
         result.capacityKWh === undefined &&

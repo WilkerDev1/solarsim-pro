@@ -117,4 +117,49 @@ assert.equal(datasheetTitle({ brand: "A", modelSeries: "A Serie 1", documentTitl
 assert.equal(datasheetTitle({ brand: "A", modelSeries: "", documentTitle: "Ficha A" } as any), "A Ficha A");
 assert.equal(datasheetTitle({ brand: "", modelSeries: "", documentTitle: undefined } as any), "Ficha analizada");
 
+// Revisión: conversiones antes de la FV máxima, coma de miles, cadenas en blanco y precedencia de dimensiones.
+const wOnly = normalizeDatasheetResponse({
+  equipmentType: "inverter", brand: "QA", modelSeries: "M",
+  variants: [
+    { modelCode: "M800", powerW: 800, maxPvPowerPct: 150 },
+    { modelCode: "M0", powerKW: 5, maxPvPowerPct: 0 },
+  ],
+});
+assert.equal(wOnly.variants[0].powerKW, 0.8);
+assert.equal(wOnly.variants[0].maxPvPowerKW, 1.2, "FV máxima se calcula con la potencia convertida de W");
+assert.equal(wOnly.variants[1].maxPvPowerKW, undefined);
+assert(!wOnly.warnings?.some((w) => /falta la potencia AC/.test(w)), "sin aviso falso de potencia AC");
+assert(wOnly.warnings?.some((w) => /M0/.test(w) && /maxPvPowerPct/.test(w) && !/falta/.test(w)), "porcentaje no positivo: aviso propio");
+
+const thousands = normalizeDatasheetResponse({
+  equipmentType: "panel", brand: "QA", modelSeries: "S",
+  variants: [
+    { modelCode: "A", powerW: 500, dimensions: "2,465 x 1,134 x 30 MM" },
+    { modelCode: "B", powerW: 500, dimensions: "246,5 x 113,4 x 3 CM" },
+  ],
+});
+assert.equal(thousands.variants[0].dimensions, "2465 x 1134 x 30 mm", "coma de miles y unidad en mayúsculas");
+assert.equal(thousands.variants[1].dimensions, "2465 x 1134 x 30 mm", "coma decimal en cm");
+
+const blank = normalizeDatasheetResponse({
+  equipmentType: "panel", brand: "QA", modelSeries: "S",
+  familySpecs: { tempCoeff: "   " },
+  variants: [{ modelCode: "A", powerW: 500, isc: "  ", imp: " 13,5 " }],
+});
+assert.equal(blank.variants[0].isc, undefined, "una cadena en blanco no es 0");
+assert.equal(blank.variants[0].tempCoeff, undefined);
+assert.equal(blank.variants[0].imp, 13.5, "se recorta antes de leer");
+assert.equal(blank.warnings, undefined);
+
+const dimPrecedence = normalizeDatasheetResponse({
+  equipmentType: "panel", brand: "QA", modelSeries: "S",
+  familySpecs: { dimensions: "2000 x 1000 x 30 mm" },
+  variants: [
+    { modelCode: "A", powerW: 500, lengthMm: 2465, widthMm: 1134, heightMm: 30 },
+    { modelCode: "B", powerW: 510 },
+  ],
+});
+assert.equal(dimPrecedence.variants[0].dimensions, "2465 x 1134 x 30 mm", "las dimensiones propias de la variante prevalecen");
+assert.equal(dimPrecedence.variants[1].dimensions, "2000 x 1000 x 30 mm");
+
 console.log("testDatasheetFamilySpecs: OK");
