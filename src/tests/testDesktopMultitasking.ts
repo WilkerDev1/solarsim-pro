@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { MAIN_WINDOW_MIN_SIZE, MAIN_WINDOW_DEFAULT_SIZE } from '../../electron/window/windowLayout';
-import { parameterSidebarCssWidth, PARAMETER_SIDEBAR_MIN_PX } from '../components/simulator/sidebar/sidebarWidth';
+import { parameterSidebarCssWidth, draggedSidebarWidth, PARAMETER_SIDEBAR_MIN_PX } from '../components/simulator/sidebar/sidebarWidth';
 
 // Multitarea de escritorio: Windows Snap (Win+←/→, Win+↑/↓ en cuadrantes) y el tiling de GNOME/KDE
 // (Super+←/→) solo acomodan la ventana si su tamaño mínimo cabe en la mitad / el cuadrante del área de trabajo.
@@ -30,7 +30,15 @@ assert.equal(parameterSidebarCssWidth(520), `min(520px, max(${PARAMETER_SIDEBAR_
 assert.equal(parameterSidebarCssWidth(0), `min(380px, max(${PARAMETER_SIDEBAR_MIN_PX}px, 40vw))`);
 assert.equal(parameterSidebarCssWidth(200), `min(380px, max(${PARAMETER_SIDEBAR_MIN_PX}px, 40vw))`);
 assert.equal(parameterSidebarCssWidth(Number.NaN), `min(380px, max(${PARAMETER_SIDEBAR_MIN_PX}px, 40vw))`);
-// Con la ventana al mínimo queda al menos la mitad del área útil para el contenido (dock de 64 px).
+// Con la ventana al mínimo el contenido del simulador conserva al menos 280 px (dock de 64 px).
 assert.ok(MAIN_WINDOW_MIN_SIZE.width - 64 - PARAMETER_SIDEBAR_MIN_PX >= 280, 'el contenido del simulador conserva espacio con la ventana al mínimo');
+
+// Arrastre del borde: el ancho guardado es la distancia al borde izquierdo del panel (no a la ventana)
+// y nunca supera lo que se dibuja (40 % de la ventana, máx. 600 px), así el borde sigue al cursor.
+assert.equal(draggedSidebarWidth(64 + 450, 64, 1440), 450, 'descuenta el dock de iconos');
+assert.equal(draggedSidebarWidth(64 + 900, 64, 1920), 600, 'tope absoluto de 600 px');
+assert.equal(draggedSidebarWidth(64 + 700, 64, 1280), 512, 'tope del 40 % de la ventana');
+assert.equal(draggedSidebarWidth(64 + 100, 64, 1440), PARAMETER_SIDEBAR_MIN_PX, 'piso de 280 px');
+assert.equal(draggedSidebarWidth(64 + 500, 64, 640), PARAMETER_SIDEBAR_MIN_PX, 'ventana mínima: el panel no baja de 280 px');
 
 console.log('testDesktopMultitasking: OK');

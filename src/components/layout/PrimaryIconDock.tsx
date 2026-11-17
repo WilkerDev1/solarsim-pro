@@ -91,7 +91,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
 
   return (
     <aside
-      className={`w-16 h-full bg-slate-900 border-r border-slate-800 flex flex-col items-center justify-between py-4 shrink-0 ${aiMenuStackClass(isAIMenuOpen)} select-none relative`}
+      className={`w-16 h-full bg-slate-900 border-r border-slate-800 flex flex-col items-center justify-between gap-2 py-4 [@media(max-height:600px)]:py-2 overflow-y-auto overflow-x-hidden [scrollbar-width:none] shrink-0 ${aiMenuStackClass(isAIMenuOpen)} select-none relative`}
       aria-label="Barra de Navegación Principal"
       onKeyDown={(event) => {
         if (event.key === "Escape" && isAIMenuOpen) {
@@ -102,7 +102,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
       }}
     >
       {/* Zona Superior: Theme Toggle & Navegación */}
-      <div className="flex flex-col items-center gap-5 w-full">
+      <div className="flex flex-col items-center gap-5 [@media(max-height:600px)]:gap-2 w-full">
         {/* Toggle de Tema (Sol/Luna) */}
         <button
           onClick={toggleSidebarTheme}
@@ -120,7 +120,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
         <div className="w-8 h-[1px] bg-[#2a3444]" />
 
         {/* Iconos de Acción Principal */}
-        <nav className="flex flex-col items-center gap-3 w-full px-2">
+        <nav className="flex flex-col items-center gap-3 [@media(max-height:600px)]:gap-1 w-full px-2">
           {/* 1. Proyectos / Dashboard */}
           <button
             onClick={() => {
@@ -242,7 +242,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
             {isAIMenuOpen && (
               <div
                 ref={aiMenuRef}
-                className="fixed left-[4.5rem] top-28 w-80 bg-[#161b24]/95 border border-[#2d3748] rounded-2xl shadow-2xl p-2.5 flex flex-col gap-1.5 z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+                className="fixed left-[4.5rem] top-28 w-80 max-h-[calc(100vh-8rem)] overflow-y-auto bg-[#161b24]/95 border border-[#2d3748] rounded-2xl shadow-2xl p-2.5 flex flex-col gap-1.5 z-50 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
               >
                 {/* Cabecera del Menú */}
                 <div className="flex items-center justify-between px-3 py-2 border-b border-[#242c3b] mb-1">
@@ -388,7 +388,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
       </div>
 
       {/* Zona Inferior: Actualizaciones & Ajustes */}
-      <div className="flex flex-col items-center gap-3 w-full px-2">
+      <div className="flex flex-col items-center gap-3 [@media(max-height:600px)]:gap-1 w-full px-2">
         {/* Papelera de Reciclaje */}
         <button
           onClick={() => {

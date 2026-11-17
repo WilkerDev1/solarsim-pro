@@ -59,12 +59,12 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
       )}
       {/* Indicadores Financieros Principales */}
       {comparable && (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] [&>*]:min-w-0 [&>*]:[overflow-wrap:anywhere] gap-3 shrink-0">
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
             PERÍODO DE RETORNO (PAYBACK)
           </span>
-          <div className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-2xl font-black text-emerald-800">{summary.paybackYears}</span>
             <span className="text-xs text-slate-600 font-bold">Años</span>
           </div>
@@ -77,7 +77,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
             TASA INTERNA DE RETORNO (TIR)
           </span>
-          <div className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-2xl font-black text-emerald-700">{summary.irrPct}%</span>
           </div>
           <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
@@ -89,7 +89,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
             VALOR ACTUAL NETO (VAN)
           </span>
-          <div className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-xl font-bold text-slate-900">${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
@@ -101,7 +101,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
             AHORRO ACUMULADO 25 AÑOS
           </span>
-          <div className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-xl font-bold text-emerald-800">${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
@@ -109,11 +109,11 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
           </span>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm col-span-2 sm:col-span-1">
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
             RETORNO DE INVERSIÓN (ROI)
           </span>
-          <div className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-1">
             <span className="text-2xl font-black text-emerald-800">{summary.roi25YrPct}%</span>
           </div>
           <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
@@ -125,7 +125,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
       )}
 
       {/* TABLA 1: Inversión Inicial e Incentivos */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-xs shrink-0">
         <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
           {comparable ? 'Cálculo de Ahorro y Retorno de Inversión' : 'Inversión e Incentivos Fiscales'}
         </div>
@@ -179,7 +179,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
 
       {comparable && (<>
       {/* TABLA 2: Resumen de Ahorro Anual y Retorno de Inversión */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-xs shrink-0">
         <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
           Resumen de Ahorro Anual y Retorno de Inversión
         </div>
@@ -233,11 +233,11 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
 
       {/* GRÁFICA DE BENEFICIO ACUMULADO (25 AÑOS) */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3 shrink-0">
-        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+        <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-2">
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
             Beneficio Acumulado (25 Años)
           </h3>
-          <div className="flex items-center gap-4 text-xs font-semibold">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold">
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-xs bg-red-500"></span>
               <span className="text-slate-700">Inversión Neta Negativa</span>
@@ -273,7 +273,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
       </div>
 
       {/* TABLA 3: Flujo de Caja y Beneficios Acumulados (25 AÑOS) */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-xs shrink-0">
         <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
           Flujo de Caja y Beneficios Acumulados (25 Años)
         </div>
@@ -328,7 +328,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
       </div>
 
       {/* TABLA 4: Indicadores Financieros del Proyecto */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-xs shrink-0">
         <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
           Indicadores Financieros del Proyecto
         </div>

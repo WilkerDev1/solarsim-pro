@@ -1,5 +1,6 @@
 import { isReaderRole } from '../../../shared/permissions';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { draggedSidebarWidth } from './sidebar/sidebarWidth';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
@@ -56,18 +57,19 @@ export const SimulatorView: React.FC = () => {
   // Resize Drawer state
   const [isDragging, setIsDragging] = useState(false);
 
+  // Borde izquierdo del panel al empezar a arrastrar (a su izquierda está el dock de iconos).
+  const sidebarLeftRef = useRef(0);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    sidebarLeftRef.current = e.currentTarget.previousElementSibling?.getBoundingClientRect().left ?? 0;
     setIsDragging(true);
   }, []);
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (!isDragging) return;
-      const minW = 280;
-      const maxW = 600;
-      const newW = Math.max(minW, Math.min(maxW, e.clientX));
-      setSidebarWidth(newW);
+      setSidebarWidth(draggedSidebarWidth(e.clientX, sidebarLeftRef.current, window.innerWidth));
     },
     [isDragging, setSidebarWidth]
   );
@@ -222,41 +224,47 @@ export const SimulatorView: React.FC = () => {
 
         {/* Top Fixed View Selector Tabs */}
         <div className="bg-white border-b border-slate-200 px-4 lg:px-6 pt-3 pb-0 shrink-0 z-20 shadow-xs flex justify-between items-center gap-3">
-          <div className="flex gap-4 lg:gap-8 min-w-0 overflow-x-auto">
+          <div className="flex gap-2.5 lg:gap-8 min-w-0 overflow-x-auto [scrollbar-width:thin]">
             <button
               onClick={() => setActiveMainTab('energia')}
-              className={`pb-3 text-sm font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+              aria-label="Análisis de Energía"
+              title="Análisis de Energía"
+              className={`pb-3 text-xs lg:text-sm font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
                 activeMainTab === 'energia'
                   ? 'text-emerald-800 font-extrabold border-b-2 border-emerald-700'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <span className="xl:hidden" title="Análisis de Energía">Energía</span>
-              <span className="hidden xl:inline">Análisis de Energía</span>
+              <span className="xl:hidden" aria-hidden="true">Energía</span>
+              <span className="hidden xl:inline" aria-hidden="true">Análisis de Energía</span>
             </button>
 
             <button
               onClick={() => setActiveMainTab('cotizacion')}
-              className={`pb-3 text-sm font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+              aria-label="Cotización y Equipos"
+              title="Cotización y Equipos"
+              className={`pb-3 text-xs lg:text-sm font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
                 activeMainTab === 'cotizacion'
                   ? 'text-emerald-800 font-extrabold border-b-2 border-emerald-700'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <span className="xl:hidden" title="Cotización y Equipos">Cotización</span>
-              <span className="hidden xl:inline">Cotización y Equipos</span>
+              <span className="xl:hidden" aria-hidden="true">Cotización</span>
+              <span className="hidden xl:inline" aria-hidden="true">Cotización y Equipos</span>
             </button>
 
             <button
               onClick={() => setActiveMainTab('retorno')}
-              className={`pb-3 text-sm font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+              aria-label="Retorno de Inversión y Flujo 25 Años"
+              title="Retorno de Inversión y Flujo 25 Años"
+              className={`pb-3 text-xs lg:text-sm font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
                 activeMainTab === 'retorno'
                   ? 'text-emerald-800 font-extrabold border-b-2 border-emerald-700'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <span className="xl:hidden" title="Retorno de Inversión y Flujo 25 Años">Retorno</span>
-              <span className="hidden xl:inline">Retorno de Inversión y Flujo 25 Años</span>
+              <span className="xl:hidden" aria-hidden="true">Retorno</span>
+              <span className="hidden xl:inline" aria-hidden="true">Retorno de Inversión y Flujo 25 Años</span>
             </button>
           </div>
 
@@ -265,6 +273,7 @@ export const SimulatorView: React.FC = () => {
             <button
               type="button"
               onClick={undo}
+              aria-label="Deshacer"
               disabled={!canUndo}
               className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
               title="Deshacer último cambio (Ctrl+Z)"
@@ -276,6 +285,7 @@ export const SimulatorView: React.FC = () => {
             <button
               type="button"
               onClick={redo}
+              aria-label="Rehacer"
               disabled={!canRedo}
               className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
               title="Rehacer cambio (Ctrl+Y)"
