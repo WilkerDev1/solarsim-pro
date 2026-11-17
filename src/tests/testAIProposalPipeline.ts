@@ -1,7 +1,9 @@
 import {batteryBank,readEquipment} from '../../shared/equipment';
 import assert from 'node:assert/strict';
 import { normalizeProposalDraft, buildProposalRequest, robustParseJson, draftForPrompt, PROPOSAL_JSON_SCHEMA, PROPOSAL_SYSTEM_INSTRUCTION } from '../../shared/aiProposal';
-import { calculateMonthlyBill } from '../../shared/tariffBilling';
+import { calculateMonthlyBill, resolveEnergyValuationMethod } from '../../shared/tariffBilling';
+import { averageBlockEnergyRateDOP } from '../../shared/tariffRules';
+import { issueTier } from '../components/common/ai-invoice/reviewIssues';
 import { DEFAULT_RD_TARIFF_MATRIX, referenceBillingTariff } from '../data/rdTariffs';
 import { prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { requestGeminiJson, GeminiRequestError, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
@@ -38,7 +40,10 @@ assert.equal(normalized.panels?.[1].unitPriceUSD,undefined,'missing price cannot
 assert.equal(normalized.recommendedCapacityKWp,10.2);
 assert.equal(normalized.targetMarginPct,0);
 assert.equal(normalized.inverters?.length,2);assert.equal(normalized.batteries?.length,2);
-assert.equal(normalized.energyCostPerKWhDOP,13.09);
+// BTS2 es escalonada: el 13.09 del modelo no coincide con ningún bloque de EDESUR BTS2 y la propuesta se valora con la fila
+// oficial (900 kWh ≥ 701: todo al cuarto bloque, 13.43), con aviso por confirmar.
+assert.equal(normalized.energyRateSource,'reference');assert.equal(normalized.energyCostPerKWhDOP,13.43);
+assert(normalized.validationIssues?.some(i=>i.code==='invoice_block_rates_mismatch'&&i.severity==='warning'));
 const groundedAgain=normalizeProposalDraft(normalized,catalog,context);
 assert.deepEqual(groundedAgain.panels,normalized.panels);
 const removed=normalizeProposalDraft({...normalized,panels:[]},catalog,context);
@@ -70,7 +75,7 @@ const missing=normalizeProposalDraft({...raw,monthlyConsumptionKWh:[],averageMon
 assert.equal(missing.monthlyConsumptionKWh.length,0,'no fabricated 1200kWh');
 const estimated=normalizeProposalDraft({...raw,monthlyConsumptionKWh:[],averageMonthlyKWh:800},catalog,context);
 assert.equal(estimated.consumptionSource,'estimated');assert.equal(normalizeProposalDraft(estimated,catalog,context).consumptionSource,'estimated');
-const zeroRate=normalizeProposalDraft({...raw,energyCostPerKWhDOP:0},catalog,context);assert.equal(zeroRate.energyCostPerKWhUSD,0);assert(!zeroRate.validationIssues?.some(i=>i.code==='missing_energy_rate'));
+const zeroRate=normalizeProposalDraft({...raw,tariffCode:'BTD',energyCostPerKWhDOP:0},catalog,context);assert.equal(zeroRate.energyCostPerKWhUSD,0);assert(!zeroRate.validationIssues?.some(i=>i.code==='missing_energy_rate'));
 const unknownTariff=normalizeProposalDraft({...raw,tariffCode:'BTS999'},catalog,context);assert.equal(unknownTariff.requiresReview,true);
 assert.throws(()=>robustParseJson('{"clientName":"truncado'),/incompleta/);
 assert.throws(()=>geminiResponseText({candidates:[{finishReason:'MAX_TOKENS',content:{parts:[{text:'{}'}]}}]}),/parciales/);
@@ -205,5 +210,76 @@ useSimulationStore.getState().applyExtractedInvoice(normalized,true);assert.stri
   const echoed=draftForPrompt(withMetering) as Record<string,unknown>;
   assert.equal(echoed.energyInjectedKWh,120);assert.equal(echoed.hasDistributedGeneration,true);
   assert.deepEqual(METERING_KEYS.filter(key=>key in (draftForPrompt(plain)??{})),[],'sin medición neta, nada viaja de vuelta');
+}
+
+// Tarifas escalonadas: el precio de UNA línea de bloque de la factura no valora todo el consumo.
+{
+  const matrixContext={...context,tariffReference:buildAITariffContext(DEFAULT_RD_TARIFF_MATRIX)};
+  const bts1=referenceBillingTariff(DEFAULT_RD_TARIFF_MATRIX,'EDESUR','BTS1')!;
+  const history=[152,107,49,0,0,128,373,582,0,0,0,305];
+  const average=history.reduce((sum,n)=>sum+n,0)/12;
+  // Caso real (Gemini, factura EDESUR BTS1): líneas 200×6.05, 100×8.59, 73×12.89; el modelo devolvió el marginal 12.89.
+  const invoice={clientName:'Cliente EDESUR BTS1',province:'Santiago',distributor:'EDESUR',tariffCode:'BTS-1',monthlyConsumptionKWh:history,consumptionSource:'observed',
+    energyCostPerKWhDOP:12.89,fixedChargeDOP:128.59,energyTiers:[{kwh:200,rateDOP:6.05},{kwh:100,rateDOP:8.59},{kwh:73,rateDOP:12.89}],currentBilledKWh:373,totalBilledAmountDOP:3138.56,
+    panels:[{equipmentId:'panel-a',quantity:4}],inverters:[{equipmentId:'inv-b',quantity:1}],batteries:[],hasBattery:false,confidenceScore:90};
+  const codes=(draft:{validationIssues?:{code:string}[]})=>draft.validationIssues?.map(i=>i.code) ?? [];
+  const stepped=normalizeProposalDraft(invoice,catalog,matrixContext);
+  assert.equal(stepped.requiresReview,false,'el aviso no bloquea');
+  assert.equal(stepped.energyRateSource,'reference','tarifa escalonada: se valora con la fila oficial, no con el precio de un bloque');
+  assert(Math.abs(stepped.energyCostPerKWhDOP!-averageBlockEnergyRateDOP(bts1.energyBlocks,average,'BTS1')!)<1e-9,'el escalar es el promedio por bloques del consumo, no 12.89');
+  assert(stepped.energyCostPerKWhDOP!<7,'~6 RD$/kWh para ~141 kWh/mes');
+  assert.equal(stepped.marginalRateDOP,12.89,'el precio de la factura se conserva como dato observado');
+  const notice=stepped.validationIssues?.find(i=>i.code==='invoice_block_rates_reference');
+  assert(notice,'aviso de que la factura muestra precios por bloque');
+  assert.match(notice!.message,/BTS1/);assert.match(notice!.message,/SIE-121-2026-TF/);
+  assert.equal(issueTier(notice!),'info','aviso informativo: no pide confirmación');
+  assert(!codes(stepped).includes('reference_energy_rate'),'la factura confirma la fila: no se pide confirmar una tarifa aproximada');
+  assert(!codes(stepped).includes('invoice_block_rates_mismatch'));
+  // Renormalizar (revisión) es idempotente: misma procedencia, mismo precio y un solo aviso.
+  const again=normalizeProposalDraft(stepped,catalog,matrixContext);
+  assert.equal(again.energyRateSource,'reference');assert.equal(again.energyCostPerKWhDOP,stepped.energyCostPerKWhDOP);
+  assert.deepEqual(codes(again).filter(c=>c.startsWith('invoice_block_rates')),['invoice_block_rates_reference']);
+  // El modelo devuelve en la ronda siguiente el escalar del borrador (sin procedencia): sigue siendo referencia, sin falso aviso.
+  const echoed=normalizeProposalDraft({...invoice,energyCostPerKWhDOP:stepped.energyCostPerKWhDOP,marginalRateDOP:12.89},catalog,matrixContext);
+  assert.equal(echoed.energyRateSource,'reference');assert(!codes(echoed).includes('invoice_block_rates_mismatch'));
+  // Propuesta aplicada: guarda la fila y se factura por bloques.
+  const savedBase=structuredClone(useSimulationStore.getState().getActiveProject());
+  const prepared=prepareProposalDraftProject(savedBase,stepped,DEFAULT_RD_TARIFF_MATRIX,{isNew:true});
+  assert.equal(prepared.rates.energyRateSource,'reference');
+  assert.deepEqual(prepared.rates.billingTariff,bts1,'la propuesta guarda la fila oficial');
+  assert.equal(resolveEnergyValuationMethod(prepared.rates),'block_billing');
+  useSimulationStore.setState({tariffMatrix:DEFAULT_RD_TARIFF_MATRIX,syncSettings:{...useSimulationStore.getState().syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
+  useSimulationStore.getState().applyExtractedInvoice(stepped,true);
+  const applied=useSimulationStore.getState().getActiveProject();
+  assert.equal(applied.client.name,'Cliente EDESUR BTS1');
+  assert.equal(applied.rates.energyRateSource,'reference');assert.equal(resolveEnergyValuationMethod(applied.rates),'block_billing','la propuesta aplicada se valora por bloques');
+  // Un precio tecleado en la revisión (manual) se respeta como precio único.
+  const typed=normalizeProposalDraft({...stepped,energyRateSource:'manual',energyCostPerKWhDOP:11},catalog,matrixContext);
+  assert.equal(typed.energyRateSource,'manual');assert.equal(typed.energyCostPerKWhDOP,11);
+
+  // Precio de factura que no coincide con ningún bloque oficial (posible cambio de pliego): referencia y aviso por confirmar.
+  const mismatch=normalizeProposalDraft({...invoice,energyCostPerKWhDOP:14.5,energyTiers:undefined},catalog,matrixContext);
+  assert.equal(mismatch.energyRateSource,'reference');
+  const mismatchIssue=mismatch.validationIssues?.find(i=>i.code==='invoice_block_rates_mismatch');
+  assert.equal(mismatchIssue?.severity,'warning');assert.equal(issueTier(mismatchIssue!),'confirm');
+  assert.match(mismatchIssue!.message,/14[.,]5/);assert.match(mismatchIssue!.message,/período|periodo/);
+  assert.equal(mismatch.requiresReview,false);
+
+  // Tarifa de precio único (BTD): el precio de la factura sigue mandando.
+  const btd=normalizeProposalDraft({...invoice,tariffCode:'BTD',energyCostPerKWhDOP:9.5,energyTiers:undefined},catalog,matrixContext);
+  assert.equal(btd.energyRateSource,'invoice');assert.equal(btd.energyCostPerKWhDOP,9.5);
+  assert(!codes(btd).some(c=>c.startsWith('invoice_block_rates')));
+  // CEPM en US$ (RMT-1): sin cambios, precio de factura como invoice y referencia en US$ convertida sin precio.
+  const cepm=normalizeProposalDraft({...invoice,distributor:'CEPM',tariffCode:'RMT-1',energyCostPerKWhDOP:17.2,energyTiers:undefined},catalog,matrixContext);
+  assert.equal(cepm.energyRateSource,'invoice');assert.equal(cepm.energyCostPerKWhDOP,17.2);
+  const cepmReference=normalizeProposalDraft({...invoice,distributor:'CEPM',tariffCode:'RMT-1',energyCostPerKWhDOP:undefined,energyTiers:undefined},catalog,matrixContext);
+  assert.equal(cepmReference.energyRateSource,'reference');assert(Math.abs(cepmReference.energyCostPerKWhDOP!-0.2789*cepmReference.dopExchangeRate!)<1e-9);
+  assert(!codes(cepm).some(c=>c.startsWith('invoice_block_rates'))&&!codes(cepmReference).some(c=>c.startsWith('invoice_block_rates')));
+
+  // Prompt: en tarifas escalonadas el precio de un bloque no va en energyCostPerKWhDOP; el marginal va en marginalRateDOP.
+  const properties=PROPOSAL_JSON_SCHEMA.properties as Record<string,{description?:string}>;
+  assert.match(properties.energyCostPerKWhDOP.description!,/bloque/);
+  assert.match(properties.marginalRateDOP.description!,/bloque/);
+  assert.match(PROPOSAL_SYSTEM_INSTRUCTION,/marginalRateDOP/);
 }
 console.log('AI proposal pipeline: exact multi-model grounding, real sizing, no invented consumption, transport budget and store commit guards passed.');

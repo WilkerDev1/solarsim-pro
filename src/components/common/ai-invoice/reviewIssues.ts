@@ -48,7 +48,7 @@ export const reviewAnchor = {
 const GROUP_LABEL: Record<EquipmentKey, string> = { panels: 'Paneles', inverters: 'Inversores', batteries: 'Baterías' };
 const TYPE_KEY: Record<string, EquipmentKey> = { panel: 'panels', inverter: 'inverters', battery: 'batteries' };
 /** Avisos que no piden una decisión: describen de dónde salió un dato o una referencia externa. */
-const INFORMATIVE = /^(context_consumption|theoretical_consumption|automated_pricing_forced|document_\w+_difference|too_many_document_texts|unknown_document_text|document_text_is_draft_field|invalid_document_text)$/;
+const INFORMATIVE = /^(context_consumption|invoice_block_rates_reference|theoretical_consumption|automated_pricing_forced|document_\w+_difference|too_many_document_texts|unknown_document_text|document_text_is_draft_field|invalid_document_text)$/;
 
 export function issueTier(issue: Pick<AIProposalIssue, 'code' | 'severity'>): IssueTier {
   if (issue.severity === 'error') return 'blocking';
@@ -86,7 +86,7 @@ export function issueTarget(issue: AIProposalIssue, draft?: ExtractedInvoiceData
   if (code === 'missing_client') return client('clientName', 'Nombre del cliente');
   if (code === 'missing_distributor') return client('distributor', 'Distribuidora');
   if (code === 'missing_tariff' || code === 'unknown_tariff') return client('tariffCode', 'Tarifa');
-  if (code === 'missing_energy_rate' || code === 'reference_energy_rate') return client('energyRate', 'Tarifa de energía');
+  if (code === 'missing_energy_rate' || code === 'reference_energy_rate' || code.startsWith('invoice_block_rates_')) return client('energyRate', 'Tarifa de energía');
   if (code === 'invalid_exchange') return client('exchange', 'Cambio RD$ por USD');
   if (/consumption$/.test(code) || code === 'existing_distributed_generation' || code === 'invalid_metering_value') return { tab: 'consumption', anchor: reviewAnchor.field('months'), label: 'Consumo mensual' };
   if (code === 'pv_overload') return equipmentTarget(issue, 'inverters', draft);
