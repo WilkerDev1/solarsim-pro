@@ -49,6 +49,7 @@ export const EQUIPMENT_DETAIL_KEYS = [
   "bifacialityPct",
   "maxAcPowerKW",
   "maxPvPowerKW",
+  "maxPvPowerSource",
   "maxEfficiencyPct",
   "mpptCount",
   "capacityAh",
