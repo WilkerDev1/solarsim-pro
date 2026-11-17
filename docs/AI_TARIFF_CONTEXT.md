@@ -41,6 +41,16 @@ El borrador de IA nuevo nace en el régimen `sie007_2026` con el cargo de fábri
 
 El escáner de resoluciones (`GeminiTariffService`, `mergeExtractedTariffs`) extrae también el cargo fijo por rango de consumo (`fixedChargeTiersDOP`: BTS1 0–100 y ≥101 kWh, contiguos desde 0, el último abierto y con el mismo cargo que `fixedChargeDOP`; un cargo fijo nuevo sin rangos descarta los anteriores) y el cargo por uso de la red por distribuidora (`DistributorTariffSchedule.gridUseChargeDOPPerKWh`, 0–100, con su resolución en `gridUseChargeSource`; ausente o `null` conserva el anterior). `buildAITariffContext` devuelve en `gridUseCharges` el de la matriz si existe y, si no, el de fábrica (`origin: 'matrix' | 'factory'`), y `fixedChargeTiersDOP` en cada tarifa; el modal de revisión los muestra y exige contrastarlos. Cada propuesta guarda su propio cargo: el valor de la matriz es referencia para la IA y la revisión, y no cambia propuestas existentes.
 
+### Propuestas existentes en el régimen anterior (fase 7)
+
+EDESUR comunicó que desde el 1/11/2026 aplica SIE-007-2026 (cargo por uso de red = energía inyectada × 25 % del cargo por energía) a clientes BTS-1/BTS-2 en medición neta, también a los anteriores a octubre de 2021. La postura es conservadora y provisional: ninguna propuesta migra sola. Las reglas están en `src/domain/netMeteringUpgrade.ts`:
+
+- `canOfferSie007Upgrade(rates)`: régimen anterior (explícito, ausente o desconocido) y `gridUseChargeApplies` (inyección a red, tarifa sin potencia). No se ofrece en inyección cero, aislado ni ya en `sie007_2026`.
+- `sie007UpgradePatch(rates)`: `netMeteringRegime: 'sie007_2026'` y el cargo de fábrica de la distribuidora solo si no hay uno válido guardado (un 0 explícito se respeta). No toca el precio, su procedencia ni la retención guardada.
+- `planSie007Upgrade(rates, referencePatch?)`: datos del aviso del dock. Si después de actualizar la energía se seguiría valorando con el escalar pero la fila oficial permitiría bloques, el aviso menciona «Aplicar tarifa oficial» sin aplicarlo.
+
+El dock (Tarifas, junto al selector de régimen) muestra el aviso con «Actualizar a SIE-007-2026». Pulsarlo es una edición `rates` normal (`applyProjectEdit`) que se puede deshacer. Si la organización oculta el selector (`netMeteringRegimeSelector`), el aviso tampoco aparece: la política decide quién cambia el régimen y, sin selector, no habría forma de volver al régimen anterior. El listado de Inicio (tarjetas y lista) y el resumen de la propuesta muestran la insignia «Régimen anterior» (`showsLegacyRegimeBadge`) en las propuestas abiertas con inyección a red. Abierta (`isOpenProposal`) quiere decir: no está en la papelera, no está archivada y no tiene decisión comercial aprobada ni rechazada. El modelo no guarda si una propuesta se publicó. Mostrar el aviso o la insignia no escribe nada, y los enlaces publicados conservan su snapshot.
+
 ## Propuestas y extracción
 
 `buildAITariffContext(matrix, now?)` entrega únicamente códigos, monedas, cargos, bloques y fuente, ordenados; omite descripciones extensas y aliases duplicados. `resolveAITariffSelection` acepta una fila disponible o devuelve `null`: una distribuidora o código desconocido no se convierte silenciosamente en BTS2. Los aliases CEPM históricos se resuelven explícitamente.
