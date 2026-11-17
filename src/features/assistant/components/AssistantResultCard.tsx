@@ -164,7 +164,7 @@ export function AssistantActionCard({
 }: {
   action: AssistantAction;
   disabled: boolean;
-  onApplied: (text: string) => void;
+  onApplied: (text: string, activityId?: string) => void;
 }) {
   const [status, setStatus] = useState<'pending' | 'applied' | 'discarded'>(
     'pending'
@@ -199,7 +199,8 @@ export function AssistantActionCard({
                   setStatus('applied');
                   setError('');
                   onApplied(
-                    'Cambio aplicado localmente. La sincronización sigue el flujo habitual de la aplicación.'
+                    'Cambio aplicado localmente. La sincronización sigue el flujo habitual de la aplicación.',
+                    result.activityId
                   );
                 } catch (e) {
                   setError(

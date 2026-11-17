@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  announceAppliedChanges, condenseText, proposalSubject, subjectHeadline, textChangeRows, textChangeSummary,
+  announceActivities, announceAppliedChanges, condenseText, proposalSubject, subjectHeadline, textChangeRows, textChangeSummary,
 } from '../features/agentTools/documentTextLog';
 import { restoreComposerText } from '../features/assistant/chatUi';
 import { aiMenuStackClass } from '../components/layout/aiMenuStack';
@@ -35,6 +35,12 @@ assert.equal(announceAppliedChanges([other]), 'Cambio aplicado en otra propuesta
 const same = { title: 't', subject: proposalSubject(p, 'a'), changes: rows };
 assert.match(announceAppliedChanges([same]), /^Cambio aplicado en SS-001 · Hotel Sol\. /);
 assert.equal(announceAppliedChanges([{ title: 'x', changes: rows }]), '');
+
+// 4b. Anuncio por ids de actividad (turno del chat o confirmación manual): solo las entradas pedidas, en el orden del registro.
+const log = [{ id: 'x', ...other }, { id: 'y', title: 'z', changes: rows }];
+assert.equal(announceActivities(['x'], log), announceAppliedChanges([other]));
+assert.equal(announceActivities(['y'], log), '');
+assert.equal(announceActivities([], log), '');
 
 // 5. Compositor: se restaura el texto enviado solo si el campo sigue vacío.
 assert.equal(restoreComposerText('', 'hola'), 'hola');

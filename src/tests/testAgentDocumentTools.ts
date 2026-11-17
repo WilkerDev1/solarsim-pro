@@ -50,6 +50,13 @@ const own = await executeAgentTool({ name: 'set_document_text', args: { proposal
 assert(own.status === 'applied');
 assert.equal(store.getState().agentActivity.find((x) => x.id === (own as any).activityId)!.subject?.outsideOpen, false, 'la propuesta abierta no se marca como otra');
 
+// 2c. Con el panel (dashboard) activeProjectId conserva la última propuesta visitada, pero no hay ninguna abierta.
+store.setState({ activeView: 'dashboard' });
+const viaDashboard = await executeAgentTool({ name: 'set_document_text', args: { proposalId: active.id, key: 'quotation.warranty.panel', text: '15 años' } }, ctx());
+assert(viaDashboard.status === 'applied');
+assert.equal(store.getState().agentActivity.find((x) => x.id === (viaDashboard as any).activityId)!.subject?.outsideOpen, true, 'en dashboard ninguna propuesta cuenta como abierta');
+store.setState({ activeView: 'simulator' });
+
 // 3. The client phone is mirrored into the printed client data.
 const phone = await executeAgentTool({ name: 'set_document_text', args: { proposalId: other.id, key: 'client.phone', text: '809-555-7777' } }, ctx());
 assert(phone.status === 'applied');

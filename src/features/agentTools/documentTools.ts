@@ -9,9 +9,12 @@ import type { ProjectSimulation } from '../../types';
 import { applyDocumentClientEdit } from '../../domain/projectEdit';
 import { withSectionVisible, type DocumentLayout } from '../../../shared/documentLayout';
 import type { DocumentSectionId } from '../../../shared/documentTexts';
+import { assistantProjectId } from '../assistant/assistantScope';
 import { proposalSubject, subjectHeadline, textChangeRows } from './documentTextLog';
 import { findVisibleProject, fingerprint, pickFields, requireEditableProject, store, type NativeHandler } from './nativeTools';
 
+/** Propuesta abierta según el selector canónico: en dashboard/hubs `activeProjectId` solo recuerda la última visitada. */
+const openProposalId = () => assistantProjectId(store().activeView, store().activeProjectId);
 const TEXT_FIELDS = ['customization', 'client'] as const;
 const contextFor = (project: ProjectSimulation) => {
   const s = store();
@@ -37,7 +40,7 @@ function textsPlan(proposalId: string, values: Record<string, string | null>, ti
   const unknown = Object.keys(values).filter((key) => !getDocumentTextDefinition(key));
   if (unknown.length) throw new Error(`Textos del documento desconocidos: ${unknown.join(', ')}. No se aplicó ningún cambio; consulta las claves con list_document_texts.`);
   const patch = documentTextsPatch(values, project, contextFor(project)); // validates before queueing
-  const subject = proposalSubject(project, store().activeProjectId);
+  const subject = proposalSubject(project, openProposalId());
   const simulated = { ...project, ...applyDocumentTextPatch({ customization: project.customization || {}, client: project.client }, patch) } as ProjectSimulation;
   return {
     data: { status: 'ready' },
@@ -59,7 +62,7 @@ function textsPlan(proposalId: string, values: Record<string, string | null>, ti
         return {
           targetId: current.id,
           // La propuesta abierta se mide al aplicar: una confirmación tardía puede ocurrir con otra abierta.
-          subject: proposalSubject(current, store().activeProjectId),
+          subject: proposalSubject(current, openProposalId()),
           changes: textRows(values, current, after),
           undo: { before: pickFields(current, fields), fields, afterFingerprint: fingerprint(pickFields(after, fields)) },
         };

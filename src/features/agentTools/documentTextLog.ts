@@ -30,6 +30,10 @@ export function proposalSubject(project: { id: string; client: { name: string; p
 export const subjectHeadline = (subject: ChangeSubject): string =>
   subject.outsideOpen ? `Cambio en otra propuesta: ${subject.label}` : `Propuesta: ${subject.label}`;
 
+/** Anuncio de las actividades con esos ids (un turno del chat o una confirmación manual). */
+export const announceActivities = (ids: readonly string[], activity: readonly { id: string; title: string; subject?: ChangeSubject; changes: readonly AgentChange[] }[]): string =>
+  announceAppliedChanges(activity.filter((a) => ids.includes(a.id)));
+
 /** Texto para el anuncio (aria-live) de los cambios de textos recién aplicados; vacío si ninguno lleva propuesta. */
 export function announceAppliedChanges(entries: readonly { title: string; subject?: ChangeSubject; changes: readonly AgentChange[] }[]): string {
   return entries
