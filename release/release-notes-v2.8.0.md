@@ -20,7 +20,7 @@ Medición neta SIE-007-2026 con facturación por bloques, Modo IA renovado (Gemi
 - **El asistente edita los textos del documento PDF**, en cualquier propuesta editable, con registro transparente: cada cambio muestra la propuesta, el texto, «antes → después» y Deshacer. Si el cambio es en otra propuesta, la tarjeta lo destaca.
 - **Emparejador único de equipos** con el catálogo, con resultado explicable y tolerancias por tipo (por ejemplo, la batería de 16 kWh ya se reconoce).
 - **Escáner de facturas.** Lee energía retirada e inyectada, crédito acumulado y generación distribuida como datos informativos. Las tarifas escalonadas (BTS-1/BTS-2) se valoran con los bloques oficiales y no con el precio de un solo bloque de la factura, que antes casi duplicaba el ahorro.
-- **Escáner de fichas.** Reparte los valores comunes de una familia de modelos y rellena los campos de cada variante (corriente, eficiencia, coeficiente de temperatura, dimensiones, potencia AC máxima, MPPT). Estima la FV máxima del inversor a partir del porcentaje, de forma opcional.
+- **Escáner de fichas.** Reparte los valores comunes de una familia de modelos y rellena los campos de cada variante (corriente, eficiencia, coeficiente de temperatura, dimensiones, potencia AC máxima, MPPT). La FV máxima publicada como porcentaje se convierte a kW; si la ficha no la publica, ofrece una estimación opcional a partir de MPPT, corriente y tensión, marcada como «estimado».
 - **Escáner de tarifas.** Extrae cargo fijo por rango y cargo por uso de red con su resolución de origen. Si el cuadro no cita una resolución, la revisión pide la procedencia (resolución y fecha, o «cuadro de la distribuidora» con mes y año). Rechaza pliegos de otro país y muestra como informativas las tarifas no soportadas. Nada se aplica sin confirmar.
 
 ## Sistemas aislados e inyección cero (#129)
@@ -61,7 +61,7 @@ Medición neta SIE-007-2026 con facturación por bloques, Modo IA renovado (Gemi
 
 Pensadas para el operador. No hay migraciones nuevas aparte de la 008 del MCP remoto.
 
-1. **Migraciones.** La 008 (`agent_grants`, `agent_tokens`, tablas OAuth y actividad; aditiva) se aplica con la API del MCP remoto. Según el responsable ya está aplicada en producción desde el 16/11, pero no consta en el repositorio: comprobar migraciones pendientes antes de desplegar (esperado `[1,…,8]`).
+1. **Migraciones.** La 008 (`agent_grants`, `agent_tokens`, tablas OAuth y actividad; aditiva) se aplicó en producción el 16/11/2026 al desplegar el MCP remoto. Comprobar igualmente antes del despliegue que no hay migraciones pendientes (esperado `[1,…,8]`).
 2. **Checkpoint y ensayo de restauración** con la imagen candidata, como en cada despliegue.
 3. **Worker (visor) 2.8.0** antes de la release de escritorio o junto con ella.
 4. **API 2.8.0** junto con el cliente: conserva `maxPvPowerSource` de los equipos (#140), por lo que debe desplegarse a la vez que el cliente nuevo.
