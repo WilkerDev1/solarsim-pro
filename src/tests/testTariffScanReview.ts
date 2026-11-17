@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { GeminiTariffService } from '../services/geminiTariffService';
-import { applyTariffScanReview, assertDominicanTariffOrigin, prepareTariffScanReview, summarizeTariffScan } from '../utils/tariffExtraction';
+import { applyTariffScanReview, assertDominicanTariffOrigin, describeTariffSource, humanizeTariffNotes, PENDING_TARIFF_SOURCE, prepareTariffScanReview, summarizeTariffScan } from '../utils/tariffExtraction';
 import type { GeminiTransport } from '../../shared/geminiTransport';
 
 /**
@@ -156,6 +156,62 @@ const edesurCuadro = {
   assert.equal(review.provenanceRequired, false);
   assert.deepEqual(review.defaultDecision, { kind: 'resolution', resolutionCode: 'SIE-130-2026-TF', effectiveDate: '2026-11-01' });
   assert.equal(applyTariffScanReview(review, review.defaultDecision).schedules.EDESUR.tariffs.BTS1.source?.resolutionCode, 'SIE-130-2026-TF');
+}
+
+// Prueba real con Gemini: el cuadro de EDESUR «0-200, 201-300, 301-700, >701 kWh» daba un falso «Cambia: Energía (RD$)» en BTS1
+// y BTS2. La IA da como precio plano el primer tramo (o un redondeo) y escribe los límites de varias formas; con bloques, el precio
+// plano de la matriz es el del último tramo y los límites inclusivos/exclusivos o el tramo abierto (null/999999) no son un cambio.
+{
+  const asPrinted = (rates: number[], style: 'inclusive' | 'exclusive') => style === 'inclusive'
+    ? [{ minKWh: 0, maxKWh: 200, rateDOP: rates[0] }, { minKWh: 201, maxKWh: 300, rateDOP: rates[1] }, { minKWh: 301, maxKWh: 700, rateDOP: rates[2] }, { minKWh: 701, maxKWh: null, rateDOP: rates[3] }]
+    : [{ minKWh: 0, maxKWh: 200, rateDOP: rates[0] }, { minKWh: 200, maxKWh: 300, rateDOP: rates[1] }, { minKWh: 300, maxKWh: 700, rateDOP: rates[2] }, { minKWh: 700, maxKWh: 999999, rateDOP: rates[3] }];
+  const real = {
+    country: 'DO', regulator: null, currency: 'DOP', resolutionCode: null, effectiveDate: '2026-11-01', publishedBy: 'EDESUR Dominicana, Dirección Comercial',
+    notes: 'BTD: demandChargePerKWDOP leído de la columna de potencia; baseEnergyRateDOP de BTS1 es el primer tramo; fixedChargeTiersDOP 0-100 y >101.',
+    schedules: { EDESUR: { tariffs: {
+      'BTS-1': { code: 'BTS-1', currency: 'DOP', baseEnergyRateDOP: 6.05, fixedChargeDOP: 128.59, blocks: asPrinted([6.05, 8.59, 12.89, 13.09], 'inclusive'),
+        fixedChargeTiersDOP: [{ minKWh: 0, maxKWh: 100, chargeDOP: 42.10 }, { minKWh: 101, maxKWh: null, chargeDOP: 128.59 }] },
+      'BTS-2': { code: 'BTS-2', currency: 'DOP', baseEnergyRateDOP: 8.62, fixedChargeDOP: 128.96, blocks: asPrinted([8.62, 10.93, 13.26, 13.4300001], 'exclusive') },
+      BTD: { code: 'BTD', currency: 'DOP', baseEnergyRateDOP: 9.02, fixedChargeDOP: 210.15, demandChargePerKWDOP: 1189.164 },
+      'BTS-VE': bvte,
+    } } },
+  };
+  const review = prepareTariffScanReview(real, DEFAULT_RD_TARIFF_MATRIX);
+  assert.deepEqual(review.rows.map((row) => [row.code, row.status, row.changedFields]), [['BTS1', 'unchanged', []], ['BTS2', 'unchanged', []], ['BTD', 'unchanged', []], ['BTS-VE', 'unsupported', []]], 'bloques idénticos con otra convención de límites: sin cambios');
+  assert.equal(review.priceChanges, false);
+  assert.match(summarizeTariffScan(review), /^Sin cambios de precio: 3 tarifas coinciden/);
+  // 2. Coincidencia total → resolución de la matriz prellenada y esa opción marcada por defecto.
+  assert.equal(review.suggestion?.resolutionCode, 'SIE-121-2026-TF');
+  assert.deepEqual(review.defaultDecision, { kind: 'resolution', resolutionCode: 'SIE-121-2026-TF', effectiveDate: '2026-11-01' });
+  // Aplicado, el precio plano de una tarifa por bloques sigue siendo el del último tramo (convención de la matriz).
+  const applied = applyTariffScanReview(review, review.defaultDecision);
+  assert.equal(applied.schedules.EDESUR.tariffs.BTS1.baseEnergyRateDOP, 13.09);
+  assert.equal(applied.schedules.EDESUR.tariffs.BTS2.baseEnergyRateDOP, 13.4300001);
+  assert.equal(applied.schedules.EDESUR.tariffs.BTS2.blocks![3].maxKWh, Infinity);
+
+  // Un cambio real de un tramo sí se detecta, y una diferencia de redondeo (±0.005) no.
+  const moved = structuredClone(real);
+  moved.schedules.EDESUR.tariffs['BTS-1'].blocks[3].rateDOP = 13.2;
+  moved.schedules.EDESUR.tariffs['BTS-2'].blocks[1].rateDOP = 10.934;
+  const movedReview = prepareTariffScanReview(moved, DEFAULT_RD_TARIFF_MATRIX);
+  assert.deepEqual(movedReview.rows.slice(0, 2).map((row) => [row.code, row.status, row.changedFields]), [['BTS1', 'changed', ['baseEnergyRateDOP', 'blocks']], ['BTS2', 'unchanged', []]]);
+  const bounds = structuredClone(real);
+  bounds.schedules.EDESUR.tariffs['BTS-2'].blocks = asPrinted([8.62, 10.93, 13.26, 13.43], 'inclusive').map((block, index) => index === 2 ? { ...block, maxKWh: 650 } : index === 3 ? { ...block, minKWh: 651 } : block);
+  assert.deepEqual(prepareTariffScanReview(bounds, DEFAULT_RD_TARIFF_MATRIX).rows[1].changedFields, ['blocks'], 'un límite de tramo distinto sí es un cambio');
+
+  // 3. La vista previa no muestra la fecha centinela de la procedencia provisional.
+  const pending = review.preview.schedules.EDESUR.tariffs.BTS1.source!;
+  assert.equal(pending.resolutionCode, PENDING_TARIFF_SOURCE);
+  assert.equal(describeTariffSource(pending), 'Procedencia pendiente de revisión');
+  assert.doesNotMatch(describeTariffSource(pending), /2000/);
+  assert.equal(describeTariffSource({ resolutionCode: 'SIE-121-2026-TF', effectiveDate: '2026-10-01' }), 'SIE-121-2026-TF · 2026-10-01');
+
+  // 4. Las notas del documento usan etiquetas legibles, no nombres internos; también las que quedan en la matriz.
+  assert.equal(humanizeTariffNotes('demandChargePerKWDOP y fixedChargeTiersDOP'), 'Demanda (RD$) y Cargo fijo por rango');
+  for (const text of [review.notes ?? '', applied.notes ?? '']) {
+    assert.doesNotMatch(text, /demandChargePerKWDOP|baseEnergyRateDOP|fixedChargeTiersDOP/);
+    assert.match(text, /Demanda \(RD\$\)/);
+  }
 }
 
 // 4. Rechazo por origen: EDESUR Argentina (edesur.com.ar, Resolución ENReGE 887/26, pesos argentinos, T1-R1…).
