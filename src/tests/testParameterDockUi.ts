@@ -330,6 +330,14 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   assert.match(html, /Ley 57-07: crédito del 40% sobre equipos en 3 cuotas\.<\/span>/);
 }
 
+// --- InfoTip: el tooltip va en un portal a body, por encima de la barra lateral (z-40) y de los menús (z-[1100]) ---
+{
+  const source = readFileSync('src/components/simulator/params/ui/InfoTip.tsx', 'utf8');
+  assert.match(source, /createPortal\(tooltip, document\.body\)/, 'portal a body');
+  assert.match(source, /z-\[1200\]/, 'por encima de menús y barra lateral');
+  assert.match(source, /aria-describedby=\{id\}/, 'el botón sigue describiéndose con el tooltip');
+}
+
 // --- InfoTip: posición pura, acotada a la ventana y volteable ---
 {
   const vp = { width: 1280, height: 800 };

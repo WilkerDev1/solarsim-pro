@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Info } from 'lucide-react';
 import { computeTipPosition } from './infoTipPosition';
 
@@ -15,7 +16,7 @@ const CLOSE_DELAY_MS = 150;
 /**
  * Ícono ⓘ que sustituye a los párrafos explicativos. El tooltip se abre con puntero o foco, se posiciona con
  * `position: fixed` (no lo recorta el overflow del dock) acotado a la ventana, y Escape lo cierra sin mover el foco
- * (WCAG 1.4.13).
+ * (WCAG 1.4.13). El puntero puede pasar al tooltip: React propaga mouseenter/leave a través del portal y el cierre lleva retardo.
  */
 export const InfoTip: React.FC<InfoTipProps> = ({ text, label = 'Más información' }) => {
   const id = useId();
@@ -26,6 +27,9 @@ export const InfoTip: React.FC<InfoTipProps> = ({ text, label = 'Más informaci�
   const [dismissed, setDismissed] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tras montar, el tooltip va en un portal a `body`: ni el overflow ni el apilamiento del dock (barra lateral) lo tapan.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const open = (hovered || focused) && !dismissed;
 
   const place = useCallback(() => {
@@ -52,6 +56,18 @@ export const InfoTip: React.FC<InfoTipProps> = ({ text, label = 'Más informaci�
     };
   }, [open, place, text]);
 
+  const tooltip = (
+    <span
+      ref={tipRef}
+      role="tooltip"
+      id={id}
+      style={{ left: pos?.left ?? 0, top: pos?.top ?? 0 }}
+      className={`fixed z-[1200] w-64 whitespace-pre-line rounded-md border border-pd-border bg-pd-panel px-2.5 py-2 text-left text-xs font-normal leading-snug text-pd-text shadow-lg ${open && pos ? 'visible' : 'invisible'}`}
+    >
+      {text}
+    </span>
+  );
+
   return (
     <span
       className="relative inline-flex"
@@ -67,15 +83,7 @@ export const InfoTip: React.FC<InfoTipProps> = ({ text, label = 'Más informaci�
       <button ref={buttonRef} type="button" aria-label={label} aria-describedby={id} className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-md border-0 bg-transparent p-0 text-pd-muted hover:text-pd-text focus-visible:text-pd-text">
         <Info size={14} strokeWidth={2} aria-hidden="true" />
       </button>
-      <span
-        ref={tipRef}
-        role="tooltip"
-        id={id}
-        style={{ left: pos?.left ?? 0, top: pos?.top ?? 0 }}
-        className={`fixed z-50 w-64 whitespace-pre-line rounded-md border border-pd-border bg-pd-panel px-2.5 py-2 text-left text-xs font-normal leading-snug text-pd-text shadow-lg ${open && pos ? 'visible' : 'invisible'}`}
-      >
-        {text}
-      </span>
+      {mounted ? createPortal(tooltip, document.body) : tooltip}
     </span>
   );
 };
