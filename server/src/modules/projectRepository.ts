@@ -10,6 +10,7 @@ import {
   readEquipment,
 } from "../../../shared/equipment/index.js";
 import { resolveMembership } from "../membership.js";
+import { storeDocumentAssets } from "./documentAssets.js";
 import type { PoolClient } from "pg";
 import type { AuthUser } from "../dependencies.js";
 export interface ProjectRow {
@@ -219,6 +220,8 @@ export async function saveProject(
   };
   delete (data as any).forceOverwrite;
   delete (data as any).forceNewVersion;
+  // Images of the document are stored once per organization; the proposal keeps references (shared/documentAssets.ts).
+  const document = await storeDocumentAssets(client, user.organizationId, data);
   // Capacity comes from the groups clients save (`specs.panels`); old documents derive them from the legacy mirror.
   const capacity =
     input.specs &&
@@ -239,7 +242,7 @@ export async function saveProject(
           input.client?.projectId ?? "",
           capacity,
           version,
-          JSON.stringify(data),
+          JSON.stringify(document),
           deleted,
           deletedAt,
           deleted ? user.name : null,
@@ -260,7 +263,7 @@ export async function saveProject(
           input.client?.projectId ?? "",
           capacity,
           version,
-          JSON.stringify(data),
+          JSON.stringify(document),
           deleted,
           deletedAt,
           deleted ? user.name : null,

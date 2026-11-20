@@ -20,6 +20,7 @@ import {
   saveProject,
   type ProjectRow,
 } from "./projectRepository.js";
+import { projectJson } from "./documentAssets.js";
 const validId = (id: unknown): id is string =>
   typeof id === "string" && id.length > 0 && id.length <= 128;
 export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
@@ -56,7 +57,7 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
         [user.organizationId],
       );
       await client.query("COMMIT");
-      return c.json({
+      return projectJson(c, pool, user.organizationId, {
         success: true,
         serverTimestamp: cursor,
         projects: rows.rows.map(canonicalProject),
@@ -350,7 +351,7 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
         });
       }
       await client.query("COMMIT");
-      return c.json({
+      return projectJson(c, pool, user.organizationId, {
         success: true,
         results,
         syncedCount: results.filter((r) => r.status !== "conflict").length,
@@ -398,7 +399,10 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
       const baseVersion = Number(c.req.query("baseVersion"));
       if (!Number.isSafeInteger(baseVersion) || baseVersion !== row.version) {
         await client.query("ROLLBACK");
-        return c.json(
+        return projectJson(
+          c,
+          pool,
+          user.organizationId,
           {
             error: "Actualiza antes de eliminar",
             serverVersion: row.version,
@@ -410,7 +414,10 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
       if (c.req.query("permanent") === "true") {
         if (!row.is_deleted) {
           await client.query("ROLLBACK");
-          return c.json(
+          return projectJson(
+            c,
+            pool,
+            user.organizationId,
             {
               error: "Solo se elimina permanentemente desde papelera",
               serverVersion: row.version,
@@ -432,7 +439,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
             row,
           );
       await client.query("COMMIT");
-      return c.json({ success: true, version: project.version, project });
+      return projectJson(c, pool, user.organizationId, {
+        success: true,
+        version: project.version,
+        project,
+      });
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -467,7 +478,10 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
       const baseVersion = Number(c.req.query("baseVersion"));
       if (!Number.isSafeInteger(baseVersion) || baseVersion !== row.version) {
         await client.query("ROLLBACK");
-        return c.json(
+        return projectJson(
+          c,
+          pool,
+          user.organizationId,
           {
             error: "Actualiza antes de restaurar",
             serverVersion: row.version,
@@ -485,7 +499,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
           )
         : canonicalProject(row);
       await client.query("COMMIT");
-      return c.json({ success: true, version: project.version, project });
+      return projectJson(c, pool, user.organizationId, {
+        success: true,
+        version: project.version,
+        project,
+      });
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -567,7 +585,10 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
     // Agents see what the search lists: the trash is out of their reach. Desktop sessions still get it.
     if (!row || (user.agent && row.is_deleted))
       return c.json({ error: "Proyecto no encontrado" }, 404);
-    return c.json({ success: true, project: canonicalProject(row) });
+    return projectJson(c, pool, user.organizationId, {
+      success: true,
+      project: canonicalProject(row),
+    });
   });
   /**
    * Links (clientId string) or unlinks (null) a directory client with CAS on `baseVersion`. Only the link
@@ -636,7 +657,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
       else data.clientId = clientId;
       const project = await saveProject(client, user, data, row);
       await client.query("COMMIT");
-      return c.json({ success: true, project, version: project.version });
+      return projectJson(c, pool, user.organizationId, {
+        success: true,
+        project,
+        version: project.version,
+      });
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -651,7 +676,10 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
       "SELECT h.* FROM project_version_history h JOIN projects p ON p.id=h.project_id WHERE h.project_id=$1 AND p.organization_id=$2 ORDER BY h.version_number DESC",
       [c.req.param("id"), user.organizationId],
     );
-    return c.json({ success: true, history: result.rows });
+    return projectJson(c, pool, user.organizationId, {
+      success: true,
+      history: result.rows,
+    });
   });
   app.post("/api/projects/:id/history/:versionId/restore", async (c) => {
     const user = await authenticate(c);
@@ -680,7 +708,10 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
       }
       if (body.baseVersion !== row.version) {
         await client.query("ROLLBACK");
-        return c.json(
+        return projectJson(
+          c,
+          pool,
+          user.organizationId,
           {
             error: "Actualiza antes de restaurar",
             serverVersion: row.version,
@@ -719,7 +750,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
         row,
       );
       await client.query("COMMIT");
-      return c.json({ success: true, project, version: project.version });
+      return projectJson(c, pool, user.organizationId, {
+        success: true,
+        project,
+        version: project.version,
+      });
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

@@ -196,7 +196,7 @@ try {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input) => {
     order.push('pull');
-    assert.ok(String(input).endsWith('/api/sync/pull'));
+    assert.ok(new URL(String(input)).pathname.endsWith('/api/sync/pull'));
     return json({ success: true, projects: [], deletedIds: [] });
   };
   try {
