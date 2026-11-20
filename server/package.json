@@ -12,14 +12,14 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
-    "bcryptjs": "^2.4.3",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.5",
     "hono": "^4.13.12",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.1"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
+    "@types/bcryptjs": "^3.0.0",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^24.9.0",
     "@types/pg": "^8.11.10",
