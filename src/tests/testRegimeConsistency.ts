@@ -160,6 +160,11 @@ for (const source of ['manual', 'invoice'] as const) {
   assert.equal(changed.rates.energyRateSource, undefined, 'sin fila: el precio no se marca como referencia');
   assert.equal(changed.rates.energyCostPerKWh, copy.rates.energyCostPerKWh, 'sin fila: no se pone el precio de otra tarifa');
   assert.equal(resolveAssumptions(changed).energyValuationMethod, 'flat_rate');
+  // Tarifa en US$ de la matriz (CEPM RMT-1): precio oficial de referencia, sin fila en RD$.
+  const cepm = applyProjectEdit(copy, { kind: 'rates', patch: { distributor: 'CEPM', tariffCode: 'RMT-1' } }, editCtx);
+  assert.equal(cepm.rates.energyRateSource, 'reference', 'RMT-1: sigue siendo referencia');
+  assert.equal(cepm.rates.billingTariff, undefined, 'RMT-1: sin fila en RD$');
+  close(cepm.rates.energyCostPerKWh, getReferenceEnergyRateUSD(DEFAULT_RD_TARIFF_MATRIX, 'CEPM', 'RMT-1', 2885, fxOf(copy)), 'RMT-1: su precio oficial, no el de la tarifa anterior', 1e-9);
   // Distribuidora escrita en minúsculas: misma fila que en mayúsculas.
   const lower = applyProjectEdit(copy, { kind: 'rates', patch: { distributor: 'edenorte' as never } }, editCtx);
   assert.deepEqual(lower.rates.billingTariff, referenceBillingTariff(DEFAULT_RD_TARIFF_MATRIX, 'EDENORTE', 'BTS2'), 'distribuidora normalizada');

@@ -14,7 +14,7 @@ import { normalizeGridConnectionPatch } from '../../shared/gridConnection';
 import { normalizeSupplyAlternativePatch } from '../../shared/offGridSupply';
 import { tariffMatrixKey } from '../../shared/tariffRules';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTariffs';
-import type { GlobalTariffMatrix } from '../types/tariffs';
+import type { GlobalTariffMatrix, UtilityDistributor } from '../types/tariffs';
 
 /**
  * Edición de proyecto (ADR 0004): la única regla para aplicar un cambio de specs, tarifas, cliente, consumo o
@@ -76,10 +76,12 @@ function withTariffChange(project: ProjectSimulation, patch: Partial<UtilityRate
   const active = matrix?.schedules && Object.keys(matrix.schedules).length > 0 ? matrix : DEFAULT_RD_TARIFF_MATRIX;
   // Las claves de la matriz van en mayúsculas («edenorte» → EDENORTE), como en la comparación de arriba.
   const key = distributorKey(distributor);
+  // Tarifa que no está en la matriz (código desconocido): el precio queda como dato sin procedencia ni fila, nunca el de
+  // otra tarifa (`getReferenceEnergyRateUSD` cae a BTS2) marcado como referencia. Igual que el borrador de IA.
+  const inMatrix = !!active.schedules?.[key as UtilityDistributor]?.tariffs?.[tariffMatrixKey(key, tariffCode)];
+  if (!inMatrix) return { ...patch, energyRateSource: undefined, billingTariff: undefined };
+  // En la matriz pero sin fila en RD$ (tarifa en US$, como CEPM RMT-1): precio oficial de referencia, sin bloques.
   const row = referenceBillingTariff(active, key, tariffCode);
-  // Sin fila exacta en la matriz (código desconocido, tarifa en US$): el precio queda como dato sin procedencia ni fila,
-  // nunca el de otra tarifa (`getReferenceEnergyRateUSD` cae a BTS2) marcado como referencia. Igual que el borrador de IA.
-  if (!row) return { ...patch, energyRateSource: undefined, billingTariff: undefined };
   const months = project.monthlyConsumption ?? [];
   const average = months.length ? months.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0) / months.length : 0;
   return {
