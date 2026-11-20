@@ -80,6 +80,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     currentUser: null,
   },
   projectDeletionQueue: [],
+  projectSyncCursor: null,
   queueProjectDeletion: (project) => {
     const { serverUrl, currentUser } = get().syncSettings;
     if (!currentUser || !ownsProject(project, serverUrl, currentUser.organizationId)) return;
@@ -193,7 +194,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     }
   },
 
-  syncProjectsWithServer: async (silent = false) => {
+  syncProjectsWithServer: async (silent = false, options = {}) => {
     if (get().isSyncing) return { success: false, message: 'Ya hay una sincronización en curso.' };
     const session = captureSession();
     const { serverUrl, currentUser } = session;
@@ -205,6 +206,8 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     set({ isSyncing: true, syncFeedbackMessage: silent ? null : 'Sincronizando…' });
     let conflicts = 0;
     let deletionErrors = 0;
+    // A failed download is reported on its own: it never blocks uploading local work (CAS still guards every write).
+    let pullError: string | null = null;
     const releaseDeletion = (command: ProjectDeletionCommand) => set((state) => ({ projectDeletionQueue: state.projectDeletionQueue.filter((item) => item.scope !== command.scope || item.id !== command.id) }));
     const recoverDeletion = (command: ProjectDeletionCommand, server?: ProjectSimulation) => {
       conflicts++;
@@ -227,27 +230,50 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       const clients = await get().syncClientsWithServer();
       ensureCurrent();
       // Folder errors must not prevent downloading independent project updates.
-      const pull = await SyncService.pullProjects(serverUrl, token());
+      // Incremental: only what changed since this scope's last applied pull; tombstones always arrive in full.
+      const cursor = get().projectSyncCursor;
+      const since = !options.fullPull && cursor?.scope === scope && typeof cursor.serverTimestamp === 'string' && Number.isFinite(Date.parse(cursor.serverTimestamp)) ? cursor.serverTimestamp : null;
+      const pull = await SyncService.pullProjects(serverUrl, token(), since);
       ensureCurrent();
-      if (!pull.success || !pull.projects) throw new Error(pull.error || 'No se pudieron descargar los proyectos.');
-      set((state) => {
-        const projects = reconcilePulledProjects(state.projects, pull.projects!, pull.deletedIds || [], new Set(state.projectDeletionQueue.filter((item) => item.scope === scope).map((item) => item.id)), serverUrl, currentUser.organizationId);
+      if (!pull.success || !pull.projects) pullError = pull.error || 'No se pudieron descargar los proyectos.';
+      const pulled = pull.projects ?? [];
+      const deletedIds = pull.deletedIds ?? [];
+      /** Server copy of one document: absent from a full pull means absent; a partial pull falls back to a targeted read. `null` = unknown. */
+      const serverCopy = async (id: string): Promise<{ project?: ProjectSimulation } | null> => {
+        const found = pulled.find((project) => project.id === id);
+        if (found || !since) return { project: found };
+        const read = await SyncService.getProject(serverUrl, token(), id);
+        ensureCurrent();
+        return read.success ? { project: read.project } : read.notFound ? { project: undefined } : null;
+      };
+      if (!pullError) set((state) => {
+        const projects = reconcilePulledProjects(state.projects, pulled, deletedIds, new Set(state.projectDeletionQueue.filter((item) => item.scope === scope).map((item) => item.id)), serverUrl, currentUser.organizationId);
         let projectConflicts = Object.fromEntries(Object.entries(state.projectConflicts).filter(([, conflict]) => conflict.scope !== scope || projects.some(project => project.id === conflict.projectId && project.syncStatus === 'conflict')));
         for (const project of projects) {
-          if (project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId) && pull.deletedIds?.includes(project.id)) {
+          if (project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId) && deletedIds.includes(project.id)) {
             projectConflicts[scope + '|' + project.id] = { scope, reason: 'deleted', projectId: project.id, localVersion: project.baseVersion ?? 0, serverVersion: 0, localProject: project, serverProject: { ...project, isDeleted: true }, lastModifiedByName: '', lastModifiedAt: '', diffs: [] };
           }
         }
         projectConflicts = reuseRecord(state.projectConflicts, projectConflicts);
         const activeConflict = state.activeConflict?.scope === scope ? projectConflicts[scope + '|' + state.activeConflict.projectId] ?? null : state.activeConflict;
-        return { projects, projectConflicts, activeConflict };
+        // The cursor advances together with the cache it describes; later steps read missing documents directly.
+        const projectSyncCursor = typeof pull.serverTimestamp === 'string' && Number.isFinite(Date.parse(pull.serverTimestamp)) ? { scope, serverTimestamp: pull.serverTimestamp } : state.projectSyncCursor;
+        return { projects, projectConflicts, activeConflict, projectSyncCursor };
       });
       // Confirm trash through CAS before physical deletion, including documents created offline.
       // A failed command remains durable without preventing unrelated documents from syncing.
-      if (canWrite) for (const captured of get().projectDeletionQueue.filter((item) => item.scope === scope)) {
+      // Without a pull there are no tombstones to compare against: deletions wait for the next sync.
+      if (canWrite && !pullError) for (const captured of get().projectDeletionQueue.filter((item) => item.scope === scope)) {
         let command = captured;
-        if ((pull.deletedIds || []).includes(command.id)) { releaseDeletion(command); continue; }
-        const server = pull.projects.find((project) => project.id === command.id);
+        if (deletedIds.includes(command.id)) { releaseDeletion(command); continue; }
+        let server = pulled.find((project) => project.id === command.id);
+        // A document missing from a partial pull may still have changed before this cursor (e.g. a teammate restored it
+        // while this command waited): read its real server copy so CAS recovery and the ACK stages see it.
+        if (!server && (since || command.project?.pendingCanonicalAck || !command.project)) {
+          const read = await serverCopy(command.id);
+          if (!read) { deletionErrors++; continue; }
+          server = read.project;
+        }
         if (command.project?.pendingCanonicalAck) {
           if (!server || !Number.isSafeInteger(server.version) || server.version! < command.project.pendingCanonicalAck.version) { deletionErrors++; continue; }
           command = { ...command, stage: server.isDeleted ? 'delete' : 'trash', project: { ...command.project, pendingCanonicalAck: undefined } };
@@ -279,11 +305,17 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         const success = await SyncService.deleteProject(serverUrl, token(), command.id, true, command.baseVersion);
         ensureCurrent();
         if (success) { releaseDeletion(command); continue; }
-        // DELETE may race a teammate or lose its response; re-read before deciding.
-        const latest = await SyncService.pullProjects(serverUrl, token());
+        // DELETE may race a teammate or lose its response; re-read before deciding. Changes since this sync's
+        // cursor include our own trash push, so an unchanged document is absent exactly as before (still pending).
+        const latest = await SyncService.pullProjects(serverUrl, token(), pull.serverTimestamp ?? null);
         ensureCurrent();
         if (latest.success && latest.deletedIds?.includes(command.id)) { releaseDeletion(command); continue; }
-        const changed = latest.projects?.find((project) => project.id === command.id);
+        let changed = latest.projects?.find((project) => project.id === command.id);
+        if (!changed && latest.success && pull.serverTimestamp) {
+          const read = await SyncService.getProject(serverUrl, token(), command.id);
+          ensureCurrent();
+          changed = read.project;
+        }
         if (changed && (changed.version !== command.baseVersion || !changed.isDeleted)) recoverDeletion(command, changed);
         else deletionErrors++;
       }
@@ -329,12 +361,14 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       const pendingConfirmations = get().projects.filter(project => project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)).length;
       const unresolvedConflicts = get().projects.filter(project => project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId)).length;
       conflicts = Math.max(conflicts, unresolvedConflicts);
-      const message = !folders.success ? `Proyectos descargados; carpetas pendientes: ${folders.message}` : pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : !clients.success ? `Proyectos sincronizados; clientes pendientes: ${clients.message}` : 'Sincronización completada.';
-      set((state) => ({ isSyncing: false, syncFeedbackMessage: silent ? null : message, syncSettings: { ...state.syncSettings, lastSyncTimestamp: deletionErrors ? state.syncSettings.lastSyncTimestamp : pull.serverTimestamp || state.syncSettings.lastSyncTimestamp } }));
-      if (folders.success && (get().projects.some((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) || (!deletionErrors && get().projectDeletionQueue.some((command) => command.scope === scope)))) get().triggerAutoSync();
-      return { success: folders.success && conflicts === 0 && deletionErrors === 0 && pendingConfirmations === 0, message };
+      const message = pullError ? `No se pudieron descargar los proyectos: ${pullError}${sent.length ? ' Los cambios locales se enviaron igualmente.' : ''}` : !folders.success ? `Proyectos descargados; carpetas pendientes: ${folders.message}` : pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : !clients.success ? `Proyectos sincronizados; clientes pendientes: ${clients.message}` : 'Sincronización completada.';
+      set((state) => ({ isSyncing: false, syncFeedbackMessage: silent && !pullError ? null : message, syncSettings: { ...state.syncSettings, lastSyncTimestamp: deletionErrors || pullError ? state.syncSettings.lastSyncTimestamp : pull.serverTimestamp || state.syncSettings.lastSyncTimestamp } }));
+      // A failing download must not spin: the regular heartbeat retries it.
+      if (!pullError && folders.success && (get().projects.some((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) || (!deletionErrors && get().projectDeletionQueue.some((command) => command.scope === scope)))) get().triggerAutoSync();
+      return { success: !pullError && folders.success && conflicts === 0 && deletionErrors === 0 && pendingConfirmations === 0, message };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo sincronizar.';
+      const failure = error instanceof Error ? error.message : 'No se pudo sincronizar.';
+      const message = pullError && !failure.includes(pullError) ? `${failure} No se pudieron descargar los proyectos: ${pullError}` : failure;
       if (session.isCurrent()) set({ isSyncing: false, syncFeedbackMessage: message });
       return { success: false, message };
     }

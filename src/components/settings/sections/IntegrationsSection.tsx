@@ -225,7 +225,8 @@ export const IntegrationsSection: React.FC = () => {
 
   const handleManualSync = async () => {
     setSyncFeedbackMessage(null);
-    const res = await syncProjectsWithServer(false);
+    // Manual sync from settings re-reads the whole organization; the automatic cycle only downloads changes.
+    const res = await syncProjectsWithServer(false, { fullPull: true });
     if (res.success) {
       setSyncFeedbackMessage(`¡Sincronización exitosa! (${res.message || 'Datos actualizados con el servidor'}).`);
     } else {
@@ -592,6 +593,7 @@ export const IntegrationsSection: React.FC = () => {
                 type="button"
                 onClick={handleManualSync}
                 disabled={isSyncing}
+                title="Descarga de nuevo todas las propuestas de la organización y envía los cambios locales"
                 className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />

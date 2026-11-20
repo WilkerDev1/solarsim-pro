@@ -185,6 +185,11 @@ export interface SyncAuthSlice {
     stage?: 'trash' | 'delete';
   }>;
   queueProjectDeletion: (project: ProjectSimulation) => void;
+  /**
+   * `serverTimestamp` de la última descarga de proyectos aplicada a este espacio de trabajo. Viaja con la caché de
+   * proyectos de su alcance (URL del servidor + organización); sin él, o con otro alcance, la descarga es completa.
+   */
+  projectSyncCursor: { scope: string; serverTimestamp: string } | null;
   syncSettings: SyncSettings;
   isSyncing: boolean;
   syncFeedbackMessage: string | null;
@@ -193,7 +198,8 @@ export interface SyncAuthSlice {
   loginUser: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   registerUser: (name: string, email: string, password: string, organizationName?: string) => Promise<{ success: boolean; error?: string }>;
   logoutUser: () => void;
-  syncProjectsWithServer: (silent?: boolean) => Promise<{ success: boolean; message: string }>;
+  /** `fullPull` descarga toda la organización aunque haya cursor (resincronización manual). */
+  syncProjectsWithServer: (silent?: boolean, options?: { fullPull?: boolean }) => Promise<{ success: boolean; message: string }>;
   triggerAutoSync: (immediate?: boolean) => void;
   validateSession: () => Promise<{ valid: boolean; user?: UserProfile | null; error?: string }>;
 }

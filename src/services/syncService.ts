@@ -403,13 +403,14 @@ export class SyncService {
   }
 
   /** Authenticated request with session retry; propagates a renewed token sent by the server. */
-  private static async send(serverUrl: string, token: string, method: string, path: string, body?: unknown): Promise<Response> {
+  private static async send(serverUrl: string, token: string, method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
     const headers: Record<string, string> = body === undefined ? {} : { 'Content-Type': 'application/json' };
     headers.Authorization = `Bearer ${token}`;
     const res = await fetchWithSessionRetry(`${this.cleanUrl(serverUrl)}${path}`, {
       method,
       headers,
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(signal ? { signal } : {}),
     });
     this.checkRenewedToken(res, serverUrl, token);
     return res;
@@ -499,12 +500,64 @@ export class SyncService {
   }
 
   /**
-   * Pull: Descargar proyectos actualizados en el servidor
+   * Plazos de la descarga de proyectos. Su tamaño depende de cuánto cambió (incremental) o de toda la
+   * organización (completa, ~12 MB con logos): se corta por inactividad, no por duración total, para que un
+   * enlace lento pero estable termine y uno detenido falle pronto. El resto de solicitudes conserva 12 s.
+   */
+  static pullTimeouts = { idleMs: 30_000, maxMs: 10 * 60_000 };
+
+  /** Lee la respuesta completa con vigilancia de inactividad; devuelve una `Response` ya descargada. */
+  private static async sendWithIdleTimeout(serverUrl: string, token: string, method: string, path: string, body: unknown, label: string): Promise<Response> {
+    const { idleMs, maxMs } = this.pullTimeouts;
+    const controller = new AbortController();
+    let expired: 'idle' | 'max' | null = null;
+    let idle: ReturnType<typeof setTimeout> | undefined;
+    const touch = () => {
+      if (expired) return;
+      clearTimeout(idle);
+      idle = setTimeout(() => { expired = 'idle'; controller.abort(); }, idleMs);
+    };
+    const cap = setTimeout(() => { expired = 'max'; controller.abort(); }, maxMs);
+    const timeoutError = () => new Error(expired === 'idle'
+      ? `${label} se detuvo: ${Math.ceil(idleMs / 1000)} s sin recibir datos.`
+      : `${label} superó ${Math.ceil(maxMs / 60_000)} min.`);
+    touch();
+    try {
+      const res = await this.send(serverUrl, token, method, path, body, controller.signal);
+      // A deadline that fired while the headers arrived already aborted the signal (late listeners never run).
+      if (expired || controller.signal.aborted) throw timeoutError();
+      touch();
+      if (!res.body) return res;
+      const reader = res.body.getReader();
+      // Some fetch implementations do not error the body on abort: cancelling ends the read, and `expired` reports it.
+      controller.signal.addEventListener('abort', () => { reader.cancel().catch(() => undefined); }, { once: true });
+      const chunks: Uint8Array[] = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (expired) throw timeoutError();
+        if (done) break;
+        chunks.push(value);
+        touch();
+      }
+      return new Response(new Blob(chunks as BlobPart[]), { status: res.status, statusText: res.statusText, headers: res.headers });
+    } catch (error) {
+      if (expired) throw timeoutError();
+      throw error;
+    } finally {
+      clearTimeout(idle);
+      clearTimeout(cap);
+    }
+  }
+
+  /**
+   * Pull: Descargar proyectos cambiados en el servidor desde `lastSyncTimestamp` (el `serverTimestamp` de la
+   * descarga anterior de la misma sesión). Sin cursor la descarga es completa. `deletedIds` siempre llega completo.
    */
   static async pullProjects(serverUrl: string, token: string, lastSyncTimestamp?: string | null): Promise<SyncPullResult> {
     try {
       const body = { lastSyncTimestamp: lastSyncTimestamp || '1970-01-01T00:00:00.000Z' };
-      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'POST', '/api/sync/pull', body), 'Error al descargar proyectos');
+      const res = await this.sendWithIdleTimeout(serverUrl, token, 'POST', '/api/sync/pull', body, 'La descarga de proyectos');
+      const { data, error } = await this.readSuccess(res, 'Error al descargar proyectos');
       if (error) return { success: false, error };
       return {
         success: true,
@@ -515,6 +568,26 @@ export class SyncService {
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al sincronizar' };
+    }
+  }
+
+  /**
+   * Lectura puntual de una propuesta (incluida la papelera). `notFound` solo cuando la API responde que no existe
+   * en la organización (purgada o nunca enviada); cualquier otro fallo es desconocido y no prueba nada.
+   */
+  static async getProject(serverUrl: string, token: string, projectId: string): Promise<{ success: boolean; project?: ProjectSimulation; notFound?: boolean; error?: string }> {
+    try {
+      const res = await this.send(serverUrl, token, 'GET', `/api/projects/${encodeURIComponent(projectId)}`);
+      if (res.status === 404) {
+        const body = await res.clone().json().catch(() => null);
+        if (body && typeof body.error === 'string' && body.success !== true) return { success: false, notFound: true, error: body.error };
+      }
+      const { data, error } = await this.readSuccess(res, 'Error al consultar el proyecto');
+      if (error) return { success: false, error };
+      if (!data.project || data.project.id !== projectId) throw new Error('Respuesta de proyecto inválida.');
+      return { success: true, project: withGroupsOnly(data.project) };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Error de conexión al consultar el proyecto' };
     }
   }
 

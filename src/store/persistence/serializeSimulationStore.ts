@@ -38,6 +38,7 @@ export function serializeSimulationStore(state: SimulationStore) {
     localUserProfile: state.localUserProfile,
     snapshotsByProject: state.snapshotsByProject,
     projectDeletionQueue: state.projectDeletionQueue,
+    projectSyncCursor: state.projectSyncCursor,
     projectConflicts: state.projectConflicts,
     agentPolicy: state.agentPolicy,
     agentActivity: state.agentActivity,
