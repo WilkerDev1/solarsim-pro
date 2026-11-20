@@ -25,6 +25,7 @@ assert.equal(forkAck.projects[0].id, 'qa-fork-confirmed'); assert.equal(forkAck.
 const initial = useSimulationStore.getState();
 const fetchOriginal = globalThis.fetch;
 const pullOriginal = SyncService.pullProjects;
+const getOriginal = SyncService.getProject;
 try {
   initial.setSyncSettings(session);
   // Legacy successful ACK requires canonical read-back, not guessing from the payload.
@@ -59,7 +60,8 @@ try {
   initial.setActiveConflict(null);
   const scope = featureScope(url, user.organizationId);
   assert.ok(serializeSimulationStore(useSimulationStore.getState()).projectConflicts[scope + '|' + local.id], 'Closing preserves durable conflict');
-  SyncService.pullProjects = async () => ({ success: true, projects: [remote] });
+  // Opening a conflict reads only that proposal.
+  SyncService.getProject = async () => ({ success: true, project: remote });
   assert.equal((await initial.openProjectConflict(local.id)).success, true);
   assert.equal(useSimulationStore.getState().activeConflict?.localVersion, 0);
   initial.resolveConflict('fork');
@@ -78,6 +80,8 @@ try {
   assert.equal(useSimulationStore.getState().activeConflict?.reason, 'deleted', 'An open modal must follow a fresh tombstone');
   initial.resolveConflict('accept_server');
   assert.equal(useSimulationStore.getState().projects[0].client.name, conflicted.client.name, 'A stale modal cannot discard deleted-cloud local work');
+  // The purged proposal no longer exists in the organization: the API answers 404.
+  SyncService.getProject = async () => ({ success: false, notFound: true, error: 'Proyecto no encontrado' });
   assert.equal((await initial.openProjectConflict(local.id)).success, true);
   assert.equal(useSimulationStore.getState().activeConflict?.reason, 'deleted');
   initial.resolveConflict('accept_server');
@@ -92,14 +96,14 @@ try {
 
   useSimulationStore.setState({ projects: [conflicted], activeConflict: null, syncSettings: session });
   let finish!: (result: any) => void;
-  SyncService.pullProjects = () => new Promise(resolve => { finish = resolve; });
+  SyncService.getProject = () => new Promise(resolve => { finish = resolve; });
   const opening = initial.openProjectConflict(local.id);
   initial.logoutUser(); initial.setSyncSettings(session);
-  finish({ success: true, projects: [remote] });
+  finish({ success: true, project: remote });
   assert.equal((await opening).success, false, 'Old session readback cannot open a conflict');
   assert.equal(useSimulationStore.getState().activeConflict, null);
 
-  SyncService.pullProjects = async () => ({ success: true, projects: [remote] });
+  SyncService.getProject = async () => ({ success: true, project: remote });
   useSimulationStore.setState({ syncSettings: { ...session, currentUser: { ...user, role: 'VIEWER' } } });
   await initial.openProjectConflict(local.id);
   initial.resolveConflict('keep_local');
@@ -107,6 +111,6 @@ try {
   initial.resolveConflict('accept_server');
   assert.equal(useSimulationStore.getState().projects[0].syncStatus, 'synced', 'Viewer may accept an authorized server read');
 } finally {
-  globalThis.fetch = fetchOriginal; SyncService.pullProjects = pullOriginal; useSimulationStore.setState(initial, true);
+  globalThis.fetch = fetchOriginal; SyncService.pullProjects = pullOriginal; SyncService.getProject = getOriginal; useSimulationStore.setState(initial, true);
 }
 console.log('Legacy ACK recovery, semantic differences, durable conflicts, checkpoints and session isolation passed.');
