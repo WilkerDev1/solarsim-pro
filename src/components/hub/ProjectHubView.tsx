@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useEnergyCalculationMode } from "../../features/application/useApplicationFeatures";
 import { calculateProjectFinancialSummary } from "../../engine/financeEngine";
 import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis, supplyPresentation, supplySummaryText } from "../../../shared/offGridSupply";
+import { PAYBACK_NOT_REACHED_LABEL, irrText, isPaybackReached } from "../../../shared/returnIndicators";
 import { ProposalCommercialPanel } from "../../features/proposals/ProposalCommercialPanel";
 import { ProposalClientSection } from "../clients/ProposalClientLink";
 import {
@@ -167,9 +168,9 @@ export const ProjectHubView = () => {
           <strong>
             {!comparable
               ? noSavingsLabel
-              : Number.isFinite(summary.paybackYears) && summary.paybackYears > 0
+              : isPaybackReached(summary) && Number.isFinite(summary.paybackYears) && summary.paybackYears > 0
               ? `${summary.paybackYears.toFixed(1)} años`
-              : "No alcanzado"}
+              : PAYBACK_NOT_REACHED_LABEL}
           </strong>
         </div>
       </div>
@@ -321,7 +322,7 @@ export const ProjectHubView = () => {
                 </header>
                 <dl className="summary-facts">
                   {(comparable ? [
-                    ["TIR", `${summary.irrPct.toFixed(1)}%`],
+                    ["TIR", irrText(summary)],
                     ["VAN", `${money(summary.npvUSD)} USD`],
                     ["ROI a 25 años", `${summary.roi25YrPct.toFixed(1)}%`],
                     [

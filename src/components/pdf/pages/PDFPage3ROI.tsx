@@ -1,4 +1,5 @@
 import { PDFPageShell } from '../PDFPageShell';
+import { IRR_NOT_APPLICABLE_LABEL, PAYBACK_NOT_REACHED_LABEL, isIrrDefined, isPaybackReached } from '../../../../shared/returnIndicators';
 import { EditableText } from '../editor/EditableText';
 import { cleanClientName } from '../../../../shared/proposalPresentation';
 import React from 'react';
@@ -48,6 +49,7 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
     })),
   ];
 
+  const paybackReached = isPaybackReached(summary);
   const paybackYearObj = cf25.find((c) => c.year === Math.ceil(summary.paybackYears)) || cf25[2] || cf25[0];
   const year1Obj = cf25[0];
   const year10Obj = cf25[9] || cf25[0];
@@ -76,13 +78,13 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
             <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
               <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5"><EditableText k="roi.indicator.payback" /></p>
               <p className="text-lg font-bold text-gray-900">
-                {summary.paybackYears} <span className="text-[10px] font-medium text-gray-500"><EditableText k="roi.indicator.paybackUnit" /></span>
+                {paybackReached ? <>{summary.paybackYears} <span className="text-[10px] font-medium text-gray-500"><EditableText k="roi.indicator.paybackUnit" /></span></> : PAYBACK_NOT_REACHED_LABEL}
               </p>
             </div>
 
             <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
               <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5"><EditableText k="roi.indicator.irr" /></p>
-              <p className="text-lg font-bold" style={{ color: activeTheme.primary }}>{summary.irrPct}%</p>
+              <p className="text-lg font-bold" style={{ color: activeTheme.primary }}>{isIrrDefined(summary) ? `${summary.irrPct}%` : IRR_NOT_APPLICABLE_LABEL}</p>
             </div>
 
             <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
@@ -183,13 +185,13 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
                     ${year1Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
-                <tr className={`font-bold ${activeTheme.accentLightBg}`}>
+                {paybackReached && <tr className={`font-bold ${activeTheme.accentLightBg}`}>
                   <td className="px-4 py-1.5" style={{ color: activeTheme.primary }}>Año {paybackYearObj.year} (Retorno: {summary.paybackYears} años)</td>
                   <td className="px-4 py-1.5 text-right">${paybackYearObj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                   <td className="px-4 py-1.5 text-right font-bold" style={{ color: activeTheme.primary }}>
                     ${paybackYearObj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
-                </tr>
+                </tr>}
                 <tr className="bg-gray-50/60">
                   <td className="px-4 py-1.5 font-bold"><EditableText k="roi.table.year10" /></td>
                   <td className="px-4 py-1.5 text-right">${year10Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>

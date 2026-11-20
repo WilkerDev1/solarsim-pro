@@ -58,6 +58,9 @@ async function main() {
   assert.equal((await publish(missingSummary)).status, 400);
   const invalid = payload(); invalid.summary.monthlyBreakdown[0].consumptionKWh = -1;
   assert.equal((await publish(invalid)).status, 400);
+  // Únicas marcas booleanas del resumen: payback y TIR sin retorno; cualquier otra métrica booleana se rechaza.
+  const otherFlag = payload(); (otherFlag.summary as unknown as Record<string, unknown>).npvUSD = true;
+  assert.equal((await publish(otherFlag)).status, 400);
   const badType = payload(); badType.project.client.name = { invalid: true } as never;
   assert.equal((await publish(badType)).status, 400);
   assert.equal((await publish({ ...payload(), validityDays: 0 })).status, 400);
@@ -325,6 +328,15 @@ async function main() {
   const customHtml = renderProposalPage(paragraphCase);
   assert.ok(customHtml.includes('<strong class="font-bold text-slate-950">12 equipos auxiliares</strong>'));
   assert.ok(customHtml.includes('<strong class="font-bold text-slate-950">12000 kWh</strong>'));
+
+  // Sin retorno en la vida útil: las dos únicas marcas booleanas del resumen se aceptan y se guardan.
+  enabled = false; // misma política que `payload()` (modo legacy)
+  const noReturn = payload(); Object.assign(noReturn.summary as unknown as Record<string, unknown>, { paybackReached: false, irrDefined: false });
+  const noReturnResponse = await publish(noReturn);
+  assert.equal(noReturnResponse.status, 200, await noReturnResponse.clone().text());
+  const noReturnStored = JSON.parse(rows.get(`proposal:${(await noReturnResponse.json() as { id: string }).id}`)!) as StoredProposal;
+  assert.equal((noReturnStored.summary as unknown as Record<string, unknown>).paybackReached, false);
+  assert.equal((noReturnStored.summary as unknown as Record<string, unknown>).irrDefined, false);
 
   console.log('PASS: publicación autenticada, límites, esquema, escape HTML/atributos/JSON/Markdown, snapshots, retroactividad multi-equipos y expiración.');
 }

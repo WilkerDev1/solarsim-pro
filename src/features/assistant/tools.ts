@@ -219,8 +219,8 @@ export function executeAssistantTool(
           resolveGridConnection(p.rates),
           mode,
           engineGridUseCharge(resolveAssumptions(p), resolveGridConnection(p.rates)),
-          // Misma valoración que el resumen: factura por bloques cuando la propuesta la usa (SIE-007-2026).
-          engineBlockBilling(resolveAssumptions(p), p.rates)
+          // Misma valoración que el resumen: facturación neta en SIE-007-2026 (bloques o precio único).
+          engineBlockBilling(resolveAssumptions(p), p.rates, savingsValuationCostPerKWh(p.rates))
         ).map((month) => withoutMoney(month, monthlyMoney)),
         summary: comparable ? summary : {
           ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct', 'annualCreditSettlementUSD']),

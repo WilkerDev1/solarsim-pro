@@ -1,4 +1,5 @@
 import { PDFPageShell } from '../PDFPageShell';
+import { IRR_NOT_APPLICABLE_LABEL, PAYBACK_NOT_REACHED_LABEL, isIrrDefined, isPaybackReached } from '../../../../shared/returnIndicators';
 import { EditableText } from '../editor/EditableText';
 import React from 'react';
 import { ShieldCheck } from 'lucide-react';
@@ -80,7 +81,7 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
 
               {/* Years 1 to 25 */}
               {cf25.map((row) => {
-                const isPaybackYear = row.year === Math.ceil(summary.paybackYears);
+                const isPaybackYear = isPaybackReached(summary) && row.year === Math.ceil(summary.paybackYears);
                 const totalAnnualSavings = row.savingsUSD + row.taxCreditUSD;
                 const isCumulativeNegative = row.cumulativeCashFlowUSD < 0;
 
@@ -130,11 +131,11 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
           <div className="grid grid-cols-4 gap-y-1 gap-x-3 text-[10.5px]">
             <div>
               <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.payback" /></p>
-              <p className="font-bold text-slate-900">{summary.paybackYears} años</p>
+              <p className="font-bold text-slate-900">{isPaybackReached(summary) ? `${summary.paybackYears} años` : PAYBACK_NOT_REACHED_LABEL}</p>
             </div>
             <div>
               <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.irr" /></p>
-              <p className="font-bold" style={{ color: activeTheme.primary }}>{summary.irrPct}%</p>
+              <p className="font-bold" style={{ color: activeTheme.primary }}>{isIrrDefined(summary) ? `${summary.irrPct}%` : IRR_NOT_APPLICABLE_LABEL}</p>
             </div>
             <div>
               <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.npv" /></p>

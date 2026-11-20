@@ -26,7 +26,7 @@
  *   la energía, conforme a la tarifa asignada»).
  */
 import { averageBlockEnergyRateDOP, tariffMatrixKey, type EnergyBlock } from './tariffRules.js';
-import { resolveGridConnection } from './gridConnection.js';
+import { exportsToGrid, resolveGridConnection } from './gridConnection.js';
 import { resolveNetMeteringRegime } from './netMetering.js';
 
 /** Rango del cargo fijo con límites impresos inclusivos (0–100, 101–…); `toKWh: null` es el último rango abierto. */
@@ -327,6 +327,15 @@ export function resolveEnergyValuationMethod(rates: TariffBillingRatesInput | nu
   return proposalBillingTariff(rates) ? 'block_billing' : 'flat_rate';
 }
 
+/**
+ * ¿Se factura con medición neta (neteo, arrastre del crédito y liquidación anual del remanente)? En SIE-007-2026 con
+ * inyección a la red: por bloques con la fila de la tarifa, o a precio único sin ella (`engineBlockBilling`). La misma
+ * regla decide si el dock muestra el precio de liquidación.
+ */
+export function usesNetBilling(rates: TariffBillingRatesInput | null | undefined): boolean {
+  return resolveNetMeteringRegime(rates?.netMeteringRegime) === 'sie007_2026' && exportsToGrid(resolveGridConnection(rates));
+}
+
 export interface TariffPricePresentation {
   method: EnergyValuationMethod;
   /**
@@ -360,8 +369,9 @@ export const ENERGY_VALUATION_METHOD_LABELS:Record<EnergyValuationMethod, string
  * 1. Una procedencia válida en el propio cambio manda (la escribe quien fija el precio de referencia junto con la fila).
  *    Una inválida (o `null`) cuenta como ausente: no se guarda y queda la anterior, salvo que la regla 2 marque `manual`.
  * 2. Si cambia el precio sin procedencia, es un precio tecleado: `manual`.
- * 3. En otro caso no cambia. Cambiar de distribuidora o tarifa sin fila nueva deja la fila guardada sin efecto (no
- *    coincide), y la propuesta se valora con el escalar.
+ * 3. En otro caso no cambia. Un cambio de distribuidora o tarifa sin fila nueva lo reconcilia antes `applyProjectEdit`
+ *    (`src/domain/projectEdit.ts`): con precio de referencia siembra la fila y el precio de la tarifa nueva; con un precio
+ *    tecleado o de factura suelta la fila de la tarifa anterior.
  */
 export function reconcileEnergyRateSource<R extends { energyCostPerKWh?: number; energyRateSource?: unknown }>(
   before: R,
