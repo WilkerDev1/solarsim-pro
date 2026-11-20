@@ -329,6 +329,15 @@ async function main() {
   assert.ok(customHtml.includes('<strong class="font-bold text-slate-950">12 equipos auxiliares</strong>'));
   assert.ok(customHtml.includes('<strong class="font-bold text-slate-950">12000 kWh</strong>'));
 
+  // Sin retorno en la vida útil: las dos únicas marcas booleanas del resumen se aceptan y se guardan.
+  enabled = false; // misma política que `payload()` (modo legacy)
+  const noReturn = payload(); Object.assign(noReturn.summary as unknown as Record<string, unknown>, { paybackReached: false, irrDefined: false });
+  const noReturnResponse = await publish(noReturn);
+  assert.equal(noReturnResponse.status, 200, await noReturnResponse.clone().text());
+  const noReturnStored = JSON.parse(rows.get(`proposal:${(await noReturnResponse.json() as { id: string }).id}`)!) as StoredProposal;
+  assert.equal((noReturnStored.summary as unknown as Record<string, unknown>).paybackReached, false);
+  assert.equal((noReturnStored.summary as unknown as Record<string, unknown>).irrDefined, false);
+
   console.log('PASS: publicación autenticada, límites, esquema, escape HTML/atributos/JSON/Markdown, snapshots, retroactividad multi-equipos y expiración.');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

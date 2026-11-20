@@ -25,6 +25,7 @@ assert.ok(never.includes(PAYBACK_NOT_REACHED_LABEL), 'payback: no se recupera');
 assert.ok(never.includes(IRR_NOT_APPLICABLE_LABEL), 'TIR: no aplica');
 assert.ok(!never.includes('12206.6'), 'nunca la TIR sin converger');
 assert.ok(!never.includes('Retorno: 25.0 años'), 'sin fila de retorno');
+assert.ok(!/25\s*⭐/.test(never), 'el año 25 no se marca como año de retorno en la tabla a 25 años');
 
 const legacy = renderProposalPage(proposal({}));
 assert.ok(legacy.includes('12206.6%') && legacy.includes('Retorno: 25.0 años'), 'resumen sin marcas: como hasta ahora');

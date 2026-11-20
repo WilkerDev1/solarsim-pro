@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
-import { calculateFinancialSummary, calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { calculateFinancialSummary, calculateIRR, calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { calculateMonthlyBill, type BillingTariff } from '../../shared/tariffBilling';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTariffs';
 import { applyProjectEdit } from '../domain/projectEdit';
 import { resolveAssumptions } from '../../shared/assumptions';
+import { publishedSummary } from '../services/shareProposalService';
 import type { FinancialParams, ProjectSimulation, SystemSpecs, UtilityRates } from '../types';
 
 /**
@@ -156,7 +157,13 @@ for (const source of ['manual', 'invoice'] as const) {
   const copy = base({});
   const changed = applyProjectEdit(copy, { kind: 'rates', patch: { tariffCode: 'XYZ' } }, editCtx);
   assert.equal(changed.rates.billingTariff, undefined, 'sin fila nueva: la vieja no se queda');
+  assert.equal(changed.rates.energyRateSource, undefined, 'sin fila: el precio no se marca como referencia');
+  assert.equal(changed.rates.energyCostPerKWh, copy.rates.energyCostPerKWh, 'sin fila: no se pone el precio de otra tarifa');
   assert.equal(resolveAssumptions(changed).energyValuationMethod, 'flat_rate');
+  // Distribuidora escrita en minúsculas: misma fila que en mayúsculas.
+  const lower = applyProjectEdit(copy, { kind: 'rates', patch: { distributor: 'edenorte' as never } }, editCtx);
+  assert.deepEqual(lower.rates.billingTariff, referenceBillingTariff(DEFAULT_RD_TARIFF_MATRIX, 'EDENORTE', 'BTS2'), 'distribuidora normalizada');
+  close(lower.rates.energyCostPerKWh, getReferenceEnergyRateUSD(DEFAULT_RD_TARIFF_MATRIX, 'EDENORTE', 'BTS2', 2885, fxOf(copy)), 'precio de EDENORTE, no del respaldo', 1e-9);
 }
 
 // ── 4. Sistema que nunca recupera la inversión ──
@@ -175,6 +182,32 @@ for (const source of ['manual', 'invoice'] as const) {
   const rate = ok.irrPct / 100;
   const npv = ok.cashFlow25Years.reduce((sum, cf) => sum + cf.netCashFlowUSD / Math.pow(1 + rate, cf.year), -ok.initialOutflowUSD);
   assert.ok(Math.abs(npv) < ok.initialOutflowUSD * 0.001, `VAN a la TIR ≈ 0 (${npv})`);
+}
+
+// TIR con un flujo final negativo (reemplazo de baterías en el último año): sigue existiendo y anula el VAN.
+{
+  const flows = [5000, 5000, 5000, 4000, 4000, 4000, 4000, 4000, 4000, -2000];
+  const irr = calculateIRR(15000, flows);
+  assert.ok(irr !== undefined, 'flujo final negativo: hay TIR');
+  const npv = flows.reduce((sum, cf, t) => sum + cf / Math.pow(1 + irr! / 100, t + 1), -15000);
+  assert.ok(Math.abs(npv) < 15, `VAN a la TIR ≈ 0, salvo el redondeo a 0.01 % (${npv})`);
+  assert.ok(irr! > 20 && irr! < 30, `TIR ≈ 26 % (${irr})`);
+  assert.equal(calculateIRR(0, Array(25).fill(0)), undefined, 'sin inversión ni flujos: no hay TIR');
+  const negative = calculateIRR(10000, Array(25).fill(300));
+  assert.ok(negative !== undefined && negative < 0, `recupera menos de lo invertido: TIR negativa (${negative})`);
+}
+
+// Resumen publicado: las marcas solo viajan si son false y hay comparación de ahorro (un visor 2.8.1 rechaza booleanos).
+{
+  const never = romero(romeroRates(), 385);
+  const published = publishedSummary(never, romeroRates()) as unknown as Record<string, unknown>;
+  assert.equal(published.paybackReached, false);
+  assert.equal(published.irrDefined, false);
+  const ok = publishedSummary(legacy, romeroRates({ netMeteringRegime: 'legacy_retention' })) as unknown as Record<string, unknown>;
+  assert.ok(!('paybackReached' in ok) && !('irrDefined' in ok), 'se recupera: mismo resumen que 2.8.1');
+  const offGrid = romeroRates({ gridConnection: 'off_grid', isZeroExport: true, supplyAlternative: 'no_comparison' } as Partial<UtilityRates>);
+  const noComparison = publishedSummary(calculateFinancialSummary('Santo Domingo / Distrito Nacional', romeroSpecs, offGrid, romeroFinancials, Array(12).fill(385)), offGrid) as unknown as Record<string, unknown>;
+  assert.ok(!('paybackReached' in noComparison) && !('irrDefined' in noComparison), 'aislado sin comparación: sin marcas');
 }
 
 console.log('testRegimeConsistency: OK');

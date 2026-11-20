@@ -338,27 +338,41 @@ export function calculateCostMatrixSummary(
 }
 
 /**
- * Internal Rate of Return (IRR / TIR) por bisección sobre [-99 %, 1000 %]: el VAN de los flujos cambia de signo en la TIR.
- * Sin cambio de signo en ese rango (p. ej. un sistema cuyo ahorro es negativo) la TIR no existe: `undefined`, nunca el
- * valor sin converger de un método iterativo (antes salían 12 206 % o 60 223 %).
+ * Internal Rate of Return (IRR / TIR): la tasa con VAN = 0 más cercana a 0 %, buscada desde 0 % hacia arriba (VAN(0) > 0)
+ * o hacia abajo (VAN(0) < 0) en pasos de 1 punto hasta 1000 % / −99 %, y refinada por bisección. Empezar en 0 % (y no
+ * en un extremo) evita que un flujo final negativo, p. ej. el reemplazo de baterías, domine el VAN cerca de −99 %.
+ * Sin cambio de signo en el rango (un sistema cuyo ahorro es negativo) la TIR no existe: `undefined`, nunca el valor sin
+ * converger de un método iterativo (antes salían 12 206 % o 60 223 %).
  */
 export function calculateIRR(initialInvestment: number, cashFlows: number[]): number | undefined {
+  if (!(initialInvestment > 0) && cashFlows.every((cf) => cf === 0)) return undefined;
   const npvAt = (rate: number) => cashFlows.reduce((npv, cf, t) => npv + cf / Math.pow(1 + rate, t + 1), -initialInvestment);
-  let low = -0.99;
-  let high = 10;
-  let npvLow = npvAt(low);
-  const npvHigh = npvAt(high);
-  if (!Number.isFinite(npvLow) || !Number.isFinite(npvHigh)) return undefined;
-  if (npvLow === 0) return Math.round(low * 10000) / 100;
-  if (npvHigh === 0) return Math.round(high * 10000) / 100;
-  if (Math.sign(npvLow) === Math.sign(npvHigh)) return undefined;
-  for (let iter = 0; iter < 200 && high - low > 1e-12; iter++) {
-    const mid = (low + high) / 2;
-    const npvMid = npvAt(mid);
-    if (npvMid === 0) { low = high = mid; break; }
-    if (Math.sign(npvMid) === Math.sign(npvLow)) { low = mid; npvLow = npvMid; } else { high = mid; }
+  const npv0 = npvAt(0);
+  if (!Number.isFinite(npv0)) return undefined;
+  if (npv0 === 0) return 0;
+  const step = npv0 > 0 ? 0.01 : -0.01;
+  const limit = npv0 > 0 ? 10 : -0.99;
+  let low = 0;
+  let npvLow = npv0;
+  for (let rate = step; npv0 > 0 ? rate <= limit + 1e-12 : rate >= limit - 1e-12; rate += step) {
+    const bounded = npv0 > 0 ? Math.min(rate, limit) : Math.max(rate, limit);
+    const npv = npvAt(bounded);
+    if (!Number.isFinite(npv)) return undefined;
+    if (npv === 0) return Math.round(bounded * 10000) / 100;
+    if (Math.sign(npv) !== Math.sign(npvLow)) {
+      let a = low, b = bounded, fa = npvLow;
+      for (let iter = 0; iter < 200 && Math.abs(b - a) > 1e-12; iter++) {
+        const mid = (a + b) / 2;
+        const fm = npvAt(mid);
+        if (fm === 0) { a = b = mid; break; }
+        if (Math.sign(fm) === Math.sign(fa)) { a = mid; fa = fm; } else { b = mid; }
+      }
+      return Math.round(((a + b) / 2) * 10000) / 100;
+    }
+    low = bounded;
+    npvLow = npv;
   }
-  return Math.round(((low + high) / 2) * 10000) / 100;
+  return undefined;
 }
 
 /**

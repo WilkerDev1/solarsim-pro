@@ -12,14 +12,16 @@ import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { publishedDocumentTexts } from '../../shared/documentTexts';
 import { buildDocumentTextContext } from '../utils/documentTextContext';
 import { gridConnectionFields, resolveGridConnection } from '../../shared/gridConnection';
-import { publishedSupplyFields } from '../../shared/offGridSupply';
+import { hasSavingsComparison, publishedSupplyFields, resolveSavingsBasis } from '../../shared/offGridSupply';
 
 /**
- * Resumen que se publica: las marcas de payback y TIR (`paybackReached`, `irrDefined`) solo viajan cuando son `false`,
- * así el resumen de un sistema que sí se recupera es idéntico al de 2.8.1 y lo acepta el visor aunque aún no lo conozca.
+ * Resumen que se publica: las marcas de payback y TIR (`paybackReached`, `irrDefined`) solo viajan cuando son `false` y
+ * hay comparación de ahorro (sin ella el visor no muestra el retorno). Así el resumen de un sistema que se recupera, o de
+ * un aislado sin comparación, es idéntico al de 2.8.1 y lo acepta un visor que aún no conoce las marcas.
  */
-function publishedSummary(summary: FinancialSummaryResult): FinancialSummaryResult {
+export function publishedSummary(summary: FinancialSummaryResult, rates: ProjectSimulation['rates']): FinancialSummaryResult {
   const { paybackReached, irrDefined, ...rest } = summary;
+  if (!hasSavingsComparison(resolveSavingsBasis(rates))) return rest as FinancialSummaryResult;
   return { ...rest, ...(paybackReached === false ? { paybackReached } : {}), ...(irrDefined === false ? { irrDefined } : {}) } as FinancialSummaryResult;
 }
 
@@ -290,7 +292,7 @@ export class ShareProposalService {
         body: JSON.stringify({
           project: projectPayload,
           calculationSnapshot,
-          summary: publishedSummary(summary),
+          summary: publishedSummary(summary, project.rates),
           validityDays,
         }),
       });

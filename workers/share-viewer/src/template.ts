@@ -1013,7 +1013,7 @@ ${paybackReached ? `              <tr class="bg-orange-50 text-orange-950 font-b
 
               <!-- Years 1 to 25 -->
               ${cf25.map((row: any) => {
-                const isPayback = row.year === paybackCeil;
+                const isPayback = paybackReached && row.year === paybackCeil;
                 const cumulative = Number(row.cumulativeCashFlowUSD || 0);
                 const isNegative = cumulative < 0;
                 const savings = Number(row.savingsUSD || 0);

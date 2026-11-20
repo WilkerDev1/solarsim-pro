@@ -12,7 +12,7 @@ import {
   FACTORY_ANNUAL_CREDIT_SETTLEMENT,
   calculateBillingYear,
   calculateMonthlyBill,
-  proposalBillingTariff,
+  proposalBillingTariff, usesNetBilling,
   resolveAnnualCreditSettlementDOPPerKWh,
   resolveEnergyValuationMethod,
   tariffPricePresentation,
@@ -144,7 +144,7 @@ export function buildBillBreakdown(project: ProjectSimulation, calculationMode: 
 // ── Supuestos no verificados ──
 
 export interface UnverifiedAssumption {
-  id: 'annual_settlement_price' | 'fixed_charge_tier_basis' | 'net_consumption_blocks' | 'gross_injection_charge';
+  id: 'annual_settlement_price' | 'fixed_charge_tier_basis';
   title: string;
   /** Valor vigente, legible. */
   valueText: string;
@@ -155,16 +155,18 @@ export interface UnverifiedAssumption {
 }
 
 /**
- * Los cuatro supuestos de la fase 3 que ninguna factura confirmó, con su valor vigente. Se listan los que afectan a la
- * propuesta: con factura por bloques, el precio de liquidación, el rango del cargo fijo (si la tarifa lo tiene por rango)
- * y los bloques sobre consumo neto; con cargo por uso de la red, la base de inyección bruta.
+ * Supuestos de la fase 3 que ninguna factura confirmó todavía, con su valor vigente: el precio de liquidación del
+ * remanente anual (con facturación neta, `usesNetBilling`) y el rango del cargo fijo (con bloques y cargo por rango).
+ * La factura EDESUR NIC 2084605 (nov-2026) confirmó los otros dos: bloques sobre el consumo neto y cargo sobre la
+ * inyección bruta al 25 % de la tarifa de referencia, que ya no se listan.
  */
 export function unverifiedAssumptions(rates: UtilityRates): UnverifiedAssumption[] {
   const items: UnverifiedAssumption[] = [];
   // Sin inyección (inyección cero) no hay neteo, crédito ni liquidación: ningún supuesto tiene efecto.
   const injects = exportsToGrid(resolveGridConnection(rates));
   const tariff = injects && resolveEnergyValuationMethod(rates) === 'block_billing' ? proposalBillingTariff(rates) : undefined;
-  if (tariff) {
+  // El remanente anual se liquida siempre que hay facturación neta: con bloques o a precio único (`usesNetBilling`).
+  if (usesNetBilling(rates)) {
     const settlement = resolveAnnualCreditSettlementDOPPerKWh(rates);
     items.push({
       id: 'annual_settlement_price',
@@ -173,6 +175,8 @@ export function unverifiedAssumptions(rates: UtilityRates): UnverifiedAssumption
       note: `El crédito que sobra al cierre del año se paga al precio de referencia de la CNE a 10 años, que no se encontró publicado; de fábrica ${FACTORY_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh} (el remanente no suma ahorro).`,
       editable: true,
     });
+  }
+  if (tariff) {
     if (tariff.fixedChargeTiers?.length) {
       items.push({
         id: 'fixed_charge_tier_basis',
@@ -182,22 +186,6 @@ export function unverifiedAssumptions(rates: UtilityRates): UnverifiedAssumption
         editable: false,
       });
     }
-    items.push({
-      id: 'net_consumption_blocks',
-      title: 'Bloques sobre consumo neto',
-      valueText: 'Consumo neto facturado',
-      note: 'Los bloques de la tarifa se aplican al consumo neto (retirado menos inyectado y crédito), según la lectura del art. 19 E.1.b.',
-      editable: false,
-    });
-  }
-  if (resolveNetMeteringRegime(rates.netMeteringRegime) === 'sie007_2026' && gridUseChargeApplies(rates)) {
-    items.push({
-      id: 'gross_injection_charge',
-      title: 'Cargo sobre inyección bruta',
-      valueText: 'Todos los kWh inyectados',
-      note: 'El cargo por uso de la red se cobra sobre la energía inyectada bruta del medidor, aunque se compense con consumo del mismo mes.',
-      editable: false,
-    });
   }
   return items;
 }

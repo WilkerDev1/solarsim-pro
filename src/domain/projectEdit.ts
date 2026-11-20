@@ -74,13 +74,19 @@ function withTariffChange(project: ProjectSimulation, patch: Partial<UtilityRate
   if (!changed) return patch;
   if (before.energyRateSource !== 'reference') return { ...patch, billingTariff: undefined };
   const active = matrix?.schedules && Object.keys(matrix.schedules).length > 0 ? matrix : DEFAULT_RD_TARIFF_MATRIX;
+  // Las claves de la matriz van en mayúsculas («edenorte» → EDENORTE), como en la comparación de arriba.
+  const key = distributorKey(distributor);
+  const row = referenceBillingTariff(active, key, tariffCode);
+  // Sin fila exacta en la matriz (código desconocido, tarifa en US$): el precio queda como dato sin procedencia ni fila,
+  // nunca el de otra tarifa (`getReferenceEnergyRateUSD` cae a BTS2) marcado como referencia. Igual que el borrador de IA.
+  if (!row) return { ...patch, energyRateSource: undefined, billingTariff: undefined };
   const months = project.monthlyConsumption ?? [];
   const average = months.length ? months.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0) / months.length : 0;
   return {
     ...patch,
-    energyCostPerKWh: getReferenceEnergyRateUSD(active, distributor, tariffCode, average, resolveAssumptions(project).dopExchangeRate),
+    energyCostPerKWh: getReferenceEnergyRateUSD(active, key, tariffCode, average, resolveAssumptions(project).dopExchangeRate),
     energyRateSource: 'reference',
-    billingTariff: referenceBillingTariff(active, distributor, tariffCode),
+    billingTariff: row,
   };
 }
 

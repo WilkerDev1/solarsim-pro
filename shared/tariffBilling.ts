@@ -26,7 +26,7 @@
  *   la energía, conforme a la tarifa asignada»).
  */
 import { averageBlockEnergyRateDOP, tariffMatrixKey, type EnergyBlock } from './tariffRules.js';
-import { resolveGridConnection } from './gridConnection.js';
+import { exportsToGrid, resolveGridConnection } from './gridConnection.js';
 import { resolveNetMeteringRegime } from './netMetering.js';
 
 /** Rango del cargo fijo con límites impresos inclusivos (0–100, 101–…); `toKWh: null` es el último rango abierto. */
@@ -325,6 +325,15 @@ export function resolveEnergyValuationMethod(rates: TariffBillingRatesInput | nu
   if (resolveGridConnection(rates) === 'off_grid') return 'flat_rate';
   if (!isEnergyRateSource(rates?.energyRateSource) || !BLOCK_BILLING_RATE_SOURCES.includes(rates.energyRateSource)) return 'flat_rate';
   return proposalBillingTariff(rates) ? 'block_billing' : 'flat_rate';
+}
+
+/**
+ * ¿Se factura con medición neta (neteo, arrastre del crédito y liquidación anual del remanente)? En SIE-007-2026 con
+ * inyección a la red: por bloques con la fila de la tarifa, o a precio único sin ella (`engineBlockBilling`). La misma
+ * regla decide si el dock muestra el precio de liquidación.
+ */
+export function usesNetBilling(rates: TariffBillingRatesInput | null | undefined): boolean {
+  return resolveNetMeteringRegime(rates?.netMeteringRegime) === 'sie007_2026' && exportsToGrid(resolveGridConnection(rates));
 }
 
 export interface TariffPricePresentation {
