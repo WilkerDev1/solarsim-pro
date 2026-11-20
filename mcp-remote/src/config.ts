@@ -4,7 +4,7 @@ import {
   type ClientIpConfig,
 } from "../../shared/clientIp.js";
 /** Configuration by environment variables (docs/MCP_REMOTE.md#variables). A typo fails at startup. */
-export const SERVICE_VERSION = "2.8.1";
+export const SERVICE_VERSION = "2.8.2";
 
 export interface McpRemoteConfig {
   port: number;
