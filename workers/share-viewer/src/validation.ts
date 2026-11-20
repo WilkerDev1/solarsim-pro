@@ -5,6 +5,8 @@ import { isGridConnectionMode } from '../../../shared/gridConnection';
 import { GENERATOR_COST_RULE_MESSAGE, isSupplyAlternative, isValidGeneratorCost } from '../../../shared/offGridSupply';
 import { isNetMeteringRegime, isValidGridUseCharge, resolveNetMeteringRegime } from '../../../shared/netMetering';
 export const MAX_SHARE_BYTES = 2 * 1024 * 1024;
+const SUMMARY_FLAGS = new Set(['paybackReached', 'irrDefined']);
+
 export class RequestValidationError extends Error {
   constructor(message: string, public readonly status: 400 | 413 = 400) { super(message); }
 }
@@ -133,6 +135,8 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   }
   const summary = requireRecord(body.summary, 'summary');
   for (const [key, item] of Object.entries(summary)) {
+    // Únicas marcas booleanas: payback y TIR sin retorno en la vida útil (`shared/returnIndicators.ts`).
+    if (typeof item === 'boolean' && SUMMARY_FLAGS.has(key)) continue;
     if (typeof item === 'string' || typeof item === 'boolean') throw new RequestValidationError(`La métrica ${key} debe ser numérica.`);
   }
   if (!Array.isArray(summary.monthlyBreakdown) || summary.monthlyBreakdown.length !== 12) throw new RequestValidationError('El resumen debe incluir doce meses.');

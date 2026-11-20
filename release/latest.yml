@@ -1,8 +1,8 @@
-version: 2.7.4
+version: 2.8.1
 files:
-  - url: SolarSim-Pro-Setup-2.7.4.exe
-    sha512: 5gVQmunT9F4dAue5Mzx/wDqd50SwSlGm/auFzb+r5oOmvU7aU4xqOmGAVuAqg8cG9R4D98Llj7aE/PrhueJm4A==
-    size: 152802322
-path: SolarSim-Pro-Setup-2.7.4.exe
-sha512: 5gVQmunT9F4dAue5Mzx/wDqd50SwSlGm/auFzb+r5oOmvU7aU4xqOmGAVuAqg8cG9R4D98Llj7aE/PrhueJm4A==
-releaseDate: '2026-11-03T11:21:21.697Z'
+  - url: SolarSim-Pro-Setup-2.8.1.exe
+    sha512: OnLsyg+7AWdFnwnYmtnpnhdQGzw3qpBtjVTr/LxWyXFh+nv2xiVTCfhyqSJOsTVyOFhReczhqIBPEJk5V7y1rA==
+    size: 152864835
+path: SolarSim-Pro-Setup-2.8.1.exe
+sha512: OnLsyg+7AWdFnwnYmtnpnhdQGzw3qpBtjVTr/LxWyXFh+nv2xiVTCfhyqSJOsTVyOFhReczhqIBPEJk5V7y1rA==
+releaseDate: '2026-11-17T17:07:22.446Z'

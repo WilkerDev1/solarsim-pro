@@ -309,15 +309,18 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     const local = captured.projects.find(project => project.id === projectId);
     if (!authToken || !currentUser || !local || !ownsProject(local, serverUrl, currentUser.organizationId)) return { success: false, error: 'Inicia sesión en la organización de esta propuesta.' };
     const scope = featureScope(serverUrl, currentUser.organizationId);
-    const result = await SyncService.pullProjects(serverUrl, authToken);
+    // One targeted read, not the organization's full pull (it can weigh megabytes on a slow link).
+    const result = await SyncService.getProject(serverUrl, authToken, projectId);
     const fresh = get();
     if (fresh.sessionGeneration !== captured.sessionGeneration || fresh.syncSettings.serverUrl !== serverUrl || fresh.syncSettings.currentUser?.id !== currentUser.id || fresh.syncSettings.currentUser?.organizationId !== currentUser.organizationId || !fresh.syncSettings.authToken) return { success: false, error: 'La sesión cambió. Vuelve a abrir el conflicto.' };
     const latest = fresh.projects.find(project => project.id === projectId);
     if (!latest || latest.syncStatus !== 'conflict' || !ownsProject(latest, serverUrl, currentUser.organizationId)) return { success: false, error: 'El estado de la propuesta cambió. Actualiza la lista.' };
     const previous = fresh.projectConflicts[scope + '|' + projectId];
-    if (!result.success) return { success: false, error: result.error || 'No se pudo consultar la nube. Tu copia local se conserva.' };
-    const server = result.projects?.find(project => project.id === projectId);
-    const deleted = result.deletedIds?.includes(projectId) || (!server && previous?.reason === 'deleted');
+    if (!result.success && !result.notFound) return { success: false, error: result.error || 'No se pudo consultar la nube. Tu copia local se conserva.' };
+    const server = result.project;
+    // "Not found" means purged only for a document the server had confirmed; a creation rejected by the push
+    // (invalid folder, client, link…) never existed there.
+    const deleted = !server && ((latest.baseVersion ?? 0) > 0 || previous?.reason === 'deleted');
     if (!server && !deleted) return { success: false, error: 'La propuesta ya no está disponible en la nube. Tu copia local se conserva.' };
     get().setActiveConflict({ projectId, scope, reason: deleted ? 'deleted' : undefined, localVersion: latest.baseVersion ?? 0, serverVersion: server?.version ?? 0, localProject: latest, serverProject: server || { ...latest, isDeleted: true },
       lastModifiedByName: !deleted && previous?.serverVersion === server?.version ? previous.lastModifiedByName : '', lastModifiedAt: server?.updatedAt || '', diffs: deleted ? [] : projectDifferences(server!, latest) });

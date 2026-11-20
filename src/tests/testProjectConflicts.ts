@@ -25,25 +25,26 @@ assert.equal(forkAck.projects[0].id, 'qa-fork-confirmed'); assert.equal(forkAck.
 const initial = useSimulationStore.getState();
 const fetchOriginal = globalThis.fetch;
 const pullOriginal = SyncService.pullProjects;
+const getOriginal = SyncService.getProject;
 try {
   initial.setSyncSettings(session);
   // Legacy successful ACK requires canonical read-back, not guessing from the payload.
-  globalThis.fetch = async (input) => String(input).endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : Response.json({ success: true, projects: [remote] });
+  globalThis.fetch = async (input) => new URL(String(input)).pathname.endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : Response.json({ success: true, projects: [remote] });
   const result = await SyncService.pushProjects(url, 'synthetic', [local]);
   assert.equal(result.success, true); assert.equal(result.results?.[0].status, 'created');
   const duringSend = { ...local, client: { ...local.client, name: 'Edición durante envío' } };
   const ack = acknowledgeProjectPush([duringSend], [local], result.results!, url, user.organizationId).projects[0];
   assert.equal(ack.client.name, duringSend.client.name); assert.equal(ack.syncStatus, 'pending'); assert.equal(ack.baseVersion, 1);
-  globalThis.fetch = async (input) => String(input).endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : Response.json({ success: true, projects: [{ ...remote, version: 2 }] });
+  globalThis.fetch = async (input) => new URL(String(input)).pathname.endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : Response.json({ success: true, projects: [{ ...remote, version: 2 }] });
   assert.equal((await SyncService.pushProjects(url, 'synthetic', [local])).results?.[0].status, 'conflict', 'A concurrent change during readback stays reviewable');
-  globalThis.fetch = async (input) => String(input).endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : new Response('', { status: 503 });
+  globalThis.fetch = async (input) => new URL(String(input)).pathname.endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : new Response('', { status: 503 });
   const sparse = await SyncService.pushProjects(url, 'synthetic', [local]);
   assert.equal(sparse.success, true);
   const deferred = acknowledgeProjectPush([local], [local], sparse.results!, url, user.organizationId).projects[0];
   assert.equal(deferred.syncStatus, 'pending'); assert.equal(deferred.pendingCanonicalAck?.version, 1);
   assert.equal(reconcilePulledProjects([deferred], [], [], new Set(), url, user.organizationId)[0].pendingCanonicalAck?.version, 1);
   assert.equal(reconcilePulledProjects([deferred], [remote], [], new Set(), url, user.organizationId)[0].syncStatus, 'synced');
-  globalThis.fetch = async (input) => String(input).endsWith('/push') ? Response.json({ success: true, results: [{ id: 'qa-fork-readback', originalId: local.id, status: 'forked', version: 1 }] }) : new Response('', { status: 503 });
+  globalThis.fetch = async (input) => new URL(String(input)).pathname.endsWith('/push') ? Response.json({ success: true, results: [{ id: 'qa-fork-readback', originalId: local.id, status: 'forked', version: 1 }] }) : new Response('', { status: 503 });
   const sparseFork = await SyncService.pushProjects(url, 'synthetic', [local]);
   const forkReceipt = acknowledgeProjectPush([edited], [local], sparseFork.results!, url, user.organizationId).projects[0];
   assert.equal(forkReceipt.id, 'qa-fork-readback'); assert.equal(forkReceipt.client.name, edited.client.name);
@@ -59,7 +60,8 @@ try {
   initial.setActiveConflict(null);
   const scope = featureScope(url, user.organizationId);
   assert.ok(serializeSimulationStore(useSimulationStore.getState()).projectConflicts[scope + '|' + local.id], 'Closing preserves durable conflict');
-  SyncService.pullProjects = async () => ({ success: true, projects: [remote] });
+  // Opening a conflict reads only that proposal.
+  SyncService.getProject = async () => ({ success: true, project: remote });
   assert.equal((await initial.openProjectConflict(local.id)).success, true);
   assert.equal(useSimulationStore.getState().activeConflict?.localVersion, 0);
   initial.resolveConflict('fork');
@@ -78,6 +80,8 @@ try {
   assert.equal(useSimulationStore.getState().activeConflict?.reason, 'deleted', 'An open modal must follow a fresh tombstone');
   initial.resolveConflict('accept_server');
   assert.equal(useSimulationStore.getState().projects[0].client.name, conflicted.client.name, 'A stale modal cannot discard deleted-cloud local work');
+  // The purged proposal no longer exists in the organization: the API answers 404.
+  SyncService.getProject = async () => ({ success: false, notFound: true, error: 'Proyecto no encontrado' });
   assert.equal((await initial.openProjectConflict(local.id)).success, true);
   assert.equal(useSimulationStore.getState().activeConflict?.reason, 'deleted');
   initial.resolveConflict('accept_server');
@@ -92,14 +96,14 @@ try {
 
   useSimulationStore.setState({ projects: [conflicted], activeConflict: null, syncSettings: session });
   let finish!: (result: any) => void;
-  SyncService.pullProjects = () => new Promise(resolve => { finish = resolve; });
+  SyncService.getProject = () => new Promise(resolve => { finish = resolve; });
   const opening = initial.openProjectConflict(local.id);
   initial.logoutUser(); initial.setSyncSettings(session);
-  finish({ success: true, projects: [remote] });
+  finish({ success: true, project: remote });
   assert.equal((await opening).success, false, 'Old session readback cannot open a conflict');
   assert.equal(useSimulationStore.getState().activeConflict, null);
 
-  SyncService.pullProjects = async () => ({ success: true, projects: [remote] });
+  SyncService.getProject = async () => ({ success: true, project: remote });
   useSimulationStore.setState({ syncSettings: { ...session, currentUser: { ...user, role: 'VIEWER' } } });
   await initial.openProjectConflict(local.id);
   initial.resolveConflict('keep_local');
@@ -107,6 +111,6 @@ try {
   initial.resolveConflict('accept_server');
   assert.equal(useSimulationStore.getState().projects[0].syncStatus, 'synced', 'Viewer may accept an authorized server read');
 } finally {
-  globalThis.fetch = fetchOriginal; SyncService.pullProjects = pullOriginal; useSimulationStore.setState(initial, true);
+  globalThis.fetch = fetchOriginal; SyncService.pullProjects = pullOriginal; SyncService.getProject = getOriginal; useSimulationStore.setState(initial, true);
 }
 console.log('Legacy ACK recovery, semantic differences, durable conflicts, checkpoints and session isolation passed.');

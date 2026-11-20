@@ -334,7 +334,11 @@ export interface FinancialSummaryResult {
   annualCreditSettlementUSD?: number;
   total25YearSavingsUSD: number;
   paybackYears: number;
+  /** false si la inversión no se recupera dentro de la vida útil (o no hay comparación de ahorro): `paybackYears` no aplica. */
+  paybackReached: boolean;
   irrPct: number;
+  /** false si los flujos no tienen TIR en [-99 %, 1000 %] (o no hay comparación de ahorro): `irrPct` vale 0 y no aplica. */
+  irrDefined: boolean;
   npvUSD: number;
   roi25YrPct: number;
   co2AvoidedTonsPerYear: number;

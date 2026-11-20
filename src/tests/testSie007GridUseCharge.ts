@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
-import { calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { calculateProjectFinancialSummary, flatSinglePriceTariff } from '../engine/financeEngine';
+import { calculateBillingYear, calculateMonthlyBill } from '../../shared/tariffBilling';
 import { migrateLegacySpecs } from '../../shared/equipment';
 import { resolveAssumptions } from '../../shared/assumptions';
 import {
@@ -48,6 +49,18 @@ const project = (rates: Partial<UtilityRates>, monthlyKWh = 250, specOverrides: 
 const MODES: EnergyCalculationMode[] = ['legacy', 'self_consumption'];
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Ahorro mensual esperado con precio escalar en SIE-007: la misma facturación neta que el motor (`engineBlockBilling`). */
+function assertFlatNetBilling(summary: ReturnType<typeof calculateProjectFinancialSummary>, distributor: string, priceUSD: number, chargeDOP: number, fx: number, label: string) {
+  const tariff = flatSinglePriceTariff({ distributor }, priceUSD * fx);
+  const months = summary.monthlyBreakdown;
+  const year = calculateBillingYear(tariff, months.map((m) => ({ withdrawnKWh: Math.max(0, Math.round((m.consumptionKWh - m.solarSelfConsumedKWh) * 1e9) / 1e9), injectedKWh: m.gridExportedKWh })), { gridUseChargeDOPPerKWh: chargeDOP, settlementDOPPerKWh: 0 });
+  months.forEach((m, i) => {
+    const before = r2(calculateMonthlyBill({ tariff, withdrawnKWh: m.consumptionKWh }).totalDOP / fx);
+    const after = r2(year.months[i].totalDOP / fx);
+    assert.equal(m.savingsUSD, r2(before - after), `${label} ${m.month}: factura sin − con sistema a precio único`);
+  });
+}
+
 // 1. Resolución del régimen: lo que falta o es desconocido es el régimen anterior; las nuevas nacen en SIE-007.
 assert.equal(SAVED_PROPOSAL_NET_METERING_REGIME, 'legacy_retention');
 assert.equal(NEW_PROPOSAL_NET_METERING_REGIME, 'sie007_2026');
@@ -83,8 +96,10 @@ for (const [distributor, charge] of [['EDESUR', 3.78], ['EDENORTE', 4.02], ['EDE
       assert.equal(m.retainedExportKWh, 0);
       const chargeUSD = r2(m.gridExportedKWh * charge / 60);
       assert.equal(m.gridUseChargeUSD, chargeUSD, `${distributor} ${mode} ${m.month}: cargo por kWh inyectado`);
-      assert.equal(m.savingsUSD, r2(r2((m.solarSelfConsumedKWh + m.gridExportedKWh) * 0.111) - chargeUSD));
     });
+    // Precio escalar en SIE-007: factura sin sistema − factura con sistema a precio único, con neteo, arrastre del
+    // crédito y liquidación anual del remanente (de fábrica 0): el excedente no se paga al precio de venta.
+    assertFlatNetBilling(sie, distributor, 0.111, charge, 60, `${distributor} ${mode}`);
     assert.ok(sie.monthlyBreakdown.some((m) => m.gridExportedKWh > 0), 'el caso exporta');
   }
 }
@@ -103,9 +118,14 @@ for (const mode of MODES) {
   for (const m of btd.monthlyBreakdown) {
     assert.equal(m.gridUseChargeUSD, 0, `BTD ${mode}: sin cargo`);
     assert.equal(m.retainedExportKWh, 0);
-    assert.equal(m.savingsUSD, r2((m.solarSelfConsumedKWh + m.gridExportedKWh) * 0.15));
   }
-  assert.ok(btd.year1SavingsUSD > btdLegacy.year1SavingsUSD, 'BTD: sin retención del 25 %');
+  assertFlatNetBilling(btd, 'EDESUR', 0.15, 0, 60, `BTD ${mode}`);
+  // Sin excedente anual (sistema menor que el consumo) la ausencia de retención favorece a SIE-007.
+  const btdFit = calculateProjectFinancialSummary(project({ ...btdRates, netMeteringRegime: 'sie007_2026' }, 3000, { panelCount: 30, inverterPowerKW: 15, inverterCount: 1 }), mode);
+  const btdFitLegacy = calculateProjectFinancialSummary(project(btdRates, 3000, { panelCount: 30, inverterPowerKW: 15, inverterCount: 1 }), mode);
+  assert.ok(btdFit.year1SavingsUSD > btdFitLegacy.year1SavingsUSD, 'BTD: sin retención del 25 %');
+  // Con excedente anual, el remanente se liquida (0 de fábrica): no supera la factura sin sistema.
+  assert.ok(btd.year1SavingsUSD <= 3000 * 12 * 0.15 + 0.01, 'BTD sobredimensionado: ahorro ≤ factura sin sistema');
   const zero = calculateProjectFinancialSummary(project({ distributor: 'EDEESTE', tariffCode: 'BTS2', isZeroExport: true, netMeteringRegime: 'sie007_2026' }, 800, { panelCount: 10 }), mode);
   const zeroLegacy = calculateProjectFinancialSummary(project({ distributor: 'EDEESTE', tariffCode: 'BTS2', isZeroExport: true }, 800, { panelCount: 10 }), mode);
   for (const m of zero.monthlyBreakdown) { assert.equal(m.gridExportedKWh, 0); assert.equal(m.gridUseChargeUSD, 0); }

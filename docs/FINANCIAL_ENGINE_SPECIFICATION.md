@@ -56,10 +56,11 @@ $$E_{net\_credit,m} = E_{exp,m}, \qquad G_m = E_{exp,m} \times \frac{c_{red}}{FX
 - $c_{red} = 0$ en tarifas con cargo de potencia (`tariffChargeKind` = `demand`: BTD, BTH, MTD-1, MTD-2, MTH, RBT-2, ESTRBT-2) y en inyección cero. Una tarifa sin clasificar (`unknown`) **sí** paga el cargo: es la estimación conservadora (ahorro a la baja) hasta clasificarla.
 - $FX$ es la tasa efectiva de la propuesta (`resolveAssumptions(...).dopExchangeRate`). El desglose mensual lleva `gridUseChargeUSD` solo en este régimen; en el anterior el campo no aparece.
 - $E_{exp,m}$ es la energía inyectada del modelo: en legacy, $E_m - E_{auto,m}$; en la proyección física, el excedente diario que no carga la batería. Con batería en la proyección física baja la inyección y, con ella, el cargo.
-- El cargo es una **estimación no verificada con facturas**; el dock, la revisión y la nota regulatoria lo dicen.
-- La fórmula de arriba es la **valoración escalar** ($T_{kWh}$ plano). Con el precio de referencia de la tarifa se factura por bloques (§1.3.0).
+- El cargo sobre la energía inyectada **bruta** al 25 % de la tarifa de referencia está confirmado por la factura EDESUR NIC 2084605 (oct–nov 2026: 692 kWh × 25 % × RD$ 15.12 = RD$ 2,615.76), que también confirma los bloques sobre el consumo **neto** (1,089 − 692 = 397 kWh). Siguen sin confirmar el precio de liquidación del remanente anual y qué consumo elige el rango del cargo fijo.
+- La fórmula de arriba solo vale mes a mes mientras lo inyectado no supera lo retirado. Con red, el ahorro es siempre **factura sin sistema − factura con sistema** (§1.3.0): con la fila de la tarifa, por bloques; sin fila válida (precio tecleado, de factura o fila de otra tarifa), con una tarifa de **precio único** $T_{kWh}$ sin cargo fijo (`flatSinglePriceTariff`). En los dos casos hay neteo kWh contra kWh, arrastre del crédito y liquidación anual del remanente, así que el excedente nunca se paga al precio de venta (`src/tests/testRegimeConsistency.ts`).
+- **Régimen anterior** (`legacy_retention`): se mantiene sin cambios porque sigue coincidiendo con las facturas reales. Valora el autoconsumo y lo exportado menos la retención (75 % con 25 % de retención) al precio por kWh, también cuando el sistema produce más que el consumo anual: con un sistema sobredimensionado ese excedente pesa mucho en el ahorro y en el payback.
 
-`resolveAssumptions` expone `netMeteringRegime`, `gridUseChargeDOPPerKWh`, `appliedGridUseChargeDOPPerKWh` (0 cuando el cargo no aplica), `energyValuationMethod` y `annualCreditSettlementDOPPerKWh`. `src/tests/testSie007GridUseCharge.ts` fija el régimen nuevo con precio escalar, `testTariffBilling.ts` la facturación por bloques y `testNetMeteringRegime.ts` sigue fijando el anterior sin cambios.
+`resolveAssumptions` expone `netMeteringRegime`, `gridUseChargeDOPPerKWh`, `appliedGridUseChargeDOPPerKWh` (0 cuando el cargo no aplica), `energyValuationMethod` y `annualCreditSettlementDOPPerKWh`. `src/tests/testSie007GridUseCharge.ts` fija el régimen nuevo con precio único, `testRegimeConsistency.ts` la coherencia entre regímenes y la factura real, `testTariffBilling.ts` la facturación por bloques y `testNetMeteringRegime.ts` sigue fijando el anterior sin cambios.
 
 ### 1.3.0 Facturación por bloques en SIE-007-2026
 
@@ -77,13 +78,13 @@ $$S_m = B(C_m, 0, 0) - B(R_m, E_{exp,m}, K_{m-1}), \qquad S_{12} \mathrel{+}= K_
 - `calculateBillingYear` exige doce meses y devuelve `billsDOP` (suma bruta de las facturas), `settlement.amountDOP` (pago del remanente) y `netCostDOP` = `billsDOP − settlement.amountDOP`.
 - Un mes sin consumo o con mucha inyección puede tener ahorro negativo (cargo fijo y cargo por uso de red sin energía que compensar); se suma tal cual al año y ningún consumidor lo recorta.
 
-**Cuándo se factura por bloques** (regla única `resolveEnergyValuationMethod`, expuesta como `resolveAssumptions(...).energyValuationMethod`: `block_billing` | `flat_rate`): régimen `sie007_2026`, con red, con la fila de la tarifa guardada en la propuesta (`rates.billingTariff`, válida y de la misma distribuidora y código) **y** el precio del kWh de referencia (`rates.energyRateSource` en `BLOCK_BILLING_RATE_SOURCES`, hoy solo `reference`). Un precio tecleado (`manual`) o de factura (`invoice`), o una propuesta sin indicador (anterior a la fase 3), se valora con el escalar más el cargo por uso de red, como en la fase 2. Para cambiar la decisión basta con editar `BLOCK_BILLING_RATE_SOURCES`.
+**Cuándo se factura por bloques** (regla única `resolveEnergyValuationMethod`, expuesta como `resolveAssumptions(...).energyValuationMethod`: `block_billing` | `flat_rate`): régimen `sie007_2026`, con red, con la fila de la tarifa guardada en la propuesta (`rates.billingTariff`, válida y de la misma distribuidora y código) **y** el precio del kWh de referencia (`rates.energyRateSource` en `BLOCK_BILLING_RATE_SOURCES`, hoy solo `reference`). Un precio tecleado (`manual`) o de factura (`invoice`), o una propuesta sin indicador (anterior a la fase 3), se factura a precio único con el mismo neteo, arrastre, cargo por uso de red y liquidación (`engineBlockBilling`). Para cambiar la decisión basta con editar `BLOCK_BILLING_RATE_SOURCES`.
 
 - La fila (`BillingTariff`: tramos en RD$/kWh, cargo fijo o por rango, resolución) se guarda en la propuesta al fijar el precio de referencia (propuesta nueva, cambio de distribuidora o tarifa en el dock, «Aplicar tarifa oficial», borrador de IA con referencia), copiada de la matriz activa del usuario u organización. Así la propuesta da las mismas cifras en cualquier equipo y aunque cambie la matriz (ADR 0003). Una tarifa sin fila exacta en la matriz o en US$ (RMT-1) no se guarda y se valora con el escalar.
 - `applyProjectEdit` (ADR 0004) marca `manual` un precio que cambia sin procedencia válida (`reconcileEnergyRateSource`; una procedencia desconocida o `null` cuenta como ausente). Cambiar de tarifa sin fila nueva deja la guardada sin efecto (no coincide; distribuidora y código se comparan normalizados). Una propuesta nueva sin matriz cargada usa la de fábrica.
 - Borrador de IA: un precio explícito manda con su procedencia (`invoice` en RD$, `manual` en US$); con referencia, el escalar es la referencia de la matriz y se guarda su fila; sin precio sobre una propuesta existente con la misma tarifa (distribuidora y código normalizados) no se tocan ni precio ni procedencia; con otra tarifa sin fila en la matriz el escalar queda sin procedencia ni fila; un precio explícito suelta la fila.
 - Dock: en `sie007_2026` con red, «Tarifa oficial aplicada» sale de la procedencia (`reference` con fila válida), no de la igualdad numérica del precio (`isReferenceApplied`).
-- Salida: solo con bloques, cada mes trae `tariffBill` (`withdrawnKWh`, `netBilledKWh`, `creditInKWh`, `creditAppliedKWh`, `creditCarriedKWh`, `energyChargeUSD`, `fixedChargeUSD`; en diciembre `creditSettlementKWh`/`creditSettlementUSD`), `originalBillUSD`/`netBillUSD` pasan a ser las facturas sin y con sistema (con cargo fijo) y `savingsUSD = originalBillUSD − netBillUSD (+ liquidación en diciembre)`. El resumen añade `annualCreditSettlementKWh`/`annualCreditSettlementUSD` (solo números: un Worker anterior rechaza métricas de texto). `year1SavingsUSD`, flujo, payback, TIR y VAN salen de esos ahorros. Con el escalar, ningún campo nuevo aparece.
+- Salida: solo con bloques, cada mes trae `tariffBill` (`withdrawnKWh`, `netBilledKWh`, `creditInKWh`, `creditAppliedKWh`, `creditCarriedKWh`, `energyChargeUSD`, `fixedChargeUSD`; en diciembre `creditSettlementKWh`/`creditSettlementUSD`), `originalBillUSD`/`netBillUSD` pasan a ser las facturas sin y con sistema (con cargo fijo) y `savingsUSD = originalBillUSD − netBillUSD (+ liquidación en diciembre)`. El resumen añade `annualCreditSettlementKWh`/`annualCreditSettlementUSD` (solo números: un Worker anterior rechaza métricas de texto). `year1SavingsUSD`, flujo, payback, TIR y VAN salen de esos ahorros. Con precio único en SIE-007 y red aparecen los mismos campos (cargo fijo 0); en el régimen anterior, en inyección cero o en aislado no aparecen.
 
 ### 1.3.1 Tipo de conexión con la red
 
@@ -237,7 +238,7 @@ $$CF_t = S_{yr1} \times (1 - d)^{t-1} \times (1 + i)^{t-1} + \text{Crédito}_t -
 
 ## 6. Indicadores
 
-**Payback** (interpolación lineal en el primer año $k$ con acumulado $\ge 0$; 25 si no se alcanza):
+**Payback** (interpolación lineal en el primer año $k$ con acumulado $\ge 0$). Si no se alcanza en la vida útil, `paybackReached` es `false` y la app, el PDF y el visor muestran «No se recupera» (`shared/returnIndicators.ts`):
 
 $$\text{Payback} = (k - 1) + \frac{|\text{Acumulado}_{k-1}|}{CF_k}$$
 
@@ -245,9 +246,7 @@ $$\text{Payback} = (k - 1) + \frac{|\text{Acumulado}_{k-1}|}{CF_k}$$
 
 $$\text{VAN} = -CF_0 + \sum_{t=1}^{N} \frac{CF_t}{(1 + r)^t}$$
 
-**TIR**: Newton-Raphson desde 15%, hasta 100 iteraciones, tolerancia $10^{-6}$:
-
-$$r_{n+1} = r_n - \frac{\text{VAN}(r_n)}{\text{VAN}'(r_n)}, \qquad \text{VAN}'(r) = -\sum_{t=1}^{N} \frac{t \times CF_t}{(1 + r)^{t+1}}$$
+**TIR**: raíz de $\text{VAN}(r) = 0$ por bisección en $[-99\,\%, 1000\,\%]$ (`calculateIRR`). Sin cambio de signo en ese rango (p. ej. ahorro negativo) no hay TIR: `irrDefined` es `false`, `irrPct` vale 0 y se muestra «No aplica». El resumen publicado solo lleva estas marcas cuando son `false`, así que un sistema que se recupera publica lo mismo que antes.
 
 **ROI**:
 

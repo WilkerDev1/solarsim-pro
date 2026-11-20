@@ -1,4 +1,5 @@
 import type { FinancialSummaryResult, ProjectSimulation } from '../../../../types';
+import { PAYBACK_NOT_REACHED_LABEL, isPaybackReached } from '../../../../../shared/returnIndicators';
 import { resolveAssumptions } from '../../../../../shared/assumptions';
 import { resolveGridConnection } from '../../../../../shared/gridConnection';
 import { tariffPricePresentation } from '../../../../../shared/tariffBilling';
@@ -90,14 +91,16 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const totalPaybackMonths = Math.max(1, Math.round(paybackYearsRaw * 12));
   const paybackYearsInt = Math.floor(totalPaybackMonths / 12);
   const paybackMonthsInt = totalPaybackMonths % 12;
-  const paybackText = `${paybackYearsInt} ${paybackYearsInt === 1 ? 'Año' : 'Años'}${
+  // Sin retorno en la vida útil: «No se recupera», nunca «25 Años» (`shared/returnIndicators.ts`).
+  const paybackReached = isPaybackReached(summary);
+  const paybackText = !paybackReached ? PAYBACK_NOT_REACHED_LABEL : `${paybackYearsInt} ${paybackYearsInt === 1 ? 'Año' : 'Años'}${
     paybackMonthsInt > 0 ? ` y ${paybackMonthsInt} ${paybackMonthsInt === 1 ? 'Mes' : 'Meses'}` : ''
   }`;
 
   // Amortización sobre 25 años de vida útil
-  const paybackPct = Math.min(100, Math.max(2, Math.round((paybackYearsRaw / 25) * 100)));
+  const paybackPct = !paybackReached ? 100 : Math.min(100, Math.max(2, Math.round((paybackYearsRaw / 25) * 100)));
   const freePct = Math.max(0, 100 - paybackPct);
-  const freeYears = Math.max(0, Math.round(25 - paybackYearsRaw));
+  const freeYears = !paybackReached ? 0 : Math.max(0, Math.round(25 - paybackYearsRaw));
 
   // Sistema aislado sin comparación de ahorro: la fila 6 presenta energía entregada, no servida y autonomía.
   const savingsBasis = resolveSavingsBasis(project.rates);
@@ -112,7 +115,7 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const generatorCostUSD = resolveGeneratorCostPerKWh(project.rates);
   const generatorCostDOP = generatorCostUSD === null ? null : generatorCostUSD * exchangeRate;
 
-  return { savingsBasis, hasComparison, supplyKind, showsGeneratorCost, generatorCostUSD, generatorCostDOP, annualServedKWh, annualUnservedKWh, autonomyHours, panels, primaryPanel, totalPanels, systemCapacityKWp, lossesPercent, performanceRatio, inverters, totalInverterPowerKW, invertersSummary, isZeroExport, isOffGrid, hasBattery, batteries, totalBatteryKWh, batteriesSummary, grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffUSD, tariffDOP, tariffCode, tariffPrice, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD, paybackYearsRaw, totalPaybackMonths, paybackYearsInt, paybackMonthsInt, paybackText, paybackPct, freePct, freeYears };
+  return { savingsBasis, hasComparison, supplyKind, showsGeneratorCost, generatorCostUSD, generatorCostDOP, annualServedKWh, annualUnservedKWh, autonomyHours, panels, primaryPanel, totalPanels, systemCapacityKWp, lossesPercent, performanceRatio, inverters, totalInverterPowerKW, invertersSummary, isZeroExport, isOffGrid, hasBattery, batteries, totalBatteryKWh, batteriesSummary, grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffUSD, tariffDOP, tariffCode, tariffPrice, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD, paybackYearsRaw, paybackReached, totalPaybackMonths, paybackYearsInt, paybackMonthsInt, paybackText, paybackPct, freePct, freeYears };
 }
 
 export type ExecutiveSummaryModel = ReturnType<typeof executiveSummaryModel>;

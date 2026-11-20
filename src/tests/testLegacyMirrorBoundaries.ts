@@ -73,8 +73,8 @@ try {
       assert.ok(url.startsWith(serverUrl), 'Only synthetic transport');
       if (url.endsWith('/api/folders')) return json({ success: true, folders: [], deletedIds: [] });
       if (url.includes('/api/clients')) return json({ success: true, clients: [], deletedIds: [] });
-      if (url.endsWith('/api/sync/pull')) return json({ success: true, projects: [remote], deletedIds: [] });
-      if (url.endsWith('/api/sync/push')) {
+      if (new URL(url).pathname.endsWith('/api/sync/pull')) return json({ success: true, projects: [remote], deletedIds: [] });
+      if (new URL(url).pathname.endsWith('/api/sync/push')) {
         const submitted = JSON.parse(String(init?.body)).projects[0] as ProjectSimulation;
         pushed.push(submitted);
         remote = { ...submitted, version: remote.version! + 1, baseVersion: remote.version! + 1, syncStatus: 'synced' };

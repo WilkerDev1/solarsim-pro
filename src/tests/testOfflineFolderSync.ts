@@ -19,8 +19,8 @@ try {
     assert.ok(String(input).startsWith(serverUrl), 'Only synthetic transport');
     if (!online) throw new Error('Sin conexión');
     if (String(input).endsWith('/api/folders')) return json({ success: true, folders: [folder], deletedIds: [] });
-    if (String(input).endsWith('/api/sync/pull')) return json({ success: true, projects: [remote], deletedIds: [] });
-    if (String(input).endsWith('/api/sync/push')) {
+    if (new URL(String(input)).pathname.endsWith('/api/sync/pull')) return json({ success: true, projects: [remote], deletedIds: [] });
+    if (new URL(String(input)).pathname.endsWith('/api/sync/push')) {
       pushes++;
       const submitted = JSON.parse(String(init?.body)).projects[0];
       if (submitted.baseVersion !== remote.version) return json({ success: true, results: [{ id: remote.id, status: 'conflict', reason: 'version_conflict', serverVersion: remote.version, serverProject: remote }] });

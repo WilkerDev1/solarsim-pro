@@ -13,7 +13,7 @@ interface RowsProps {
 }
 
 export const SummaryPaybackRow: React.FC<RowsProps> = ({ project, summary, activeTheme, model }) => {
-  const { totalPaybackMonths, paybackText, paybackPct, freePct, freeYears } = model;
+  const { paybackReached, totalPaybackMonths, paybackText, paybackPct, freePct, freeYears } = model;
   return (
     <>
           {/* FILA 06: RETORNO DE INVERSIÓN (PAYBACK) */}
@@ -35,9 +35,9 @@ export const SummaryPaybackRow: React.FC<RowsProps> = ({ project, summary, activ
                   <span className="text-2xl font-black text-amber-600 tracking-tight font-mono leading-none">
                     {paybackText}
                   </span>
-                  <span className="text-xs font-bold text-slate-500 font-mono">
+                  {paybackReached && <span className="text-xs font-bold text-slate-500 font-mono">
                     ({totalPaybackMonths} meses)
-                  </span>
+                  </span>}
                 </div>
 
                 {/* Barra de amortización lineal */}
@@ -60,12 +60,12 @@ export const SummaryPaybackRow: React.FC<RowsProps> = ({ project, summary, activ
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-none text-xs font-semibold text-slate-700">
+              {paybackReached && <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-none text-xs font-semibold text-slate-700">
                 <span className="w-2.5 h-2.5 bg-amber-500 shrink-0"></span>
                 <EditableText k="executiveSummary.row6.lifespan" boldClassName="text-slate-950 font-bold">
                   {(text) => <RichText text={text.replace('{freeYears}', String(freeYears))} boldClassName="text-slate-950 font-bold" />}
                 </EditableText>
-              </div>
+              </div>}
             </div>
           </article>
     </>

@@ -128,10 +128,11 @@ assert.equal(buildBillBreakdown(project({ energyRateSource: 'manual' })), null, 
 assert.equal(buildBillBreakdown(project({ netMeteringRegime: 'legacy_retention' })), null, 'régimen anterior: escalar');
 assert.equal(buildBillBreakdown(project({ ...gridConnectionFields('off_grid') })), null, 'aislado: sin factura');
 
-// 5. Supuestos no verificados: los cuatro, con su valor vigente y sin cambiar los de fábrica.
+// 5. Supuestos no verificados: los dos que ninguna factura confirmó (la EDESUR NIC 2084605 confirmó bloques sobre el neto
+// y cargo sobre la inyección bruta), con su valor vigente y sin cambiar los de fábrica.
 {
   const items = unverifiedAssumptions(project().rates);
-  assert.deepEqual(items.map((item) => item.id), ['annual_settlement_price', 'fixed_charge_tier_basis', 'net_consumption_blocks', 'gross_injection_charge'], 'BTS-1 con red y bloques: los cuatro');
+  assert.deepEqual(items.map((item) => item.id), ['annual_settlement_price', 'fixed_charge_tier_basis'], 'BTS-1 con red y bloques: liquidación y rango del cargo fijo');
   assert.equal(items[0].valueText, 'RD$0.00/kWh', 'precio de liquidación de fábrica = 0');
   assert.equal(items[0].editable, true);
   assert.equal(items.filter((item) => item.editable).length, 1, 'solo el precio de liquidación tiene parámetro');
@@ -140,7 +141,7 @@ assert.equal(buildBillBreakdown(project({ ...gridConnectionFields('off_grid') })
   assert.equal(unverifiedAssumptions(project({ annualCreditSettlementDOPPerKWh: 7.5 }).rates)[0].valueText, 'RD$7.50/kWh', 'refleja el valor editado');
 
   // Solo se listan los que afectan a la propuesta.
-  assert.deepEqual(unverifiedAssumptions(project({ energyRateSource: 'manual' }).rates).map((item) => item.id), ['gross_injection_charge'], 'precio escalar: solo el cargo sobre inyección bruta');
+  assert.deepEqual(unverifiedAssumptions(project({ energyRateSource: 'manual' }).rates).map((item) => item.id), ['annual_settlement_price'], 'precio único en SIE-007: también liquida el remanente, sin rango de cargo fijo');
   assert.deepEqual(unverifiedAssumptions(project({ netMeteringRegime: 'legacy_retention' }).rates), [], 'régimen anterior: ninguno');
   assert.deepEqual(unverifiedAssumptions(project({ ...gridConnectionFields('zero_export') }).rates).map((item) => item.id), [], 'inyección cero: nada se inyecta, ningún supuesto tiene efecto');
   assert.deepEqual(unverifiedAssumptions(project({ ...gridConnectionFields('off_grid') }).rates), [], 'aislado: ninguno');
@@ -183,14 +184,17 @@ assert.equal(formatDOP(1234.5), 'RD$1,234.50');
   assert.match(html, /Supuestos estimados, no verificados con facturas/, 'la línea discreta');
   assert.equal((html.match(/data-tariff-unverified/g) ?? []).length, 1, 'una sola línea');
   assert.ok(html.includes(UNVERIFIED_ESTIMATE_LABEL), 'el tooltip conserva «estimado, no verificado con facturas»');
-  for (const title of ['Precio de liquidación anual del crédito', 'Rango del cargo fijo', 'Bloques sobre consumo neto', 'Cargo sobre inyección bruta']) assert.match(html, new RegExp(title), `${title}: sigue en el tooltip`);
+  for (const title of ['Precio de liquidación anual del crédito', 'Rango del cargo fijo']) assert.match(html, new RegExp(title), `${title}: sigue en el tooltip`);
+  // Confirmados por la factura EDESUR NIC 2084605: ya no se presentan como supuestos sin verificar.
+  for (const title of ['Bloques sobre consumo neto', 'Cargo sobre inyección bruta']) assert.doesNotMatch(html, new RegExp(title), `${title}: confirmado, fuera del tooltip`);
   assert.match(html, /role="tooltip"/, 'los textos van en tooltips accesibles (InfoTip)');
   assert.match(html, /Cargo por uso de la red estimado, no verificado con facturas/, 'el aviso del cargo pasó al ⓘ del campo');
 
   const flat = render(h(RatesFields, { project: project({ energyRateSource: 'manual' }), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never));
   assert.match(flat, /Precio por kWh de la propuesta/);
   assert.doesNotMatch(flat, /data-tariff-bill-breakdown/, 'precio escalar: sin desglose');
-  assert.doesNotMatch(flat, /pd-rates-settlement/, 'precio escalar: la liquidación no aplica');
+  assert.match(flat, /pd-rates-settlement/, 'precio único en SIE-007: el remanente también se liquida, el campo se ve');
+  assert.doesNotMatch(render(h(RatesFields, { project: project({ netMeteringRegime: 'legacy_retention' }), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never)), /pd-rates-settlement/, 'régimen anterior: sin liquidación');
 
   assert.doesNotMatch(render(h(RatesFields, { project: project({ ...gridConnectionFields('zero_export') }), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never)), /pd-rates-settlement|data-tariff-unverified/, 'inyección cero: sin liquidación ni supuestos');
   const zero = render(h(RatesFields, { project: project({ ...gridConnectionFields('zero_export') }), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never));

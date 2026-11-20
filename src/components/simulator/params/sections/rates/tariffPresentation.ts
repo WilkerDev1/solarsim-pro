@@ -12,7 +12,7 @@ import {
   FACTORY_ANNUAL_CREDIT_SETTLEMENT,
   calculateBillingYear,
   calculateMonthlyBill,
-  proposalBillingTariff,
+  proposalBillingTariff, usesNetBilling,
   resolveAnnualCreditSettlementDOPPerKWh,
   resolveEnergyValuationMethod,
   tariffPricePresentation,
@@ -50,12 +50,14 @@ export function describeValuationMethod(rates: UtilityRates): ValuationMethodVie
     return { method, label, detail: `Factura sin sistema menos factura con sistema, con los bloques y el cargo fijo de ${code} (${source}).` };
   }
   let detail: string;
+  // SIE-007 con red y precio escalar: mismo neteo, arrastre y liquidación que con bloques (`engineBlockBilling`).
+  const netted = !exportsToGrid(resolveGridConnection(rates)) ? '' : ' Con medición neta el excedente solo descuenta consumo; el crédito que sobra al cierre del año se liquida al precio de liquidación.';
   if (resolveGridConnection(rates) === 'off_grid') detail = 'Sistema aislado: se compara contra su alternativa de suministro, sin factura de la distribuidora.';
-  else if (resolveNetMeteringRegime(rates.netMeteringRegime) !== 'sie007_2026') detail = 'Régimen anterior (retención %): cada kWh evitado se valora al precio por kWh.';
-  else if (rates.energyRateSource === 'manual') detail = 'Precio tecleado a mano: se respeta como precio único. «Aplicar tarifa oficial» devuelve la factura por bloques.';
-  else if (rates.energyRateSource === 'invoice') detail = 'Precio tomado de una factura: se respeta como precio único.';
-  else if (!proposalBillingTariff(rates)) detail = 'La propuesta no guarda la fila de esta tarifa (código desconocido, tarifa en US$ o tarifa cambiada). «Aplicar tarifa oficial» la guarda.';
-  else detail = 'Sin procedencia del precio guardada (propuesta anterior): se valora al precio por kWh.';
+  else if (resolveNetMeteringRegime(rates.netMeteringRegime) !== 'sie007_2026') detail = 'Régimen anterior (retención %): cada kWh autoconsumido y lo exportado, menos la retención, se valoran al precio por kWh.';
+  else if (rates.energyRateSource === 'manual') detail = 'Precio tecleado a mano: se respeta como precio único. «Aplicar tarifa oficial» devuelve la factura por bloques.' + netted;
+  else if (rates.energyRateSource === 'invoice') detail = 'Precio tomado de una factura: se respeta como precio único.' + netted;
+  else if (!proposalBillingTariff(rates)) detail = 'La propuesta no guarda la fila de esta tarifa (código desconocido, tarifa en US$ o tarifa cambiada). «Aplicar tarifa oficial» la guarda.' + netted;
+  else detail = 'Sin procedencia del precio guardada (propuesta anterior): se valora al precio por kWh.' + netted;
   return { method, label, detail };
 }
 
@@ -142,7 +144,7 @@ export function buildBillBreakdown(project: ProjectSimulation, calculationMode: 
 // ── Supuestos no verificados ──
 
 export interface UnverifiedAssumption {
-  id: 'annual_settlement_price' | 'fixed_charge_tier_basis' | 'net_consumption_blocks' | 'gross_injection_charge';
+  id: 'annual_settlement_price' | 'fixed_charge_tier_basis';
   title: string;
   /** Valor vigente, legible. */
   valueText: string;
@@ -153,16 +155,18 @@ export interface UnverifiedAssumption {
 }
 
 /**
- * Los cuatro supuestos de la fase 3 que ninguna factura confirmó, con su valor vigente. Se listan los que afectan a la
- * propuesta: con factura por bloques, el precio de liquidación, el rango del cargo fijo (si la tarifa lo tiene por rango)
- * y los bloques sobre consumo neto; con cargo por uso de la red, la base de inyección bruta.
+ * Supuestos de la fase 3 que ninguna factura confirmó todavía, con su valor vigente: el precio de liquidación del
+ * remanente anual (con facturación neta, `usesNetBilling`) y el rango del cargo fijo (con bloques y cargo por rango).
+ * La factura EDESUR NIC 2084605 (nov-2026) confirmó los otros dos: bloques sobre el consumo neto y cargo sobre la
+ * inyección bruta al 25 % de la tarifa de referencia, que ya no se listan.
  */
 export function unverifiedAssumptions(rates: UtilityRates): UnverifiedAssumption[] {
   const items: UnverifiedAssumption[] = [];
   // Sin inyección (inyección cero) no hay neteo, crédito ni liquidación: ningún supuesto tiene efecto.
   const injects = exportsToGrid(resolveGridConnection(rates));
   const tariff = injects && resolveEnergyValuationMethod(rates) === 'block_billing' ? proposalBillingTariff(rates) : undefined;
-  if (tariff) {
+  // El remanente anual se liquida siempre que hay facturación neta: con bloques o a precio único (`usesNetBilling`).
+  if (usesNetBilling(rates)) {
     const settlement = resolveAnnualCreditSettlementDOPPerKWh(rates);
     items.push({
       id: 'annual_settlement_price',
@@ -171,6 +175,8 @@ export function unverifiedAssumptions(rates: UtilityRates): UnverifiedAssumption
       note: `El crédito que sobra al cierre del año se paga al precio de referencia de la CNE a 10 años, que no se encontró publicado; de fábrica ${FACTORY_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh} (el remanente no suma ahorro).`,
       editable: true,
     });
+  }
+  if (tariff) {
     if (tariff.fixedChargeTiers?.length) {
       items.push({
         id: 'fixed_charge_tier_basis',
@@ -180,22 +186,6 @@ export function unverifiedAssumptions(rates: UtilityRates): UnverifiedAssumption
         editable: false,
       });
     }
-    items.push({
-      id: 'net_consumption_blocks',
-      title: 'Bloques sobre consumo neto',
-      valueText: 'Consumo neto facturado',
-      note: 'Los bloques de la tarifa se aplican al consumo neto (retirado menos inyectado y crédito), según la lectura del art. 19 E.1.b.',
-      editable: false,
-    });
-  }
-  if (resolveNetMeteringRegime(rates.netMeteringRegime) === 'sie007_2026' && gridUseChargeApplies(rates)) {
-    items.push({
-      id: 'gross_injection_charge',
-      title: 'Cargo sobre inyección bruta',
-      valueText: 'Todos los kWh inyectados',
-      note: 'El cargo por uso de la red se cobra sobre la energía inyectada bruta del medidor, aunque se compense con consumo del mismo mes.',
-      editable: false,
-    });
   }
   return items;
 }

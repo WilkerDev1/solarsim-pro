@@ -36,9 +36,10 @@ const keys = [
   "activeCompanyId",
   "localUserProfile",
   "agentActivity",
+  "projectSyncCursor",
 ] as const;
 // Keys added after 2.6 are optional: archives written by older versions lack them and fall back to emptyWorkspace().
-type OptionalWorkspaceKey = "agentActivity";
+type OptionalWorkspaceKey = "agentActivity" | "projectSyncCursor";
 export type OrganizationWorkspace = Pick<
   SimulationStore,
   Exclude<(typeof keys)[number], OptionalWorkspaceKey>
@@ -83,6 +84,8 @@ export function emptyWorkspace(): OrganizationWorkspace {
     activeCompanyId: DEFAULT_LOCAL_COMPANY.id,
     localUserProfile: DEFAULT_LOCAL_USER,
     agentActivity: [],
+    // The pull cursor describes this workspace's project cache: a new or reset cache always starts with a full pull.
+    projectSyncCursor: null,
   });
 }
 /** One-time partition of legacy mixed project caches. No document is reassigned. */
