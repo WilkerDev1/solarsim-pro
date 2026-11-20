@@ -50,12 +50,14 @@ export function describeValuationMethod(rates: UtilityRates): ValuationMethodVie
     return { method, label, detail: `Factura sin sistema menos factura con sistema, con los bloques y el cargo fijo de ${code} (${source}).` };
   }
   let detail: string;
+  // SIE-007 con red y precio escalar: mismo neteo, arrastre y liquidación que con bloques (`engineBlockBilling`).
+  const netted = !exportsToGrid(resolveGridConnection(rates)) ? '' : ' Con medición neta el excedente solo descuenta consumo; el crédito que sobra al cierre del año se liquida al precio de liquidación.';
   if (resolveGridConnection(rates) === 'off_grid') detail = 'Sistema aislado: se compara contra su alternativa de suministro, sin factura de la distribuidora.';
-  else if (resolveNetMeteringRegime(rates.netMeteringRegime) !== 'sie007_2026') detail = 'Régimen anterior (retención %): cada kWh evitado se valora al precio por kWh.';
-  else if (rates.energyRateSource === 'manual') detail = 'Precio tecleado a mano: se respeta como precio único. «Aplicar tarifa oficial» devuelve la factura por bloques.';
-  else if (rates.energyRateSource === 'invoice') detail = 'Precio tomado de una factura: se respeta como precio único.';
-  else if (!proposalBillingTariff(rates)) detail = 'La propuesta no guarda la fila de esta tarifa (código desconocido, tarifa en US$ o tarifa cambiada). «Aplicar tarifa oficial» la guarda.';
-  else detail = 'Sin procedencia del precio guardada (propuesta anterior): se valora al precio por kWh.';
+  else if (resolveNetMeteringRegime(rates.netMeteringRegime) !== 'sie007_2026') detail = 'Régimen anterior (retención %): cada kWh autoconsumido y lo exportado, menos la retención, se valoran al precio por kWh.';
+  else if (rates.energyRateSource === 'manual') detail = 'Precio tecleado a mano: se respeta como precio único. «Aplicar tarifa oficial» devuelve la factura por bloques.' + netted;
+  else if (rates.energyRateSource === 'invoice') detail = 'Precio tomado de una factura: se respeta como precio único.' + netted;
+  else if (!proposalBillingTariff(rates)) detail = 'La propuesta no guarda la fila de esta tarifa (código desconocido, tarifa en US$ o tarifa cambiada). «Aplicar tarifa oficial» la guarda.' + netted;
+  else detail = 'Sin procedencia del precio guardada (propuesta anterior): se valora al precio por kWh.' + netted;
   return { method, label, detail };
 }
 

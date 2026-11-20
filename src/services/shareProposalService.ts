@@ -14,6 +14,15 @@ import { buildDocumentTextContext } from '../utils/documentTextContext';
 import { gridConnectionFields, resolveGridConnection } from '../../shared/gridConnection';
 import { publishedSupplyFields } from '../../shared/offGridSupply';
 
+/**
+ * Resumen que se publica: las marcas de payback y TIR (`paybackReached`, `irrDefined`) solo viajan cuando son `false`,
+ * así el resumen de un sistema que sí se recupera es idéntico al de 2.8.1 y lo acepta el visor aunque aún no lo conozca.
+ */
+function publishedSummary(summary: FinancialSummaryResult): FinancialSummaryResult {
+  const { paybackReached, irrDefined, ...rest } = summary;
+  return { ...rest, ...(paybackReached === false ? { paybackReached } : {}), ...(irrDefined === false ? { irrDefined } : {}) } as FinancialSummaryResult;
+}
+
 export interface ShareResult {
   success: boolean;
   id?: string;
@@ -281,7 +290,7 @@ export class ShareProposalService {
         body: JSON.stringify({
           project: projectPayload,
           calculationSnapshot,
-          summary,
+          summary: publishedSummary(summary),
           validityDays,
         }),
       });

@@ -12,6 +12,9 @@ import { normalizeEnabledBatteries } from '../utils/batteryState';
 import { supplierQuotesItem } from '../utils/equipmentMatchingUtils';
 import { normalizeGridConnectionPatch } from '../../shared/gridConnection';
 import { normalizeSupplyAlternativePatch } from '../../shared/offGridSupply';
+import { tariffMatrixKey } from '../../shared/tariffRules';
+import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTariffs';
+import type { GlobalTariffMatrix } from '../types/tariffs';
 
 /**
  * Edición de proyecto (ADR 0004): la única regla para aplicar un cambio de specs, tarifas, cliente, consumo o
@@ -48,6 +51,37 @@ export type ProjectEdit =
 export interface ProjectEditContext {
   /** Catálogo de equipos vigente. Vacío (sin cargar) desactiva la reconciliación, no las demás reglas. */
   equipmentCatalog: readonly SolarEquipmentItem[];
+  /** Matriz tarifaria activa: de ella sale la fila y el precio de referencia al cambiar de tarifa. Sin ella, la de fábrica. */
+  tariffMatrix?: GlobalTariffMatrix | null;
+}
+
+const distributorKey = (value: unknown): string => (typeof value === 'string' ? value.trim().toUpperCase() : '');
+
+/**
+ * Cambio de tarifa o distribuidora sin fila nueva en el parche (asistente, agentes, cualquier camino que no sea el dock):
+ * - con precio de referencia, se vuelven a sembrar el precio, la procedencia y la fila de la tarifa nueva desde la matriz
+ *   (lo mismo que hace el dock con `referenceRatesPatch`);
+ * - con un precio tecleado o de factura, el precio se respeta y se suelta la fila de la tarifa anterior.
+ * Así una copia BTS2 → BTS1 no se queda con la fila y el precio de BTS2. Un parche que trae su fila o su precio manda.
+ */
+function withTariffChange(project: ProjectSimulation, patch: Partial<UtilityRates>, matrix: GlobalTariffMatrix | null | undefined): Partial<UtilityRates> {
+  if ('billingTariff' in patch || patch.energyCostPerKWh !== undefined || patch.energyRateSource !== undefined) return patch;
+  const before = project.rates;
+  const distributor = patch.distributor ?? before.distributor;
+  const tariffCode = patch.tariffCode ?? before.tariffCode;
+  const changed = distributorKey(distributor) !== distributorKey(before.distributor)
+    || tariffMatrixKey(distributorKey(distributor), tariffCode) !== tariffMatrixKey(distributorKey(before.distributor), before.tariffCode);
+  if (!changed) return patch;
+  if (before.energyRateSource !== 'reference') return { ...patch, billingTariff: undefined };
+  const active = matrix?.schedules && Object.keys(matrix.schedules).length > 0 ? matrix : DEFAULT_RD_TARIFF_MATRIX;
+  const months = project.monthlyConsumption ?? [];
+  const average = months.length ? months.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0) / months.length : 0;
+  return {
+    ...patch,
+    energyCostPerKWh: getReferenceEnergyRateUSD(active, distributor, tariffCode, average, resolveAssumptions(project).dopExchangeRate),
+    energyRateSource: 'reference',
+    billingTariff: referenceBillingTariff(active, distributor, tariffCode),
+  };
 }
 
 /** El caso de referencia auditado conserva sus cifras manuales; en cualquier otra propuesta se recalculan. */
@@ -71,7 +105,7 @@ export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, 
     case 'rates': {
       // Tipo de conexión: `gridConnection` e `isZeroExport` se escriben siempre juntos y coherentes; alternativa de
       // suministro saneada; cargo por uso de la red reconciliado (SIE-007-2026).
-      const patch = normalizeGridConnectionPatch(project.rates, normalizeSupplyAlternativePatch(edit.patch));
+      const patch = withTariffChange(project, normalizeGridConnectionPatch(project.rates, normalizeSupplyAlternativePatch(edit.patch)), ctx.tariffMatrix);
       const rates = reconcileEnergyRateSource(project.rates, reconcileGridUseCharge(project.rates, { ...project.rates, ...patch }, patch), patch);
       next = resizeIfNeeded(project, { ...project, rates, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, edit.patch.targetCoveragePct !== undefined);
       break;

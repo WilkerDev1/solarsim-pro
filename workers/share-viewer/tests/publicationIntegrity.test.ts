@@ -58,6 +58,9 @@ async function main() {
   assert.equal((await publish(missingSummary)).status, 400);
   const invalid = payload(); invalid.summary.monthlyBreakdown[0].consumptionKWh = -1;
   assert.equal((await publish(invalid)).status, 400);
+  // Únicas marcas booleanas del resumen: payback y TIR sin retorno; cualquier otra métrica booleana se rechaza.
+  const otherFlag = payload(); (otherFlag.summary as unknown as Record<string, unknown>).npvUSD = true;
+  assert.equal((await publish(otherFlag)).status, 400);
   const badType = payload(); badType.project.client.name = { invalid: true } as never;
   assert.equal((await publish(badType)).status, 400);
   assert.equal((await publish({ ...payload(), validityDays: 0 })).status, 400);

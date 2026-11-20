@@ -4,7 +4,7 @@ import { DEFAULT_PRICE_PER_WATT_USD, resolvePricePerWattUSD, resolveSaleMarginMu
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction, type BlockBillingInput, type GridUseChargeInput } from './solarEngine';
-import { proposalBillingTariff, type TariffBillingRatesInput } from '../../shared/tariffBilling';
+import { proposalBillingTariff, type BillingTariff, type TariffBillingRatesInput } from '../../shared/tariffBilling';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -12,7 +12,7 @@ import {
   calculateTotalDCCapacityKWp,
 } from '../utils/equipmentSpecsUtils';
 import { batteryAutonomyHours, batteryBank, readEquipment } from '../../shared/equipment';
-import { resolveGridConnection, type GridConnectionMode } from '../../shared/gridConnection';
+import { exportsToGrid, resolveGridConnection, type GridConnectionMode } from '../../shared/gridConnection';
 import { hasSavingsComparison, resolveSavingsBasis, savingsValuationCostPerKWh } from '../../shared/offGridSupply';
 
 /**
@@ -338,36 +338,27 @@ export function calculateCostMatrixSummary(
 }
 
 /**
- * Solves Internal Rate of Return (IRR / TIR) using Newton-Raphson method.
+ * Internal Rate of Return (IRR / TIR) por bisección sobre [-99 %, 1000 %]: el VAN de los flujos cambia de signo en la TIR.
+ * Sin cambio de signo en ese rango (p. ej. un sistema cuyo ahorro es negativo) la TIR no existe: `undefined`, nunca el
+ * valor sin converger de un método iterativo (antes salían 12 206 % o 60 223 %).
  */
-function calculateIRR(initialInvestment: number, cashFlows: number[]): number {
-  let rate = 0.15; // Initial guess 15%
-  const maxIterations = 100;
-  const tolerance = 1e-6;
-
-  for (let iter = 0; iter < maxIterations; iter++) {
-    let npv = -initialInvestment;
-    let dnpv = 0; // derivative of NPV with respect to rate
-
-    for (let t = 0; t < cashFlows.length; t++) {
-      const year = t + 1;
-      const factor = Math.pow(1 + rate, year);
-      npv += cashFlows[t] / factor;
-      dnpv -= (year * cashFlows[t]) / (factor * (1 + rate));
-    }
-
-    if (Math.abs(npv) < tolerance) {
-      return Math.round(rate * 10000) / 100; // Return % e.g. 31.97%
-    }
-
-    if (Math.abs(dnpv) < 1e-10) break;
-
-    const newRate = rate - npv / dnpv;
-    if (newRate <= -1 || isNaN(newRate)) break;
-    rate = newRate;
+export function calculateIRR(initialInvestment: number, cashFlows: number[]): number | undefined {
+  const npvAt = (rate: number) => cashFlows.reduce((npv, cf, t) => npv + cf / Math.pow(1 + rate, t + 1), -initialInvestment);
+  let low = -0.99;
+  let high = 10;
+  let npvLow = npvAt(low);
+  const npvHigh = npvAt(high);
+  if (!Number.isFinite(npvLow) || !Number.isFinite(npvHigh)) return undefined;
+  if (npvLow === 0) return Math.round(low * 10000) / 100;
+  if (npvHigh === 0) return Math.round(high * 10000) / 100;
+  if (Math.sign(npvLow) === Math.sign(npvHigh)) return undefined;
+  for (let iter = 0; iter < 200 && high - low > 1e-12; iter++) {
+    const mid = (low + high) / 2;
+    const npvMid = npvAt(mid);
+    if (npvMid === 0) { low = high = mid; break; }
+    if (Math.sign(npvMid) === Math.sign(npvLow)) { low = mid; npvLow = npvMid; } else { high = mid; }
   }
-
-  return Math.round(rate * 10000) / 100;
+  return Math.round(((low + high) / 2) * 10000) / 100;
 }
 
 /**
@@ -563,7 +554,7 @@ export function calculateFinancialSummary(
     gridConnection,
     calculationMode,
     engineGridUseCharge(assumptions, gridConnection),
-    engineBlockBilling(assumptions, rates)
+    engineBlockBilling(assumptions, rates, savingsValuationCostPerKWh(rates))
   );
 
   const annualConsumptionKWh = monthlyResults.reduce((sum, m) => sum + m.consumptionKWh, 0);
@@ -649,7 +640,11 @@ export function calculateFinancialSummary(
   npvUSD = Math.round(npvUSD * 100) / 100;
 
   // IRR (TIR) Calculation
-  const irrPct = comparable ? calculateIRR(initialOutflowUSD, annualNetCashFlows) : 0;
+  const irr = comparable ? calculateIRR(initialOutflowUSD, annualNetCashFlows) : undefined;
+  const irrDefined = irr !== undefined;
+  const irrPct = irr ?? 0;
+  // Sin recuperar la inversión en la vida útil no hay payback: se publica como «no se recupera», no como 25 años.
+  const paybackReached = comparable && paybackFound;
 
   // 25-Year ROI % Calculation
   const totalNetReturns = annualNetCashFlows.reduce((sum, cf) => sum + cf, 0);
@@ -694,7 +689,9 @@ export function calculateFinancialSummary(
     ...settlementFields,
     total25YearSavingsUSD,
     paybackYears,
+    paybackReached,
     irrPct,
+    irrDefined,
     npvUSD,
     roi25YrPct,
     co2AvoidedTonsPerYear,
@@ -733,18 +730,39 @@ export function engineGridUseCharge(
 }
 
 /**
- * Facturación por bloques que recibe el motor de energía: solo cuando los supuestos efectivos la eligen
- * (`energyValuationMethod`, regla de `shared/tariffBilling.ts`); si no, el ahorro se valora con el precio escalar.
+ * Facturación neta que recibe el motor de energía en el régimen SIE-007-2026 con red:
+ * - con la fila de la tarifa y precio de referencia (`energyValuationMethod === 'block_billing'`), los bloques oficiales;
+ * - sin fila válida (precio tecleado, de factura o fila de otra tarifa), una tarifa de precio único al precio escalar,
+ *   sin cargo fijo. Así el neteo kWh contra kWh, el arrastre del crédito, el cargo por uso de la red y la liquidación
+ *   anual del remanente son los mismos: el excedente solo anula consumo, nunca se paga al precio de venta.
+ * Régimen anterior, sistema aislado o inyección cero con precio escalar: `undefined` (el ahorro se valora con el escalar).
  */
 export function engineBlockBilling(
-  assumptions: Pick<ResolvedAssumptions, 'energyValuationMethod' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate' | 'annualCreditSettlementDOPPerKWh'>,
+  assumptions: Pick<ResolvedAssumptions, 'energyValuationMethod' | 'netMeteringRegime' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate' | 'annualCreditSettlementDOPPerKWh'>,
   rates: TariffBillingRatesInput,
+  /** Precio escalar con que se valora el ahorro (USD/kWh), el mismo que recibe el motor de energía. */
+  flatEnergyCostUSDPerKWh?: number,
 ): BlockBillingInput | undefined {
+  const common = { dopPerUSD: assumptions.dopExchangeRate, gridUseChargeDOPPerKWh: assumptions.appliedGridUseChargeDOPPerKWh, settlementDOPPerKWh: assumptions.annualCreditSettlementDOPPerKWh };
   const tariff = assumptions.energyValuationMethod === 'block_billing' ? proposalBillingTariff(rates) : undefined;
-  return tariff
-    ? { tariff, dopPerUSD: assumptions.dopExchangeRate, gridUseChargeDOPPerKWh: assumptions.appliedGridUseChargeDOPPerKWh, settlementDOPPerKWh: assumptions.annualCreditSettlementDOPPerKWh }
-    : undefined;
+  if (tariff) return { tariff, ...common };
+  if (assumptions.netMeteringRegime !== 'sie007_2026' || !exportsToGrid(resolveGridConnection(rates))) return undefined;
+  if (!(typeof flatEnergyCostUSDPerKWh === 'number' && Number.isFinite(flatEnergyCostUSDPerKWh) && flatEnergyCostUSDPerKWh > 0)) return undefined;
+  return { tariff: flatSinglePriceTariff(rates, flatEnergyCostUSDPerKWh * assumptions.dopExchangeRate), ...common };
 }
+
+/** Tarifa de precio único (sin cargo fijo ni regla de 701 kWh) para facturar con medición neta al precio escalar. */
+export function flatSinglePriceTariff(rates: TariffBillingRatesInput, rateDOP: number): BillingTariff {
+  return {
+    distributor: typeof rates.distributor === 'string' ? rates.distributor : '',
+    tariffCode: FLAT_SINGLE_PRICE_TARIFF_CODE,
+    energyBlocks: [{ fromKWh: 0, toKWh: null, rateDOP }],
+    fixedChargeDOP: 0,
+  };
+}
+
+/** Código neutro de la tarifa de precio único: no coincide con ninguna fila de la matriz ni activa la regla de 701 kWh. */
+export const FLAT_SINGLE_PRICE_TARIFF_CODE = 'PRECIO-UNICO';
 
 /**
  * Convenience helper to calculate complete financial summary directly from a ProjectSimulation object.

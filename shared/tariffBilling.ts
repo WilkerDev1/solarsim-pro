@@ -360,8 +360,9 @@ export const ENERGY_VALUATION_METHOD_LABELS:Record<EnergyValuationMethod, string
  * 1. Una procedencia válida en el propio cambio manda (la escribe quien fija el precio de referencia junto con la fila).
  *    Una inválida (o `null`) cuenta como ausente: no se guarda y queda la anterior, salvo que la regla 2 marque `manual`.
  * 2. Si cambia el precio sin procedencia, es un precio tecleado: `manual`.
- * 3. En otro caso no cambia. Cambiar de distribuidora o tarifa sin fila nueva deja la fila guardada sin efecto (no
- *    coincide), y la propuesta se valora con el escalar.
+ * 3. En otro caso no cambia. Un cambio de distribuidora o tarifa sin fila nueva lo reconcilia antes `applyProjectEdit`
+ *    (`src/domain/projectEdit.ts`): con precio de referencia siembra la fila y el precio de la tarifa nueva; con un precio
+ *    tecleado o de factura suelta la fila de la tarifa anterior.
  */
 export function reconcileEnergyRateSource<R extends { energyCostPerKWh?: number; energyRateSource?: unknown }>(
   before: R,

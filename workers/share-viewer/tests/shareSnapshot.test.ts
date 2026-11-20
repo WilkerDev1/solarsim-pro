@@ -41,7 +41,9 @@ async function main() {
     assert.equal(body.project.commercial,undefined);
     assert.equal(body.project.proposalLink,undefined);
     assert.deepEqual(body.calculationSnapshot, { mode: 'legacy', organizationId: 'mock-org', policyVersion: 4, capturedAt: body.calculationSnapshot.capturedAt, netMeteringRegime: 'legacy_retention' });
-    assert.deepEqual(body.summary, calculateProjectFinancialSummary(BENCHMARK_PROJECT, 'legacy'));
+    // Las marcas de payback/TIR solo se publican cuando son false: un sistema que se recupera publica lo mismo que 2.8.1.
+    const { paybackReached: _reached, irrDefined: _defined, ...expectedSummary } = calculateProjectFinancialSummary(BENCHMARK_PROJECT, 'legacy');
+    assert.deepEqual(body.summary, expectedSummary);
     return Response.json({ success: true, id: 'abcdef1234567890abcdef1234567890', shareUrl: 'https://propuesta.electsun.net/p/abcdef1234567890abcdef1234567890', validityDays: 7, expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() });
   };
   try {

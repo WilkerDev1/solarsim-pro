@@ -164,13 +164,14 @@ for (const mode of MODES) {
     assert.equal(m.tariffBill!.creditCarriedKWh, expectedYear.months[i].creditCarriedKWh);
     assert.equal(m.tariffBill!.netBilledKWh, expectedYear.months[i].netKWh);
     assert.equal(m.gridUseChargeUSD, r2(expectedYear.months[i].gridUseChargeDOP / 60));
-    assert.equal(flatMonth.tariffBill, undefined, 'escalar: sin campos nuevos');
+    // Precio tecleado en SIE-007: misma facturación neta a precio único (sin cargo fijo), ver `testRegimeConsistency`.
+    assert.equal(flatMonth.tariffBill?.fixedChargeUSD, 0, 'escalar SIE-007: precio único sin cargo fijo');
   });
   assert.equal(summary.year1SavingsUSD, r2(summary.monthlyBreakdown.reduce((total, m) => total + m.savingsUSD, 0)), 'año 1 = suma mensual');
   assert.equal(summary.cashFlow25Years[0].savingsUSD, summary.year1SavingsUSD, 'el flujo de caja sale de los ahorros nuevos');
   assert.equal(summary.annualCreditSettlementUSD, 0, 'liquidación con el precio de fábrica (0)');
   assert.notEqual(summary.year1SavingsUSD, flat.year1SavingsUSD, 'bloques ≠ escalar');
-  assert.equal(flat.annualCreditSettlementUSD, undefined, 'escalar: sin campos nuevos en el resumen');
+  assert.equal(flat.annualCreditSettlementUSD, 0, 'escalar SIE-007: remanente liquidado al precio de fábrica (0)');
 
   // 5b. Liquidación anual con precio: sistema sobredimensionado (remanente al cierre) suma remanente × precio en diciembre.
   const oversized = project(blockRates({ annualCreditSettlementDOPPerKWh: 4 }), 300, { panelCount: 9 });
@@ -185,7 +186,12 @@ for (const mode of MODES) {
   const withoutIndicator = calculateProjectFinancialSummary(project({ netMeteringRegime: 'sie007_2026' }), mode);
   assert.deepEqual(calculateProjectFinancialSummary(project(blockRates({ energyRateSource: 'manual' })), mode).monthlyBreakdown, withoutIndicator.monthlyBreakdown, 'manual ≡ fase 2');
   assert.deepEqual(calculateProjectFinancialSummary(project(blockRates({ energyRateSource: 'invoice' })), mode).monthlyBreakdown, withoutIndicator.monthlyBreakdown, 'factura ≡ fase 2');
-  withoutIndicator.monthlyBreakdown.forEach((m) => assert.equal(m.savingsUSD, r2(r2(m.effectiveSavedKWh * 0.218) - m.gridUseChargeUSD!)));
+  withoutIndicator.monthlyBreakdown.forEach((m) => {
+    // Facturación neta a precio único (SIE-007): ahorro = diferencia de facturas; sin crédito arrastrado coincide con la
+    // fórmula de la fase 2 (kWh evitados × precio − cargo) salvo el redondeo de cada factura a centavos.
+    assert.equal(m.savingsUSD, r2(m.originalBillUSD! - m.netBillUSD!));
+    if (!m.tariffBill?.creditInKWh && !m.tariffBill?.creditCarriedKWh) close(m.savingsUSD, r2(m.effectiveSavedKWh * 0.218) - m.gridUseChargeUSD!, 'sin crédito: como la fase 2', 0.011);
+  });
 
   // 5d. BTD con precio de referencia: energía a su precio único, cargo de potencia fuera del ahorro, sin cargo por uso de red.
   const btdP = project({ ...blockRates(), tariffCode: 'BTD', billingTariff: edesurBtd, energyCostPerKWh: 0.15 }, 3000, { panelCount: 60, inverterPowerKW: 15, inverterCount: 2 });
@@ -252,8 +258,12 @@ assert.equal(applyProjectEdit(reference, { kind: 'rates', patch: { targetCoverag
 const reapplied = applyProjectEdit(typed, { kind: 'rates', patch: applyPlan }, editCtx);
 assert.equal(reapplied.rates.energyRateSource, 'reference', 'aplicar tarifa oficial: de nuevo referencia');
 assert.equal(resolveAssumptions(reapplied).energyValuationMethod, 'block_billing');
-assert.equal(applyProjectEdit(reference, { kind: 'rates', patch: { tariffCode: 'BTS2' } }, editCtx).rates.energyRateSource, 'reference');
-assert.equal(resolveAssumptions(applyProjectEdit(reference, { kind: 'rates', patch: { tariffCode: 'BTS2' } }, editCtx)).energyValuationMethod, 'flat_rate', 'cambio de tarifa sin fila nueva: escalar');
+// Cambio de tarifa sin fila en el parche (asistente, agentes): con precio de referencia se siembra la fila nueva
+// (`testRegimeConsistency` cubre el resto: precio tecleado, distribuidora, matriz activa).
+const retariffed = applyProjectEdit(reference, { kind: 'rates', patch: { tariffCode: 'BTS2' } }, editCtx);
+assert.equal(retariffed.rates.energyRateSource, 'reference');
+assert.equal(retariffed.rates.billingTariff?.tariffCode, 'BTS2', 'cambio de tarifa: fila de la tarifa nueva');
+assert.equal(resolveAssumptions(retariffed).energyValuationMethod, 'block_billing', 'cambio de tarifa: sigue por bloques');
 assert.deepEqual(reconcileEnergyRateSource({ energyCostPerKWh: 0.2 }, { energyCostPerKWh: 0.3, energyRateSource: 'invoice' }, { energyCostPerKWh: 0.3, energyRateSource: 'invoice' }), { energyCostPerKWh: 0.3, energyRateSource: 'invoice' }, 'el cambio explícito manda');
 assert.equal(reconcileEnergyRateSource({ energyCostPerKWh: 0.2 }, { energyCostPerKWh: 0.3, energyRateSource: 'nuevo' as never }, { energyRateSource: 'nuevo' as never }).energyRateSource, undefined, 'valor desconocido: no se guarda');
 

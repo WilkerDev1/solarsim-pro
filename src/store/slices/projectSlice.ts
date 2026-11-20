@@ -89,7 +89,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
 
   /** ADR 0004: las reglas de la edición viven en `applyProjectEdit`; aquí solo se persiste, sincroniza y deshace. */
   const editActiveProject = (edit: ProjectEdit) =>
-    updateActiveProject((p, state) => applyProjectEdit(p, edit, { equipmentCatalog: state.equipmentCatalog }));
+    updateActiveProject((p, state) => applyProjectEdit(p, edit, { equipmentCatalog: state.equipmentCatalog, tariffMatrix: state.tariffMatrix }));
 
   return {
   projects: INITIAL_PROJECTS,
@@ -565,7 +565,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   updateMonthlyConsumption: (index, value) => updateActiveProject((p, state) => {
     const monthlyConsumption = [...p.monthlyConsumption];
     monthlyConsumption[index] = value;
-    return applyProjectEdit(p, { kind: 'consumption', monthlyConsumption }, { equipmentCatalog: state.equipmentCatalog });
+    return applyProjectEdit(p, { kind: 'consumption', monthlyConsumption }, { equipmentCatalog: state.equipmentCatalog, tariffMatrix: state.tariffMatrix });
   }),
 
   updateAllMonthlyConsumption: (value) => editActiveProject({ kind: 'consumption', monthlyConsumption: Array(12).fill(value) }),

@@ -2,6 +2,7 @@ import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { resolveAssumptions } from '../../../../shared/assumptions';
 import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis } from '../../../../shared/offGridSupply';
+import { IRR_NOT_APPLICABLE_LABEL, PAYBACK_NOT_REACHED_LABEL, isIrrDefined, isPaybackReached } from '../../../../shared/returnIndicators';
 import {
   BarChart,
   Bar,
@@ -42,6 +43,8 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
   // Sistema aislado sin comparación (o generador sin costo): no hay ahorro que mostrar; nunca tarjetas en cero.
   const savingsBasis = resolveSavingsBasis(project.rates);
   const comparable = hasSavingsComparison(savingsBasis);
+  const paybackReached = isPaybackReached(summary);
+  const irrDefined = isIrrDefined(summary);
 
   return (
     <div className="space-y-6 shrink-0">
@@ -65,8 +68,10 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
             PERÍODO DE RETORNO (PAYBACK)
           </span>
           <div className="flex flex-wrap items-baseline gap-x-1">
-            <span className="text-2xl font-black text-emerald-800">{summary.paybackYears}</span>
-            <span className="text-xs text-slate-600 font-bold">Años</span>
+            {paybackReached ? (<>
+              <span className="text-2xl font-black text-emerald-800">{summary.paybackYears}</span>
+              <span className="text-xs text-slate-600 font-bold">Años</span>
+            </>) : <span className="text-xl font-black text-red-700">{PAYBACK_NOT_REACHED_LABEL}</span>}
           </div>
           <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
             Recuperación de inversión neta
@@ -78,7 +83,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
             TASA INTERNA DE RETORNO (TIR)
           </span>
           <div className="flex flex-wrap items-baseline gap-x-1">
-            <span className="text-2xl font-black text-emerald-700">{summary.irrPct}%</span>
+            <span className={irrDefined ? 'text-2xl font-black text-emerald-700' : 'text-xl font-black text-red-700'}>{irrDefined ? `${summary.irrPct}%` : IRR_NOT_APPLICABLE_LABEL}</span>
           </div>
           <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
             Rentabilidad anualizada (IRR)
@@ -204,13 +209,13 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
               </td>
             </tr>
 
-            <tr className="hover:bg-slate-50 bg-emerald-50/60 font-bold">
+            {paybackReached && <tr className="hover:bg-slate-50 bg-emerald-50/60 font-bold">
               <td className="py-2.5 px-4 text-emerald-900">Año {Math.ceil(summary.paybackYears)} (Retorno Payback: {summary.paybackYears} años)</td>
               <td className="py-2.5 px-4 text-right">${(cf25[Math.ceil(summary.paybackYears) - 1]?.savingsUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               <td className="py-2.5 px-4 text-right text-emerald-700">${(cf25[Math.ceil(summary.paybackYears) - 1]?.taxCreditUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               <td className="py-2.5 px-4 text-right">${((cf25[Math.ceil(summary.paybackYears) - 1]?.savingsUSD || 0) + (cf25[Math.ceil(summary.paybackYears) - 1]?.taxCreditUSD || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               <td className="py-2.5 px-4 text-right font-bold text-emerald-800">${(cf25[Math.ceil(summary.paybackYears) - 1]?.cumulativeCashFlowUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            </tr>
+            </tr>}
 
             <tr className="hover:bg-slate-50">
               <td className="py-2.5 px-4 font-bold text-slate-800">Año 10</td>
@@ -343,12 +348,12 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
           <tbody className="divide-y divide-slate-200 text-slate-700 font-semibold">
             <tr>
               <td className="py-2.5 px-4 font-bold text-slate-800">Payback (Periodo de Recuperación)</td>
-              <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{summary.paybackYears}</td>
+              <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{paybackReached ? summary.paybackYears : PAYBACK_NOT_REACHED_LABEL}</td>
               <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Años hasta recuperar la inversión inicial</td>
             </tr>
             <tr>
               <td className="py-2.5 px-4 font-bold text-slate-800">TIR (Tasa Interna de Retorno)</td>
-              <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{summary.irrPct}%</td>
+              <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{irrDefined ? `${summary.irrPct}%` : IRR_NOT_APPLICABLE_LABEL}</td>
               <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Rendimiento anual del proyecto</td>
             </tr>
             <tr>

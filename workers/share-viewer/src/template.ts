@@ -10,6 +10,7 @@ import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '
 import { ENERGY_FLOW_CSS, renderEnergyFlowSection } from './energyFlow';
 import { isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
 import { resolveGridConnection } from '../../../shared/gridConnection';
+import { PAYBACK_NOT_REACHED_LABEL, irrText, isPaybackReached } from '../../../shared/returnIndicators';
 import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, storedSupplyAlternative, supplyPresentation, type SavingsBasis } from '../../../shared/offGridSupply';
 import { EQUIPMENT_FALLBACK_NAME, equipmentTotals, readEquipment } from '../../../shared/equipment';
 import { mainModelPhrase } from '../../../shared/documentTexts/equipmentPhrases';
@@ -255,7 +256,9 @@ export function renderProposalPage(stored: StoredProposal): string {
   ).toFixed(2);
 
   const paybackYears = Number(summary?.paybackYears || 0).toFixed(1);
-  const irrPct = Number(summary?.irrPct || 0).toFixed(1);
+  // Sin retorno en la vida útil: «No se recupera» / «No aplica» (resúmenes antiguos sin las marcas: como hasta ahora).
+  const paybackReached = isPaybackReached(summary);
+  const irrDisplay = escapeHtml(irrText(summary));
   const npvUSD = Number(summary?.npvUSD || 0);
   const roi25YrPct = Number(summary?.roi25YrPct || 0).toFixed(1);
   const total25YearSavingsUSD = Number(summary?.total25YearSavingsUSD || 0);
@@ -296,6 +299,9 @@ export function renderProposalPage(stored: StoredProposal): string {
   const year1Obj = cf25[0] || { savingsUSD: 0, cumulativeCashFlowUSD: -initialOutflowUSD };
   const paybackCeil = Math.ceil(Number(paybackYears)) || 3;
   const paybackYearObj = cf25.find((c: any) => c.year === paybackCeil) || cf25[2] || year1Obj;
+  const paybackCard = paybackReached
+    ? `${paybackYears} <span class="text-[10px] sm:text-xs font-sans text-slate-500">años</span>`
+    : `<span class="text-sm sm:text-base">${escapeHtml(PAYBACK_NOT_REACHED_LABEL)}</span>`;
   const year10Obj = cf25[9] || year1Obj;
   const year25Obj = cf25[cf25.length - 1] || year1Obj;
 
@@ -884,12 +890,12 @@ ${ENERGY_FLOW_CSS}
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3">
         <div class="bg-orange-50/70 border border-orange-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 text-center">
           <p class="text-[9px] sm:text-[9.5px] uppercase font-bold text-orange-700 mb-0.5">Payback</p>
-          <p class="text-lg sm:text-xl font-black font-mono text-orange-600">${paybackYears} <span class="text-[10px] sm:text-xs font-sans text-slate-500">años</span></p>
+          <p class="text-lg sm:text-xl font-black font-mono text-orange-600">${paybackCard}</p>
         </div>
 
         <div class="bg-sky-50/70 border border-sky-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 text-center">
           <p class="text-[9px] sm:text-[9.5px] uppercase font-bold text-sky-700 mb-0.5">TIR</p>
-          <p class="text-lg sm:text-xl font-black font-mono text-sky-700">${irrPct}%</p>
+          <p class="text-lg sm:text-xl font-black font-mono text-sky-700">${irrDisplay}</p>
         </div>
 
         <div class="bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 text-center">
@@ -928,13 +934,13 @@ ${ENERGY_FLOW_CSS}
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-bold whitespace-nowrap">US$ ${Number(year1Obj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono text-red-600 font-bold whitespace-nowrap">US$ ${Number(year1Obj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
-              <tr class="bg-orange-50 text-orange-950 font-bold border-y border-orange-200">
+${paybackReached ? `              <tr class="bg-orange-50 text-orange-950 font-bold border-y border-orange-200">
                 <td class="px-2.5 sm:px-4 py-2 font-black flex items-center gap-1">
                   <span>⭐ Año ${escapeHtml(paybackYearObj.year)} (Retorno: ${paybackYears} años)</span>
                 </td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black whitespace-nowrap">US$ ${Number(paybackYearObj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black text-sky-700 whitespace-nowrap">US$ ${Number(paybackYearObj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-              </tr>
+              </tr>` : ''}
               <tr class="bg-surface">
                 <td class="px-2.5 sm:px-4 py-2 font-bold">Año 10 (Consolidación)</td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-bold whitespace-nowrap">US$ ${Number(year10Obj.savingsUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
