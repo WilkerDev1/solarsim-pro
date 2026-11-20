@@ -2,7 +2,9 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import pg from "pg";
+import { createHash } from "node:crypto";
 import { migrateDatabase } from "../src/database/migrations.js";
+import { replaceAssetRefs } from "../../shared/documentAssets.js";
 import {
   LEGACY_MIRROR_FIELDS,
   equipmentTotals,
@@ -47,12 +49,55 @@ try {
         ]),
       ),
     );
-  const fingerprint = async () =>
-    (
+  // Migration 009 moves document images into `document_assets`: compare documents with their references resolved
+  // (what every reader receives), in a key-order independent form.
+  const fingerprint = async () => {
+    const assets = (
       await pool.query(
-        "SELECT md5(coalesce(string_agg((data_json - 'specs')::text, '' ORDER BY id), '')) AS fingerprint FROM projects",
+        "SELECT to_regclass('document_assets') IS NOT NULL AS present",
       )
-    ).rows[0].fingerprint;
+    ).rows[0].present
+      ? (
+          await pool.query(
+            "SELECT organization_id, sha256, content FROM document_assets",
+          )
+        ).rows
+      : [];
+    const contents = new Map(
+      assets.map((row) => [
+        `${row.organization_id}|${row.sha256}`,
+        row.content,
+      ]),
+    );
+    const rows = (
+      await pool.query(
+        "SELECT id, organization_id, data_json - 'specs' AS document FROM projects ORDER BY id",
+      )
+    ).rows;
+    const stable = (value: unknown): unknown =>
+      Array.isArray(value)
+        ? value.map(stable)
+        : value && typeof value === "object"
+          ? Object.fromEntries(
+              Object.keys(value)
+                .sort()
+                .map((key) => [key, stable((value as any)[key])]),
+            )
+          : value;
+    return createHash("md5")
+      .update(
+        JSON.stringify(
+          rows.map((row) =>
+            stable(
+              replaceAssetRefs(row.document, (hash) =>
+                contents.get(`${row.organization_id}|${hash}`),
+              ),
+            ),
+          ),
+        ),
+      )
+      .digest("hex");
+  };
   // Migration 006 rewrites only `specs`: the equipment totals of every restored project must be the same afterwards.
   const equipment = async () =>
     Object.fromEntries(
@@ -104,7 +149,7 @@ try {
     (
       await pool.query("SELECT version FROM schema_migrations ORDER BY version")
     ).rows.map((row) => row.version),
-    [1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 2, 3, 4, 5, 6, 7, 8, 9],
   );
   assert.equal(
     Number(
@@ -128,7 +173,7 @@ try {
       projectContentPreserved: true,
       equipmentTotalsPreserved: true,
       migrationReplay: "pass",
-      migrations: [1, 2, 3, 4, 5, 6, 7, 8],
+      migrations: [1, 2, 3, 4, 5, 6, 7, 8, 9],
       orphanProjects: 0,
       recovering: false,
     }),

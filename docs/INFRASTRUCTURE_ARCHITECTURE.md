@@ -50,7 +50,7 @@ En el CT (con el usuario de servicio indicado en el archivo privado):
    docker save <imagen en ejecución> | gzip > "$D/<imagen>.tar.gz"
    ```
 
-2. **Ensayo de restauración.** Desde la raíz de un checkout de la revisión a desplegar, con Docker local: `$S 'cat <checkpoint>/solarsim_prod.dump' | python3 scripts/qa/restoreBackupRehearsal.py`. El script guarda el dump completo (datos de producción) en una carpeta privada de `TMPDIR` (0700, archivo 0600) y la borra al terminar; si se interrumpe a la fuerza puede quedar `solarsim-logical-qa-*/input.dump`. Ejecutarlo solo en una máquina de confianza con disco cifrado y comprobar después que no quedan restos. Debe listar las migraciones de esa revisión (incluidas las nuevas: con la 008 la salida termina en `"migrations":[1,2,3,4,5,6,7,8]`). El script recibe el dump por stdin, lo restaura en PostgreSQL 16 sin red (`--network none`, 1 GB de memoria con los datos en tmpfs) con socket Unix privado, ejecuta `server/tests/backupRehearsal.ts` (migraciones del repositorio dos veces, conteos iguales, huellas iguales del contenido de cada propuesta salvo `specs`, `equipmentTotals` iguales antes y después, ningún proyecto con el espejo heredado, cero huérfanos) y `pg_amcheck --heapallindexed --parent-check`; al terminar elimina contenedor y temporales. No monta ni modifica la base de producción.
+2. **Ensayo de restauración.** Desde la raíz de un checkout de la revisión a desplegar, con Docker local: `$S 'cat <checkpoint>/solarsim_prod.dump' | python3 scripts/qa/restoreBackupRehearsal.py`. El script guarda el dump completo (datos de producción) en una carpeta privada de `TMPDIR` (0700, archivo 0600) y la borra al terminar; si se interrumpe a la fuerza puede quedar `solarsim-logical-qa-*/input.dump`. Ejecutarlo solo en una máquina de confianza con disco cifrado y comprobar después que no quedan restos. Debe listar las migraciones de esa revisión (incluidas las nuevas: con la 009 la salida termina en `"migrations":[1,2,3,4,5,6,7,8,9]`). El script recibe el dump por stdin, lo restaura en PostgreSQL 16 sin red (`--network none`, 1 GB de memoria con los datos en tmpfs) con socket Unix privado, ejecuta `server/tests/backupRehearsal.ts` (migraciones del repositorio dos veces, conteos iguales, huellas iguales del contenido de cada propuesta salvo `specs`, `equipmentTotals` iguales antes y después, ningún proyecto con el espejo heredado, cero huérfanos) y `pg_amcheck --heapallindexed --parent-check`; al terminar elimina contenedor y temporales. No monta ni modifica la base de producción.
 3. **Compatibilidad de clientes.** La API exige `baseVersion` (CAS), publicación autenticada y, desde la 2.7.1, `X-SolarSim-Client` con versión ≥ `MIN_CLIENT_VERSION` (426 en caso contrario; ver más abajo). Los clientes 2.6.0 y 2.7.0 dejan de sincronizar: coordinar la versión de escritorio y del Worker, avisar al equipo y exportar el trabajo pendiente de quienes vayan a cambiar.
 4. **Construir y reemplazar solo la API.** La imagen se etiqueta `solarsim-api-api:<versión>-<sha corto>` para poder volver a ella. PostgreSQL, Caddy y el túnel no se recrean.
 
@@ -152,6 +152,16 @@ Orden (ya no es frágil):
 4. Opcional: subir `MIN_CLIENT_VERSION` a `2.8.0` (y `DEFAULT_MIN_CLIENT_VERSION` en una release posterior) cuando se quiera obligar a actualizar.
 
 Rollback: la imagen 2.7.4 es compatible con los datos (normaliza `feature_settings` a una clave e ignora la otra). Si una política se guardó con `netMeteringRegimeSelector: false` y un cliente 2.7.4 la vuelve a guardar con la API anterior, la clave se pierde y vuelve al valor por defecto (visible).
+
+### Versión 2.8.2: imágenes del documento una sola vez (migración 009)
+
+Migración aditiva 009 (`document_assets`) con relleno: mueve logos y miniaturas de anexos de cada propuesta a la tabla y deja referencias, sin cambiar `version` ni `updated_at` ([API](DATABASE_AND_API_SPECIFICATION.md#imágenes-del-documento-migración-009)). Los clientes que no piden `?assetRefs=1` (2.8.1 y anteriores, agentes) siguen recibiendo las imágenes en línea: `MIN_CLIENT_VERSION` no cambia.
+
+1. Checkpoint y ensayo de restauración. El ensayo debe terminar en `[1..9]` y conservar la huella de cada propuesta (se compara con las referencias resueltas). Anotar el tamaño de `projects` antes y después (`SELECT pg_size_pretty(pg_total_relation_size('projects'))`).
+2. **API** (aplica la 009 al arrancar, en una transacción) y **Worker**, en cualquier orden: el Worker no cambia de contrato.
+3. **Release de escritorio** 2.8.2. Con la API anterior también funciona: esa API nunca devuelve referencias y el cliente entonces nunca las envía.
+
+Rollback: una imagen anterior a la 009 serviría las referencias tal cual (los logos no se verían) y guardaría lo que reciba. Volver atrás exige restaurar el checkpoint en una base nueva y reconciliar las escrituras posteriores (sección siguiente); no desplegar una API anterior sobre la base migrada.
 
 ## Rollback de la API
 

@@ -4,6 +4,25 @@ import { migrateLegacySpecs } from '../../shared/equipment';
 import { CLIENT_OUTDATED, isClientGateOpen } from '../../shared/clientVersion';
 import { CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE } from './clientIdentity';
 import { clientOutdatedText, getClientOutdated, isServerBlocked, reportClientOutdated } from './clientVersionGate';
+import { UNKNOWN_DOCUMENT_ASSET, withAssetRefs, assetRef, collectAssetRefs, isAssetCandidate, mapDocumentAssetFields, replaceAssetRefs } from '../../shared/documentAssets';
+
+/**
+ * Imágenes del documento (shared/documentAssets.ts). Contenido por sha256 (verificado o calculado aquí) y, por
+ * servidor, los hashes que ese servidor confirmó tener: solo esos viajan como referencia en un push. Con una API
+ * anterior que nunca devuelve referencias, nada se compacta.
+ */
+const documentAssetContents = new Map<string, string>();
+const serverDocumentAssets = new Map<string, Set<string>>();
+export function clearDocumentAssetCache(): void {
+  documentAssetContents.clear();
+  serverDocumentAssets.clear();
+}
+async function sha256Hex(text: string): Promise<string | null> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return null;
+  const digest = new Uint8Array(await subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 export type EquipmentPushOutcome =
   | { id: string; status: 'created' | 'updated'; version: number; item: SolarEquipmentItem }
@@ -403,8 +422,8 @@ export class SyncService {
   }
 
   /** Authenticated request with session retry; propagates a renewed token sent by the server. */
-  private static async send(serverUrl: string, token: string, method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
-    const headers: Record<string, string> = body === undefined ? {} : { 'Content-Type': 'application/json' };
+  private static async send(serverUrl: string, token: string, method: string, path: string, body?: unknown, signal?: AbortSignal, extraHeaders: Record<string, string> = {}): Promise<Response> {
+    const headers: Record<string, string> = { ...extraHeaders, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) };
     headers.Authorization = `Bearer ${token}`;
     const res = await fetchWithSessionRetry(`${this.cleanUrl(serverUrl)}${path}`, {
       method,
@@ -499,6 +518,63 @@ export class SyncService {
     }
   }
 
+  private static knownDocumentAssets(serverUrl: string): Set<string> {
+    const key = this.cleanUrl(serverUrl);
+    let known = serverDocumentAssets.get(key);
+    if (!known) serverDocumentAssets.set(key, (known = new Set()));
+    return known;
+  }
+
+  /**
+   * Replaces every `asset:sha256:` reference in a response with its content, downloading each image this session
+   * has not seen yet. Nothing with a reference reaches the store: an image that cannot be read fails the request.
+   */
+  private static async expandDocumentAssets<T>(serverUrl: string, token: string, value: T): Promise<T> {
+    const hashes = [...collectAssetRefs(value)];
+    if (!hashes.length) return value;
+    const known = this.knownDocumentAssets(serverUrl);
+    for (const hash of hashes) {
+      known.add(hash);
+      if (documentAssetContents.has(hash)) continue;
+      let content: unknown;
+      try {
+        const res = await this.sendWithIdleTimeout(serverUrl, token, 'GET', `/api/document-assets/${hash}`, undefined, 'La descarga de una imagen');
+        const { data, error } = await this.readSuccess(res, 'Error al descargar una imagen');
+        if (error) throw new Error(error);
+        content = data.content;
+      } catch (err: any) {
+        known.delete(hash);
+        throw new Error(`No se pudo descargar un logo o imagen de la propuesta: ${err?.message || 'error de conexión'}`);
+      }
+      const actual = typeof content === 'string' ? await sha256Hex(content) : undefined;
+      if (typeof content !== 'string' || (actual !== null && actual !== hash)) {
+        known.delete(hash);
+        throw new Error('El servidor devolvió una imagen de la propuesta que no corresponde.');
+      }
+      documentAssetContents.set(hash, content);
+    }
+    return replaceAssetRefs(value, (hash) => documentAssetContents.get(hash));
+  }
+
+  /** Images this server already confirmed travel as references; new ones go inline once (the server stores them). */
+  private static async compactDocumentAssets(serverUrl: string, projects: ProjectSimulation[]): Promise<ProjectSimulation[]> {
+    const known = this.knownDocumentAssets(serverUrl);
+    const refs = new Map<string, string>();
+    for (const project of projects) {
+      const values: string[] = [];
+      mapDocumentAssetFields(project, (value) => { if (isAssetCandidate(value)) values.push(value); return value; });
+      for (const value of values) {
+        if (refs.has(value)) continue;
+        const hash = await sha256Hex(value);
+        if (!hash) return projects;
+        // The acknowledged document comes back with references: its content is already here.
+        documentAssetContents.set(hash, value);
+        if (known.has(hash)) refs.set(value, assetRef(hash));
+      }
+    }
+    return refs.size ? projects.map((project) => mapDocumentAssetFields(project, (value) => refs.get(value) ?? value)) : projects;
+  }
+
   /**
    * Plazos de la descarga de proyectos. Su tamaño depende de cuánto cambió (incremental) o de toda la
    * organización (completa, ~12 MB con logos): se corta por inactividad, no por duración total, para que un
@@ -507,7 +583,7 @@ export class SyncService {
   static pullTimeouts = { idleMs: 30_000, maxMs: 10 * 60_000 };
 
   /** Lee la respuesta completa con vigilancia de inactividad; devuelve una `Response` ya descargada. */
-  private static async sendWithIdleTimeout(serverUrl: string, token: string, method: string, path: string, body: unknown, label: string): Promise<Response> {
+  private static async sendWithIdleTimeout(serverUrl: string, token: string, method: string, path: string, body: unknown, label: string, extraHeaders: Record<string, string> = {}): Promise<Response> {
     const { idleMs, maxMs } = this.pullTimeouts;
     const controller = new AbortController();
     let expired: 'idle' | 'max' | null = null;
@@ -523,7 +599,7 @@ export class SyncService {
       : `${label} superó ${Math.ceil(maxMs / 60_000)} min.`);
     touch();
     try {
-      const res = await this.send(serverUrl, token, method, path, body, controller.signal);
+      const res = await this.send(serverUrl, token, method, path, body, controller.signal, extraHeaders);
       // A deadline that fired while the headers arrived already aborted the signal (late listeners never run).
       if (expired || controller.signal.aborted) throw timeoutError();
       touch();
@@ -556,12 +632,14 @@ export class SyncService {
   static async pullProjects(serverUrl: string, token: string, lastSyncTimestamp?: string | null): Promise<SyncPullResult> {
     try {
       const body = { lastSyncTimestamp: lastSyncTimestamp || '1970-01-01T00:00:00.000Z' };
-      const res = await this.sendWithIdleTimeout(serverUrl, token, 'POST', '/api/sync/pull', body, 'La descarga de proyectos');
+      const res = await this.sendWithIdleTimeout(serverUrl, token, 'POST', withAssetRefs('/api/sync/pull'), body, 'La descarga de proyectos');
       const { data, error } = await this.readSuccess(res, 'Error al descargar proyectos');
       if (error) return { success: false, error };
+      if (!Array.isArray(data.projects)) throw new Error('Respuesta de proyectos inválida.');
+      const projects: ProjectSimulation[] = await this.expandDocumentAssets(serverUrl, token, data.projects);
       return {
         success: true,
-        projects: Array.isArray(data.projects) ? data.projects.map(withGroupsOnly) : (() => { throw new Error('Respuesta de proyectos inválida.'); })(),
+        projects: projects.map(withGroupsOnly),
         deletedIds: data.deletedIds || [],
         serverTimestamp: data.serverTimestamp,
         count: data.count || 0,
@@ -577,7 +655,7 @@ export class SyncService {
    */
   static async getProject(serverUrl: string, token: string, projectId: string): Promise<{ success: boolean; project?: ProjectSimulation; notFound?: boolean; error?: string }> {
     try {
-      const res = await this.send(serverUrl, token, 'GET', `/api/projects/${encodeURIComponent(projectId)}`);
+      const res = await this.send(serverUrl, token, 'GET', withAssetRefs(`/api/projects/${encodeURIComponent(projectId)}`));
       if (res.status === 404) {
         const body = await res.clone().json().catch(() => null);
         if (body && typeof body.error === 'string' && body.success !== true) return { success: false, notFound: true, error: body.error };
@@ -585,7 +663,7 @@ export class SyncService {
       const { data, error } = await this.readSuccess(res, 'Error al consultar el proyecto');
       if (error) return { success: false, error };
       if (!data.project || data.project.id !== projectId) throw new Error('Respuesta de proyecto inválida.');
-      return { success: true, project: withGroupsOnly(data.project) };
+      return { success: true, project: withGroupsOnly(await this.expandDocumentAssets(serverUrl, token, data.project as ProjectSimulation)) };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al consultar el proyecto' };
     }
@@ -596,8 +674,16 @@ export class SyncService {
    */
   static async pushProjects(serverUrl: string, token: string, projects: ProjectSimulation[]): Promise<SyncPushResult> {
     try {
-      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'POST', '/api/sync/push', { projects: projects.map(withGroupsOnly) }), 'Error al subir proyectos');
-      if (error) return { success: false, error };
+      const documents = projects.map(withGroupsOnly);
+      let res = await this.send(serverUrl, token, 'POST', withAssetRefs('/api/sync/push'), { projects: await this.compactDocumentAssets(serverUrl, documents) });
+      if (res.status === 400 && (await res.clone().json().catch(() => null))?.code === UNKNOWN_DOCUMENT_ASSET) {
+        // The server lacks an image it was referenced by (another organization, restored database): send the images once.
+        serverDocumentAssets.get(this.cleanUrl(serverUrl))?.clear();
+        res = await this.send(serverUrl, token, 'POST', withAssetRefs('/api/sync/push'), { projects: documents });
+      }
+      const read = await this.readSuccess(res, 'Error al subir proyectos');
+      if (read.error) return { success: false, error: read.error };
+      const data = await this.expandDocumentAssets(serverUrl, token, read.data);
 
       if (Array.isArray(data.results) && data.results.some((result: any) => result.awaitingConfirmation !== undefined)) throw new Error('Confirmación de sincronización inválida.');
       // Legacy servers acknowledge versions without returning the canonical document.

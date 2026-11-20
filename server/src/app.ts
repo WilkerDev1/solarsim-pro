@@ -1,6 +1,11 @@
 import { registerFolderRoutes } from "./modules/folders.js";
 import { registerClientRoutes } from "./modules/clients.js";
 import { registerEquipmentAssetRoutes } from "./modules/equipmentAssets.js";
+import {
+  UnknownDocumentAssetError,
+  registerDocumentAssetRoutes,
+} from "./modules/documentAssets.js";
+import { UNKNOWN_DOCUMENT_ASSET } from "../../shared/documentAssets.js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -75,6 +80,16 @@ export function createApp(options: {
       return c.json({ error: error.message }, error.status);
     if (error instanceof SyntaxError)
       return c.json({ error: "JSON inválido" }, 400);
+    // The transaction was rolled back: nothing of the batch was written. The client retries with the images.
+    if (error instanceof UnknownDocumentAssetError)
+      return c.json(
+        {
+          error: "La propuesta usa una imagen que el servidor no tiene.",
+          code: UNKNOWN_DOCUMENT_ASSET,
+          missing: error.missing,
+        },
+        400,
+      );
     console.error(
       "API request failed:",
       error instanceof Error ? error.name : "UnknownError",
@@ -102,6 +117,7 @@ export function createApp(options: {
   registerFolderRoutes(app, deps);
   registerClientRoutes(app, deps);
   registerEquipmentAssetRoutes(app, deps);
+  registerDocumentAssetRoutes(app, deps);
   registerTariffsRoutes(app, deps);
   registerNotificationsRoutes(app, deps);
   registerOrganizationRoutes(app, deps);

@@ -29,22 +29,22 @@ const getOriginal = SyncService.getProject;
 try {
   initial.setSyncSettings(session);
   // Legacy successful ACK requires canonical read-back, not guessing from the payload.
-  globalThis.fetch = async (input) => String(input).endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : Response.json({ success: true, projects: [remote] });
+  globalThis.fetch = async (input) => new URL(String(input)).pathname.endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : Response.json({ success: true, projects: [remote] });
   const result = await SyncService.pushProjects(url, 'synthetic', [local]);
   assert.equal(result.success, true); assert.equal(result.results?.[0].status, 'created');
   const duringSend = { ...local, client: { ...local.client, name: 'Edición durante envío' } };
   const ack = acknowledgeProjectPush([duringSend], [local], result.results!, url, user.organizationId).projects[0];
   assert.equal(ack.client.name, duringSend.client.name); assert.equal(ack.syncStatus, 'pending'); assert.equal(ack.baseVersion, 1);
-  globalThis.fetch = async (input) => String(input).endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : Response.json({ success: true, projects: [{ ...remote, version: 2 }] });
+  globalThis.fetch = async (input) => new URL(String(input)).pathname.endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : Response.json({ success: true, projects: [{ ...remote, version: 2 }] });
   assert.equal((await SyncService.pushProjects(url, 'synthetic', [local])).results?.[0].status, 'conflict', 'A concurrent change during readback stays reviewable');
-  globalThis.fetch = async (input) => String(input).endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : new Response('', { status: 503 });
+  globalThis.fetch = async (input) => new URL(String(input)).pathname.endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : new Response('', { status: 503 });
   const sparse = await SyncService.pushProjects(url, 'synthetic', [local]);
   assert.equal(sparse.success, true);
   const deferred = acknowledgeProjectPush([local], [local], sparse.results!, url, user.organizationId).projects[0];
   assert.equal(deferred.syncStatus, 'pending'); assert.equal(deferred.pendingCanonicalAck?.version, 1);
   assert.equal(reconcilePulledProjects([deferred], [], [], new Set(), url, user.organizationId)[0].pendingCanonicalAck?.version, 1);
   assert.equal(reconcilePulledProjects([deferred], [remote], [], new Set(), url, user.organizationId)[0].syncStatus, 'synced');
-  globalThis.fetch = async (input) => String(input).endsWith('/push') ? Response.json({ success: true, results: [{ id: 'qa-fork-readback', originalId: local.id, status: 'forked', version: 1 }] }) : new Response('', { status: 503 });
+  globalThis.fetch = async (input) => new URL(String(input)).pathname.endsWith('/push') ? Response.json({ success: true, results: [{ id: 'qa-fork-readback', originalId: local.id, status: 'forked', version: 1 }] }) : new Response('', { status: 503 });
   const sparseFork = await SyncService.pushProjects(url, 'synthetic', [local]);
   const forkReceipt = acknowledgeProjectPush([edited], [local], sparseFork.results!, url, user.organizationId).projects[0];
   assert.equal(forkReceipt.id, 'qa-fork-readback'); assert.equal(forkReceipt.client.name, edited.client.name);
