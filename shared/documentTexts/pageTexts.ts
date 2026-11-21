@@ -135,6 +135,7 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
     ...connectionAwareText({
       grid: "Asistencia personalizada y gestión integral de permisos, medición neta y garantías durante toda la vida del sistema.",
       zeroExport: "Asistencia personalizada y gestión integral de permisos, interconexión y garantías durante toda la vida del sistema.",
+      offGrid: "Asistencia personalizada y gestión integral de permisos y garantías durante toda la vida del sistema.",
     }),
   },
   // Beneficios y Ley 57-07

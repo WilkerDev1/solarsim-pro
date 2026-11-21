@@ -19,7 +19,7 @@ const lines = (x: number, y: number, rows: string[], size = 12.5, color = MUTED)
 const arrow = (x1: number, y1: number, x2: number, y2: number, color: string, id: string) =>
   `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="4" marker-end="url(#${id})"/>`;
 
-function zeroExportSvg(): string {
+function zeroExportSvg(hasBattery: boolean): string {
   const sunRays = Array.from({ length: 12 }, (_, i) => {
     const a = (i * Math.PI) / 6;
     return `<line x1="${70 + Math.cos(a) * 42}" y1="${95 + Math.sin(a) * 42}" x2="${70 + Math.cos(a) * 56}" y2="${95 + Math.sin(a) * 56}" stroke="#f5a623" stroke-width="6" stroke-linecap="round"/>`;
@@ -46,32 +46,34 @@ ${label(760, 45, 'USO DOMÉSTICO')}
 <circle cx="745" cy="118" r="9" fill="none" stroke="${INK}" stroke-width="3"/><rect x="770" y="110" width="18" height="22" rx="3" fill="none" stroke="${INK}" stroke-width="3"/>
 ${lines(760, 172, ['Toda la energía solar aprovechada', 'se consume en el inmueble.'])}
 ${label(760, 208, 'AUTOCONSUMO', 14)}
-${label(195, 245, 'ALMACENAMIENTO (CA)')}
+${hasBattery ? `${label(195, 245, 'ALMACENAMIENTO (CA)')}
 <rect x="160" y="262" width="70" height="78" rx="6" fill="#ffffff" stroke="${INK}" stroke-width="4"/>
 <line x1="170" y1="288" x2="220" y2="288" stroke="${INK}" stroke-width="3"/><line x1="170" y1="312" x2="220" y2="312" stroke="${INK}" stroke-width="3"/>
 ${lines(98, 280, ['Guarda la energía', 'que no se consume', 'al momento.'], 12, MUTED)}
 ${label(195, 372, 'MAYOR INDEPENDENCIA', 13)}
-<polyline points="510,198 510,300 240,300" fill="none" stroke="${RED}" stroke-width="4" marker-end="url(#r)"/>${label(375, 292, 'AC', 14, 800, RED)}
+<polyline points="510,198 510,300 240,300" fill="none" stroke="${RED}" stroke-width="4" marker-end="url(#r)"/>${label(375, 292, 'AC', 14, 800, RED)}` : ''}
 ${label(600, 245, 'MEDIDOR + LIMITADOR', 14)}${label(600, 262, 'ANTIVERTIDO', 14)}
 <rect x="566" y="276" width="68" height="62" rx="12" fill="#ffffff" stroke="${INK}" stroke-width="4"/><rect x="580" y="292" width="40" height="16" fill="none" stroke="${INK}" stroke-width="2"/>
 ${lines(600, 360, ['Mide el consumo de la red y evita', 'enviar energía a la red.'], 12)}
-<polyline points="760,215 760,250 640,250 640,276" fill="none" stroke="${RED}" stroke-width="3" stroke-dasharray="7 5"/>
-${arrow(858, 307, 642, 307, BLUE, 'b')}${label(750, 298, 'IMPORTACIÓN', 12, 800, BLUE)}${label(750, 326, 'solo cuando falta energía', 11.5, 600, MUTED)}
+<polyline points="760,214 760,290 636,290" fill="none" stroke="${MUTED}" stroke-width="3"/>
+${arrow(858, 312, 642, 312, BLUE, 'b')}${label(750, 330, 'IMPORTACIÓN', 12, 800, BLUE)}${label(750, 346, 'solo cuando falta energía', 11.5, 600, MUTED)}
 ${label(925, 245, 'RED ELÉCTRICA (CA)', 14)}
 <line x1="925" y1="262" x2="925" y2="360" stroke="${INK}" stroke-width="5"/><line x1="896" y1="276" x2="954" y2="276" stroke="${INK}" stroke-width="4"/><line x1="902" y1="294" x2="948" y2="294" stroke="${INK}" stroke-width="4"/>
 ${lines(925, 378, ['Respaldo: cubre lo que', 'la producción solar no alcanza.'], 11.5)}
 </svg>`;
 }
 
-const ZERO_EXPORT_DIAGRAM = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(zeroExportSvg())}`;
+const svgDataUrl = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+// Con baterías se dibuja el almacenamiento; sin ellas, la producción simplemente se limita a la demanda.
+const ZERO_EXPORT_DIAGRAM = { withBattery: svgDataUrl(zeroExportSvg(true)), withoutBattery: svgDataUrl(zeroExportSvg(false)) };
 
 export interface FlowDiagram {
   src: string;
   alt: string;
 }
 
-export function connectionFlowDiagram(connection: GridConnectionMode): FlowDiagram {
+export function connectionFlowDiagram(connection: GridConnectionMode, options: { hasBattery?: boolean } = {}): FlowDiagram {
   return connection === 'zero_export'
-    ? { src: ZERO_EXPORT_DIAGRAM, alt: 'Diagrama de flujo del sistema solar de autoconsumo con inyección cero' }
+    ? { src: options.hasBattery === false ? ZERO_EXPORT_DIAGRAM.withoutBattery : ZERO_EXPORT_DIAGRAM.withBattery, alt: 'Diagrama de flujo del sistema solar de autoconsumo con inyección cero' }
     : { src: PDF_FLOW_DIAGRAM_BASE64, alt: 'Diagrama de flujo del sistema solar fotovoltaico' };
 }

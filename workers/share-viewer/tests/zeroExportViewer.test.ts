@@ -31,9 +31,17 @@ for (const html of [zero, legacyZero]) {
 }
 assert.ok(grid.includes('Inyección neta (kWh)'), 'conectado a red: la columna se mantiene');
 
-// Columnas de cuerpo y cabecera alineadas: misma cantidad de celdas en cabecera, filas y total.
-const table = zero.slice(zero.indexOf('Autoconsumo (kWh)') - 2000, zero.indexOf('Autoconsumo (kWh)') + 6000);
-assert.ok(!/netExport/.test(table));
+// Columnas alineadas: la cabecera, cada fila y el total tienen la misma cantidad de celdas en cada modo.
+const cellCounts = (html: string) => {
+  const start = html.lastIndexOf('<table', html.indexOf('Autoconsumo (kWh)'));
+  const table = html.slice(start, html.indexOf('</table>', start));
+  return [...table.matchAll(/<tr[\s\S]*?<\/tr>/g)].map((row) => (row[0].match(/<t[hd][\s>]/g) || []).length);
+};
+for (const [html, cells] of [[zero, 6], [legacyZero, 6], [grid, 7]] as const) {
+  const counts = cellCounts(html);
+  assert.ok(counts.length >= 14, `cabecera, 12 meses y total: ${counts.length}`);
+  assert.ok(counts.every((n) => n === cells), `celdas por fila: ${counts.join(',')}`);
+}
 
 // Apagón sin baterías: la nota no presenta el sistema como «de inyección».
 const outage = energyFlowScenarios({ hybrid: false, isZeroExport: true, gridConnection: 'zero_export', systemCapacityKWp: 6, annualConsumptionKWh: 9000, totalBESSKWh: 0 }).find((s) => s.mode === 'outage');

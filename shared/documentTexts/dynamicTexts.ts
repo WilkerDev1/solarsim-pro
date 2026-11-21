@@ -34,7 +34,7 @@ export function regulatoryNoteDefault(ctx: DocumentTextContext): string {
     : 'La presente propuesta ha sido elaborada conforme a la Resolución SIE-007-2026-REG y se basa en criterios técnicos y el historial de consumo del cliente.';
   const p3 = 'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.';
   const p4 = zeroExport
-    ? `Al operar con limitador antivertido${ctx.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la producción solar se ajusta a la demanda del inmueble${ctx.hasBattery ? ' y la energía que no se consume al momento se guarda para usarla más tarde' : ''}: toda la energía aprovechada se destina al autoconsumo, el ahorro proviene únicamente de la energía que se deja de comprar a la distribuidora y el proyecto no paga cargos por la energía que se envía a la red, porque no envía ninguna.`
+    ? `Al operar con limitador antivertido${ctx.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la producción solar se ajusta a la demanda del inmueble${ctx.hasBattery ? ' y la energía que no se consume al momento se guarda para usarla más tarde' : ''}: toda la energía aprovechada se destina al autoconsumo, el ahorro proviene únicamente de la energía que se deja de comprar a la distribuidora y, como no se envía energía a la red, no aplican cargos por uso de la red.`
     : gridUseChargeParagraph(ctx, distributor, tariff, tariffDisplayName, exportFee);
   return [p1, p2, p3, p4].join('\n\n');
 }
@@ -102,12 +102,12 @@ export function savingsAwareText(standard: string, withoutComparison: string) {
 /**
  * Texto que cambia según el tipo de conexión (`resolveGridConnection`). Todas las variantes son de fábrica: una
  * propuesta que guardó cualquiera de ellas sigue al modo actual en vez de quedar congelada; lo editado se respeta.
- * Sin variante propia, aislado usa la de inyección cero y esta la de red.
+ * Sin variante propia, aislado e inyección cero usan la de red (aislado tiene sus propios textos donde hace falta).
  */
 export function connectionAwareText(variants: { grid: string; zeroExport?: string; offGrid?: string }) {
   const pick = (ctx: DocumentTextContext): string => {
     const connection = resolveGridConnection(ctx);
-    if (connection === 'off_grid') return variants.offGrid ?? variants.zeroExport ?? variants.grid;
+    if (connection === 'off_grid') return variants.offGrid ?? variants.grid;
     if (connection === 'zero_export') return variants.zeroExport ?? variants.grid;
     return variants.grid;
   };
@@ -130,7 +130,7 @@ export function servicesIncludedDefault(ctx: DocumentTextContext): string {
 
 /** Nota al pie del cuadro resumen: régimen de conexión. */
 export const EXECUTIVE_FOOTNOTE_RIGHT_GRID = 'Régimen de Medición Neta • Certificación CNE / SIE';
-export const EXECUTIVE_FOOTNOTE_RIGHT_ZERO_EXPORT = 'Autoconsumo con inyección cero • Sin exportación a la red';
+export const EXECUTIVE_FOOTNOTE_RIGHT_ZERO_EXPORT = 'Autoconsumo con inyección cero • Sin envío de energía a la red';
 export const EXECUTIVE_FOOTNOTE_RIGHT_OFF_GRID = 'Sistema aislado (modo isla) • Sin conexión a la red';
 export const executiveFootnoteRightText = connectionAwareText({ grid: EXECUTIVE_FOOTNOTE_RIGHT_GRID, zeroExport: EXECUTIVE_FOOTNOTE_RIGHT_ZERO_EXPORT, offGrid: EXECUTIVE_FOOTNOTE_RIGHT_OFF_GRID });
 export function executiveFootnoteRightDefault(ctx: DocumentTextContext): string {

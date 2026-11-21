@@ -8,6 +8,7 @@ import { PDFWatermark } from '../PDFWatermark';
 import { PDF_ROOF_DETAIL_BASE64 } from '../../../assets/pdfGraphicAssets';
 import { resolveGridConnection } from '../../../../shared/gridConnection';
 import { connectionFlowDiagram } from './connectionFlowDiagram';
+import { batteryBank, readEquipment } from '../../../../shared/equipment';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { EditableText } from '../editor/EditableText';
 
@@ -31,7 +32,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
   totalPages,
 }) => {
   // Inyección cero: diagrama de autoconsumo, sin medición bidireccional ni exportación.
-  const flowDiagram = connectionFlowDiagram(resolveGridConnection(project.rates));
+  const flowDiagram = connectionFlowDiagram(resolveGridConnection(project.rates), { hasBattery: batteryBank(readEquipment(project.specs)).hasStorage });
   return (
     <PDFPageShell
       project={project}

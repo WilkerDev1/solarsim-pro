@@ -57,9 +57,14 @@ assert.equal(text('quotation.installTypeValue', grid), 'Fotovoltaica');
 assert.ok(/medición neta/i.test(text('aboutUs.pillar3.text', grid)));
 assert.equal(text('toc.projectDescription.subtitle', grid), 'Criterios de Dimensionamiento y Resolución SIE-007');
 
-// Aislado: sus textos no cambian.
+// Aislado: sus textos no cambian (sin variante propia toma la de red, como antes), y nunca hablan de inyección cero.
 assert.equal(text('executiveSummary.footnoteRight', island), 'Sistema aislado (modo isla) • Sin conexión a la red');
 assert.ok(!/medición neta/i.test(text('quotation.servicesIncluded', island)));
+for (const key of ['quotation.installTypeValue', 'executiveSummary.row2.injection', 'executiveSummary.footnote', 'toc.projectDescription.subtitle']) {
+  assert.equal(text(key, island), text(key, grid), `${key}: aislado conserva su texto`);
+}
+assert.ok(!/medición neta|interconexi/i.test(text('aboutUs.pillar3.text', island)), 'aislado: sin medición neta ni interconexión');
+for (const key of ['quotation.installTypeValue', 'aboutUs.pillar3.text', 'executiveSummary.footnote']) assert.ok(!/inyecci[oó]n cero/i.test(text(key, island)), `${key}: aislado no es inyección cero`);
 
 // Un texto de fábrica guardado (de cualquier modo) sigue al modo actual; uno editado por el usuario se respeta.
 for (const [key, source] of ([
@@ -88,5 +93,8 @@ const svg = decodeURIComponent(zeroDiagram.src.replace(/^data:image\/svg\+xml;ch
 assert.ok(/ANTIVERTIDO/.test(svg) && /AUTOCONSUMO/.test(svg), 'el diagrama nombra el limitador y el autoconsumo');
 assert.ok(!/EXPORTACI|NET METERING|BIDIRECCIONAL/i.test(svg), 'el diagrama de inyección cero no muestra exportación');
 assert.ok(/autoconsumo/i.test(zeroDiagram.alt));
+const noBattery = decodeURIComponent(connectionFlowDiagram('zero_export', { hasBattery: false }).src.replace(/^data:image\/svg\+xml;charset=utf-8,/, ''));
+assert.ok(/ALMACENAMIENTO/.test(svg) && !/ALMACENAMIENTO/.test(noBattery), 'sin baterías no se dibuja el almacenamiento');
+assert.ok(/ANTIVERTIDO/.test(noBattery) && /AUTOCONSUMO/.test(noBattery));
 
 console.log('Inyección cero: textos del documento orientados al autoconsumo y la independencia de la red.');
