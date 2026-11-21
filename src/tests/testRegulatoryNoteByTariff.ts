@@ -28,7 +28,8 @@ for (const [d, code] of [['EDESUR', 'BTD'], ['EDENORTE', 'MTD1'], ['EDEESTE', 'B
 assert.ok(!regulatoryNoteDefault(ctx('EDESUR', 'BTD', { gridExportFeePct: 0 })).includes('% de la energía excedente'), 'Sin retención no menciona porcentaje');
 // Inyección cero y tarifas no clasificadas no cambian.
 assert.ok(regulatoryNoteDefault(ctx('EDESUR', 'VMT1')).includes(chargeSentence));
-assert.ok(regulatoryNoteDefault(ctx('EDESUR', 'BTD', { isZeroExport: true })).includes('no genera cargos por derecho de uso de la red'));
+assert.ok(regulatoryNoteDefault(ctx('EDESUR', 'BTD', { isZeroExport: true })).includes('no aplican cargos por uso de la red'));
+assert.ok(regulatoryNoteDefault(ctx('EDESUR', 'BTD', { isZeroExport: true, regulatoryNoteEdition: 'legacy' })).includes('no genera cargos por derecho de uso de la red'), 'enlaces anteriores: frase anterior');
 // Edición «legacy» (enlaces publicados antes del cambio): texto anterior para cualquier tarifa.
 assert.ok(regulatoryNoteDefault(ctx('EDESUR', 'BTD', { regulatoryNoteEdition: 'legacy' })).includes(chargeSentence));
 
