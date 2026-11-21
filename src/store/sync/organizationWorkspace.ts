@@ -286,6 +286,34 @@ export function initializeWorkspaces(state: SimulationStore): void {
     organizationWorkspaces: archives,
   });
 }
+/** Private folders of another member: kept out of the store, so only the active scope's archive remembers them. */
+const hiddenPrivateFolders = (
+  folders: OrganizationWorkspace["folders"],
+  session: SyncSettings,
+) =>
+  folders.filter(
+    (f) =>
+      f.visibility === "private" &&
+      !!f.createdById &&
+      f.createdById !== session.currentUser?.id,
+  );
+/**
+ * Drops a persisted archive of the active scope (written by 2.8.2 and earlier on every launch) unless it holds
+ * another member's private folders. Mutates the state being hydrated.
+ */
+export function dropActiveWorkspaceArchive(state: SimulationStore): void {
+  const archive = state.workspaceScope
+    ? state.organizationWorkspaces?.[state.workspaceScope]
+    : undefined;
+  if (
+    !archive ||
+    hiddenPrivateFolders(archive.folders || [], state.syncSettings).length
+  )
+    return;
+  const { [state.workspaceScope]: _active, ...others } =
+    state.organizationWorkspaces;
+  state.organizationWorkspaces = others;
+}
 export function changeWorkspace(
   state: SimulationStore,
   nextSession: SyncSettings,
@@ -320,7 +348,11 @@ export function changeWorkspace(
         f.createdById === nextSession.currentUser?.id,
     ),
   });
-  if (nextScope === initialized.workspaceScope)
+  if (nextScope === initialized.workspaceScope) {
+    // The active workspace lives in the store: archiving it too duplicated half of the persisted data on every
+    // launch (validateSession). It is archived only to keep another member's private folders hidden.
+    const { [nextScope]: _active, ...others } = initialized.organizationWorkspaces;
+    const hidden = hiddenPrivateFolders(captured.folders, nextSession);
     return {
       ...accessible(captured),
       activeFolderId: accessible(captured).folders.some(
@@ -332,22 +364,27 @@ export function changeWorkspace(
       folderSyncFeedback: null,
       clientSyncFeedback: null,
       workspaceScope: initialized.workspaceScope,
-      organizationWorkspaces: {
-        ...initialized.organizationWorkspaces,
-        [nextScope]: captured,
-      },
+      organizationWorkspaces: hidden.length
+        ? { ...others, [nextScope]: captured }
+        : others,
     };
+  }
   const archives = {
     ...initialized.organizationWorkspaces,
     [initialized.workspaceScope]: captured,
   };
+  // The restored workspace becomes the store: its archive stays only for another member's private folders.
+  const { [nextScope]: restored, ...remaining } = archives;
   return {
     ...emptyWorkspace(),
-    ...accessible(archives[nextScope] || emptyWorkspace()),
-    documentTemplatesByCompany:
-      archives[nextScope]?.documentTemplatesByCompany || {},
+    ...accessible(restored || emptyWorkspace()),
+    documentTemplatesByCompany: restored?.documentTemplatesByCompany || {},
     workspaceScope: nextScope,
-    organizationWorkspaces: archives,
+    organizationWorkspaces:
+      restored &&
+      hiddenPrivateFolders(restored.folders || [], nextSession).length
+        ? archives
+        : remaining,
     activeFolderId: null,
     activeClientId: null,
     clientSyncFeedback: null,
