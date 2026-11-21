@@ -7,9 +7,11 @@ import { resolveAssumptions } from '../../../../../../shared/assumptions';
 import { exportsToGrid, resolveGridConnection } from '../../../../../../shared/gridConnection';
 import { FACTORY_GRID_USE_CHARGES, gridUseChargeApplies, resolveNetMeteringRegime } from '../../../../../../shared/netMetering';
 import {
-  DEFAULT_FIXED_CHARGE_TIER_BASIS,
   ENERGY_VALUATION_METHOD_LABELS,
+  ESTIMATED_ANNUAL_CREDIT_SETTLEMENT,
   FACTORY_ANNUAL_CREDIT_SETTLEMENT,
+  resolveFixedChargeTierBasis,
+  type FixedChargeTierBasis,
   calculateBillingYear,
   calculateMonthlyBill,
   proposalBillingTariff, usesNetBilling,
@@ -127,7 +129,7 @@ export function buildBillBreakdown(project: ProjectSimulation, calculationMode: 
     tariff,
     // Misma energía que `withBlockBilling` del motor: retirada = consumo − autoconsumo; inyectada = exportada bruta.
     monthly.map((m) => ({ withdrawnKWh: Math.max(0, Math.round((m.consumptionKWh - m.solarSelfConsumedKWh) * 1e9) / 1e9), injectedKWh: m.gridExportedKWh })),
-    { gridUseChargeDOPPerKWh: assumptions.appliedGridUseChargeDOPPerKWh, settlementDOPPerKWh: assumptions.annualCreditSettlementDOPPerKWh },
+    { gridUseChargeDOPPerKWh: assumptions.appliedGridUseChargeDOPPerKWh, settlementDOPPerKWh: assumptions.annualCreditSettlementDOPPerKWh, fixedChargeTierBasis: assumptions.fixedChargeTierBasis },
   );
   const before = monthly.map((m) => calculateMonthlyBill({ tariff, withdrawnKWh: m.consumptionKWh }));
   const lines: BillBreakdownLine[] = [
@@ -150,9 +152,17 @@ export interface UnverifiedAssumption {
   valueText: string;
   /** Qué se asume y por qué es conservador. */
   note: string;
-  /** Solo el precio de liquidación tiene hoy un parámetro de la propuesta (`rates.annualCreditSettlementDOPPerKWh`). */
+  /** Tiene un parámetro de la propuesta (`rates.annualCreditSettlementDOPPerKWh`, `rates.fixedChargeTierBasis`). */
   editable: boolean;
 }
+
+/** Rótulos del criterio del rango del cargo fijo (selector del dock y supuestos). */
+export const FIXED_CHARGE_TIER_BASIS_LABELS: Record<FixedChargeTierBasis, string> = {
+  withdrawn: 'Energía retirada',
+  net: 'Consumo neto',
+};
+
+const fmt2 = (value: number) => value.toFixed(2);
 
 /**
  * Supuestos de la fase 3 que ninguna factura confirmó todavía, con su valor vigente: el precio de liquidación del
@@ -172,22 +182,47 @@ export function unverifiedAssumptions(rates: UtilityRates): UnverifiedAssumption
       id: 'annual_settlement_price',
       title: 'Precio de liquidación anual del crédito',
       valueText: `RD$${settlement.toFixed(2)}/kWh`,
-      note: `El crédito que sobra al cierre del año se paga al precio de referencia de la CNE a 10 años, que no se encontró publicado; de fábrica ${FACTORY_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh} (el remanente no suma ahorro).`,
+      note: `El crédito que sobra al cierre del año se paga al precio de referencia de la CNE a 10 años, que no se encontró publicado; de fábrica ${FACTORY_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh} (el remanente no suma ahorro). Estimado por contratos solares a 10 años: RD$${fmt2(ESTIMATED_ANNUAL_CREDIT_SETTLEMENT.lowDOPPerKWh)}–${fmt2(ESTIMATED_ANNUAL_CREDIT_SETTLEMENT.highDOPPerKWh)}/kWh (RD$${fmt2(ESTIMATED_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh)} central), pendiente de publicación de la CNE.`,
       editable: true,
     });
   }
   if (tariff) {
     if (tariff.fixedChargeTiers?.length) {
+      const basis = resolveFixedChargeTierBasis(rates);
       items.push({
         id: 'fixed_charge_tier_basis',
         title: 'Rango del cargo fijo',
-        valueText: DEFAULT_FIXED_CHARGE_TIER_BASIS === 'withdrawn' ? 'Según la energía retirada de la red' : 'Según el consumo neto facturado',
-        note: 'Con medición neta no está confirmado qué consumo elige el rango; se usa la energía retirada, que da la factura con sistema más alta (ahorro a la baja).',
-        editable: false,
+        valueText: basis === 'withdrawn' ? 'Según la energía retirada de la red' : 'Según el consumo neto facturado',
+        note: 'Con medición neta ninguna norma dice qué consumo elige el rango. De fábrica se usa la energía retirada, que da la factura con sistema más alta (ahorro a la baja); el consumo neto la baja cuando el neto cae en un rango menor.',
+        editable: true,
       });
     }
   }
   return items;
+}
+
+export interface SettlementPriceOption {
+  label: string;
+  /** Precio que aplica la opción (RD$/kWh). */
+  dopPerKWh: number;
+  /** Precio legible (RD$x.xx). */
+  hint: string;
+  /** La propuesta ya usa este precio. */
+  checked: boolean;
+}
+
+/**
+ * Precios del menú de la liquidación anual: el de fábrica (0, el remanente no suma) y la estimación CNE (~RD$5/kWh),
+ * que solo se aplica a mano. Un precio tecleado no marca ninguna.
+ */
+export function settlementPriceOptions(current: number): SettlementPriceOption[] {
+  const same = (price: number) => Math.abs(current - price) < 0.005;
+  const factory = FACTORY_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh;
+  const estimate = ESTIMATED_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh;
+  return [
+    { label: same(factory) ? 'Valor de fábrica aplicado' : 'Aplicar valor de fábrica', dopPerKWh: factory, hint: `RD$${fmt2(factory)}`, checked: same(factory) },
+    { label: same(estimate) ? 'Estimado CNE aplicado (pendiente)' : 'Aplicar estimado CNE (pendiente)', dopPerKWh: estimate, hint: `RD$${fmt2(estimate)}`, checked: same(estimate) },
+  ];
 }
 
 /** RD$ con separador de miles y dos decimales. */

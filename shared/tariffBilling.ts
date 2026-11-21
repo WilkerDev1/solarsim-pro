@@ -20,8 +20,10 @@
  *
  * No confirmado en las fuentes (parametrizado con el valor conservador, ver el informe de la fase 3):
  * - El precio CNE de la liquidación anual: no se encontró publicado; valor de fábrica 0 (`FACTORY_ANNUAL_CREDIT_SETTLEMENT`).
- * - Qué consumo elige el rango del cargo fijo con medición neta: se usa la energía retirada (`fixedChargeTierBasis`
+ *   El dock sugiere una estimación de ~RD$5/kWh (`ESTIMATED_ANNUAL_CREDIT_SETTLEMENT`) que solo se aplica a mano.
+ * - Qué consumo elige el rango del cargo fijo con medición neta: de fábrica la energía retirada (`fixedChargeTierBasis`
  *   `withdrawn`), que da la factura con sistema más alta (ahorro a la baja); `net` usa el consumo neto facturado.
+ *   Elegible por propuesta (`rates.fixedChargeTierBasis`, `resolveFixedChargeTierBasis`).
  * - Los bloques se aplican al consumo neto facturado (lectura de E.1.b: «cantidad de energía neta… por el precio de
  *   la energía, conforme a la tarifa asignada»).
  */
@@ -141,8 +143,17 @@ export function fixedChargeDOP(tariff: BillingTariff, kWh: number): number {
 }
 
 /** Qué consumo elige el rango del cargo fijo con medición neta (no confirmado; por defecto el conservador). */
-export type FixedChargeTierBasis = 'withdrawn' | 'net';
+export const FIXED_CHARGE_TIER_BASES = ['withdrawn', 'net'] as const;
+export type FixedChargeTierBasis = (typeof FIXED_CHARGE_TIER_BASES)[number];
 export const DEFAULT_FIXED_CHARGE_TIER_BASIS: FixedChargeTierBasis = 'withdrawn';
+
+export const isFixedChargeTierBasis = (value: unknown): value is FixedChargeTierBasis =>
+  typeof value === 'string' && (FIXED_CHARGE_TIER_BASES as readonly string[]).includes(value);
+
+/** Criterio del rango del cargo fijo de la propuesta (`rates.fixedChargeTierBasis`); sin dato o desconocido, el de fábrica. */
+export function resolveFixedChargeTierBasis(rates: { fixedChargeTierBasis?: unknown } | null | undefined): FixedChargeTierBasis {
+  return isFixedChargeTierBasis(rates?.fixedChargeTierBasis) ? rates.fixedChargeTierBasis : DEFAULT_FIXED_CHARGE_TIER_BASIS;
+}
 
 export interface MonthlyBillInput {
   tariff: BillingTariff;
@@ -267,6 +278,19 @@ export const FACTORY_ANNUAL_CREDIT_SETTLEMENT = {
   source: 'Res. SIE-007-2026-REG, art. 19, E.2.ii: precio promedio de referencia de contratos de compra de energía a 10 años publicado por la CNE (Solar Fotovoltaica de inclinación fija). No se encontró publicado; valor conservador hasta confirmarlo.',
 } as const;
 
+/**
+ * Estimación del precio CNE de la liquidación anual, solo como sugerencia en el dock: no es el valor de fábrica ni se
+ * aplica sola. Los contratos de compra de energía solar FV a 10 años rondan RD$4–6/kWh (precio mayorista); el valor
+ * vigente no se encontró publicado. Confianza baja hasta que la CNE lo publique.
+ */
+export const ESTIMATED_ANNUAL_CREDIT_SETTLEMENT = {
+  dopPerKWh: 5,
+  lowDOPPerKWh: 4,
+  highDOPPerKWh: 6,
+  confirmed: false,
+  source: 'Estimación por los rangos de contratos de compra de energía solar FV a 10 años (RD$4–6/kWh). Pendiente de publicación de la CNE (Res. SIE-007-2026-REG, art. 19, E.2.ii).',
+} as const;
+
 export function isValidSettlementPrice(value: unknown): value is number {
   return finiteNonNegative(value) && value <= MAX_SETTLEMENT_DOP_PER_KWH;
 }
@@ -302,6 +326,7 @@ export interface TariffBillingRatesInput {
   energyRateSource?: unknown;
   billingTariff?: unknown;
   annualCreditSettlementDOPPerKWh?: unknown;
+  fixedChargeTierBasis?: unknown;
 }
 
 /** Distribuidora con el mismo criterio que el código de tarifa: sin espacios y en mayúsculas («edesur » → EDESUR). */

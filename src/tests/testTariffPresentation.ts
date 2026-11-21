@@ -135,7 +135,7 @@ assert.equal(buildBillBreakdown(project({ ...gridConnectionFields('off_grid') })
   assert.deepEqual(items.map((item) => item.id), ['annual_settlement_price', 'fixed_charge_tier_basis'], 'BTS-1 con red y bloques: liquidación y rango del cargo fijo');
   assert.equal(items[0].valueText, 'RD$0.00/kWh', 'precio de liquidación de fábrica = 0');
   assert.equal(items[0].editable, true);
-  assert.equal(items.filter((item) => item.editable).length, 1, 'solo el precio de liquidación tiene parámetro');
+  assert.equal(items.filter((item) => item.editable).length, 2, 'los dos tienen parámetro: el precio de liquidación y el rango del cargo fijo');
   assert.equal(DEFAULT_FIXED_CHARGE_TIER_BASIS, 'withdrawn', 'el supuesto de fábrica del rango del cargo fijo no cambia');
   assert.match(items[1].valueText, /retirada/);
   assert.equal(unverifiedAssumptions(project({ annualCreditSettlementDOPPerKWh: 7.5 }).rates)[0].valueText, 'RD$7.50/kWh', 'refleja el valor editado');
