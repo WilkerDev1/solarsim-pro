@@ -262,6 +262,10 @@ Los datos tienen la antigüedad del último respaldo (hasta ~24 h): lo creado en
 
 `pve01` usa IP fija en `vmbr0`, y el CT100 también (`pct set 100 -net0 …,ip=<IP>/24,gw=<puerta>`, `-nameserver`): al arrancar con el puerto del switch aún sin reenviar, el DHCP no responde, `dhclient` se rinde y el CT queda sin IPv4, con el túnel inalcanzable (error 1033 en Cloudflare). La IP fija evita esa dependencia. Debe estar fuera del rango DHCP del router o reservada para el equipo. Si la red cambia (otra subred, puerta o DNS), hay que actualizar a mano `pve01` y los CT con IP fija. Valores exactos en el archivo privado. Si un CT llega a arrancar sin IPv4: `pct exec <id> -- dhclient -4 eth0` o fijar la IP.
 
+### Protocolo del túnel del CT100
+
+`cloudflared-tunnel` usa `--protocol http2` (composición en [infra/services/cloudflared/docker-compose.yml](../infra/services/cloudflared/docker-compose.yml)). El 2026-11-20, tras reiniciar `pve01`, el túnel en QUIC servía unos 0.55 MB/s por petición. La descarga completa de propuestas de los clientes 2.8.1 (unos 12 MB) superaba su límite de 12 s, y sin descarga no se enviaban los cambios. Con http2 la descarga volvió a completarse al momento. Desde la 2.8.2 la sincronización es incremental, con un plazo por inactividad, y los logos van referenciados, así que ya no depende de esa velocidad. Aun así, http2 queda como protocolo fijo. Para revertir, quitar la opción y recrear solo `cloudflared-tunnel`; el respaldo de la composición anterior está en el CT, junto a ella. El túnel del CT MCP y el de conmutación en naski no cambian.
+
 ## Proxy Caddy
 
 El `Caddyfile` vive en la carpeta de servicio de Caddy en el CT (referencia en `infra/services/caddy/`). Tras editarlo, validar con `docker exec caddy-proxy caddy validate --config /etc/caddy/Caddyfile` y recargar sin cortar conexiones con `docker exec caddy-proxy caddy reload --config /etc/caddy/Caddyfile`.
