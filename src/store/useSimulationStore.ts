@@ -4,6 +4,7 @@ import { serializeSimulationStore } from './persistence/serializeSimulationStore
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { createDeferredJSONStorage } from './persistence/deferredStorage';
+import { createPersistedDocumentAssets } from './persistence/persistedDocumentAssets';
 import { SimulationStore, SimulationState, NewProjectPayload } from './types';
 import { createProjectSlice } from './slices/projectSlice';
 import { createEquipmentSlice } from './slices/equipmentSlice';
@@ -40,9 +41,21 @@ const memoryStorage = (() => {
     },
   };
 })();
-const persistStorage = createDeferredJSONStorage<ReturnType<typeof serializeSimulationStore>>(() =>
-  typeof window !== 'undefined' && window.localStorage ? window.localStorage : memoryStorage
+// Document images are persisted once in a side key and expanded on hydrate (persistence/persistedDocumentAssets.ts).
+const documentAssets = createPersistedDocumentAssets();
+// window.localStorage in the renderer; the test environment provides an in-memory globalThis.localStorage.
+const persistStorage = createDeferredJSONStorage<ReturnType<typeof serializeSimulationStore>>(
+  () => globalThis.localStorage ?? memoryStorage,
+  400,
+  documentAssets
 );
+// Images whose hash arrived after being written inline (including data saved before this format) are collapsed.
+documentAssets.setOnLearned(() => {
+  const { name, version, partialize } = useSimulationStore.persist.getOptions();
+  if (name && partialize) persistStorage.rewrite(name, { state: partialize(useSimulationStore.getState()), version: version ?? 0 });
+});
+/** Resolves once pending image hashes are known (tests and diagnostics). */
+export const settleSimulationStoreAssets = () => documentAssets.settled();
 
 /** Writes the pending persisted state now; the window flushes it on its own before closing. */
 export const flushSimulationStorePersistence = () => persistStorage.flush();
