@@ -18,6 +18,8 @@ export function regulatoryNoteDefault(ctx: DocumentTextContext): string {
   const connection = resolveGridConnection(ctx);
   if (connection === 'off_grid') return offGridRegulatoryNote(ctx);
   const zeroExport = connection === 'zero_export';
+  // Los enlaces publicados antes (edición `legacy`) conservan exactamente su nota de inyección cero.
+  if (zeroExport && ctx.regulatoryNoteEdition === 'legacy') return legacyZeroExportRegulatoryNote(ctx);
   const distributor = ctx.distributor || 'EDES';
   const isCEPM = distributor === 'CEPM';
   const tariff = ctx.tariffCode || (isCEPM ? 'RBT-1' : 'BTS2');
@@ -25,14 +27,26 @@ export function regulatoryNoteDefault(ctx: DocumentTextContext): string {
   const exportFee = ctx.gridExportFeePct;
 
   const p1 = zeroExport
-    ? 'El sistema fotovoltaico operará bajo la modalidad de Inyección Cero (Zero-Export con limitador antivertido), suministrando energía prioritariamente a los consumos internos del inmueble y evitando cualquier inyección de excedentes hacia la red eléctrica de distribución.'
+    ? 'El sistema fotovoltaico está diseñado para el autoconsumo y una mayor independencia de la red eléctrica: opera en modalidad de Inyección Cero, con limitador antivertido, de modo que la energía solar abastece directamente los consumos del inmueble y reduce la energía que se compra a la distribuidora, sin enviar energía a la red de distribución.'
     : `La energía generada mensualmente se descontará del consumo tomado de la red de ${isCEPM ? 'CEPM' : 'la distribuidora eléctrica (EDES)'}. Cuando la producción supere el consumo, el excedente se acreditará como descuento en su factura eléctrica bajo el régimen de Medición Neta.`;
-  const p2 = 'La presente propuesta ha sido elaborada conforme a la Resolución SIE-007-2026-REG y se basa en criterios técnicos y el historial de consumo del cliente.';
+  const p2 = zeroExport
+    ? 'La presente propuesta se basa en criterios técnicos y en el historial de consumo del cliente. El sistema opera en paralelo con la red de la distribuidora, que sigue abasteciendo los consumos que la producción solar no cubre.'
+    : 'La presente propuesta ha sido elaborada conforme a la Resolución SIE-007-2026-REG y se basa en criterios técnicos y el historial de consumo del cliente.';
   const p3 = 'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.';
   const p4 = zeroExport
-    ? `Al operar con limitador antivertido (inyección cero)${ctx.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`
+    ? `Al operar con limitador antivertido${ctx.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la producción solar se ajusta a la demanda del inmueble${ctx.hasBattery ? ' y la energía que no se consume al momento se guarda para usarla más tarde' : ''}: toda la energía aprovechada se destina al autoconsumo, el ahorro proviene únicamente de la energía que se deja de comprar a la distribuidora y, como no se envía energía a la red, no aplican cargos por uso de la red.`
     : gridUseChargeParagraph(ctx, distributor, tariff, tariffDisplayName, exportFee);
   return [p1, p2, p3, p4].join('\n\n');
+}
+
+/** Nota de inyección cero tal como la mostraban los enlaces publicados antes de orientarla al autoconsumo. */
+function legacyZeroExportRegulatoryNote(ctx: DocumentTextContext): string {
+  return [
+    'El sistema fotovoltaico operará bajo la modalidad de Inyección Cero (Zero-Export con limitador antivertido), suministrando energía prioritariamente a los consumos internos del inmueble y evitando cualquier inyección de excedentes hacia la red eléctrica de distribución.',
+    'La presente propuesta ha sido elaborada conforme a la Resolución SIE-007-2026-REG y se basa en criterios técnicos y el historial de consumo del cliente.',
+    'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.',
+    `Al operar con limitador antivertido (inyección cero)${ctx.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`,
+  ].join('\n\n');
 }
 
 /**
@@ -85,17 +99,42 @@ export function savingsAwareText(standard: string, withoutComparison: string) {
   };
 }
 
-/** Servicios gestionados: un sistema aislado no tramita medición neta ni interconexión con la distribuidora. */
+/**
+ * Texto que cambia según el tipo de conexión (`resolveGridConnection`). Todas las variantes son de fábrica: una
+ * propuesta que guardó cualquiera de ellas sigue al modo actual en vez de quedar congelada; lo editado se respeta.
+ * Sin variante propia, aislado e inyección cero usan la de red (aislado tiene sus propios textos donde hace falta).
+ */
+export function connectionAwareText(variants: { grid: string; zeroExport?: string; offGrid?: string }) {
+  const pick = (ctx: DocumentTextContext): string => {
+    const connection = resolveGridConnection(ctx);
+    if (connection === 'off_grid') return variants.offGrid ?? variants.grid;
+    if (connection === 'zero_export') return variants.zeroExport ?? variants.grid;
+    return variants.grid;
+  };
+  return {
+    defaultText: pick,
+    knownFactoryValues: [...new Set([variants.grid, variants.zeroExport, variants.offGrid].filter((value): value is string => !!value))] as readonly string[],
+  };
+}
+
+/**
+ * Servicios gestionados. Aislado: sin medición neta ni interconexión. Inyección cero: sin medición neta (no hay
+ * intercambio con la red); se configura el limitador antivertido. Cada servicio sin comas internas: se parten en viñetas.
+ */
+export const SERVICES_INCLUDED_OFF_GRID = 'Permisos y Tramitación ante CNE, Planos Eléctricos, Instalación Certificada y Puesta en Marcha.';
+export const SERVICES_INCLUDED_ZERO_EXPORT = 'Permisos y Tramitación ante CNE y Distribuidora, Planos Eléctricos, Configuración del Limitador Antivertido (Inyección Cero), Instalación Certificada y Puesta en Marcha.';
+export const servicesIncludedText = connectionAwareText({ grid: FACTORY_TEXTS.servicesIncludedText, zeroExport: SERVICES_INCLUDED_ZERO_EXPORT, offGrid: SERVICES_INCLUDED_OFF_GRID });
 export function servicesIncludedDefault(ctx: DocumentTextContext): string {
-  return resolveGridConnection(ctx) === 'off_grid'
-    ? 'Permisos y Tramitación ante CNE, Planos Eléctricos, Instalación Certificada y Puesta en Marcha.'
-    : FACTORY_TEXTS.servicesIncludedText;
+  return servicesIncludedText.defaultText(ctx);
 }
 
 /** Nota al pie del cuadro resumen: régimen de conexión. */
 export const EXECUTIVE_FOOTNOTE_RIGHT_GRID = 'Régimen de Medición Neta • Certificación CNE / SIE';
+export const EXECUTIVE_FOOTNOTE_RIGHT_ZERO_EXPORT = 'Autoconsumo con inyección cero • Sin envío de energía a la red';
+export const EXECUTIVE_FOOTNOTE_RIGHT_OFF_GRID = 'Sistema aislado (modo isla) • Sin conexión a la red';
+export const executiveFootnoteRightText = connectionAwareText({ grid: EXECUTIVE_FOOTNOTE_RIGHT_GRID, zeroExport: EXECUTIVE_FOOTNOTE_RIGHT_ZERO_EXPORT, offGrid: EXECUTIVE_FOOTNOTE_RIGHT_OFF_GRID });
 export function executiveFootnoteRightDefault(ctx: DocumentTextContext): string {
-  return resolveGridConnection(ctx) === 'off_grid' ? 'Sistema aislado (modo isla) • Sin conexión a la red' : EXECUTIVE_FOOTNOTE_RIGHT_GRID;
+  return executiveFootnoteRightText.defaultText(ctx);
 }
 
 /**

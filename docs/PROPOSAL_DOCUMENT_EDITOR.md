@@ -71,7 +71,17 @@ Las reglas generales de maquetación están en [.agents/rules/html2canvas_pdf_ex
 
 El Worker solo acepta strings en `customization` (`workers/share-viewer/src/validation.ts`). Al publicar, `publishedDocumentTexts` añade `doc:<clave>` con el texto ya resuelto de cada texto personalizado que el visor dibuja (`VIEWER_TEXT_KEYS`) y, siempre, de la nota regulatoria. El visor prefiere `doc:<clave>`, luego el campo heredado y por último el texto por defecto compartido (`viewerText`); los enlaces anteriores, sin claves `doc:`, se renderizan igual. Para la nota regulatoria el visor usa la edición `legacy` del texto por defecto (`regulatoryNoteEdition`), la que mostraban esos enlaces.
 
-**Nota regulatoria por tipo de tarifa.** `regulatoryNoteDefault` distingue la tarifa con `tariffChargeKind` (`shared/tariffRules.ts`). En tarifas de un solo precio (BTS-1, BTS-2, RBT-1) mantiene el párrafo del cargo por uso de la red. En tarifas con cargo de potencia (BTD, BTH, MTD, MTH, RBT-2, ESTRBT-2) dice que el Reglamento SIE-007-2026-REG no les aplica ese cargo y declara el porcentaje que el cálculo todavía descuenta. Las tarifas sin clasificar y la inyección cero no cambian. Un texto personalizado nunca se toca. La validación solo admite claves del registro, de tipo string, con tope de longitud y de cantidad.
+**Nota regulatoria por tipo de tarifa.** `regulatoryNoteDefault` distingue la tarifa con `tariffChargeKind` (`shared/tariffRules.ts`). En tarifas de un solo precio (BTS-1, BTS-2, RBT-1) mantiene el párrafo del cargo por uso de la red. En tarifas con cargo de potencia (BTD, BTH, MTD, MTH, RBT-2, ESTRBT-2) dice que el Reglamento SIE-007-2026-REG no les aplica ese cargo y declara el porcentaje que el cálculo todavía descuenta. Las tarifas sin clasificar no cambian. Un texto personalizado nunca se toca. La validación solo admite claves del registro, de tipo string, con tope de longitud y de cantidad.
+
+**Inyección cero.** Un sistema con limitador antivertido se presenta como de autoconsumo e independencia de la red, nunca como de medición neta o exportación. La nota regulatoria habla de autoconsumo y del limitador, y no cita la Res. SIE-007. Los enlaces ya publicados (edición `legacy`) conservan su nota exacta. Hay textos con una variante por tipo de conexión (`connectionAwareText` en `shared/documentTexts/dynamicTexts.ts`):
+- los servicios gestionados;
+- el pie y la nota del cuadro resumen;
+- la fila «Modo de Operación»;
+- el tipo de instalación;
+- el pilar «Soporte Cercano»;
+- el subtítulo del índice de la descripción.
+
+Sin variante propia, el sistema aislado toma la de red. Todas las variantes cuentan como texto de fábrica, así que una guardada sigue al modo actual. Por eso, como con `savingsAwareText`/`supplyAwareText`, si el usuario escribe exactamente el texto de fábrica de otro modo, se toma como de fábrica. La «Descripción Técnica» usa un diagrama SVG de autoconsumo (`connectionFlowDiagram`, sin almacenamiento si no hay baterías). En el visor, la tabla mensual no lleva la columna «Inyección neta». Esto alcanza también a los enlaces ya publicados de inyección cero, porque los servicios solo se publican cuando están personalizados: dejan de listar «Medición Neta», que en esos sistemas era un error.
 
 ## Cómo añadir un texto
 

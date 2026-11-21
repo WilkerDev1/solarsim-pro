@@ -156,6 +156,8 @@ export function renderProposalPage(stored: StoredProposal): string {
   const gridConnection = resolveGridConnection(rates);
   const isZeroExport = gridConnection !== 'grid_export';
   const isOffGrid = gridConnection === 'off_grid';
+  // Inyección cero y aislado no envían energía a la red: la tabla no lleva la columna de inyección neta.
+  const showsNetExport = gridConnection === 'grid_export';
   // Sistema aislado: alternativa de suministro. Enlaces sin el campo (o con red) se ven igual que siempre.
   const savingsBasis = resolveSavingsBasis(rates);
   const showSavings = hasSavingsComparison(savingsBasis);
@@ -635,7 +637,7 @@ ${ENERGY_FLOW_CSS}
         <canvas id="energyChart"></canvas>
       </div>
 
-      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. ${isOffGrid ? 'Sin red, el excedente se recorta.' : isZeroExport ? 'Con inyección cero, el excedente no se inyecta a la red.' : netMeteringRegime === 'sie007_2026' ? (gridUseChargeApplied ? 'La inyección se acredita completa; el cargo por uso de la red se descuenta del ahorro.' : 'La inyección se acredita completa.') : 'La inyección se presenta como crédito neto después de retención.'}</p>` : ''}
+      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. ${isOffGrid ? 'Sin red, el excedente se recorta.' : isZeroExport ? 'Con inyección cero (limitador antivertido), toda la energía solar aprovechada se destina al autoconsumo y reduce la dependencia de la red: no se envía energía a la red.' : netMeteringRegime === 'sie007_2026' ? (gridUseChargeApplied ? 'La inyección se acredita completa; el cargo por uso de la red se descuenta del ahorro.' : 'La inyección se acredita completa.') : 'La inyección se presenta como crédito neto después de retención.'}</p>` : ''}
       ${isOffGrid ? `<p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2" data-grid-connection="off_grid">${offGridEnergyNote(summary?.annualUnservedKWh, annualConsumptionKWh)}</p>` : ''}
       <!-- Full 12-Month Table with Mobile Horizontal Scroll -->
       <div class="space-y-1.5">
@@ -653,7 +655,7 @@ ${ENERGY_FLOW_CSS}
                 <th class="px-3 sm:px-4 py-2 sticky left-0 bg-head z-10">Mes</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Consumo (kWh)</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Producción (kWh)</th>
-                ${showSelfConsumption ? '<th class="px-3 sm:px-4 py-2 text-right">Autoconsumo (kWh)</th><th class="px-3 sm:px-4 py-2 text-right">Inyección neta (kWh)</th>' : ''}
+                ${showSelfConsumption ? `<th class="px-3 sm:px-4 py-2 text-right">Autoconsumo (kWh)</th>${showsNetExport ? '<th class="px-3 sm:px-4 py-2 text-right">Inyección neta (kWh)</th>' : ''}` : ''}
                 <th class="px-3 sm:px-4 py-2 text-right text-emerald-300">${!showSavings ? 'Energía servida (kWh)' : showSelfConsumption ? 'Ahorro fact. (kWh)' : 'Ahorro Energ. (kWh)'}</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Cobertura</th>
               </tr>
@@ -667,7 +669,7 @@ ${ENERGY_FLOW_CSS}
                   <td class="px-3 sm:px-4 py-1.5 font-bold text-slate-900 sticky left-0 ${idx % 2 === 0 ? 'bg-zebra' : 'bg-surface'} z-10 border-r sm:border-r-0 border-slate-100">${escapeHtml(row.month)}</td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Math.round(row.consumptionKWh).toLocaleString()}</td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Number(row.productionKWh).toFixed(1)}</td>
-                  ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-1.5 text-right font-mono text-blue-800">${Number(row.solarSelfConsumedKWh || 0).toFixed(1)}</td><td class="px-3 sm:px-4 py-1.5 text-right font-mono">${Number(row.netExportCreditKWh || 0).toFixed(1)}</td>` : ''}
+                  ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-1.5 text-right font-mono text-blue-800">${Number(row.solarSelfConsumedKWh || 0).toFixed(1)}</td>${showsNetExport ? `<td class="px-3 sm:px-4 py-1.5 text-right font-mono">${Number(row.netExportCreditKWh || 0).toFixed(1)}</td>` : ''}` : ''}
                   <td class="px-3 sm:px-4 py-1.5 text-right font-bold font-mono text-emerald-800">
                     <span>${Number(effectiveSaved).toFixed(1)}</span>
                   </td>
@@ -680,7 +682,7 @@ ${ENERGY_FLOW_CSS}
                 <td class="px-3 sm:px-4 py-2 uppercase font-black sticky left-0 bg-slate-100 z-10 border-r sm:border-r-0 border-slate-200">TOTAL ANUAL</td>
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(annualConsumptionKWh).toLocaleString()}</td>
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(annualProductionKWh).toLocaleString()}</td>
-                ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-2 text-right font-mono text-blue-800">${Math.round(annualSelfConsumption).toLocaleString()}</td><td class="px-3 sm:px-4 py-2 text-right font-mono">${Math.round(annualNetExport).toLocaleString()}</td>` : ''}
+                ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-2 text-right font-mono text-blue-800">${Math.round(annualSelfConsumption).toLocaleString()}</td>${showsNetExport ? `<td class="px-3 sm:px-4 py-2 text-right font-mono">${Math.round(annualNetExport).toLocaleString()}</td>` : ''}` : ''}
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-black text-emerald-900">
                   <span>${Math.round(totalEffectiveSavedKWh).toLocaleString()}</span>
                 </td>

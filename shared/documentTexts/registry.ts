@@ -6,7 +6,8 @@ import {
   projectSummaryParagraph2Default,
   regulatoryNoteDefault,
   savingsAwareText,
-  servicesIncludedDefault,
+  connectionAwareText,
+  servicesIncludedText,
   syncProjectSummaryParagraph1,
   syncProjectSummaryParagraph2,
   validityNoteDefault,
@@ -187,7 +188,9 @@ const DEFINITIONS: DocumentTextDefinition[] = [
   { key: 'quotation.warranty.workmanship', section: 'quotation', label: 'Garantía de mano de obra', format: 'rich', multiline: false, templatable: true, maxLength: SHORT, ...legacy('workmanshipWarrantyText'), defaultText: FACTORY_TEXTS.workmanshipWarrantyText },
   {
     key: 'quotation.servicesIncluded', section: 'quotation', label: 'Servicios gestionados', format: 'rich', multiline: true, templatable: true, maxLength: PARAGRAPH, ...legacy('servicesIncludedText'),
-    defaultText: (ctx) => servicesIncludedDefault(ctx),
+    // Variantes por tipo de conexión (red, inyección cero, aislado), todas de fábrica junto a las históricas.
+    defaultText: servicesIncludedText.defaultText,
+    knownFactoryValues: [...new Set([...(KNOWN_FACTORY_VALUES.servicesIncludedText ?? []), ...servicesIncludedText.knownFactoryValues])],
   },
   {
     key: 'quotation.validityNote', projectDependent: true, section: 'quotation', label: 'Nota legal y términos', format: 'rich', multiline: false, templatable: true, maxLength: 600, ...legacy('validityNote'),
@@ -216,7 +219,11 @@ const SECTION_TEXT_DEFINITIONS: DocumentTextDefinition[] = DOCUMENT_SECTION_IDS.
   if (meta.toc) {
     defs.push(
       { ...base, key: `toc.${id}.title`, label: `Índice: ${meta.label}`, defaultText: meta.toc.title },
-      { ...base, key: `toc.${id}.subtitle`, label: `Índice (subtítulo): ${meta.label}`, defaultText: meta.toc.subtitle },
+      {
+        ...base, key: `toc.${id}.subtitle`, label: `Índice (subtítulo): ${meta.label}`, defaultText: meta.toc.subtitle,
+        // La descripción del proyecto cita la Res. SIE-007 (medición neta): en inyección cero se habla de autoconsumo.
+        ...(id === 'projectDescription' ? connectionAwareText({ grid: meta.toc.subtitle, zeroExport: 'Criterios de Dimensionamiento y Operación en Autoconsumo' }) : {}),
+      },
     );
   }
   return defs.map(sectionText);

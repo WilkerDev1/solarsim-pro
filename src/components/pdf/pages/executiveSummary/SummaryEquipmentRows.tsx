@@ -187,7 +187,7 @@ export const SummaryEquipmentRows: React.FC<RowsProps> = ({ project, summary, ac
                   {isOffGrid ? 'Aislado' : isZeroExport ? 'Inyección Cero' : 'Bidireccional'}
                 </span>
                 <span className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap">
-                  {isOffGrid ? 'Modo isla • Sin red' : `${project.rates.distributor || 'Distribuidora'} • Norma SIE`}
+                  {isOffGrid ? 'Modo isla • Sin red' : isZeroExport ? 'Autoconsumo • Antivertido' : `${project.rates.distributor || 'Distribuidora'} • Norma SIE`}
                 </span>
               </div>
 

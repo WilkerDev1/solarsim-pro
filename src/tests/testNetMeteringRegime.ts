@@ -213,7 +213,9 @@ assert.equal(btdNote.split('\n\n').length, 4);
 assert.ok(!btdNote.includes('equivalente al 25% del valor de la energía excedente exportada'), btdNote);
 assert.ok(note('EDESUR', 'BTD', { regulatoryNoteEdition: 'legacy' }).split('\n\n')[3].includes('equivalente al 25% del valor de la energía excedente exportada'));
 const zeroNote = note('EDEESTE', 'BTS2', { isZeroExport: true, hasBattery: true });
-assert.equal(zeroNote.split('\n\n')[3], 'Al operar con limitador antivertido (inyección cero) y almacenamiento en baterías de litio, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.');
+// Inyección cero: autoconsumo, sin cargos por uso de la red; los enlaces publicados antes conservan la frase anterior.
+assert.ok(/autoconsumo/.test(zeroNote.split('\n\n')[3]) && /no aplican cargos por uso de la red/.test(zeroNote.split('\n\n')[3]), zeroNote);
+assert.equal(note('EDEESTE', 'BTS2', { isZeroExport: true, hasBattery: true, regulatoryNoteEdition: 'legacy' }).split('\n\n')[3], 'Al operar con limitador antivertido (inyección cero) y almacenamiento en baterías de litio, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.');
 
 // Fase 1b: EDESUR y EDENORTE con sus propios valores (SIE-121-2026-TF); EDEESTE no cambia; CEPM RBT-2 según SIE-147-2026-TF.
 const REFERENCE_RATES = {
