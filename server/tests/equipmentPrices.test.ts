@@ -470,6 +470,33 @@ test("history is newest first, paginated by seq, with the proposal name until it
   );
 });
 
+test("a NUL character rejects only that record and is a 400 in history", async () => {
+  const good = observation({ equipmentId: "eq-nul-ok" });
+  const result = await batch(editor, [
+    observation({ supplierName: "Prov\u0000eedor" }),
+    good,
+    observation({ equipmentId: "eq\u0000x" }),
+    observation({ supplierOfferId: "offer\u0000" }),
+    observation({
+      source: "proposal",
+      projectId: "proj\u00001",
+      supplierName: undefined,
+      supplierOfferId: undefined,
+    }),
+  ]);
+  assert.equal(result.status, 200);
+  assert.deepEqual(
+    result.body.observations.map((r: any) => r.status),
+    ["rejected", "created", "rejected", "rejected", "rejected"],
+  );
+  const stored = await pool.query(
+    "SELECT id FROM equipment_price_observations WHERE id=$1",
+    [good.id],
+  );
+  assert.equal(stored.rows.length, 1);
+  assert.equal((await history(editor, "equipmentId=eq%00x")).status, 400);
+});
+
 test("the client version gate applies to every route", async () => {
   for (const [method, path] of [
     ["GET", "/api/equipment-prices/generic"],

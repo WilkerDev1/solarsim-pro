@@ -77,13 +77,16 @@ export type ObservationInput = Pick<
 export type ObservationValidation = { ok: true; value: ObservationInput } | { ok: false; error: string };
 
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+/** PostgreSQL `text` cannot store U+0000: a value carrying it is invalid, never sent to the database. */
+export const hasNulCharacter = (value: string) => value.includes('\u0000');
+
 const cleanText = (value: unknown) => (typeof value === 'string' ? value.normalize('NFKC').trim().replace(/\s+/g, ' ') : value);
 
 function optionalText(source: Record<string, unknown>, key: string, max: number): { value?: string; error?: string } {
   const raw = source[key];
   if (raw === undefined || raw === null) return {};
   const value = cleanText(raw);
-  if (typeof value !== 'string') return { error: `${key} inválido` };
+  if (typeof value !== 'string' || hasNulCharacter(value)) return { error: `${key} inválido` };
   if (value.length > max) return { error: `${key} excede ${max} caracteres` };
   return value ? { value } : {};
 }
@@ -94,7 +97,7 @@ export function validateObservation(input: unknown): ObservationValidation {
   const source = input as Record<string, unknown>;
   if (!isObservationId(source.id)) return { ok: false, error: 'id inválido (po-<uuid>)' };
   const equipmentId = source.equipmentId;
-  if (typeof equipmentId !== 'string' || !equipmentId.trim() || equipmentId.length > PRICE_OBSERVATION_LIMITS.equipmentId) return { ok: false, error: 'equipmentId inválido' };
+  if (typeof equipmentId !== 'string' || !equipmentId.trim() || equipmentId.length > PRICE_OBSERVATION_LIMITS.equipmentId || hasNulCharacter(equipmentId)) return { ok: false, error: 'equipmentId inválido' };
   const kind = source.kind;
   if (!PRICE_OBSERVATION_KINDS.includes(kind as PriceObservationKind)) return { ok: false, error: 'kind inválido' };
   const priceUSD = source.priceUSD;
@@ -171,7 +174,6 @@ export interface PriceOffer {
   priceDOP?: number;
   stockStatus?: 'in_stock' | 'on_order' | 'out_of_stock' | 'consult';
   source?: 'manual' | 'ai_scan';
-  [key: string]: unknown;
 }
 /** Equipo del catálogo con sus ofertas (`SolarEquipmentItem`). */
 export interface PricedItem {

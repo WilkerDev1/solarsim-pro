@@ -4,6 +4,7 @@ import { isWriterRole } from "../../../shared/permissions.js";
 import { REFERENCE_EQUIPMENT_IDS } from "../../../shared/referenceEquipment.js";
 import {
   PRICE_OBSERVATION_LIMITS,
+  hasNulCharacter,
   isObservationId,
   validateObservation,
   type EquipmentPriceObservation,
@@ -293,6 +294,7 @@ export function registerEquipmentPriceRoutes(
     if (
       !equipmentId ||
       equipmentId.length > PRICE_OBSERVATION_LIMITS.equipmentId ||
+      hasNulCharacter(equipmentId) ||
       !Number.isSafeInteger(limit) ||
       limit < 1 ||
       limit > PRICE_OBSERVATION_LIMITS.historyPage ||

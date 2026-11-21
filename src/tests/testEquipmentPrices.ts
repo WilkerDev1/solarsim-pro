@@ -12,6 +12,11 @@ import {
   type EquipmentPriceObservation,
   type PricedItem,
 } from "../../shared/equipmentPrices";
+import type { SolarEquipmentItem } from "../types/equipment";
+
+// Type-level guard (checked by `npm run lint`): the app's real catalog item must be usable with the shared helpers.
+const _catalogItemIsPriced: PricedItem = {} as SolarEquipmentItem;
+void _catalogItemIsPriced;
 
 const ID = (n: number) => `po-00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
@@ -68,6 +73,11 @@ for (const [label, invalid] of [
   ["derived on observation", { ...base, derivedFromId: ID(9) }],
   ["bad derived id", { ...base, kind: "generic", derivedFromId: "x" }],
   ["long supplier", { ...base, supplierName: "s".repeat(256) }],
+  // PostgreSQL text cannot store U+0000: these must be rejected per item, never reach the database.
+  ["NUL equipment", { ...base, equipmentId: "eq\u0000x" }],
+  ["NUL supplier", { ...base, supplierName: "Prov\u0000eedor" }],
+  ["NUL offer id", { ...base, supplierOfferId: "offer\u0000" }],
+  ["NUL project", { ...base, source: "proposal", projectId: "proj\u00001", supplierName: undefined, supplierOfferId: undefined }],
 ] as const)
   assert.equal(validateObservation(invalid).ok, false, label);
 assert.ok(validateObservation({ ...base, priceUSD: 0 }).ok, "an observation may record a zero price");
