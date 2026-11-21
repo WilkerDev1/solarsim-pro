@@ -80,7 +80,7 @@ assert.equal(usesCredit.creditCarriedKWh, 0);
 const partialCredit = calculateMonthlyBill({ tariff: edesurBts1, withdrawnKWh: 300, injectedKWh: 100, creditInKWh: 500 });
 assert.deepEqual([partialCredit.netKWh, partialCredit.creditAppliedKWh, partialCredit.creditCarriedKWh], [0, 200, 300]);
 
-// 3. Doce meses: arrastre del crédito y liquidación anual del remanente (art. 19.2).
+// 3. Doce meses: arrastre del crédito y liquidación anual del remanente (art. 19, E.2).
 const months = [
   { withdrawnKWh: 100, injectedKWh: 400 }, // +300
   { withdrawnKWh: 300, injectedKWh: 100 }, // usa 200 → quedan 100
@@ -99,7 +99,7 @@ assert.throws(() => calculateBillingYear(edesurBts1, months.slice(0, 11)), Range
 assert.throws(() => calculateBillingYear(edesurBts1, [...months, months[0]]), RangeError, 'el crédito no cruza de año');
 assert.equal(FACTORY_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh, 0, 'precio CNE no confirmado: valor conservador');
 assert.equal(FACTORY_ANNUAL_CREDIT_SETTLEMENT.confirmed, false);
-assert.match(FACTORY_ANNUAL_CREDIT_SETTLEMENT.source, /19\.2/);
+assert.match(FACTORY_ANNUAL_CREDIT_SETTLEMENT.source, /art\. 19, E\.2/);
 assert.equal(resolveAnnualCreditSettlementDOPPerKWh({}), 0);
 assert.equal(resolveAnnualCreditSettlementDOPPerKWh({ annualCreditSettlementDOPPerKWh: 4.2 }), 4.2);
 assert.equal(resolveAnnualCreditSettlementDOPPerKWh({ annualCreditSettlementDOPPerKWh: -1 }), 0, 'no válido: fábrica');

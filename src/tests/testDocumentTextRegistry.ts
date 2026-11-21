@@ -206,6 +206,8 @@ const EXPECTED_DIFFERENCES = new Set([
   'otherCompany:aboutUs.intro',
   'otherCompany:aboutUs.whyChooseUs',
   'otherCompany:quotation.quoteDate',
+  // Inyección cero: sin «Medición Neta» entre los servicios gestionados (se configura el limitador antivertido).
+  'otherCompany:quotation.servicesIncluded',
 ]);
 
 let compared = 0;

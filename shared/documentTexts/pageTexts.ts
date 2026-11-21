@@ -1,5 +1,5 @@
 import type { DocumentTextDefinition, DocumentTextFormat, DocumentTextSection } from './registry';
-import { EXECUTIVE_FOOTNOTE_RIGHT_GRID, executiveFootnoteRightDefault, savingsAwareText, supplyAwareText } from './dynamicTexts';
+import { EXECUTIVE_FOOTNOTE_RIGHT_GRID, connectionAwareText, executiveFootnoteRightText, savingsAwareText, supplyAwareText } from './dynamicTexts';
 
 /**
  * Textos fijos de las páginas (títulos, etiquetas, tarjetas y notas). El valor por defecto es el
@@ -50,12 +50,18 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   // Sin comparación de ahorro (sistema aislado) no se habla de retorno.
   { ...text("executiveSummary", "executiveSummary.heading", "Cuadro Resumen de Inversión y Retorno", "Cuadro Resumen de Inversión y Retorno"), ...savingsAwareText("Cuadro Resumen de Inversión y Retorno", "Cuadro Resumen de Inversión y Energía") },
   text("executiveSummary", "executiveSummary.subheading", "Pipeline ejecutivo del dimensionamiento fotov…", "Pipeline ejecutivo del dimensionamiento fotovoltaico, balance económico y marco de la Ley 57-07."),
-  text("executiveSummary", "executiveSummary.footnote", "* Estimación calculada conforme al marco regu…", "* Estimación calculada conforme al marco regulatorio dominicano, Resolución SIE-007 y Ley 57-07."),
+  // Inyección cero: la Res. SIE-007 regula la medición neta, que no aplica; el ahorro viene solo del autoconsumo.
+  {
+    ...text("executiveSummary", "executiveSummary.footnote", "* Estimación calculada conforme al marco regu…", "* Estimación calculada conforme al marco regulatorio dominicano, Resolución SIE-007 y Ley 57-07."),
+    ...connectionAwareText({
+      grid: "* Estimación calculada conforme al marco regulatorio dominicano, Resolución SIE-007 y Ley 57-07.",
+      zeroExport: "* Estimación basada en el autoconsumo de la energía generada (sin envío a la red) y en los incentivos de la Ley 57-07.",
+    }),
+  },
   // Dinámico según el tipo de conexión: un sistema aislado no opera bajo medición neta.
   {
     ...text("executiveSummary", "executiveSummary.footnoteRight", "Régimen de Medición Neta • Certificación CNE…", EXECUTIVE_FOOTNOTE_RIGHT_GRID),
-    defaultText: (ctx) => executiveFootnoteRightDefault(ctx),
-    knownFactoryValues: [EXECUTIVE_FOOTNOTE_RIGHT_GRID],
+    ...executiveFootnoteRightText,
   },
   text("executiveSummary", "executiveSummary.row1.title", "CAPACIDAD Y MÓDULOS", "CAPACIDAD Y MÓDULOS"),
   text("executiveSummary", "executiveSummary.row1.panelPower", "Capacidad Panel", "Capacidad Panel"),
@@ -67,7 +73,7 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("executiveSummary", "executiveSummary.row1.performanceNote", "Performance Ratio", "Performance Ratio"),
   text("executiveSummary", "executiveSummary.row2.title", "INVERSORES & CONEXIÓN", "INVERSORES & CONEXIÓN"),
   text("executiveSummary", "executiveSummary.row2.inverters", "Inversores kW/AC", "Inversores kW/AC"),
-  text("executiveSummary", "executiveSummary.row2.injection", "Régimen de Inyección", "Régimen de Inyección"),
+  { ...text("executiveSummary", "executiveSummary.row2.injection", "Régimen de Inyección", "Régimen de Inyección"), ...connectionAwareText({ grid: "Régimen de Inyección", zeroExport: "Modo de Operación" }) },
   text("executiveSummary", "executiveSummary.row2.storage", "Almacenamiento BESS", "Almacenamiento BESS"),
   text("executiveSummary", "executiveSummary.row3.title", "INVERSIÓN BRUTA", "INVERSIÓN BRUTA"),
   text("executiveSummary", "executiveSummary.row3.pricePerWatt", "Precio por Watt", "Precio por Watt"),
@@ -124,7 +130,13 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("aboutUs", "aboutUs.pillar2.title", "Compromiso Ambiental", "Compromiso Ambiental"),
   text("aboutUs", "aboutUs.pillar2.text", "Cada proyecto reduce de manera verificable mi…", "Cada proyecto reduce de manera verificable miles de toneladas de CO2 y fomenta la transición energética nacional.", { multiline: true }),
   text("aboutUs", "aboutUs.pillar3.title", "Soporte Cercano", "Soporte Cercano"),
-  text("aboutUs", "aboutUs.pillar3.text", "Asistencia personalizada y gestión integral d…", "Asistencia personalizada y gestión integral de permisos, medición neta y garantías durante toda la vida del sistema.", { multiline: true }),
+  {
+    ...text("aboutUs", "aboutUs.pillar3.text", "Asistencia personalizada y gestión integral d…", "Asistencia personalizada y gestión integral de permisos, medición neta y garantías durante toda la vida del sistema.", { multiline: true }),
+    ...connectionAwareText({
+      grid: "Asistencia personalizada y gestión integral de permisos, medición neta y garantías durante toda la vida del sistema.",
+      zeroExport: "Asistencia personalizada y gestión integral de permisos, interconexión y garantías durante toda la vida del sistema.",
+    }),
+  },
   // Beneficios y Ley 57-07
   text("benefits", "benefits.objective3.text", "Permite deducir hasta un 40% de la inversión…", "Permite deducir hasta un **40% de la inversión en equipos** del Impuesto Sobre la Renta (ISR), acelerando el retorno del capital invertido.", { multiline: true }),
   text("benefits", "benefits.heading", "2. BENEFICIOS DE LA ENERGÍA SOLAR", "2. BENEFICIOS DE LA ENERGÍA SOLAR"),
@@ -177,7 +189,7 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("quotation", "quotation.warranty.batteryLabel", "Garantías: etiqueta batería", "• Batería:"),
   text("quotation", "quotation.warranty.workmanshipLabel", "Garantías: etiqueta mano de obra", "• Mano de Obra y Soporte:"),
   text("quotation", "quotation.warrantiesHeading", "GARANTÍAS", "GARANTÍAS"),
-  text("quotation", "quotation.installTypeValue", "Fotovoltaica", "Fotovoltaica"),
+  { ...text("quotation", "quotation.installTypeValue", "Fotovoltaica", "Fotovoltaica"), ...connectionAwareText({ grid: "Fotovoltaica", zeroExport: "Fotovoltaica de autoconsumo (inyección cero)" }) },
   text("quotation", "quotation.label.installType", "Tipo de instalación:", "Tipo de instalación:"),
   text("quotation", "quotation.clientHeading", "DATOS DEL CLIENTE :", "DATOS DEL CLIENTE :"),
   text("quotation", "quotation.label.client", "Cliente:", "Cliente:"),

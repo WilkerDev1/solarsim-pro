@@ -5,7 +5,9 @@ import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
-import { PDF_ROOF_DETAIL_BASE64, PDF_FLOW_DIAGRAM_BASE64 } from '../../../assets/pdfGraphicAssets';
+import { PDF_ROOF_DETAIL_BASE64 } from '../../../assets/pdfGraphicAssets';
+import { resolveGridConnection } from '../../../../shared/gridConnection';
+import { connectionFlowDiagram } from './connectionFlowDiagram';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { EditableText } from '../editor/EditableText';
 
@@ -28,6 +30,8 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
   pageNum,
   totalPages,
 }) => {
+  // Inyección cero: diagrama de autoconsumo, sin medición bidireccional ni exportación.
+  const flowDiagram = connectionFlowDiagram(resolveGridConnection(project.rates));
   return (
     <PDFPageShell
       project={project}
@@ -98,8 +102,8 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
           {/* High Quality Flow Diagram - Larger & Prominent */}
           <div className="p-3.5 rounded-2xl border border-slate-200 bg-white shadow-xs flex items-center justify-center h-52">
             <img
-              src={PDF_FLOW_DIAGRAM_BASE64}
-              alt="Diagrama de flujo del sistema solar fotovoltaico"
+              src={flowDiagram.src}
+              alt={flowDiagram.alt}
               className="max-h-[190px] max-w-[95%] w-auto h-auto mx-auto block object-contain"
             />
           </div>
