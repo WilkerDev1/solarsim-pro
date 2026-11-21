@@ -39,7 +39,7 @@ Dos formas de obtener un token `ssm_…`; ambas crean un **acceso** ligado a una
 
 Reglas comunes, aplicadas por la API en cada petición:
 
-- Solo se aceptan en las rutas de `AGENT_ROUTES` (`shared/agentAccess.ts`): leer propuestas, clientes, catálogo y tarifas; crear o editar clientes; enlazar una propuesta con un cliente. Nunca `/api/auth/*` (un token de agente no puede convertirse en sesión), usuarios, organización, publicación, borrados ni papelera.
+- Solo se aceptan en las rutas de `AGENT_ROUTES` (`shared/agentAccess.ts`): leer propuestas, clientes, catálogo, tarifas, precios genéricos e historial de precios de equipos; crear o editar clientes; enlazar una propuesta con un cliente. Nunca `/api/auth/*` (un token de agente no puede convertirse en sesión), usuarios, organización, publicación, borrados, papelera ni registros de precio (`POST /api/equipment-prices/batch`).
 - Alcance `read` = LECTOR aunque la cuenta sea EDITOR o ADMIN. Alcance `write` = el rol **actual** de la cuenta (si la degradan a LECTOR, deja de escribir al instante).
 - Cambiar la contraseña o desactivar a la persona (sube `auth_version`) invalida todos sus accesos, como una sesión.
 - El token solo vale para el `MCP_REMOTE_URL` configurado (audiencia); un token emitido para otro recurso se rechaza.

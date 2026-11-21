@@ -34,6 +34,9 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 | GET /api/equipment | Catálogo accesible y deletedIds de ese ámbito. VIEWER puede descargar. |
 | POST /api/equipment/batch | Solo escritores; baseVersion por equipo, no transferencia de propietario. |
 | DELETE /api/equipment/:id | Equipo propio exige baseVersion; catálogo compartido se oculta para la organización, sin borrar su origen. |
+| POST /api/equipment-prices/batch | Escritores (LECTOR 403; nunca tokens de agente). `{observations, voids:[{id}]}`, máximo 200 + 200. Registros primero y anulaciones después, en una transacción con `lockCurrentMembership` (sin bloqueo de proyectos). Estado por registro: `created`, `duplicate` (mismo id y contenido), `conflict` (mismo id, contenido distinto) o `rejected` (`reason: invalid \| foreign_equipment`); por anulación: `voided`, `already_voided`, `not_found` (el cliente reintenta) o `rejected` (id malformado). El equipo puede no existir; uno privado de otra organización se rechaza, los de referencia se aceptan. [Registros de precio](#registros-de-precio-migración-010). |
+| GET /api/equipment-prices | `?equipmentId=&limit=` (1–500, por defecto 100) `&before=<seq>`: historial de un equipo de la organización, más recientes primero, con anulados (`voidedAt`), autor (`createdByName`) y, si la propuesta aún existe en la organización (papelera incluida), `projectName`/`projectCode`; si se purgó, `null`. `nextBefore` pagina por `seq`. También lectores y tokens de agente `read`. |
+| GET /api/equipment-prices/generic | `{prices: {[equipmentId]: {priceUSD, observedAt, observationId}}}`: precio genérico vigente por equipo, sin los equipos ocultos por la organización. También lectores y tokens de agente `read`. |
 | GET /api/clients | Clientes activos de la organización y `deletedIds`; también lectores. |
 | PUT /api/clients/:id | Escritores; `{...cliente, baseVersion}` CAS (0 = crear). 409 con `client` actual o `null` si está borrado. |
 | DELETE /api/clients/:id | `?baseVersion=N`; borrado lógico que quita `clientId` de las propuestas y sube su versión. |
@@ -61,6 +64,26 @@ Los logos de la propuesta (`customization.coverLogoBase64`, `headerLogoBase64`, 
 - **Lectura según capacidad.** Pull, push (`project`, `serverProject`), `GET /api/projects/:id`, papelera, restauración, enlace de cliente e historial devuelven referencias solo a quien pide `?assetRefs=1` (parámetro, no cabecera: una cabecera nueva cambiaría la comprobación CORS y una API anterior bloquearía al escritorio); a cualquier otro (escritorios anteriores, agentes MCP) el contenido en línea. No hace falta subir `MIN_CLIENT_VERSION`.
 - **Escritorio 2.8.2.** Pide `?assetRefs=1` en pull, push y lectura puntual; convierte cada referencia en su contenido antes de guardar (descarga cada imagen una vez por sesión y verifica su sha256), así que el store, el PDF, la publicación web y el visor solo ven imágenes. En el push envía como referencia solo las imágenes que ese servidor ya confirmó; las nuevas viajan una vez en línea. Ante `unknown_document_asset` reintenta una vez con las imágenes.
 - **Migración 009.** Crea la tabla y mueve las imágenes de todos los proyectos (también papelera) sin cambiar `version` ni `updated_at`, como la 006. El historial (`project_version_history`) no se reescribe; se sirve en línea igual que el resto.
+
+## Registros de precio (migración 010)
+
+`equipment_price_observations` guarda los registros de precio de equipos por organización, solo de inserción ([ADR 0006](adr/0006-precio-generico-e-historial.md), funciones puras en `shared/equipmentPrices.ts`). No vive en `equipment_catalog`: no sube la versión del equipo, no choca con quien lo edita y funciona con los equipos de referencia sin filtrarse entre organizaciones.
+
+| Columna | Contrato |
+| --- | --- |
+| `organization_id`, `id` | Clave primaria compuesta; `id` lo genera el cliente (`^po-[0-9a-f-]{36}$`). Borrado en cascada con la organización. |
+| `seq` | `bigserial` único: orden de inserción en el servidor. |
+| `equipment_id` | Sin FK (el equipo puede subir después o haberse borrado). |
+| `kind` | `observation` o `generic` (`price_usd > 0`). |
+| `price_usd`, `original_currency`, `original_price` | Precio en USD (≥ 0) y monto y moneda cotizados (`USD`/`DOP`). |
+| `source` | `supplier_offer`, `ai_scan`, `proposal`, `manual`, `agent`. |
+| `supplier_name`, `supplier_offer_id` | Copia del proveedor al momento. |
+| `project_id` | Solo con `source = 'proposal'`; sin nombre de propuesta ni de cliente (se resuelve al leer). |
+| `derived_from_id` | Solo en `generic`. |
+| `observed_at` | El servidor guarda `LEAST(valor, clock_timestamp())`; antes de 2020 se rechaza. |
+| `created_by_id`, `created_at`, `voided_at`, `voided_by_id` | Los pone el servidor; anular no borra la fila. |
+
+Índices `(organization_id, equipment_id, seq DESC)` y `(organization_id, kind, equipment_id, seq DESC)`. El **precio genérico** de un equipo es el `generic` no anulado con mayor `seq`; anular el vigente devuelve el anterior. Las lecturas no toman bloqueos. Cambio aditivo: no sube `MIN_CLIENT_VERSION`; la migración no crea registros a partir de las ofertas existentes. Restaurar la base a un punto anterior a la 010 pierde registros ya confirmados.
 
 ## Migraciones y pruebas
 
