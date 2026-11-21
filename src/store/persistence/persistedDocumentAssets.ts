@@ -191,7 +191,14 @@ export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHas
         // Old ∪ new first: until the main value is written, the previous one still points at the old entries.
         const entries = readAssets(name, storage);
         for (const sha of pass.used) entries[sha] ??= contentOf.get(sha)!;
-        writeAssets(name, storage, entries);
+        try {
+          writeAssets(name, storage, entries);
+        } catch {
+          // Sin espacio para la clave de imágenes (el blob anterior en línea aún ocupa el suyo): esta escritura va en
+          // línea, como antes, para que el estado siempre se guarde. La siguiente reescritura vuelve a intentarlo
+          // cuando el blob principal ya libera espacio.
+          return state;
+        }
       }
       writing.set(name, pass.used);
       return out;
