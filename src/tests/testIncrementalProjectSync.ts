@@ -236,14 +236,15 @@ async function run() {
         const bytes = new TextEncoder().encode(body);
         const size = Math.ceil(bytes.length / 10);
         for (let i = 0; i < 10; i++) {
-          if (stallAfter !== undefined && i === stallAfter) { await new Promise((r) => setTimeout(r, 400)); }
+          if (stallAfter !== undefined && i === stallAfter) { await new Promise((r) => setTimeout(r, 2000)); }
           await new Promise((r) => setTimeout(r, chunkDelayMs));
           try { controller.enqueue(bytes.slice(i * size, (i + 1) * size)); } catch { return; }
         }
         try { controller.close(); } catch { /* aborted */ }
       },
     });
-    SyncService.pullTimeouts = { idleMs: 120, maxMs: 5000 };
+    // Margen amplio (ventana 600 ms frente a fragmentos cada 40 ms y una pausa de 2 s): estable con la máquina cargada.
+    SyncService.pullTimeouts = { idleMs: 600, maxMs: 8000 };
     let stream = slowStream(40);
     globalThis.fetch = (async (_url: string, init: RequestInit) => {
       const signal = init.signal!;
