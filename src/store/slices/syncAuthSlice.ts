@@ -208,6 +208,9 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     let deletionErrors = 0;
     // A failed download is reported on its own: it never blocks uploading local work (CAS still guards every write).
     let pullError: string | null = null;
+    // Pull cursor applied with the cache it describes, committed in the final set() of this cycle: every persisted
+    // set() serializes the whole workspace on the UI thread, so one sync cycle writes at most once.
+    let nextCursor: { scope: string; serverTimestamp: string } | null = null;
     const releaseDeletion = (command: ProjectDeletionCommand) => set((state) => ({ projectDeletionQueue: state.projectDeletionQueue.filter((item) => item.scope !== command.scope || item.id !== command.id) }));
     const recoverDeletion = (command: ProjectDeletionCommand, server?: ProjectSimulation) => {
       conflicts++;
@@ -256,10 +259,11 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         }
         projectConflicts = reuseRecord(state.projectConflicts, projectConflicts);
         const activeConflict = state.activeConflict?.scope === scope ? projectConflicts[scope + '|' + state.activeConflict.projectId] ?? null : state.activeConflict;
-        // The cursor advances together with the cache it describes; later steps read missing documents directly.
-        const projectSyncCursor = typeof pull.serverTimestamp === 'string' && Number.isFinite(Date.parse(pull.serverTimestamp)) ? { scope, serverTimestamp: pull.serverTimestamp } : state.projectSyncCursor;
-        return { projects, projectConflicts, activeConflict, projectSyncCursor };
+        return { projects, projectConflicts, activeConflict };
       });
+      // The cursor advances with the cache it describes; later steps read missing documents directly. An empty
+      // incremental pull leaves the cache unchanged, so the previous cursor stays valid and keeps its identity.
+      if (!pullError && typeof pull.serverTimestamp === 'string' && Number.isFinite(Date.parse(pull.serverTimestamp)) && (!since || pulled.length > 0)) nextCursor = { scope, serverTimestamp: pull.serverTimestamp };
       // Confirm trash through CAS before physical deletion, including documents created offline.
       // A failed command remains durable without preventing unrelated documents from syncing.
       // Without a pull there are no tombstones to compare against: deletions wait for the next sync.
@@ -362,14 +366,23 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       const unresolvedConflicts = get().projects.filter(project => project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId)).length;
       conflicts = Math.max(conflicts, unresolvedConflicts);
       const message = pullError ? `No se pudieron descargar los proyectos: ${pullError}${sent.length ? ' Los cambios locales se enviaron igualmente.' : ''}` : !folders.success ? `Proyectos descargados; carpetas pendientes: ${folders.message}` : pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : !clients.success ? `Proyectos sincronizados; clientes pendientes: ${clients.message}` : 'Sincronización completada.';
-      set((state) => ({ isSyncing: false, syncFeedbackMessage: silent && !pullError ? null : message, syncSettings: { ...state.syncSettings, lastSyncTimestamp: deletionErrors || pullError ? state.syncSettings.lastSyncTimestamp : pull.serverTimestamp || state.syncSettings.lastSyncTimestamp } }));
+      set((state) => {
+        const lastSyncTimestamp = deletionErrors || pullError ? state.syncSettings.lastSyncTimestamp : nextCursor?.serverTimestamp ?? state.syncSettings.lastSyncTimestamp;
+        return {
+          isSyncing: false,
+          syncFeedbackMessage: silent && !pullError ? null : message,
+          ...(nextCursor ? { projectSyncCursor: nextCursor } : {}),
+          ...(lastSyncTimestamp !== state.syncSettings.lastSyncTimestamp ? { syncSettings: { ...state.syncSettings, lastSyncTimestamp } } : {}),
+        };
+      });
       // A failing download must not spin: the regular heartbeat retries it.
       if (!pullError && folders.success && (get().projects.some((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) || (!deletionErrors && get().projectDeletionQueue.some((command) => command.scope === scope)))) get().triggerAutoSync();
       return { success: !pullError && folders.success && conflicts === 0 && deletionErrors === 0 && pendingConfirmations === 0, message };
     } catch (error) {
       const failure = error instanceof Error ? error.message : 'No se pudo sincronizar.';
       const message = pullError && !failure.includes(pullError) ? `${failure} No se pudieron descargar los proyectos: ${pullError}` : failure;
-      if (session.isCurrent()) set({ isSyncing: false, syncFeedbackMessage: message });
+      // A pull already applied keeps its cursor: a step failing on every cycle must not grow each incremental pull.
+      if (session.isCurrent()) set({ isSyncing: false, syncFeedbackMessage: message, ...(nextCursor ? { projectSyncCursor: nextCursor } : {}) });
       return { success: false, message };
     }
   },
