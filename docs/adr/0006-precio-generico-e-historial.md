@@ -116,3 +116,4 @@ El historial empieza vacío (decisión del usuario, 2026-11-21): la migración n
 - Restaurar la base a un punto anterior a la migración 010 pierde registros ya confirmados a los clientes (anotar en las notas de versión).
 - Clientes 2.8.x: ven un grupo `generic` como precio sin proveedor y, si actualizan esa propuesta con IA, lo vuelven manual. No se rompe nada.
 - Orden de despliegue: API (migración 010) antes que los clientes con esta función.
+- `seq` es una única secuencia para todas las organizaciones y la API lo devuelve (registro y `nextBefore`): comparando sus propios `seq` consecutivos, una organización puede estimar cuántos registros de precio escriben las demás y cuándo. Se acepta: solo revela un volumen agregado, sin datos, equipos ni autores, y el contrato necesita `seq` para ordenar el precio vigente y paginar el historial. Si deja de ser aceptable, se sustituye por un cursor opaco sin cambiar el orden en el servidor.
