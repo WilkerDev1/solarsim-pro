@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import type { PoolClient } from "pg";
+import { isWriterRole } from "../../../shared/permissions.js";
 import { REFERENCE_EQUIPMENT_IDS } from "../../../shared/referenceEquipment.js";
 import {
   PRICE_OBSERVATION_LIMITS,
@@ -149,7 +150,7 @@ export function registerEquipmentPriceRoutes(
   app.post("/api/equipment-prices/batch", async (c) => {
     const user = await authenticate(c);
     if (!user) return c.json({ error: "No autorizado" }, 401);
-    if (user.role === "LECTOR")
+    if (!isWriterRole(user.role))
       return c.json({ error: "Permisos insuficientes" }, 403);
     const body = await readObjectBody(c);
     const observations = body.observations ?? [];
