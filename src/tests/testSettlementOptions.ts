@@ -216,8 +216,8 @@ const legacy = (rates: Partial<UtilityRates> = {}, options: { panels?: number; c
   assert.match(item(project({ fixedChargeTierBasis: 'net' }).rates).valueText, /neto/);
   const dock = render(h(RatesFields, { project: project(), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never));
   assert.match(dock, /data-fixed-charge-tier-basis="withdrawn"/, 'el dock muestra el criterio vigente');
-  assert.match(dock, /Energía retirada/);
-  assert.match(dock, /Consumo neto/);
+  assert.match(dock, />Retirada</, 'opción corta: cabe en el control de 172 px');
+  assert.match(dock, />Neto</);
   const flatDock = render(h(RatesFields, { project: project({ energyRateSource: 'manual' }), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never));
   assert.doesNotMatch(flatDock, /data-fixed-charge-tier-basis/, 'precio único sin cargo por rango: sin selector');
 }

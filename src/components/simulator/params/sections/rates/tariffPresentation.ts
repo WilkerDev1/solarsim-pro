@@ -158,8 +158,8 @@ export interface UnverifiedAssumption {
 
 /** Rótulos del criterio del rango del cargo fijo (selector del dock y supuestos). */
 export const FIXED_CHARGE_TIER_BASIS_LABELS: Record<FixedChargeTierBasis, string> = {
-  withdrawn: 'Energía retirada',
-  net: 'Consumo neto',
+  withdrawn: 'Retirada',
+  net: 'Neto',
 };
 
 const fmt2 = (value: number) => value.toFixed(2);
@@ -221,7 +221,7 @@ export function settlementPriceOptions(current: number): SettlementPriceOption[]
   const estimate = ESTIMATED_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh;
   return [
     { label: same(factory) ? 'Valor de fábrica aplicado' : 'Aplicar valor de fábrica', dopPerKWh: factory, hint: `RD$${fmt2(factory)}`, checked: same(factory) },
-    { label: same(estimate) ? 'Estimado CNE aplicado (pendiente)' : 'Aplicar estimado CNE (pendiente)', dopPerKWh: estimate, hint: `RD$${fmt2(estimate)}`, checked: same(estimate) },
+    { label: same(estimate) ? 'Estimado CNE aplicado' : 'Aplicar estimado CNE', dopPerKWh: estimate, hint: `RD$${fmt2(estimate)}`, checked: same(estimate) },
   ];
 }
 
