@@ -1,5 +1,5 @@
 import { normalizeCompanyProfiles } from './companyProfiles';
-import { initializeWorkspaces } from '../sync/organizationWorkspace';
+import { dropActiveWorkspaceArchive, initializeWorkspaces } from '../sync/organizationWorkspace';
 import type { SimulationStore } from '../types';
 import type { LegacyProjectSpecs } from '../../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../../data/defaultEquipmentCatalog';
@@ -234,6 +234,7 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
     if (!state.companies.some(c => c.id === state.activeCompanyId)) state.activeCompanyId = state.companies.find(c => c.isDefault)!.id;
     state.localUserProfile = { ...state.localUserProfile, activeCompanyId: state.activeCompanyId };
     initializeWorkspaces(state);
+    dropActiveWorkspaceArchive(state);
 
     // Validación y auto-renovación silenciosa de sesión en segundo plano al iniciar la app
     if (state.syncSettings?.authToken && typeof window !== 'undefined') {

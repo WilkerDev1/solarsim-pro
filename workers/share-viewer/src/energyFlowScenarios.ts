@@ -199,7 +199,7 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
       make('outage', solveNight(0, 0, false, inverter), {
         label: 'Apagón', title: 'Apagón', night: false, gridConnected: false, inverterState: 'off',
         description: 'Cuando falla la red, el inversor se apaga por seguridad y la casa se queda sin energía hasta que regrese el servicio.',
-        note: 'Por normativa, un sistema de inyección sin baterías se desconecta cuando falla la red. Un sistema híbrido con baterías y salida de respaldo sí puede mantener la casa con energía.',
+        note: 'Por normativa, un sistema conectado a la red sin baterías se desconecta cuando falla la red. Un sistema híbrido con baterías y salida de respaldo sí puede mantener la casa con energía.',
         pill: { text: 'Inversor apagado por seguridad', tone: 'amber' },
       }),
     ];

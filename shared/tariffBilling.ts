@@ -14,7 +14,7 @@
  * - Cargo por uso de la red: kWh inyectados × RD$/kWh, solo tarifas monómicas (art. 19, E.1.e; `shared/netMetering.ts`).
  * - Liquidación anual: el crédito que sobra al cierre del año se paga al 100 % antes del 31 de enero, valorado al precio
  *   promedio de referencia de contratos de compra de energía a 10 años publicado por la CNE para la tecnología
- *   (art. 19, E.2.ii–iv). Enero empieza sin crédito (el del año previo ya se liquidó).
+ *   (art. 19, E.2, incisos i–ii: se paga el 100 % antes del 31 de enero). Enero empieza sin crédito (el del año previo ya se liquidó).
  * - Bloques BTS-1/BTS-2: 0–200, 201–300 y 301–700 escalonados; con 701 kWh o más, todos los kWh al 4.º rango
  *   (Res. SIE-121-2026-TF, art. 4.d; `averageBlockEnergyRateDOP`). Cargo fijo por rango de consumo (art. 2).
  *
@@ -226,7 +226,7 @@ export interface BillingYear {
 }
 
 /**
- * Doce facturas (enero a diciembre) con el crédito arrastrado mes a mes y la liquidación del remanente al cierre (art. 19.2).
+ * Doce facturas (enero a diciembre) con el crédito arrastrado mes a mes y la liquidación del remanente al cierre (art. 19, E.2; no confundir con el 19.2, transición de los clientes de medición neta existentes).
  * Exige exactamente doce meses: el crédito nunca cruza de un año a otro dentro de una llamada.
  */
 export function calculateBillingYear(tariff: BillingTariff, months: ReadonlyArray<{ withdrawnKWh: number; injectedKWh: number }>, options: BillingYearOptions = {}): BillingYear {
@@ -257,14 +257,14 @@ export const MAX_SETTLEMENT_DOP_PER_KWH = 100;
 
 /**
  * Precio de fábrica con que se valora el crédito que sobra al cierre del año. El reglamento manda el precio promedio de
- * referencia de contratos a 10 años de la CNE para solar FV (art. 19, E.2.iv), pero no se encontró publicado: hasta
+ * referencia de contratos a 10 años de la CNE para solar FV (art. 19, E.2.ii), pero no se encontró publicado: hasta
  * confirmarlo vale 0 (el remanente no suma ahorro: estimación a la baja). Editable por propuesta
  * (`rates.annualCreditSettlementDOPPerKWh`).
  */
 export const FACTORY_ANNUAL_CREDIT_SETTLEMENT = {
   dopPerKWh: 0,
   confirmed: false,
-  source: 'Res. SIE-007-2026-REG, art. 19, numeral 2 (19.2): precio promedio de referencia de contratos de compra de energía a 10 años publicado por la CNE (Solar Fotovoltaica de inclinación fija). No se encontró publicado; valor conservador hasta confirmarlo.',
+  source: 'Res. SIE-007-2026-REG, art. 19, E.2.ii: precio promedio de referencia de contratos de compra de energía a 10 años publicado por la CNE (Solar Fotovoltaica de inclinación fija). No se encontró publicado; valor conservador hasta confirmarlo.',
 } as const;
 
 export function isValidSettlementPrice(value: unknown): value is number {

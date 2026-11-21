@@ -295,7 +295,7 @@ assert.equal(applyProjectEdit(manual, { kind: 'rates', patch: { targetCoveragePc
 
 // 17. (E) Nota SIE-007 con inyección cero o con cargo 0: sin «RD$0.00 por kWh… estimado».
 const zeroExportNote = regulatoryNoteDefault(createDocumentTextContext({ distributor: 'EDESUR', tariffCode: 'BTS1', isZeroExport: true, netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 })).split('\n\n')[3];
-assert.ok(zeroExportNote.includes('inyección cero') && !zeroExportNote.includes('por kWh inyectado'), zeroExportNote);
+assert.ok(/antivertido/.test(zeroExportNote) && /autoconsumo/.test(zeroExportNote) && !zeroExportNote.includes('por kWh inyectado'), zeroExportNote);
 const zeroChargeNote = regulatoryNoteDefault(createDocumentTextContext({ distributor: 'EDESUR', tariffCode: 'BTS1', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 0 })).split('\n\n')[3];
 assert.ok(!zeroChargeNote.includes('RD$0.00') && !zeroChargeNote.includes('estimado'), zeroChargeNote);
 assert.ok(zeroChargeNote.includes('no considera'), zeroChargeNote);
