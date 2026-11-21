@@ -291,6 +291,16 @@ test("token de lectura: consulta y nunca escribe ni obtiene sesión", async () =
   assert.equal((await asAgent("GET", "/api/clients", token)).status, 200);
   assert.equal((await asAgent("GET", "/api/equipment", token)).status, 200);
   assert.equal((await asAgent("GET", "/api/tariffs", token)).status, 200);
+  const prices = await asAgent("GET", "/api/equipment-prices/generic", token);
+  assert.equal(prices.status, 200);
+  assert.deepEqual(prices.body.prices, {});
+  const priceHistory = await asAgent(
+    "GET",
+    "/api/equipment-prices?equipmentId=eq-any",
+    token,
+  );
+  assert.equal(priceHistory.status, 200);
+  assert.deepEqual(priceHistory.body.observations, []);
   const me = await asAgent("GET", "/api/agent-access/whoami", token);
   assert.equal(me.body.scope, "read");
   assert.equal(me.body.role, "LECTOR", "a read grant acts as LECTOR");
@@ -308,6 +318,7 @@ test("token de lectura: consulta y nunca escribe ni obtiene sesión", async () =
     ["GET", "/api/users"],
     ["DELETE", "/api/projects/agent-p1"],
     ["GET", "/api/projects/agent-p1/history"],
+    ["POST", "/api/equipment-prices/batch"],
   ]) {
     const r = await asAgent(
       method,
@@ -327,6 +338,15 @@ test("token de lectura: consulta y nunca escribe ni obtiene sesión", async () =
 
 test("token de escritura: clientes y enlaces con CAS; papelera de solo lectura; actividad", async () => {
   const { token } = (await createToken(editor, "write", "ChatGPT")).body;
+  // Price records are written only by the desktop app, never by a remote agent, whatever its scope.
+  const priceWrite = await asAgent(
+    "POST",
+    "/api/equipment-prices/batch",
+    token,
+    { observations: [], voids: [] },
+  );
+  assert.equal(priceWrite.status, 403);
+  assert.equal(priceWrite.body.code, "agent_route_forbidden");
   const created = await asAgent(
     "PUT",
     "/api/clients/client-agent-1",

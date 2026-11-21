@@ -30,6 +30,7 @@ import { registerAuthRoutes } from "./modules/auth.js";
 import { registerUsersRoutes } from "./modules/users.js";
 import { registerProjectsRoutes } from "./modules/projects.js";
 import { registerEquipmentRoutes } from "./modules/equipment.js";
+import { registerEquipmentPriceRoutes } from "./modules/equipmentPrices.js";
 import { registerTariffsRoutes } from "./modules/tariffs.js";
 import { registerNotificationsRoutes } from "./modules/notifications.js";
 import { registerOrganizationRoutes } from "./modules/organization.js";
@@ -114,6 +115,7 @@ export function createApp(options: {
   registerUsersRoutes(app, deps);
   registerProjectsRoutes(app, deps);
   registerEquipmentRoutes(app, deps);
+  registerEquipmentPriceRoutes(app, deps);
   registerFolderRoutes(app, deps);
   registerClientRoutes(app, deps);
   registerEquipmentAssetRoutes(app, deps);
