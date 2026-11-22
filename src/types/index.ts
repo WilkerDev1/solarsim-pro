@@ -237,7 +237,12 @@ export interface CostMatrixSummary {
   marginOnSalePct?: number;      // % Profit Margin on Sales (e.g. 38.65%)
   markupOnCostPct?: number;      // % Markup on Costs (e.g. 63.00%)
   costPerWattUSD: number;        // Cost/W USD (e.g. $0.90)
-  salePricePerWattUSD: number;   // Total System Sale/W USD (with batteries)
+  /** Costo por W en RD$ (total neto RD$ / W DC). */
+  costPerWattDOP: number;
+  salePricePerWattUSD: number;   // Total System Sale/W USD (with batteries); en Directo $/W, la inversión bruta / W
+  /** Venta por W de las filas de la matriz: la misma venta que «Precio kilos ventas» / 1000 (USD y RD$). */
+  salePerWattUSD: number;
+  salePerWattDOP: number;
   solarSalePricePerWattUSD?: number; // Solar Only Sale/W USD (e.g. $1.13)
   solarOnlyVentaUSD?: number;    // Solar Only Sale USD
   equipmentCostUSD?: number;     // Equipment Cost USD (Panels + Inverters + Batteries)
