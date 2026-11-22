@@ -50,3 +50,11 @@ const legacyReport = auditCatalog(catalog, [legacy], { now });
 assert(legacyReport.findings.some((f) => f.projectId === 'legacy-p' && f.message.includes('Panel legado')));
 assert.equal(legacy.specs.panels, undefined, 'audit never migrates stored proposals');
 console.log('PASS: catalog audit flags prices, staleness, documents, specs, duplicates, stock, outliers and unmatched proposal equipment.');
+// ADR 0006 §5: un equipo sin ofertas pero con precio genérico es informativo (`generic_only`), no `missing_price`.
+const genericReport = auditCatalog(catalog, [], { now, genericPrices: { noprice: { priceUSD: 90 } } });
+const genericCodes = genericReport.findings.filter((f) => f.equipmentId === 'noprice');
+assert.deepEqual(genericCodes.map((f) => f.code), ['generic_only']);
+assert.equal(genericCodes[0].severity, 'info');
+assert.match(genericCodes[0].message, /precio genérico/);
+assert.deepEqual(auditCatalog(catalog, [], { now, genericPrices: { 'ok-b': { priceUSD: 90 } } }).findings.filter((f) => f.equipmentId === 'ok-b'), [], 'items with offers are unaffected');
+console.log('PASS: catalog audit reports generic-only equipment as information.');

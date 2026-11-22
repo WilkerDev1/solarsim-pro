@@ -18,7 +18,10 @@ import {
 import {
   planPriceCatalogImport,
   isPriceCatalogPlanApplied,
+  genericImportChoice,
+  genericUpdatesFromImport,
 } from "../../utils/priceCatalogImport";
+import { effectiveGenericPrice, priceRecordingContext } from "../../store/slices/equipmentPriceSlice";
 import {
   X,
   Sparkles,
@@ -60,6 +63,21 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
   const canEdit =
     !syncSettings.currentUser ||
     isWriterRole(syncSettings.currentUser.role);
+  // Columna «Actualizar genérico» (ADR 0006 §4): solo con sesión y permiso de escritura.
+  const priceState = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, genericPrices: s.genericPrices, pricePending: s.pricePending })));
+  const canSetGeneric = !!priceRecordingContext(priceState);
+  const [genericOverrides, setGenericOverrides] = useState<Record<string, boolean>>({});
+  const genericChoice = (item: ExtractedPriceCatalogItem) =>
+    genericImportChoice(
+      item.action === "update_price" && item.matchedEquipmentId
+        ? effectiveGenericPrice(priceState, item.matchedEquipmentId)?.priceUSD
+        : undefined,
+      item.priceUSD,
+    );
+  const genericChecked = (item: ExtractedPriceCatalogItem) => {
+    const choice = genericChoice(item);
+    return canSetGeneric && choice !== "hidden" && (genericOverrides[item.id] ?? choice === "checked");
+  };
   const requestGeneration = useRef(0);
   const abort = useRef<AbortController | null>(null);
 
@@ -207,6 +225,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
 
       if (request !== requestGeneration.current) return;
       setScanResult(result);
+      setGenericOverrides({});
 
       // Si el usuario especificó un proveedor manual, usarlo.
       // Si no, y hay coincidencia con uno existente (>= 0.70), vincular con el existente automáticamente
@@ -363,14 +382,25 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
           serverUrl: live.syncSettings.serverUrl,
         },
       );
-      for (const item of plan.creates) live.addEquipmentItem(item);
-      if (plan.updates.length) live.batchUpdateSupplierPrices(plan.updates);
+      const recorded = new Set<string>();
+      for (const item of plan.creates) for (const id of live.addEquipmentItem(item)) recorded.add(id);
+      if (plan.updates.length) for (const id of live.batchUpdateSupplierPrices(plan.updates)) recorded.add(id);
       const fresh = useSimulationStore.getState();
       if (!isPriceCatalogPlanApplied(plan, fresh.equipmentCatalog))
         throw new Error(
           fresh.equipmentSyncFeedback ||
             "No se pudo aplicar todo el lote. Revisa los permisos y las filas seleccionadas.",
         );
+      // Checked rows also set the generic price, derived from the record of the offer just saved (no extra dialog).
+      const checked = new Set(selected.filter(genericChecked).map((item) => item.id));
+      for (const { equipmentId, priceUSD } of genericUpdatesFromImport(plan, checked)) {
+        const source = fresh.pricePending.observations.find((entry) => recorded.has(entry.id) && entry.equipmentId === equipmentId);
+        fresh.setGenericPrice(equipmentId, priceUSD, "ai_scan", {
+          derivedFromId: source?.id,
+          supplierName: supplier.trim() || undefined,
+          supplierOfferId: source?.supplierOfferId,
+        });
+      }
       closeAIPriceCatalogModal();
     } catch (cause) {
       setErrorMessage(
@@ -710,6 +740,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                   </div>
                   <span className="text-[11px] text-zinc-400 font-semibold">
                     VINCULACIÓN CON CATÁLOGO / PRECIO
+                    {canSetGeneric ? " / GENÉRICO" : ""}
                   </span>
                 </div>
 
@@ -865,6 +896,23 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                             >
                               USD/ud
                             </span>
+                            {canSetGeneric &&
+                              !isIgnored &&
+                              genericChoice(item) !== "hidden" && (
+                                <label className="mt-1 flex items-center justify-end gap-1 text-[10px] text-slate-500 dark:text-zinc-400 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={genericChecked(item)}
+                                    onChange={(event) =>
+                                      setGenericOverrides((previous) => ({
+                                        ...previous,
+                                        [item.id]: event.target.checked,
+                                      }))
+                                    }
+                                  />
+                                  Actualizar genérico
+                                </label>
+                              )}
                           </div>
                         </div>
                       </div>

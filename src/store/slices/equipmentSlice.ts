@@ -5,6 +5,7 @@ import { DEFAULT_EQUIPMENT_CATALOG } from '../../data/defaultEquipmentCatalog';
 import { SolarEquipmentItem } from '../../types/equipment';
 import { SyncService } from '../../services/syncService';
 import { reuseArray, reuseIfEqual, reuseRecord } from '../sync/structuralSharing';
+import { offerObservations } from '../../../shared/equipmentPrices';
 
 export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, get) => {
   let inFlight: { generation: number; promise: Promise<{ success: boolean; message: string }> } | null = null;
@@ -39,6 +40,28 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
     }
     return { ...patch, deletedEquipmentIds: patch.deletedEquipmentIds?.filter((id) => !protectedItems.some((item) => item.id === id)) ?? state.deletedEquipmentIds, equipmentCatalog: next, equipmentChanges: changes, equipmentDeletionQueue: deleted };
   }, replace);
+  /**
+   * ADR 0006, Regla 1: registra las ofertas nuevas o con precio distinto que de verdad quedaron guardadas, comparando el
+   * catálogo antes y después de la escritura (el `set` envuelto puede rechazar en silencio equipos ajenos o a un
+   * LECTOR). Solo lo llaman las acciones explícitas; descargar, hidratar, resolver conflictos o restablecer, nunca.
+   */
+  const recordLandedOffers = (before: SolarEquipmentItem[], source?: 'agent'): string[] => {
+    const after = get().equipmentCatalog;
+    if (after === before) return [];
+    const previous = new Map(before.map((item) => [item.id, item]));
+    const byName = new Map(before.map((item) => [item.displayName?.trim().toLowerCase(), item]));
+    const drafts = after.flatMap((item) => {
+      const old = previous.get(item.id);
+      if (old === item) return [];
+      return offerObservations(old ?? byName.get(item.displayName?.trim().toLowerCase()), item).map((candidate) => (source ? { ...candidate, source } : candidate));
+    });
+    return drafts.length ? get().recordPriceObservations(drafts) : [];
+  };
+  /** Sincronización automática del catálogo y, después, de los registros de precio que haya en cola. */
+  const autoSyncCatalog = (recorded: string[]) => {
+    if (!get().syncSettings.autoSyncEnabled || !get().syncSettings.authToken) return;
+    void get().syncEquipmentWithServer().then(() => (recorded.length ? get().syncPriceObservations({ refresh: false }) : undefined));
+  };
   return {
   equipmentChanges: {}, equipmentDeletionQueue: [], equipmentSyncFeedback: null, equipmentConflicts: {},
   resolveEquipmentConflict: (id, resolution) => {
@@ -73,6 +96,7 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
   deletedEquipmentIds: [],
 
   addEquipmentItem: (item) => {
+    const before = get().equipmentCatalog;
     set((state) => {
       const exists = state.equipmentCatalog.some((e) => e.id === item.id || e.displayName === item.displayName);
       const updated = exists
@@ -88,14 +112,14 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
       };
     });
 
+    const recorded = recordLandedOffers(before);
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
-
-    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
-      get().syncEquipmentWithServer();
-    }
+    autoSyncCatalog(recorded);
+    return recorded;
   },
 
   addEquipmentBatch: (items) => {
+    const before = get().equipmentCatalog;
     set((state) => {
       const catalogMap = new Map<string, SolarEquipmentItem>();
       state.equipmentCatalog.forEach((e) => catalogMap.set(e.displayName.toLowerCase(), e));
@@ -109,14 +133,14 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
       };
     });
 
+    const recorded = recordLandedOffers(before);
     setTimeout(() => set({ saveFeedbackMessage: null }), 3500);
-
-    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
-      get().syncEquipmentWithServer();
-    }
+    autoSyncCatalog(recorded);
+    return recorded;
   },
 
-  updateEquipmentItem: (id, updates) => {
+  updateEquipmentItem: (id, updates, options = {}) => {
+    const before = get().equipmentCatalog;
     set((state) => ({
       equipmentCatalog: state.equipmentCatalog.map((e) =>
         e.id === id ? { ...e, ...updates, updatedAt: new Date().toISOString() } : e
@@ -124,11 +148,11 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
       saveFeedbackMessage: '¡Equipo actualizado con éxito! ✨',
     }));
 
+    // An agent undo restores the previous offers: that is not a new price seen (ADR 0006 §4).
+    const recorded = options.recordPrices === false ? [] : recordLandedOffers(before);
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
-
-    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
-      get().syncEquipmentWithServer();
-    }
+    autoSyncCatalog(recorded);
+    return recorded;
   },
 
   removeEquipmentItem: (id) => {
@@ -293,7 +317,8 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
     } finally { if (inFlight?.promise === promise) inFlight = null; }
   },
 
-  addOrUpdateSupplierPrice: (equipmentId, supplierPrice) => {
+  addOrUpdateSupplierPrice: (equipmentId, supplierPrice, options = {}) => {
+    const before = get().equipmentCatalog;
     set((state) => {
       const target = state.equipmentCatalog.find((e) => e.id === equipmentId);
       if (!target) return state;
@@ -332,11 +357,10 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
       };
     });
 
+    const recorded = recordLandedOffers(before, options.priceSource);
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
-
-    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
-      get().syncEquipmentWithServer();
-    }
+    autoSyncCatalog(recorded);
+    return recorded;
   },
 
   removeSupplierPrice: (equipmentId, supplierPriceId) => {
@@ -370,6 +394,7 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
   },
 
   batchUpdateSupplierPrices: (updates) => {
+    const before = get().equipmentCatalog;
     set((state) => {
       const catalogMap = new Map(state.equipmentCatalog.map((item) => [item.id, { ...item }]));
       const nowIso = new Date().toISOString();
@@ -408,11 +433,10 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
       };
     });
 
+    const recorded = recordLandedOffers(before);
     setTimeout(() => set({ saveFeedbackMessage: null }), 4000);
-
-    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
-      get().syncEquipmentWithServer();
-    }
+    autoSyncCatalog(recorded);
+    return recorded;
   },
 
   setPreferredSupplier: (equipmentId, supplierPriceId) => {

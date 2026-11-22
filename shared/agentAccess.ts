@@ -83,6 +83,8 @@ export const AGENT_ROUTES: readonly AgentRoute[] = [
   { method: 'GET', path: '/api/projects/:id', scope: 'read' },
   { method: 'GET', path: '/api/clients', scope: 'read' },
   { method: 'GET', path: '/api/equipment', scope: 'read' },
+  { method: 'GET', path: '/api/equipment-prices', scope: 'read' },
+  { method: 'GET', path: '/api/equipment-prices/generic', scope: 'read' },
   { method: 'GET', path: '/api/tariffs', scope: 'read' },
   { method: 'PUT', path: '/api/clients/:id', scope: 'write' },
   { method: 'PUT', path: '/api/projects/:id/client-link', scope: 'write' },

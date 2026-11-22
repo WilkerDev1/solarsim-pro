@@ -1,6 +1,7 @@
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { storeGenericPriceFor } from '../params/logic/storeGenericPrice';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveAssumption, resolveAssumptions } from '../../../../shared/assumptions';
 import { resolveSystemLossesPct } from '../params/logic/dockDefaults';
@@ -33,7 +34,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({ 
   const totalInverterKW = calculateTotalInverterPowerKW(specs);
   const losses = resolveSystemLossesPct(specs);
   const autoInfo = `Calcula los paneles para cubrir el ${resolveAssumptions(project).targetCoveragePct}% del consumo, con ${losses}% de pérdidas.`;
-  const common = { mode, specs, catalog: equipmentCatalog, updateSpecs, onOpenScanner: openAIDatasheetModal } as const;
+  const common = { mode, specs, catalog: equipmentCatalog, updateSpecs, onOpenScanner: openAIDatasheetModal, genericPriceFor: storeGenericPriceFor } as const;
 
   return (
     <div className="flex flex-col gap-2.5">

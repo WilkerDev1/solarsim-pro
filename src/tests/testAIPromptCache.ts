@@ -120,6 +120,24 @@ assert(stableBytes / total > 0.8, 'con el catálogo de fábrica, más del 80 % d
   assert.equal(viaRequest[3].requestedModel, 'Panel Trina 700 W');
 }
 
+// --- Precio genérico (ADR 0006): marcado en el catálogo estable, nunca en el contexto ni reenviado en el borrador. ---
+{
+  const bare = catalog.find(e => e.type === 'panel' && !e.supplierPrices?.length) ?? { ...catalog.find(e => e.type === 'panel')!, supplierPrices: [] };
+  const items = catalog.map(e => e.id === bare.id ? bare : e);
+  const genericPrices = { [bare.id]: { priceUSD: 77, observedAt: '2026-11-10T00:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-000000000009' } };
+  const ctx: AIProposalContext = { ...base, genericPrices };
+  const draftGeneric = normalizeProposalDraft({ clientName: 'Cliente', panels: [{ equipmentId: bare.id, quantity: 8 }], inverters: [], batteries: [] }, items, ctx);
+  assert.equal(draftGeneric.panels![0].priceSource, 'generic');
+  const r1 = buildProposalRequest({ projectRequirementsText: 'Propuesta', equipmentCatalog: items, context: ctx });
+  const r2 = buildProposalRequest({ projectRequirementsText: 'Otra ronda', equipmentCatalog: items, context: { ...ctx, currentDraft: draftGeneric } });
+  assert.equal(JSON.stringify(stableParts(r1)), JSON.stringify(stableParts(r2)), 'el genérico no rompe el prefijo estable');
+  const entry = JSON.parse(r1.contents[0].parts[0].text!).catalog.find((e: { id: string }) => e.id === bare.id);
+  assert.deepEqual([entry.priceUSD, entry.priceKind, entry.supplier], [77, 'generic', undefined]);
+  assert.equal(r1.contents[0].parts[1].text!.includes('genericPrices'), false, 'el mapa no va en el contexto del proyecto');
+  const sentGeneric = JSON.parse(r2.contents[0].parts.at(-1)!.text!).currentDraft.panels[0];
+  assert.deepEqual(sentGeneric, { equipmentId: bare.id, quantity: 8 }, 'el grupo genérico viaja sin precio ni fuente');
+}
+
 // --- Asistente: instrucción y herramientas estables; la propuesta activa y la vista viajan al final del turno. ---
 const bodies: any[] = [];
 const transport: GeminiTransport = async (_url, body) => {

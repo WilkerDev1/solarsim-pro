@@ -3,7 +3,7 @@ import type { SolarEquipmentItem } from '../../../../../types/equipment';
 import { catalogPanelGroupPatch } from '../../../../../utils/catalogGroupPatch';
 import { detachedCatalogIdentity, editEquipmentGroup, selectCatalogEquipment, type EquipmentKind } from '../../../../../utils/equipmentGroups';
 import { readEquipment } from '../../../../../../shared/equipment';
-import { buildCatalogSelectionUpdate } from '../../logic/catalogSelection';
+import { autoPriceFields, buildCatalogSelectionUpdate, type GenericPriceLookup } from '../../logic/catalogSelection';
 import { MANUAL_BRAND_PLACEHOLDER, resolveBatteryDodPct, resolveBatteryEfficiencyPct } from '../../logic/dockDefaults';
 
 export type EquipmentMode = 'catalog' | 'manual';
@@ -88,11 +88,16 @@ export function groupViews(specs: SystemSpecs, kind: EquipmentKind): GroupModelV
   }));
 }
 
-/** Modelo nuevo para «+»: el primer equipo del catálogo distinto del principal, o un valor por defecto. */
-export function buildNewItem<K extends EquipmentKind>(kind: K, specs: SystemSpecs, catalog: SolarEquipmentItem[], now: number = Date.now()): GroupItem[K] {
+/**
+ * Modelo nuevo para «+»: el primer equipo del catálogo distinto del principal, o un valor por defecto. Su precio sale del
+ * resolvedor único (oferta → genérico, ADR 0006) y, sin ninguno, de la estimación por W/kW/kWh.
+ */
+export function buildNewItem<K extends EquipmentKind>(kind: K, specs: SystemSpecs, catalog: SolarEquipmentItem[], now: number = Date.now(), genericFor?: GenericPriceLookup): GroupItem[K] {
   const current = itemsOf(specs, kind)[0]?.brandModel;
   const candidate = catalog.find(entry => entry.type === kind && entry.displayName !== current);
-  const price = candidate?.supplierPrices?.[0]?.priceUSD;
+  const auto = candidate ? autoPriceFields(candidate, genericFor?.(candidate.id)) : undefined;
+  const priced = auto && auto.kind !== 'none' ? auto.fields : {};
+  const price = priced.unitPriceUSD as number | undefined;
   if (kind === 'panel') {
     return {
       id: `panel-${now}`,
@@ -101,6 +106,7 @@ export function buildNewItem<K extends EquipmentKind>(kind: K, specs: SystemSpec
       ...(candidate ? catalogPanelGroupPatch(candidate) : { brandModel: 'Módulos JA Solar JAM66D45-630/LB (630W)', powerW: 630 }),
       count: 10,
       unitPriceUSD: price || (candidate?.powerW ? candidate.powerW * 0.17 : 105),
+      ...withoutPrice(priced),
     } as GroupItem[K];
   }
   if (kind === 'inverter') {
@@ -111,6 +117,7 @@ export function buildNewItem<K extends EquipmentKind>(kind: K, specs: SystemSpec
       powerKW: candidate?.powerKW || 5.0,
       count: 1,
       unitPriceUSD: price || (candidate?.powerKW ? candidate.powerKW * 220 : 1100),
+      ...withoutPrice(priced),
     } as GroupItem[K];
   }
   return {
@@ -120,17 +127,26 @@ export function buildNewItem<K extends EquipmentKind>(kind: K, specs: SystemSpec
     capacityKWh: candidate?.capacityKWh || 5.12,
     count: 1,
     unitPriceUSD: price || (candidate?.capacityKWh ? candidate.capacityKWh * 160 : 850),
+    ...withoutPrice(priced),
     dodPct: resolveBatteryDodPct(candidate?.dodPct),
     efficiencyPct: resolveBatteryEfficiencyPct(candidate?.batteryEfficiencyPct),
   } as GroupItem[K];
 }
 
-/** Campos que un modelo secundario toma del catálogo, más su precio (el del primer proveedor o el que ya tenía). */
-function secondaryCatalogExtras(kind: EquipmentKind, item: SolarEquipmentItem, currentPrice: number | undefined): Record<string, unknown> {
-  const unitPriceUSD = item.supplierPrices?.[0]?.priceUSD || currentPrice;
-  if (kind === 'panel') return { ...catalogPanelGroupPatch(item), unitPriceUSD };
-  if (kind === 'inverter') return { powerKW: item.powerKW || 5.0, unitPriceUSD };
-  return { capacityKWh: item.capacityKWh || 5.12, unitPriceUSD, dodPct: resolveBatteryDodPct(item.dodPct), efficiencyPct: resolveBatteryEfficiencyPct(item.batteryEfficiencyPct) };
+/** Campos de precio de `autoPriceFields` sin `unitPriceUSD` (que «+» resuelve con su estimación) y sin claves vacías. */
+function withoutPrice(fields: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(fields).filter(([key, value]) => key !== 'unitPriceUSD' && value !== undefined));
+}
+
+/**
+ * Campos que un modelo secundario toma del catálogo, más su precio del resolvedor único (oferta → genérico → sin precio);
+ * nunca el precio del modelo anterior.
+ */
+function secondaryCatalogExtras(kind: EquipmentKind, item: SolarEquipmentItem, generic: ReturnType<GenericPriceLookup>): Record<string, unknown> {
+  const price = autoPriceFields(item, generic).fields;
+  if (kind === 'panel') return { ...catalogPanelGroupPatch(item), ...price };
+  if (kind === 'inverter') return { powerKW: item.powerKW || 5.0, ...price };
+  return { capacityKWh: item.capacityKWh || 5.12, ...price, dodPct: resolveBatteryDodPct(item.dodPct), efficiencyPct: resolveBatteryEfficiencyPct(item.batteryEfficiencyPct) };
 }
 
 /** Cantidad en unidades enteras, mínimo 1: el Stepper acepta fracciones y los equipos no se cuentan en fracciones. */
@@ -150,13 +166,15 @@ export interface GroupActions<K extends EquipmentKind> {
 
 /**
  * Acciones de un grupo de equipos. Todo cambio de lista y de cantidad pasa por `editEquipmentGroup`
- * (o `selectCatalogEquipment`, que lo usa) (el espejo heredado nunca se escribe).
+ * (o `selectCatalogEquipment`, que lo usa) (el espejo heredado nunca se escribe). `genericFor` da el precio genérico
+ * efectivo de un equipo al elegirlo o añadirlo; sin sesión no se pasa y no hay genérico.
  */
 export function createGroupActions<K extends EquipmentKind>(
   kind: K,
   specs: SystemSpecs,
   catalog: SolarEquipmentItem[],
-  updateSpecs: (patch: Partial<SystemSpecs>) => void
+  updateSpecs: (patch: Partial<SystemSpecs>) => void,
+  genericFor?: GenericPriceLookup
 ): GroupActions<K> {
   const commit = (patch: Partial<SystemSpecs>) => {
     if (Object.keys(patch).length > 0) updateSpecs(patch);
@@ -165,16 +183,16 @@ export function createGroupActions<K extends EquipmentKind>(
   const field = KIND_CONFIG[kind].magnitudeField;
   return {
     add: () => {
-      const edit = editEquipmentGroup(specs, kind, { type: 'add', item: buildNewItem(kind, specs, catalog) });
+      const edit = editEquipmentGroup(specs, kind, { type: 'add', item: buildNewItem(kind, specs, catalog, Date.now(), genericFor) });
       // Con varios modelos la cantidad de paneles ya no se calcula sola; una batería nueva implica «con batería».
       commit({ ...edit, ...(kind === 'panel' ? { autoCalculatePanels: false } : {}), ...(kind === 'battery' ? { hasBattery: true } : {}) });
     },
     remove: index => commit(editEquipmentGroup(specs, kind, { type: 'remove', index })),
     update,
     select: (index, item) => {
-      if (index === 0) return commit(buildCatalogSelectionUpdate(specs, kind, item));
-      const current = itemsOf(specs, kind)[index];
-      commit(selectCatalogEquipment(specs, kind, index, item, secondaryCatalogExtras(kind, item, current?.unitPriceUSD) as Partial<GroupItem[K]>));
+      const generic = genericFor?.(item.id);
+      if (index === 0) return commit(buildCatalogSelectionUpdate(specs, kind, item, generic));
+      commit(selectCatalogEquipment(specs, kind, index, item, secondaryCatalogExtras(kind, item, generic) as Partial<GroupItem[K]>));
     },
     setCount: (index, count) => update(index, { count: wholeCount(count) } as Partial<GroupItem[K]>),
     setBrand: (index, brandModel) => {

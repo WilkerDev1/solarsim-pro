@@ -58,16 +58,17 @@ Toda propuesta creada o editada por agentes cotiza en modo **Simple (Catálogo I
 | Herramienta | Tipo | Notas |
 | --- | --- | --- |
 | `search_projects`, `get_project`, `get_simulation` | read | Espacio actual, 12 resultados, motor real |
-| `search_equipment`, `get_equipment`, `get_tariffs` | read | Sin oferta en stock no significa agotado |
+| `search_equipment`, `get_equipment`, `get_tariffs` | read | Sin oferta en stock no significa agotado. `search_equipment` y `get_equipment` añaden `genericPriceUSD` (y `get_equipment`, `genericPriceObservedAt`): precio genérico sin proveedor, aparte de las ofertas; `null` si no hay o sin sesión |
 | `propose_project_update` | draft | Propuesta abierta: cliente, parámetros, tarifas, finanzas, consumos y grupos del catálogo |
 | `propose_equipment_update` | guarded | Especificaciones del catálogo; conserva id, ofertas y adjuntos |
-| `create_proposal` | draft | Cliente, tarifa, 12 consumos o promedio, grupos `{catalogItemId, count}`; no navega |
+| `create_proposal` | draft | Cliente, tarifa, 12 consumos o promedio, grupos `{catalogItemId, count}`; no navega. Precio: oferta del proveedor, si no el precio genérico (avisado en `warnings`), nunca inventado |
 | `duplicate_proposal` | draft | Versión enlazada sin cambiar la propuesta activa |
 | `open_proposal` | read | Abre resumen, simulador o PDF a petición |
 | `set_proposal_status`, `set_commercial_status`, `add_commercial_report`, `move_proposal_to_trash` | guarded | |
 | `audit_catalog` | read | Precios ausentes o vencidos, sin ficha o imagen, sin potencia nominal, duplicados, sin stock, atípicos y equipos de propuestas fuera del catálogo; tarjeta interactiva |
 | `list_supplier_offers` | read | Máximo 50 |
-| `update_supplier_price` | guarded | Precio USD y/o disponibilidad de una oferta existente |
+| `get_price_history` | read | Historial de precios de un equipo (`equipmentId`, `limit` ≤ 100, por defecto 50), más recientes primero: registros con tipo, fuente, moneda y monto originales, proveedor o propuesta (código y nombre del cliente, como `search_projects`; `proposalDeleted` si ya no existe), autor y anulación, sin ids internos de usuario; precio genérico vigente y resumen (`agentPriceHistory`, `shared/agentTools/priceHistory.ts`): meses del año con `null` en los meses sin registros y variación a 3/6/12 meses. En la app requiere sesión, suma lo pendiente del usuario (`pendingSync`, `voidPending`) y lee con `SyncService.fetchPriceHistory` (`src/features/agentTools/priceTools.ts`) ([ADR 0006](adr/0006-precio-generico-e-historial.md)) |
+| `update_supplier_price` | guarded | Precio USD y/o disponibilidad de una oferta existente. Con sesión, un precio nuevo crea un registro de precio con fuente `agent` (nunca pregunta), el resultado (`genericPrice`) dice si difiere del precio genérico y deshacer anula ese registro ([ADR 0006](adr/0006-precio-generico-e-historial.md)) |
 | `apply_proposal_draft` | draft | Solo el asistente de propuestas |
 | `get_agent_action_status` | read | Espera hasta 20 s la decisión de una acción pendiente |
 | `list_document_texts` | read | Textos editables del PDF por clave (p. ej. `quotation.warranty.panel`, `client.phone`), con sección, personalización y plantilla. Filtros `section` y `query` (clave, etiqueta o texto, sin tildes) |

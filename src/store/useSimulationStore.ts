@@ -19,6 +19,7 @@ import { createCompanyProfileSlice } from './slices/companyProfileSlice';
 import { createVersionHistorySlice } from './slices/versionHistorySlice';
 import { createFeatureSettingsSlice } from './slices/featureSettingsSlice';
 import { createNotificationSlice } from './slices/notificationSlice';
+import { createEquipmentPriceSlice } from './slices/equipmentPriceSlice';
 
 // Re-export helper types and generators for backward compatibility
 export type { SimulationStore, SimulationState, NewProjectPayload };
@@ -84,6 +85,7 @@ export const useSimulationStore = create<SimulationStore>()(
       ...createNotificationSlice(...a),
       ...createFeatureSettingsSlice(...a),
       ...createAgentSlice(...a),
+      ...createEquipmentPriceSlice(...a),
     }),
 
     {

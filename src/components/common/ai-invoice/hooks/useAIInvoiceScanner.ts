@@ -19,6 +19,7 @@ import { draftDocumentTextCatalog } from '../../../../utils/draftDocumentTexts';
 import { aiWorkspaceKey, proposalFileType, readProposalFile, PROPOSAL_FILES_LIMIT } from '../workspace';
 import { blocksPreview, buildIssueModel } from '../reviewIssues';
 import { restoreComposerText } from '../../../../features/assistant/chatUi';
+import { effectiveGenericPriceMap } from '../../../../store/slices/equipmentPriceSlice';
 
 export interface ProposalMessage { role: 'user' | 'assistant'; text: string; files?: string[]; kind?: 'error' }
 export function useAIInvoiceScanner() {
@@ -27,6 +28,10 @@ export function useAIInvoiceScanner() {
     defaultSimulationSettings: defaults, tariffMatrix } = state;
   const workspace = aiWorkspaceKey(state);
   const mode = useEnergyCalculationMode();
+  // Precio genérico (ADR 0006): referencias estables del store; el mapa se recalcula solo cuando cambian.
+  const priceState = useSimulationStore(useShallow((s) => ({ genericPrices: s.genericPrices, pricePending: s.pricePending })));
+  const genericPrices = useMemo(() => effectiveGenericPriceMap({ syncSettings: state.syncSettings, equipmentCatalog, ...priceState }),
+    [state.syncSettings, equipmentCatalog, priceState.genericPrices, priceState.pricePending]);
   const activeProject = projects.find(p => p.id === activeProjectId && !p.deletedAt);
   const [files, setFiles] = useState<FilePreview[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -61,9 +66,10 @@ export function useAIInvoiceScanner() {
       monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses,target?.client.customMonthlyHSP),
       calculationMode: mode,
       commercial: {pricingMode:'cost_matrix',markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? 0,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
-      equipmentPrices:target?[...(target.specs.panels || []),...(target.specs.inverters || []),...(target.specs.batteries || [])].filter(g=>g.unitPriceUSD!==undefined).map(g=>({id:g.id,unitPriceUSD:g.unitPriceUSD!})):[],
+      equipmentPrices:target?[...(target.specs.panels || []),...(target.specs.inverters || []),...(target.specs.batteries || [])].filter(g=>g.unitPriceUSD!==undefined).map(g=>({id:g.id,unitPriceUSD:g.unitPriceUSD!,priceSource:g.priceSource ?? 'manual'})):[],
+      genericPrices,
     } as AIProposalContext;
-  }, [extractedData?.province, target, defaults, tariffMatrix, mode]);
+  }, [extractedData?.province, target, defaults, tariffMatrix, mode, genericPrices]);
   const scope = `${workspace}|${useCurrentProject ? activeProjectId : 'new'}`;
   const previousScope = useRef(scope);
   const cancel = () => { sequence.current++; controller.current?.abort();

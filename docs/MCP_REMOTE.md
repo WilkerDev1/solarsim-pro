@@ -39,7 +39,7 @@ Dos formas de obtener un token `ssm_…`; ambas crean un **acceso** ligado a una
 
 Reglas comunes, aplicadas por la API en cada petición:
 
-- Solo se aceptan en las rutas de `AGENT_ROUTES` (`shared/agentAccess.ts`): leer propuestas, clientes, catálogo y tarifas; crear o editar clientes; enlazar una propuesta con un cliente. Nunca `/api/auth/*` (un token de agente no puede convertirse en sesión), usuarios, organización, publicación, borrados ni papelera.
+- Solo se aceptan en las rutas de `AGENT_ROUTES` (`shared/agentAccess.ts`): leer propuestas, clientes, catálogo, tarifas, precios genéricos e historial de precios de equipos; crear o editar clientes; enlazar una propuesta con un cliente. Nunca `/api/auth/*` (un token de agente no puede convertirse en sesión), usuarios, organización, publicación, borrados, papelera ni registros de precio (`POST /api/equipment-prices/batch`).
 - Alcance `read` = LECTOR aunque la cuenta sea EDITOR o ADMIN. Alcance `write` = el rol **actual** de la cuenta (si la degradan a LECTOR, deja de escribir al instante).
 - Cambiar la contraseña o desactivar a la persona (sube `auth_version`) invalida todos sus accesos, como una sesión.
 - El token solo vale para el `MCP_REMOTE_URL` configurado (audiencia); un token emitido para otro recurso se rechaza.
@@ -52,7 +52,8 @@ Reglas comunes, aplicadas por la API en cada petición:
 | --- | --- | --- |
 | `search_projects` | read | Datos sincronizados; excluye la papelera; máximo 12 |
 | `get_project` | read | `id` obligatorio (no hay «propuesta abierta»); la papelera no es visible para agentes (404, igual que en la búsqueda). Devuelve datos guardados y equipos normalizados; **no ejecuta el motor** (producción, ahorro, retorno se ven en la app) |
-| `search_equipment`, `get_equipment`, `list_supplier_offers` | read | Catálogo de la organización y equipos de referencia |
+| `search_equipment`, `get_equipment`, `list_supplier_offers` | read | Catálogo de la organización y equipos de referencia. `search_equipment` y `get_equipment` añaden `genericPriceUSD` (y `get_equipment`, `genericPriceObservedAt`) desde `GET /api/equipment-prices/generic`: precio de referencia sin proveedor, aparte de las ofertas y sin relación con el stock; `null` si no hay o si la API no tiene la función |
+| `get_price_history` | read | `GET /api/equipment-prices` del equipo (solo si existe en el catálogo de la organización) más el genérico vigente, con el mismo resultado que en la app (`agentPriceHistory`); una API sin la función responde `unsupported` |
 | `get_tariffs` | read | Matriz propia de la organización o `null` (pliego oficial integrado en la app) |
 | `search_clients`, `get_client` | read | `get_client` resume hasta 50 propuestas enlazadas |
 | `create_client`, `update_client` | draft | CAS: `update_client` envía la versión que leyó; si alguien editó entretanto, `conflict` y no se sobrescribe |

@@ -4,6 +4,7 @@ import { migrateLegacySpecs } from '../../shared/equipment';
 import { CLIENT_OUTDATED, isClientGateOpen } from '../../shared/clientVersion';
 import { CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE } from './clientIdentity';
 import { clientOutdatedText, getClientOutdated, isServerBlocked, reportClientOutdated } from './clientVersionGate';
+import { isObservationId, type EquipmentPriceObservation, type GenericPriceInfo, type ObservationInput } from '../../shared/equipmentPrices';
 import { UNKNOWN_DOCUMENT_ASSET, withAssetRefs, assetRef, collectAssetRefs, isAssetCandidate, mapDocumentAssetFields, replaceAssetRefs } from '../../shared/documentAssets';
 
 /**
@@ -27,6 +28,32 @@ async function sha256Hex(text: string): Promise<string | null> {
 export type EquipmentPushOutcome =
   | { id: string; status: 'created' | 'updated'; version: number; item: SolarEquipmentItem }
   | { id: string; status: 'conflict'; reason: string; serverVersion?: number; serverItem?: SolarEquipmentItem };
+
+/** Lote de `POST /api/equipment-prices/batch` (máximo 200 + 200, `PRICE_OBSERVATION_LIMITS`). */
+export interface PriceObservationBatch {
+  observations: ObservationInput[];
+  voids: { id: string }[];
+}
+export type PriceItemStatus = 'created' | 'duplicate' | 'conflict' | 'rejected' | 'voided' | 'already_voided' | 'not_found';
+export interface PriceItemResult {
+  id: string;
+  status: PriceItemStatus;
+  observation?: EquipmentPriceObservation;
+}
+export type PriceBatchOutcome =
+  | { status: 'ok'; observations: PriceItemResult[]; voids: PriceItemResult[] }
+  | { status: 'unsupported' }
+  | { status: 'error'; error: string };
+const PRICE_ITEM_STATUSES: readonly PriceItemStatus[] = ['created', 'duplicate', 'conflict', 'rejected', 'voided', 'already_voided', 'not_found'];
+/** Keeps only well-formed per-item results: an unknown status is never treated as an acknowledgement. */
+function priceItemResults(value: unknown): PriceItemResult[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) =>
+    raw && typeof raw.id === 'string' && PRICE_ITEM_STATUSES.includes(raw.status)
+      ? [{ id: raw.id, status: raw.status as PriceItemStatus, ...(raw.observation && typeof raw.observation === 'object' ? { observation: raw.observation } : {}) }]
+      : [],
+  );
+}
 
 export interface PingResult {
   online: boolean;
@@ -765,6 +792,56 @@ export class SyncService {
    */
   static async deleteEquipment(serverUrl: string, token: string, equipmentId: string, baseVersion?: number): Promise<boolean> {
     return this.sendOk(serverUrl, token, 'DELETE', `/api/equipment/${encodeURIComponent(equipmentId)}${baseVersion !== undefined ? `?baseVersion=${baseVersion}` : ''}`);
+  }
+
+  /**
+   * Registros de precio (ADR 0006). Un 404 significa «API sin esta función»: `unsupported`, sin mensaje de error, y el
+   * llamador conserva su cola.
+   */
+  static async pushPriceObservations(serverUrl: string, token: string, batch: PriceObservationBatch): Promise<PriceBatchOutcome> {
+    try {
+      const res = await this.send(serverUrl, token, 'POST', '/api/equipment-prices/batch', batch);
+      if (res.status === 404) return { status: 'unsupported' };
+      const { data, error } = await this.readSuccess(res, 'Error al enviar registros de precio');
+      if (error) return { status: 'error', error };
+      return { status: 'ok', observations: priceItemResults(data.observations), voids: priceItemResults(data.voids) };
+    } catch (err: any) {
+      return { status: 'error', error: err?.message || 'Error de conexión al enviar registros de precio' };
+    }
+  }
+
+  /** Precio genérico vigente por equipo (`GET /api/equipment-prices/generic`). */
+  static async fetchGenericPrices(serverUrl: string, token: string): Promise<{ status: 'ok'; prices: Record<string, GenericPriceInfo> } | { status: 'unsupported' } | { status: 'error'; error: string }> {
+    try {
+      const res = await this.send(serverUrl, token, 'GET', '/api/equipment-prices/generic');
+      if (res.status === 404) return { status: 'unsupported' };
+      const { data, error } = await this.readSuccess(res, 'Error al descargar precios genéricos');
+      if (error) return { status: 'error', error };
+      const prices: Record<string, GenericPriceInfo> = {};
+      for (const [id, raw] of Object.entries((data.prices && typeof data.prices === 'object' ? data.prices : {}) as Record<string, any>)) {
+        if (raw && Number.isFinite(raw.priceUSD) && raw.priceUSD > 0 && typeof raw.observedAt === 'string' && isObservationId(raw.observationId))
+          prices[id] = { priceUSD: raw.priceUSD, observedAt: raw.observedAt, observationId: raw.observationId };
+      }
+      return { status: 'ok', prices };
+    } catch (err: any) {
+      return { status: 'error', error: err?.message || 'Error de conexión al descargar precios genéricos' };
+    }
+  }
+
+  /** Historial de un equipo, más recientes primero, paginado por `seq` (`before`). */
+  static async fetchPriceHistory(serverUrl: string, token: string, equipmentId: string, options: { limit?: number; before?: number | null } = {}): Promise<{ status: 'ok'; observations: EquipmentPriceObservation[]; nextBefore: number | null } | { status: 'unsupported' } | { status: 'error'; error: string }> {
+    try {
+      const query = new URLSearchParams({ equipmentId });
+      if (options.limit !== undefined) query.set('limit', String(options.limit));
+      if (options.before !== undefined && options.before !== null) query.set('before', String(options.before));
+      const res = await this.send(serverUrl, token, 'GET', `/api/equipment-prices?${query.toString()}`);
+      if (res.status === 404) return { status: 'unsupported' };
+      const { data, error } = await this.readSuccess(res, 'Error al descargar el historial de precios');
+      if (error) return { status: 'error', error };
+      return { status: 'ok', observations: Array.isArray(data.observations) ? data.observations : [], nextBefore: Number.isSafeInteger(data.nextBefore) ? data.nextBefore : null };
+    } catch (err: any) {
+      return { status: 'error', error: err?.message || 'Error de conexión al descargar el historial de precios' };
+    }
   }
 
   /**

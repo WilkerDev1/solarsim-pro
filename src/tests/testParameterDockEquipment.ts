@@ -7,10 +7,11 @@ import type { LegacyProjectSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { editEquipmentGroup, normalizeEquipmentEdit, resolveGroupCatalogItem, selectCatalogEquipment, type EquipmentKind } from '../utils/equipmentGroups';
 import type { ProjectSimulation } from '../types';
+import type { GenericPriceInfo } from '../../shared/equipmentPrices';
 import { unresolvedEquipmentIds } from '../utils/proposalAnnexes';
 import { resolveAnnualDegradationPct } from '../engine/financeEngine';
 import { catalogPanelGroupPatch } from '../utils/catalogGroupPatch';
-import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
+import { autoPriceFields, buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
 import {
   buildNewItem, createGroupActions, formatDcAcRatio, formatKW, groupViews,
 } from '../components/simulator/params/sections/equipment/equipmentGroupModel';
@@ -34,13 +35,13 @@ const catalog: SolarEquipmentItem[] = [
 ];
 
 /** updateSpecs como el store: aplica el parche con la normalización de equipos y registra cada llamada. */
-function harness(initial: Partial<LegacyProjectSpecs>) {
+function harness(initial: Partial<LegacyProjectSpecs>, genericFor?: (id: string) => GenericPriceInfo | null) {
   const state = { specs: { panelCount: 10, panelPowerW: 500, ...initial } as LegacyProjectSpecs, calls: [] as Array<Partial<LegacyProjectSpecs>> };
   const updateSpecs = (patch: Partial<LegacyProjectSpecs>) => {
     state.calls.push(patch);
     state.specs = normalizeEquipmentEdit(state.specs, patch);
   };
-  const actions = <K extends EquipmentKind>(kind: K) => createGroupActions(kind, state.specs, catalog, updateSpecs);
+  const actions = <K extends EquipmentKind>(kind: K) => createGroupActions(kind, state.specs, catalog, updateSpecs, genericFor);
   return { state, actions };
 }
 
@@ -138,7 +139,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const second = harness(multi());
   const base = second.state.specs;
   second.actions('panel').select(1, catalog[0]);
-  const expected = selectCatalogEquipment(base, 'panel', 1, catalog[0], { ...catalogPanelGroupPatch(catalog[0]), unitPriceUSD: catalog[0].supplierPrices?.[0]?.priceUSD || base.panels![1].unitPriceUSD });
+  const expected = selectCatalogEquipment(base, 'panel', 1, catalog[0], { ...catalogPanelGroupPatch(catalog[0]), ...autoPriceFields(catalog[0], undefined).fields });
   assert.deepEqual(second.state.calls[0].panels, expected.panels, 'secundario: selectCatalogEquipment');
   assert.equal(second.state.specs.panels?.[1].brandModel, 'Panel A 550');
   assert.equal(second.state.specs.panels?.[1].unitPriceUSD, 90);
@@ -147,6 +148,36 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   second.actions('inverter').select(0, catalog[3]);
   assert.equal(second.state.specs.inverters?.[0].brandModel, 'Inversor 5');
   assert.equal(second.state.specs.inverters?.[0].powerKW, 5);
+}
+// --- Precio genérico (ADR 0006 §5): secundarios y «+» usan el resolvedor; nada arrastra el precio anterior ---
+{
+  const generic = (priceUSD: number): GenericPriceInfo => ({ priceUSD, observedAt: '2026-11-10T00:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-000000000001' });
+  const lookup = (id: string) => (id === 'p2' ? generic(111) : id === 'p1' ? generic(50) : id === 'i2' ? generic(900) : null);
+  // Secundario sin oferta ni genérico: sin precio (antes conservaba el del modelo anterior).
+  const plain = harness({ ...multi(), panels: [{ id: 'pa', brandModel: 'Panel A 550', powerW: 550, count: 10 }, { id: 'pb', brandModel: 'Otro', powerW: 600, count: 4, unitPriceUSD: 140 }] });
+  plain.actions('panel').select(1, catalog[1]);
+  assert.equal(plain.state.specs.panels?.[1].unitPriceUSD, undefined, 'secundario sin oferta ni genérico: sin precio arrastrado');
+  // Con genérico: copia sin proveedor; la oferta gana sobre el genérico.
+  const g = harness({ ...multi(), panels: [{ id: 'pa', brandModel: 'Panel A 550', powerW: 550, count: 10 }, { id: 'pb', brandModel: 'Otro', powerW: 600, count: 4, unitPriceUSD: 140 }] }, lookup);
+  g.actions('panel').select(1, catalog[1]);
+  const second = g.state.specs.panels![1];
+  assert.deepEqual([second.unitPriceUSD, second.priceSource, second.genericPriceInfo?.priceUSD, second.selectedSupplierInfo], [111, 'generic', 111, undefined]);
+  g.actions('panel').select(1, catalog[0]);
+  assert.deepEqual([g.state.specs.panels![1].unitPriceUSD, g.state.specs.panels![1].priceSource, g.state.specs.panels![1].genericPriceInfo], [90, 'supplier', undefined], 'la oferta gana');
+  // Principal: el genérico llega a buildCatalogSelectionUpdate.
+  g.actions('inverter').select(0, catalog[3]);
+  assert.equal(g.state.specs.inverters?.[0].unitPriceUSD, 900);
+  assert.equal(g.state.specs.inverters?.[0].priceSource, 'generic');
+  // «+»: genérico antes que la estimación por W/kW/kWh.
+  const added = buildNewItem('panel', multi() as LegacyProjectSpecs, catalog, 3, lookup);
+  assert.deepEqual([added.catalogItemId, added.unitPriceUSD, added.priceSource, added.genericPriceInfo?.priceUSD], ['p2', 111, 'generic', 111]);
+  const estimated = buildNewItem('panel', multi() as LegacyProjectSpecs, catalog, 3);
+  assert.equal(estimated.unitPriceUSD, 600 * 0.17, 'sin genérico (o sin sesión) sigue la estimación por W');
+  assert.equal(estimated.priceSource, undefined);
+  const offered = buildNewItem('panel', { ...multi(), panels: [{ id: 'pb', brandModel: 'Panel B 600', powerW: 600, count: 4 }] } as LegacyProjectSpecs, catalog, 3, lookup);
+  assert.deepEqual([offered.catalogItemId, offered.unitPriceUSD, offered.priceSource, offered.selectedSupplierInfo?.supplierName], ['p1', 90, 'supplier', 'Alfa'], 'la oferta gana en «+»');
+  const inv = buildNewItem('inverter', multi() as LegacyProjectSpecs, catalog, 3, lookup);
+  assert.deepEqual([inv.catalogItemId, inv.unitPriceUSD, inv.priceSource], ['i2', 900, 'generic']);
 }
 // --- Vista del grupo y formatos ---
 {

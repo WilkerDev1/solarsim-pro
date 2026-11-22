@@ -14,12 +14,13 @@ import { CATALOG_TOOL_HANDLERS } from './catalogTools';
 import { DOCUMENT_TOOL_HANDLERS } from './documentTools';
 import { ATTACHMENT_TOOL_HANDLERS } from './attachmentTools';
 import { CLIENT_TOOL_HANDLERS } from './clientTools';
+import { PRICE_TOOL_HANDLERS } from './priceTools';
 import { touchesPricing } from '../assistant/pricingFields';
 import { assistantFieldLabel, assistantValueLabel } from '../assistant/labels';
 import type { AssistantAction, AssistantCard, AssistantToolResult } from '../assistant/types';
 
 export type { AgentToolContext } from './nativeTools';
-const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS, ...ATTACHMENT_TOOL_HANDLERS, ...CLIENT_TOOL_HANDLERS };
+const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS, ...ATTACHMENT_TOOL_HANDLERS, ...CLIENT_TOOL_HANDLERS, ...PRICE_TOOL_HANDLERS };
 
 const MAX_RESULT_BYTES = 64000;
 /**
@@ -141,11 +142,12 @@ function undoEntry(entry: AgentActivityEntry) {
     if (s.equipmentConflicts[entry.targetId]) return { success: false, error: 'Resuelve primero el conflicto del equipo.' };
     if (fingerprint(pick(current, fields)) !== entry.undo!.afterFingerprint)
       return { success: false, error: 'El equipo cambió después; revísalo en el catálogo.' };
-    s.updateEquipmentItem(entry.targetId, restored);
+    // Restoring offers is not a new price seen: nothing is recorded, and the agent's own records are voided.
+    s.updateEquipmentItem(entry.targetId, restored, { recordPrices: false });
     const after = store().equipmentCatalog.find((e) => e.id === entry.targetId);
-    return after && fingerprint(pick(after, fields)) === fingerprint(restored)
-      ? { success: true }
-      : { success: false, error: 'El catálogo rechazó el cambio.' };
+    if (!after || fingerprint(pick(after, fields)) !== fingerprint(restored)) return { success: false, error: 'El catálogo rechazó el cambio.' };
+    for (const id of entry.undo!.priceObservationIds ?? []) store().voidPriceObservation(id);
+    return { success: true };
   }
   const current = s.projects.find((p) => p.id === entry.targetId);
   if (!current) return { success: false, error: 'La propuesta ya no existe.' };
