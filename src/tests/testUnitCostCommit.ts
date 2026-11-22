@@ -115,6 +115,9 @@ const generic = (priceUSD: number) => ({ priceUSD, observedAt: '2026-11-10T00:00
   const created = queued().observations.find((entry) => entry.id === id)!;
   assert.deepEqual([created.kind, created.source, created.priceUSD, created.derivedFromId, created.equipmentId], ['generic', 'proposal', 120, asked.observationId, 'eq-1'],
     'usa los datos capturados al confirmar, no el precio actual');
+  assert.deepEqual([created.originalCurrency, created.originalPrice], ['USD', 120], 'el genérico desde propuesta guarda moneda y precio original, como los de ofertas');
+  const observed = queued().observations.find((entry) => entry.id === asked.observationId)!;
+  assert.deepEqual([observed.originalCurrency, observed.originalPrice], ['USD', 120], 'la observación de la propuesta también');
   store.getState().setSyncSettings({ serverUrl, authToken: 'token', currentUser: { ...user(), id: 'otro' }, autoSyncEnabled: false });
   assert.equal(acceptProposalGenericQuestion(store.getState(), asked.question!), null, 'otra sesión no acepta la pregunta');
 }
