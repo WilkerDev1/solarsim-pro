@@ -1,12 +1,9 @@
 import React from 'react';
 import { useSimulationStore } from '../../../../../store/useSimulationStore';
-import {
-  acceptProposalGenericQuestion, commitProposalPrice, priceFeatureActive, type ProposalGenericQuestion,
-} from '../../../../../store/slices/equipmentPriceSlice';
+import { acceptProposalGenericQuestion, commitProposalPrice, priceFeatureActive } from '../../../../../store/slices/equipmentPriceSlice';
 import type { PriceCommitTarget } from './UnitCosts';
 import type { PricedKind } from './supplierPricing';
-
-type RowQuestion = ProposalGenericQuestion & { kind: PricedKind; index: number };
+import { nextRowQuestion, rowQuestionFor, type RowQuestion } from './priceCommit';
 
 /** «¿Usar como precio genérico? Usar · No»: una línea gris bajo el precio, sin caja ni color de aviso. */
 const GenericQuestion: React.FC<{ onUse: () => void; onDismiss: () => void }> = ({ onUse, onDismiss }) => {
@@ -28,18 +25,27 @@ const GenericQuestion: React.FC<{ onUse: () => void; onDismiss: () => void }> = 
 export function useProposalPriceCommit(projectId: string) {
   const active = useSimulationStore((s) => priceFeatureActive(s));
   const [question, setQuestion] = React.useState<RowQuestion | null>(null);
+  // La fila cambió de equipo (otro modelo, o se movieron los grupos): la pregunta se descarta tras el render, no se oculta.
+  const stale = React.useRef(false);
+  React.useEffect(() => {
+    if (stale.current) { stale.current = false; setQuestion(null); }
+  });
 
   const onPriceCommit = (target: PriceCommitTarget, previousUSD: number | undefined, priceUSD: number) => {
     const result = commitProposalPrice(useSimulationStore.getState(), { projectId, equipmentId: target.equipmentId, previousUSD, priceUSD, supplierPriceUSD: target.supplierPriceUSD });
-    if (result.observationId) setQuestion(result.question ? { ...result.question, kind: target.kind, index: target.index } : null);
+    setQuestion((current) => nextRowQuestion(current, target, result));
   };
 
-  const priceQuestionFor = (kind: PricedKind, index: number): React.ReactNode => {
-    if (!question || question.projectId !== projectId || question.kind !== kind || question.index !== index) return null;
+  const priceQuestionFor = (kind: PricedKind, index: number, equipmentId: string | undefined): React.ReactNode => {
+    const match = rowQuestionFor(question, projectId, kind, index, equipmentId);
+    if (!match) {
+      if (question && question.projectId === projectId && question.kind === kind && question.index === index) stale.current = true;
+      return null;
+    }
     return (
       <GenericQuestion
-        onUse={() => { acceptProposalGenericQuestion(useSimulationStore.getState(), question); setQuestion(null); }}
-        onDismiss={() => { useSimulationStore.getState().dismissGenericQuestion(question.equipmentId); setQuestion(null); }}
+        onUse={() => { acceptProposalGenericQuestion(useSimulationStore.getState(), match); setQuestion(null); }}
+        onDismiss={() => { useSimulationStore.getState().dismissGenericQuestion(match.equipmentId); setQuestion(null); }}
       />
     );
   };

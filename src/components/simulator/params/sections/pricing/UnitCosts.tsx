@@ -27,8 +27,8 @@ interface UnitCostsProps {
    * `undefined`; `supplierPriceUSD` es el precio del proveedor asignado al grupo.
    */
   onPriceCommit?: (target: PriceCommitTarget, previousUSD: number | undefined, priceUSD: number) => void;
-  /** Pregunta compacta bajo el precio de una fila (o `null`). */
-  priceQuestionFor?: (kind: PricedKind, index: number) => React.ReactNode;
+  /** Pregunta compacta bajo el precio de una fila (o `null`); `equipmentId` es el equipo que resuelve hoy la fila. */
+  priceQuestionFor?: (kind: PricedKind, index: number, equipmentId: string | undefined) => React.ReactNode;
 }
 
 export interface PriceCommitTarget {
@@ -66,6 +66,8 @@ export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, installationUsdPerK
       const count = model.equipment?.supplierPrices?.length || 0;
       const info = model.selectedSupplierInfo;
       const generic = showGenericLabel && isGenericPriced(model) ? model.genericPriceInfo : undefined;
+      // Estricto: catalogItemId → id del grupo → nombre exacto único (nunca «el primer equipo del tipo»).
+      const equipmentId = onPriceCommit || priceQuestionFor ? resolveGroupCatalogItem(model, kind, equipmentCatalog)?.id : undefined;
       return (
         <UnitCostRow
           key={model.id || idx}
@@ -83,11 +85,10 @@ export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, installationUsdPerK
           onChange={(value) => updateSpecs(manualUnitPricePatch(specs, kind, idx, value))}
           onCommit={onPriceCommit ? (previousUSD, priceUSD) => onPriceCommit({
             kind, index: idx,
-            // Estricto: catalogItemId → id del grupo → nombre exacto único (nunca «el primer equipo del tipo»).
-            equipmentId: resolveGroupCatalogItem(model, kind, equipmentCatalog)?.id,
+            equipmentId,
             supplierPriceUSD: info?.priceUSD,
           }, previousUSD, priceUSD) : undefined}
-          footer={priceQuestionFor?.(kind, idx) ?? undefined}
+          footer={priceQuestionFor?.(kind, idx, equipmentId) ?? undefined}
         />
       );
     });

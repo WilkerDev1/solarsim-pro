@@ -6,7 +6,7 @@ import React from 'react';
 import { useSimulationStore as store } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { acceptProposalGenericQuestion, commitProposalPrice, type ProposalPriceCommitInput } from '../store/slices/equipmentPriceSlice';
-import { createPriceCommitTracker } from '../components/simulator/params/sections/pricing/priceCommit';
+import { createPriceCommitTracker, nextRowQuestion, rowQuestionFor, type RowQuestion } from '../components/simulator/params/sections/pricing/priceCommit';
 import { UnitCosts } from '../components/simulator/params/sections/pricing/UnitCosts';
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
 import { captureWorkspace, emptyWorkspace } from '../store/sync/organizationWorkspace';
@@ -133,15 +133,36 @@ const generic = (priceUSD: number) => ({ priceUSD, observedAt: '2026-11-10T00:00
   const item = panel('eq-1');
   const specs = { ...structuredClone(BENCHMARK_PROJECT).specs, hasBattery: false, panels: [{ id: 'g-1', catalogItemId: 'eq-1', brandModel: 'Nombre cambiado', powerW: 600, count: 4, unitPriceUSD: 100, selectedSupplierInfo: { supplierName: 'Alfa', priceUSD: 95 } }] } as LegacyProjectSpecs;
   const commits: unknown[] = [];
+  const asked: unknown[] = [];
   const tree = UnitCosts({ specs, equipmentCatalog: [item], selected: {}, openSupplierPriceModal: () => {}, updateSpecs: () => {},
     onPriceCommit: (target, previousUSD, priceUSD) => commits.push({ ...target, previousUSD, priceUSD }),
-    priceQuestionFor: (kind, index) => (kind === 'panel' && index === 0 ? React.createElement('span', { id: 'q' }, '¿Usar como precio genérico?') : null) });
+    priceQuestionFor: (kind, index, equipmentId) => { asked.push({ kind, index, equipmentId }); return kind === 'panel' && index === 0 ? React.createElement('span', { id: 'q' }, '¿Usar como precio genérico?') : null; } });
   const row = findProps(tree, (props) => props.id === 'pd-cost-panel-0')[0];
   row.onCommit(100, 110);
   assert.deepEqual(commits[0], { kind: 'panel', index: 0, equipmentId: 'eq-1', supplierPriceUSD: 95, previousUSD: 100, priceUSD: 110 }, 'resuelve con resolveGroupCatalogItem (catalogItemId)');
   assert.ok(row.footer, 'la pregunta va bajo el precio de su fila');
+  assert.deepEqual(asked[0], { kind: 'panel', index: 0, equipmentId: 'eq-1' }, 'la fila pasa su equipo resuelto para casar la pregunta');
   const inverterRow = findProps(tree, (props) => props.id === 'pd-cost-inverter-0')[0];
   inverterRow.onCommit(1, 2);
   assert.equal((commits[1] as { equipmentId?: string }).equipmentId, undefined, 'un modelo sin resolver no tiene equipo');
+}
+// ── Estado de la pregunta en el dock: se casa por fila y equipo, y un confirmado rechazado en la misma fila la quita ──
+{
+  const q = (over: Partial<RowQuestion> = {}): RowQuestion => ({ projectId: 'pr-1', equipmentId: 'eq-1', priceUSD: 120, observationId: 'po-1', scope: 's', userId: 'ana', kind: 'panel', index: 0, ...over });
+  const panel0 = { kind: 'panel' as const, index: 0 };
+  const none = { observationId: null, question: null };
+  // 120 creó la pregunta; luego 100 (igual al proveedor) se rechaza en la misma fila: la pregunta de 120 ya no vale
+  assert.equal(nextRowQuestion(q(), panel0, none), null, 'un confirmado rechazado en la misma fila quita la pregunta');
+  assert.deepEqual(nextRowQuestion(q(), { kind: 'inverter', index: 0 }, none), q(), 'un rechazo en otra fila no la toca');
+  assert.equal(nextRowQuestion(q(), { kind: 'inverter', index: 0 }, { observationId: 'po-2', question: null }), null, 'un registro nuevo sin pregunta la reemplaza');
+  const { kind: _k, index: _i, ...plain } = q({ priceUSD: 130, observationId: 'po-3' });
+  assert.deepEqual(nextRowQuestion(q(), panel0, { observationId: 'po-3', question: plain }), q({ priceUSD: 130, observationId: 'po-3' }));
+  // casado por propuesta, fila y equipo
+  assert.deepEqual(rowQuestionFor(q(), 'pr-1', 'panel', 0, 'eq-1'), q());
+  assert.equal(rowQuestionFor(q(), 'pr-1', 'panel', 0, 'eq-2'), null, 'la fila ahora tiene otro modelo');
+  assert.equal(rowQuestionFor(q(), 'pr-1', 'panel', 0, undefined), null, 'la fila ya no resuelve el equipo');
+  assert.equal(rowQuestionFor(q(), 'pr-1', 'panel', 1, 'eq-1'), null);
+  assert.equal(rowQuestionFor(q(), 'pr-2', 'panel', 0, 'eq-1'), null);
+  assert.equal(rowQuestionFor(null, 'pr-1', 'panel', 0, 'eq-1'), null);
 }
 console.log('PASS: Regla 2 del precio genérico (confirmación, condiciones, registro vivo por par y pregunta).');
