@@ -1,7 +1,17 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Info } from 'lucide-react';
-import { computeTipPosition, scrollMovesAnchor } from './infoTipPosition';
+import { anchorVisible, computeTipPosition, scrollMovesAnchor, scrollReaction, type TipRect } from './infoTipPosition';
+
+/** ¿El ⓘ se ve dentro de la ventana y de sus ancestros con scroll o recorte (el dock)? */
+function isInView(element: HTMLElement): boolean {
+  const clips: TipRect[] = [];
+  for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
+    const { overflowX, overflowY } = window.getComputedStyle(node);
+    if (/(auto|scroll|hidden|clip)/.test(overflowX + overflowY)) clips.push(node.getBoundingClientRect());
+  }
+  return anchorVisible(element.getBoundingClientRect(), clips, { width: window.innerWidth, height: window.innerHeight });
+}
 
 export interface InfoTipProps {
   /** Explicación completa: va solo en el tooltip, que el botón describe con `aria-describedby`. */
@@ -16,7 +26,8 @@ const CLOSE_DELAY_MS = 150;
 /**
  * Ícono ⓘ que sustituye a los párrafos explicativos. El tooltip se abre con puntero o foco, se posiciona con
  * `position: fixed` (no lo recorta el overflow del dock) acotado a la ventana, y Escape lo cierra sin mover el foco
- * (WCAG 1.4.13). El scroll de un ancestro o de la ventana y el cambio de tamaño lo cierran. El puntero puede pasar al tooltip: React propaga mouseenter/leave a través del portal y el cierre lleva retardo.
+ * (WCAG 1.4.13). El scroll de un ancestro o de la ventana lo cierra si se abrió con el puntero; con foco de teclado lo
+ * recoloca mientras el ⓘ siga a la vista. El cambio de tamaño lo cierra. El puntero puede pasar al tooltip: React propaga mouseenter/leave a través del portal y el cierre lleva retardo.
  */
 export const InfoTip: React.FC<InfoTipProps> = ({ text, label = 'Más información' }) => {
   const id = useId();
@@ -48,10 +59,19 @@ export const InfoTip: React.FC<InfoTipProps> = ({ text, label = 'Más informaci�
   useEffect(() => {
     if (!open) { setPos(null); return undefined; }
     place();
-    // El tooltip es `fixed`: si el dock, otro ancestro o la ventana se desplazan, o la ventana cambia de tamaño, se cierra
-    // en vez de quedarse fijo tapando otros controles hasta que se mueva el puntero. Vuelve a abrirse al salir y volver a
-    // entrar con el puntero o el foco. El scroll de un contenedor ajeno (que no contiene el ⓘ) no lo cierra.
-    const onScroll = (event: Event) => { if (scrollMovesAnchor(event.target, buttonRef.current)) setDismissed(true); };
+    // El tooltip es `fixed`: si el dock, otro ancestro o la ventana se desplazan, el abierto con puntero se cierra en vez
+    // de quedarse fijo tapando otros controles. Con foco de teclado (Tab hasta un ⓘ fuera de vista hace que el navegador
+    // desplace el dock) sigue al ⓘ mientras esté a la vista. El scroll de un contenedor ajeno no lo toca; el resize lo
+    // cierra. Vuelve a abrirse al salir y volver a entrar con el puntero o el foco.
+    const onScroll = (event: Event) => {
+      const button = buttonRef.current;
+      const movesAnchor = scrollMovesAnchor(event.target, button);
+      const focused = document.activeElement === button;
+      // isInView recorre los ancestros: solo se calcula cuando decide algo (scroll que mueve un ⓘ con foco).
+      const reaction = scrollReaction({ movesAnchor, focused, anchorInView: movesAnchor && focused && button ? isInView(button) : false });
+      if (reaction === 'follow') place();
+      else if (reaction === 'close') setDismissed(true);
+    };
     const onResize = () => { setDismissed(true); };
     // Escape cierra también cuando solo hay puntero (sin foco en el ⓘ). El listener vive solo mientras está abierto.
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setDismissed(true); };
