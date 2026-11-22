@@ -163,6 +163,18 @@ Migración aditiva 009 (`document_assets`) con relleno: mueve logos y miniaturas
 
 Rollback: una imagen anterior a la 009 serviría las referencias tal cual (los logos no se verían) y guardaría lo que reciba. Volver atrás exige restaurar el checkpoint en una base nueva y reconciliar las escrituras posteriores (sección siguiente); no desplegar una API anterior sobre la base migrada.
 
+### Versión 2.9.0: registros de precio (migración 010) y versión mínima 2.9.0
+
+Migración aditiva 010 (`equipment_price_observations`, [ADR 0006](adr/0006-precio-generico-e-historial.md)). Crea una tabla vacía y no toca otras: no rellena registros a partir de las ofertas existentes. La 2.9.0 también trae campos nuevos de tarifas (opciones de liquidación SIE-007) que los clientes anteriores ignoran, por lo que mostrarían otras cifras de una propuesta sincronizada. Por eso `MIN_CLIENT_VERSION` sube a `2.9.0`.
+
+1. Checkpoint y ensayo de restauración. El ensayo debe terminar en `[1..10]` con los mismos conteos que producción.
+2. **API** (aplica la 010 al arrancar) con `MIN_CLIENT_VERSION` todavía en `2.8.0`, y **Worker** 2.9.0. El orden entre ellos da igual: el Worker no cambia de contrato.
+3. **MCP remoto** 2.9.0 (`get_price_history` y el precio genérico en la consulta de equipos), con el procedimiento de su CT. Contra una API sin la 010, el MCP responde `unsupported` y el genérico sale `null`.
+4. **Release de escritorio** 2.9.0, firmada y publicada.
+5. Subir `MIN_CLIENT_VERSION=2.9.0` en el `.env` de la API y recrear solo `api` ([versión mínima](MAINTENANCE_AND_UPDATES.md#versión-mínima-de-cliente)).
+
+Rollback: una API anterior a la 010 no usa la tabla nueva y funcionaría sobre la base migrada, pero los clientes 2.9.0 recibirían 404 en `/api/equipment-prices/*`; en ese caso conservan su cola local sin mostrar errores. La 010 no se revierte con DDL. Para volver a un estado sin la tabla, restaurar el checkpoint en una base nueva (sección siguiente). Los registros confirmados después del checkpoint se perderían.
+
 ## Rollback de la API
 
 1. Detener escritores nuevos y coordinar clientes. Guardar un dump posterior que contenga las escrituras recientes.
