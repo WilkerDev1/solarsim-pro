@@ -6,11 +6,17 @@ import {
   MAX_GRID_USE_CHARGE_DOP_PER_KWH,
   NET_METERING_REGIMES,
   NET_METERING_REGIME_LABELS,
+  LEGACY_SETTLEMENT_SHARE,
   factoryGridUseCharge,
+  factoryLegacyFirstBlock,
   gridUseChargeApplies,
+  hasOwnLegacyFirstBlock,
+  legacySettlementDOPPerKWh,
+  resolveLegacySettlementDOPPerKWh,
   type NetMeteringRegime,
 } from '../../../../../../shared/netMetering';
-import { CommitNumberField, Field, FieldMenu, InfoTip, ParamRow, SelectField } from '../../ui';
+import { exportsToGrid, resolveGridConnection } from '../../../../../../shared/gridConnection';
+import { CommitNumberField, Field, FieldMenu, InfoTip, ParamRow, SelectField, SquareSwitch } from '../../ui';
 import { exportFeeValue } from './ratesLogic';
 import { planSie007Upgrade } from '../../../../../domain/netMeteringUpgrade';
 import { Sie007UpgradeNotice } from './Sie007UpgradeNotice';
@@ -51,6 +57,15 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
       ? 'Inyección cero activa: no se inyecta energía a la red, por lo que no hay cargo por uso de red.'
       : 'Tarifa con cargo de potencia: el Reglamento SIE-007-2026-REG reserva el cargo por uso de la red a las tarifas de un solo precio (BTS-1, BTS-2, RBT-1). No se cobra.'
     : `Medición neta SIE-007-2026-REG (art. 19.1.e): se acredita todo lo inyectado y se cobra este cargo por cada kWh inyectado a la red. Valor de fábrica: RD$${factory.dopPerKWh.toFixed(2)} (Resolución ${factory.resolutionCode}, ${factory.period}).`;
+  // Régimen anterior con red: liquidación anual opcional del crédito sobrante (Reglamento de Medición Neta, art. 11.3.c).
+  const showsLegacySettlement = regime === 'legacy_retention' && exportsToGrid(resolveGridConnection(rates));
+  const firstBlock = factoryLegacyFirstBlock(rates.distributor);
+  const sharePct = Math.round(LEGACY_SETTLEMENT_SHARE * 100);
+  const factoryLegacyPrice = legacySettlementDOPPerKWh(rates.distributor);
+  const appliedLegacyPrice = resolveLegacySettlementDOPPerKWh(rates);
+  const fallbackNote = hasOwnLegacyFirstBlock(rates.distributor) ? '' : ` ${rates.distributor ? `${rates.distributor} no tiene` : 'Sin distribuidora no hay'} primer bloque BTS-1 de fábrica: se usa el menor de las EDE (estimación a la baja).`;
+  const storedNote = rates.legacyAnnualSettlement === true && Math.abs(appliedLegacyPrice - factoryLegacyPrice) >= 0.005 ? ` Precio guardado en la propuesta: RD$${appliedLegacyPrice.toFixed(2)}/kWh.` : '';
+  const legacySettlementTip = `Reglamento de Medición Neta, art. 11.3.c: el crédito que sobra al cierre del año se paga al ${sharePct} % del primer bloque BTS-1 de diciembre: ${sharePct} % × RD$${firstBlock.dopPerKWh.toFixed(2)} = RD$${factoryLegacyPrice.toFixed(2)}/kWh (Resolución ${firstBlock.resolutionCode}, ${firstBlock.period}).${fallbackNote}${storedNote} El crédito reconocido (tras la retención) se netea mes a mes contra lo retirado de la red.\nApagado: el excedente se valora a la tarifa completa, como en las propuestas anteriores (optimista si el sistema produce más de lo que se consume en el año).`;
 
   return (
     <>
@@ -116,6 +131,20 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
             value={exportFeeValue(rates, assumptions.gridExportFeePct)}
             onChange={(value) => updateRates({ gridExportFeePct: parseNumber(value) })}
             right={<InfoTip text={exportTip} />}
+          />
+        </ParamRow>
+      )}
+      {showsLegacySettlement && (
+        <ParamRow
+          label="Liquidar excedente anual"
+          htmlFor="pd-rates-legacy-settlement"
+          hint={<InfoTip label="Más información: Liquidar excedente anual" text={legacySettlementTip} />}
+        >
+          <SquareSwitch
+            id="pd-rates-legacy-settlement"
+            ariaLabel="Liquidar el crédito anual sobrante al 75 % del primer bloque BTS-1"
+            checked={rates.legacyAnnualSettlement === true}
+            onChange={(checked) => updateRates({ legacyAnnualSettlement: checked })}
           />
         </ParamRow>
       )}

@@ -46,7 +46,7 @@ try {
     // Sin dato: régimen anterior; el cargo de fábrica de una distribuidora desconocida es el mayor de las EDE (no se aplica).
     netMeteringRegime: 'legacy_retention', gridUseChargeDOPPerKWh: 4.02, appliedGridUseChargeDOPPerKWh: 0,
     // Fase 3: sin régimen SIE-007 ni precio de referencia, valoración escalar; liquidación anual con el precio de fábrica (no confirmado).
-    energyValuationMethod: 'flat_rate', annualCreditSettlementDOPPerKWh: 0,
+    energyValuationMethod: 'flat_rate', annualCreditSettlementDOPPerKWh: 0, fixedChargeTierBasis: 'withdrawn', legacyAnnualSettlementDOPPerKWh: null,
   });
   assert.equal(resolveAssumptions({ specs: { isDetailed: true } }).systemLossesPct, DEFAULT_DETAILED_SYSTEM_LOSSES_PCT, 'modo detallado sin pérdidas: 14');
   assert.equal(resolveAssumptions({ specs: { isDetailed: true, systemLosses: 0 } }).systemLossesPct, 0, 'pérdidas 0 explícitas se respetan');

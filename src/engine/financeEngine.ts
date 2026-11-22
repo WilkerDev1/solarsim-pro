@@ -744,25 +744,40 @@ export function engineGridUseCharge(
 }
 
 /**
- * Facturación neta que recibe el motor de energía en el régimen SIE-007-2026 con red:
- * - con la fila de la tarifa y precio de referencia (`energyValuationMethod === 'block_billing'`), los bloques oficiales;
- * - sin fila válida (precio tecleado, de factura o fila de otra tarifa), una tarifa de precio único al precio escalar,
- *   sin cargo fijo. Así el neteo kWh contra kWh, el arrastre del crédito, el cargo por uso de la red y la liquidación
- *   anual del remanente son los mismos: el excedente solo anula consumo, nunca se paga al precio de venta.
- * Régimen anterior, sistema aislado o inyección cero con precio escalar: `undefined` (el ahorro se valora con el escalar).
+ * Facturación neta que recibe el motor de energía:
+ * - SIE-007-2026 con red y la fila de la tarifa y precio de referencia (`energyValuationMethod === 'block_billing'`):
+ *   los bloques oficiales;
+ * - SIE-007-2026 con red sin fila válida (precio tecleado, de factura o fila de otra tarifa): una tarifa de precio único
+ *   al precio escalar, sin cargo fijo. Así el neteo kWh contra kWh, el arrastre del crédito, el cargo por uso de la red y
+ *   la liquidación anual del remanente son los mismos: el excedente solo anula consumo, nunca se paga al precio de venta;
+ * - régimen anterior con la liquidación anual activada (`legacyAnnualSettlementDOPPerKWh`): la misma tarifa de precio
+ *   único sobre el crédito reconocido tras la retención, sin cargo por uso de la red, y el remanente al 75 % del primer
+ *   bloque BTS-1.
+ * Régimen anterior sin liquidación, sistema aislado o inyección cero con precio escalar: `undefined` (el ahorro se
+ * valora con el escalar).
  */
 export function engineBlockBilling(
-  assumptions: Pick<ResolvedAssumptions, 'energyValuationMethod' | 'netMeteringRegime' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate' | 'annualCreditSettlementDOPPerKWh'>,
+  assumptions: Pick<ResolvedAssumptions, 'energyValuationMethod' | 'netMeteringRegime' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate' | 'annualCreditSettlementDOPPerKWh' | 'fixedChargeTierBasis' | 'legacyAnnualSettlementDOPPerKWh'>,
   rates: TariffBillingRatesInput,
   /** Precio escalar con que se valora el ahorro (USD/kWh), el mismo que recibe el motor de energía. */
   flatEnergyCostUSDPerKWh?: number,
 ): BlockBillingInput | undefined {
-  const common = { dopPerUSD: assumptions.dopExchangeRate, gridUseChargeDOPPerKWh: assumptions.appliedGridUseChargeDOPPerKWh, settlementDOPPerKWh: assumptions.annualCreditSettlementDOPPerKWh };
+  const common = {
+    dopPerUSD: assumptions.dopExchangeRate,
+    gridUseChargeDOPPerKWh: assumptions.appliedGridUseChargeDOPPerKWh,
+    settlementDOPPerKWh: assumptions.annualCreditSettlementDOPPerKWh,
+    fixedChargeTierBasis: assumptions.fixedChargeTierBasis,
+  };
   const tariff = assumptions.energyValuationMethod === 'block_billing' ? proposalBillingTariff(rates) : undefined;
   if (tariff) return { tariff, ...common };
-  if (assumptions.netMeteringRegime !== 'sie007_2026' || !exportsToGrid(resolveGridConnection(rates))) return undefined;
-  if (!(typeof flatEnergyCostUSDPerKWh === 'number' && Number.isFinite(flatEnergyCostUSDPerKWh) && flatEnergyCostUSDPerKWh > 0)) return undefined;
-  return { tariff: flatSinglePriceTariff(rates, flatEnergyCostUSDPerKWh * assumptions.dopExchangeRate), ...common };
+  if (!exportsToGrid(resolveGridConnection(rates))) return undefined;
+  const validFlat = typeof flatEnergyCostUSDPerKWh === 'number' && Number.isFinite(flatEnergyCostUSDPerKWh) && flatEnergyCostUSDPerKWh > 0;
+  if (!validFlat) return undefined;
+  const flat = flatSinglePriceTariff(rates, flatEnergyCostUSDPerKWh * assumptions.dopExchangeRate);
+  if (assumptions.netMeteringRegime === 'sie007_2026') return { tariff: flat, ...common };
+  const legacyPrice = assumptions.legacyAnnualSettlementDOPPerKWh;
+  if (legacyPrice === null || !Number.isFinite(legacyPrice)) return undefined;
+  return { ...common, tariff: flat, gridUseChargeDOPPerKWh: 0, settlementDOPPerKWh: legacyPrice, creditBasis: 'net_credit' };
 }
 
 /** Tarifa de precio único (sin cargo fijo ni regla de 701 kWh) para facturar con medición neta al precio escalar. */

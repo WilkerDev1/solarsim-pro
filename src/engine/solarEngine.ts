@@ -5,7 +5,7 @@ import { getProvinceHSP } from '../data/rdProvinces';
 import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
 import { batteryBank, readEquipment } from '../../shared/equipment';
 import { exportsToGrid, isGridConnectionMode, type GridConnectionMode } from '../../shared/gridConnection';
-import { calculateBillingYear, calculateMonthlyBill, type BillingTariff } from '../../shared/tariffBilling';
+import { calculateBillingYear, calculateMonthlyBill, type BillingTariff, type FixedChargeTierBasis } from '../../shared/tariffBilling';
 
 /**
  * Cargo por uso de la red del régimen SIE-007-2026 (`shared/netMetering.ts`): con él, la medición neta acredita el 100 %
@@ -30,6 +30,13 @@ export interface BlockBillingInput {
   gridUseChargeDOPPerKWh: number;
   /** Precio de liquidación del crédito anual sobrante (RD$/kWh). */
   settlementDOPPerKWh: number;
+  /** Qué consumo elige el rango del cargo fijo; sin dato, el de fábrica (energía retirada). */
+  fixedChargeTierBasis?: FixedChargeTierBasis;
+  /**
+   * Qué kWh se acreditan cada mes: la inyección bruta (SIE-007-2026, por defecto) o el crédito reconocido tras la
+   * retención del régimen anterior (`netExportCreditKWh`, liquidación anual opcional de `legacy_retention`).
+   */
+  creditBasis?: 'gross_injection' | 'net_credit';
 }
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -336,8 +343,11 @@ function withBlockBilling(results: MonthlyEnergyResult[], billing: BlockBillingI
   const year = calculateBillingYear(
     billing.tariff,
     // Sin redondeo: solo se limpia el ruido de coma flotante de la resta (los dos términos ya vienen a 0.1 kWh).
-    results.map((m) => ({ withdrawnKWh: Math.max(0, Math.round((m.consumptionKWh - m.solarSelfConsumedKWh) * 1e9) / 1e9), injectedKWh: m.gridExportedKWh })),
-    { gridUseChargeDOPPerKWh: billing.gridUseChargeDOPPerKWh, settlementDOPPerKWh: billing.settlementDOPPerKWh },
+    results.map((m) => ({
+      withdrawnKWh: Math.max(0, Math.round((m.consumptionKWh - m.solarSelfConsumedKWh) * 1e9) / 1e9),
+      injectedKWh: billing.creditBasis === 'net_credit' ? m.netExportCreditKWh : m.gridExportedKWh,
+    })),
+    { gridUseChargeDOPPerKWh: billing.gridUseChargeDOPPerKWh, settlementDOPPerKWh: billing.settlementDOPPerKWh, fixedChargeTierBasis: billing.fixedChargeTierBasis },
   );
   const settlementUSD = usd2(year.settlement.amountDOP, fx);
   return results.map((m, i) => {

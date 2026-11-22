@@ -1,5 +1,5 @@
 import type { NetMeteringRegime } from '../../shared/netMetering';
-import type { BillingTariff, EnergyRateSource } from '../../shared/tariffBilling';
+import type { BillingTariff, EnergyRateSource, FixedChargeTierBasis } from '../../shared/tariffBilling';
 import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
 import type { LegacyEquipmentFields } from '../../shared/equipment';
 import type { GridConnectionMode } from '../../shared/gridConnection';
@@ -159,6 +159,15 @@ export interface UtilityRates {
   billingTariff?: BillingTariff;
   /** Precio de liquidación del crédito anual sobrante (RD$/kWh). Ausente = el de fábrica (no confirmado, 0). */
   annualCreditSettlementDOPPerKWh?: number;
+  /** Qué consumo elige el rango del cargo fijo con medición neta (`resolveFixedChargeTierBasis`). Ausente = energía retirada. */
+  fixedChargeTierBasis?: FixedChargeTierBasis;
+  /**
+   * Régimen anterior: liquidar el crédito anual sobrante al 75 % del primer bloque BTS-1 (`legacyAnnualSettlementApplies`).
+   * Ausente o false = el excedente se valora a la tarifa tras la retención, como siempre.
+   */
+  legacyAnnualSettlement?: boolean;
+  /** Precio guardado de esa liquidación (RD$/kWh), sembrado al activarla. Ausente = 75 % del primer bloque BTS-1 de fábrica. */
+  legacyAnnualSettlementDOPPerKWh?: number;
 }
 
 export interface CustomQuotationItem {

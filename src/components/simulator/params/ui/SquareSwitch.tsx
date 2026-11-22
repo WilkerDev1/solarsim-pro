@@ -6,11 +6,14 @@ export interface SquareSwitchProps {
   onChange: (checked: boolean) => void;
   ariaLabel: string;
   disabled?: boolean;
+  /** Id del botón, para la etiqueta de un `ParamRow` (`htmlFor`). */
+  id?: string;
 }
 
 /** Interruptor cuadrado de 34 × 20 px: esquinas de 5 px, botón interior de 3 px. */
-export const SquareSwitch: React.FC<SquareSwitchProps> = ({ checked, onChange, ariaLabel, disabled }) => (
+export const SquareSwitch: React.FC<SquareSwitchProps> = ({ checked, onChange, ariaLabel, disabled, id }) => (
   <button
+    id={id}
     type="button"
     role="switch"
     aria-checked={checked}
