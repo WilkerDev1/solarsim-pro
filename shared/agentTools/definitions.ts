@@ -1,6 +1,7 @@
 // Single catalog of agent tools shared by the proposal assistant, the general assistant and the local MCP server.
 import type { AgentToolDefinition, JsonSchema } from './types.js';
 import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES } from '../netMetering.js';
+import { PRICE_HISTORY_TOOL_LIMITS } from './priceHistory.js';
 
 const ALL = ['app-assistant', 'proposal-assistant', 'mcp'] as const;
 const id = (description: string): JsonSchema => ({ type: 'string', minLength: 1, maxLength: 128, description });
@@ -211,6 +212,14 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
     name: 'list_supplier_offers', title: 'Consultar ofertas', kind: 'read', category: 'pricing', surfaces: [...ALL],
     description: 'Lista ofertas de proveedores por equipo, proveedor o texto. Máximo 50.',
     inputSchema: object({ equipmentId: id('ID del equipo.'), supplier: { type: 'string', maxLength: 120 }, query: { type: 'string', maxLength: 200 } }),
+  },
+  {
+    name: 'get_price_history', title: 'Consultar historial de precios', kind: 'read', category: 'pricing', surfaces: [...ALL],
+    description: 'Historial de precios de un equipo (más recientes primero): registros con fuente (supplier_offer, ai_scan, proposal, manual, agent), tipo (observation = precio visto, generic = fijó el precio genérico), moneda y monto originales, proveedor o propuesta, autor y anulación; más el precio genérico vigente y un resumen por mes del año con variación a 3, 6 y 12 meses. Meses sin registros quedan en null: no los rellenes. Requiere sesión iniciada.',
+    inputSchema: object({
+      equipmentId: id('ID del equipo del catálogo.'),
+      limit: { type: 'integer', minimum: 1, maximum: PRICE_HISTORY_TOOL_LIMITS.maxLimit, description: `Registros a devolver (por defecto ${PRICE_HISTORY_TOOL_LIMITS.defaultLimit}).` },
+    }, ['equipmentId']),
   },
   {
     name: 'update_supplier_price', title: 'Actualizar oferta', kind: 'guarded', category: 'pricing', card: 'pending-action', surfaces: [...ALL],

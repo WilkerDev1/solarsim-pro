@@ -733,3 +733,162 @@ test("IP: tokens no válidos por IP antes de la API; cabeceras de proxy solo des
     );
   }
 });
+
+test("precios: get_price_history lee el historial y genericPriceUSD va aparte de las ofertas", async () => {
+  const id = (n: number) =>
+    `po-00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const equipment = [
+    {
+      id: "eq-1",
+      type: "panel",
+      brand: "QA",
+      displayName: "Panel QA",
+      modelSeries: "Q",
+      supplierPrices: [
+        {
+          id: "sp-1",
+          supplierName: "Dist",
+          priceUSD: 100,
+          stockStatus: "in_stock",
+        },
+      ],
+    },
+    {
+      id: "eq-2",
+      type: "panel",
+      brand: "QA",
+      displayName: "Panel Dos",
+      modelSeries: "D",
+    },
+  ];
+  const { fetchImpl, seen } = fakeApi(
+    {
+      "GET /api/equipment": () => [200, { items: equipment, deletedIds: [] }],
+      "GET /api/equipment-prices/generic": () => [
+        200,
+        {
+          prices: {
+            "eq-1": {
+              priceUSD: 95,
+              observedAt: "2026-10-20T12:00:00.000Z",
+              observationId: id(5),
+            },
+          },
+        },
+      ],
+      "GET /api/equipment-prices": () => [
+        200,
+        {
+          success: true,
+          nextBefore: null,
+          observations: [
+            {
+              id: id(5),
+              seq: 5,
+              equipmentId: "eq-1",
+              kind: "generic",
+              priceUSD: 95,
+              source: "manual",
+              observedAt: "2026-10-20T12:00:00.000Z",
+              createdByName: "Ana",
+              createdById: "u-1",
+            },
+            {
+              id: id(4),
+              seq: 4,
+              equipmentId: "eq-1",
+              kind: "observation",
+              priceUSD: 90,
+              source: "proposal",
+              projectId: "p-1",
+              projectName: null,
+              projectCode: null,
+              observedAt: "2026-04-10T12:00:00.000Z",
+              createdByName: "Ana",
+            },
+          ],
+        },
+      ],
+    },
+    { scope: "read", role: "LECTOR", userName: "Lia" },
+  );
+  const app = createMcpApp({ config, fetch: fetchImpl });
+  const history = await rpc(
+    app,
+    call(1, "get_price_history", { equipmentId: "eq-1", limit: 20 }),
+  );
+  const data = history.body.result.structuredContent.data;
+  assert.equal(history.body.result.structuredContent.status, "ok");
+  assert.ok(
+    seen.some(
+      (s) => s.url === "/api/equipment-prices?equipmentId=eq-1&limit=20",
+    ),
+  );
+  assert.equal(
+    seen
+      .find((s) => s.url.startsWith("/api/equipment-prices?"))!
+      .headers.get("X-SolarSim-Agent-Tool"),
+    "get_price_history",
+  );
+  assert.deepEqual(data.genericPrice, {
+    priceUSD: 95,
+    observedAt: "2026-10-20T12:00:00.000Z",
+  });
+  assert.equal(data.records.length, 2);
+  assert.equal(data.records[1].proposalDeleted, true);
+  assert.equal(data.records[0].createdById, undefined, "no internal user ids");
+  assert.equal(data.stats.byCalendarMonth[3].avg, 90);
+  assert.equal(
+    data.stats.byCalendarMonth[2].avg,
+    null,
+    "empty months stay empty",
+  );
+  assert.equal(data.hasMore, false);
+  const missing = await rpc(
+    app,
+    call(2, "get_price_history", { equipmentId: "nope" }),
+  );
+  assert.equal(missing.body.result.structuredContent.code, "not_found");
+  assert.ok(
+    !seen.some((s) => s.url.includes("equipmentId=nope")),
+    "unknown equipment never reaches the history route",
+  );
+
+  const found = (
+    await rpc(app, call(3, "search_equipment", { query: "panel" }))
+  ).body.result.structuredContent.data;
+  assert.equal(
+    found.equipment.find((e: any) => e.id === "eq-1").genericPriceUSD,
+    95,
+  );
+  assert.equal(
+    found.equipment.find((e: any) => e.id === "eq-1").offers[0].priceUSD,
+    100,
+    "offers unchanged",
+  );
+  assert.equal(
+    found.equipment.find((e: any) => e.id === "eq-2").genericPriceUSD,
+    null,
+  );
+  const detail = (await rpc(app, call(4, "get_equipment", { id: "eq-1" }))).body
+    .result.structuredContent.data;
+  assert.equal(detail.genericPriceUSD, 95);
+  assert.equal(detail.genericPriceObservedAt, "2026-10-20T12:00:00.000Z");
+  assert.equal(detail.supplierPrices[0].priceUSD, 100);
+
+  // API anterior a los registros de precio (404): el catálogo sigue respondiendo y el historial dice que no está disponible.
+  const old = createMcpApp({
+    config,
+    fetch: fakeApi({
+      "GET /api/equipment": () => [200, { items: equipment, deletedIds: [] }],
+    }).fetchImpl,
+  });
+  const plain = (await rpc(old, call(5, "get_equipment", { id: "eq-1" }))).body
+    .result.structuredContent;
+  assert.equal(plain.status, "ok");
+  assert.equal(plain.data.genericPriceUSD, null);
+  const unsupported = (
+    await rpc(old, call(6, "get_price_history", { equipmentId: "eq-1" }))
+  ).body.result.structuredContent;
+  assert.equal(unsupported.code, "unsupported");
+});
