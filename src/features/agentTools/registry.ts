@@ -141,11 +141,12 @@ function undoEntry(entry: AgentActivityEntry) {
     if (s.equipmentConflicts[entry.targetId]) return { success: false, error: 'Resuelve primero el conflicto del equipo.' };
     if (fingerprint(pick(current, fields)) !== entry.undo!.afterFingerprint)
       return { success: false, error: 'El equipo cambió después; revísalo en el catálogo.' };
-    s.updateEquipmentItem(entry.targetId, restored);
+    // Restoring offers is not a new price seen: nothing is recorded, and the agent's own records are voided.
+    s.updateEquipmentItem(entry.targetId, restored, { recordPrices: false });
     const after = store().equipmentCatalog.find((e) => e.id === entry.targetId);
-    return after && fingerprint(pick(after, fields)) === fingerprint(restored)
-      ? { success: true }
-      : { success: false, error: 'El catálogo rechazó el cambio.' };
+    if (!after || fingerprint(pick(after, fields)) !== fingerprint(restored)) return { success: false, error: 'El catálogo rechazó el cambio.' };
+    for (const id of entry.undo!.priceObservationIds ?? []) store().voidPriceObservation(id);
+    return { success: true };
   }
   const current = s.projects.find((p) => p.id === entry.targetId);
   if (!current) return { success: false, error: 'La propuesta ya no existe.' };

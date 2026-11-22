@@ -361,6 +361,10 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       ensureCurrent();
       const equipment = await get().syncEquipmentWithServer();
       ensureCurrent();
+      // Price records (ADR 0006) are independent of every other step: their result never fails the sync, the queue
+      // stays until acknowledged and an API without the feature (404) is silently skipped.
+      await get().syncPriceObservations().catch(() => undefined);
+      ensureCurrent();
       if (!equipment.success) throw new Error(`Proyectos procesados; catálogo pendiente: ${equipment.message}`);
       const pendingConfirmations = get().projects.filter(project => project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)).length;
       const unresolvedConflicts = get().projects.filter(project => project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId)).length;
