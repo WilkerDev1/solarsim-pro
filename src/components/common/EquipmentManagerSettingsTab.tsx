@@ -83,7 +83,7 @@ export const EquipmentManagerSettingsTab: React.FC<
   const pricesActive = priceFeatureActive(priceState);
   const genericFor = (id: string | undefined) => (pricesActive && id ? effectiveGenericPrice(priceState, id) : null);
   const [genericSuggestion, setGenericSuggestion] = useState<GenericSuggestion | null>(null);
-  useEffect(() => { setIsEditorOpen(false); setEditingItem(null); setItemToDelete(null); setAssetBusy(false); }, [sessionGeneration]);
+  useEffect(() => { setIsEditorOpen(false); setEditingItem(null); setItemToDelete(null); setAssetBusy(false); setGenericSuggestion(null); }, [sessionGeneration]);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingItem, setEditingItem] =
     useState<Partial<SolarEquipmentItem> | null>(null);
@@ -436,6 +436,7 @@ export const EquipmentManagerSettingsTab: React.FC<
       stored.displayName !== itemToSave.displayName ||
       stored.brand !== itemToSave.brand
     ) {
+      setGenericSuggestion(null);
       setFeedbackMessage({
         type: "error",
         text:

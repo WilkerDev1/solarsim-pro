@@ -29,9 +29,11 @@ interface FakeServer {
   /** Se llama mientras la solicitud está "en vuelo" (antes de responder). */
   during?: () => void;
   history: unknown[];
+  /** Genérico anterior por equipo: vuelve a ser el vigente cuando se anula el actual. */
+  previous: Record<string, GenericPriceInfo>;
 }
 function install(): FakeServer {
-  const server: FakeServer = { batches: [], genericCalls: 0, prices: {}, mode: 'ok', forced: {}, history: [] };
+  const server: FakeServer = { batches: [], genericCalls: 0, prices: {}, mode: 'ok', forced: {}, history: [], previous: {} };
   let seq = 100;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -56,7 +58,10 @@ function install(): FakeServer {
       });
       const voids = body.voids.map((v) => {
         const status = server.forced[v.id] ?? 'voided';
-        if (status === 'voided') for (const [key, info] of Object.entries(server.prices)) if (info.observationId === v.id) delete server.prices[key];
+        if (status === 'voided') for (const [key, info] of Object.entries(server.prices)) if (info.observationId === v.id) {
+          delete server.prices[key];
+          if (server.previous[key]) server.prices[key] = server.previous[key];
+        }
         return { id: v.id, status };
       });
       return Response.json({ success: true, observations, voids });
@@ -254,6 +259,61 @@ async function run() {
     const persisted = serializeSimulationStore(store.getState()) as unknown as SimulationStore;
     hydrateSimulationStore(structuredClone(persisted));
     assert.equal(pending().observations.length, 0, 'hydrate records nothing');
+
+    // --- Envío inmediato durante otra sincronización: lo encolado tras la captura sale en una pasada más.
+    reset(session());
+    server.batches = [];
+    server.forced = {};
+    server.prices = {};
+    store.getState().recordPriceObservations([{ equipmentId: 'eq-1', kind: 'observation', priceUSD: 21, source: 'manual' }]);
+    let lateSend: Promise<unknown> | null = null;
+    let lateGeneric = '';
+    server.during = () => {
+      if (lateSend) return;
+      lateGeneric = store.getState().setGenericPrice('eq-2', 44, 'manual')!;
+      lateSend = store.getState().syncPriceObservations({ refresh: false });
+    };
+    await store.getState().syncPriceObservations();
+    server.during = undefined;
+    await lateSend;
+    assert.ok(server.batches.some((b) => b.observations.some((o) => o.id === lateGeneric)), 'a send-only call made during another run is sent once that run settles');
+    assert.equal(pending().observations.length, 0, 'nothing left in the queue');
+    assert.equal(store.getState().genericPrices['eq-2']?.observationId, lateGeneric);
+
+    // --- `duplicate` de un genérico (respuesta perdida): el mapa se vuelve a descargar aunque sea solo envío.
+    reset(session());
+    server.forced = {};
+    const old = { priceUSD: 50, observedAt: '2026-10-01T00:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-0000000000e1' };
+    store.setState({ genericPrices: { 'eq-1': old } });
+    const committed = store.getState().setGenericPrice('eq-1', 66, 'manual')!;
+    server.prices = { 'eq-1': { priceUSD: 66, observedAt: pending().observations[0].observedAt, observationId: committed } };
+    server.forced[committed] = 'duplicate';
+    const callsBeforeDuplicate = server.genericCalls;
+    assert.equal((await store.getState().syncPriceObservations({ refresh: false })).status, 'ok');
+    assert.equal(pending().observations.length, 0);
+    assert.ok(server.genericCalls > callsBeforeDuplicate, 'a non-created generic triggers a download');
+    assert.equal(effectiveGenericPrice(store.getState(), 'eq-1')?.observationId, committed, 'the committed generic is current, not the stale one');
+    server.forced = {};
+
+    // --- Anular el genérico vigente: vuelve el anterior sin esperar a la sincronización completa.
+    reset(session());
+    const current = { priceUSD: 70, observedAt: '2026-11-01T00:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-0000000000e2' };
+    const before = { priceUSD: 60, observedAt: '2026-10-01T00:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-0000000000e3' };
+    server.prices = { 'eq-1': current };
+    server.previous = { 'eq-1': before };
+    store.setState({ genericPrices: { 'eq-1': current } });
+    store.getState().voidPriceObservation(current.observationId);
+    assert.equal((await store.getState().syncPriceObservations({ refresh: false })).status, 'ok');
+    assert.equal(effectiveGenericPrice(store.getState(), 'eq-1')?.observationId, before.observationId, 'the previous generic comes back');
+    server.previous = {};
+    // Una anulación que no toca el mapa (registro normal) no descarga nada.
+    reset(session());
+    const [plain] = store.getState().recordPriceObservations([{ equipmentId: 'eq-1', kind: 'observation', priceUSD: 5, source: 'manual' }]);
+    await store.getState().syncPriceObservations({ refresh: false });
+    store.getState().voidPriceObservation(plain);
+    const callsBeforePlain = server.genericCalls;
+    await store.getState().syncPriceObservations({ refresh: false });
+    assert.equal(server.genericCalls, callsBeforePlain, 'voiding a plain observation does not download the map');
 
     // --- syncAll: el paso de precios va después del catálogo y nunca hace fallar la sincronización.
     reset(session());

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
-import { canPriceEquipment, effectiveGenericPrice, priceFeatureActive, type GenericSuggestion } from '../../../store/slices/equipmentPriceSlice';
+import { acceptGenericSuggestion, canPriceEquipment, effectiveGenericPrice, priceFeatureActive, type GenericSuggestion } from '../../../store/slices/equipmentPriceSlice';
 import type { SolarEquipmentItem } from '../../../types/equipment';
 import type { GenericPriceInfo } from '../../../../shared/equipmentPrices';
 import { confirmAction } from '../confirmAction';
@@ -35,13 +35,7 @@ export function useGenericPrice(equipmentId: string | undefined): { active: bool
 export function GenericPriceSuggestion({ suggestion, onDismiss }: { suggestion: GenericSuggestion; onDismiss: () => void }) {
   const [done, setDone] = useState<string | null>(null);
   const accept = () => {
-    const state = useSimulationStore.getState();
-    const source = state.pricePending.observations.find((entry) => entry.id === suggestion.observationId);
-    const id = state.setGenericPrice(suggestion.equipmentId, suggestion.priceUSD, 'supplier_offer', {
-      derivedFromId: suggestion.observationId,
-      supplierName: source?.supplierName,
-      supplierOfferId: source?.supplierOfferId,
-    });
+    const id = acceptGenericSuggestion(useSimulationStore.getState(), suggestion);
     setDone(id ? `Precio genérico: ${formatGenericUSD(suggestion.priceUSD)}` : 'No se pudo fijar el precio genérico. Revisa tus permisos.');
   };
   return (

@@ -79,6 +79,35 @@ console.log('Catalog equipment table rows, offers, nominal values, conflict row 
   assert.match(modal, /Genérico US\$\s?88[.,]50/, 'offers header shows the generic price');
   assert.match(modal, />Cambiar</);
   assert.match(modal, />Quitar</);
+  // LECTOR: ve el genérico pero sin acciones.
+  useSimulationStore.setState({ syncSettings: { ...session, currentUser: { ...session.currentUser, role: 'LECTOR' as const } } });
+  Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());
+  const readerModal = renderToStaticMarkup(React.createElement(SupplierPricesDetailModal));
+  assert.match(readerModal, /Genérico US\$\s?88[.,]50/, 'readers see the generic price');
+  assert.doesNotMatch(readerModal, />(Cambiar|Asignar|Quitar)</, 'readers get no generic price actions');
+  useSimulationStore.setState({ syncSettings: session });
+  Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());
+  // Regla 1: línea compacta tras guardar, con el texto del ADR para asignar y para actualizar.
+  const { GenericPriceSuggestion } = await import('../components/common/equipment/GenericPrice');
+  const base = { equipmentId: 'i', observationId: 'po-00000000-0000-4000-8000-000000000124', priceUSD: 80, scope: 'x', userId: 'qa' };
+  const assign = renderToStaticMarkup(React.createElement(GenericPriceSuggestion, { suggestion: { ...base, decision: 'assign' }, onDismiss: () => {} }));
+  assert.match(assign, /Oferta guardada · Sin precio genérico/);
+  assert.match(assign, /Usar US\$\s?80[.,]00 como genérico/);
+  const change = renderToStaticMarkup(React.createElement(GenericPriceSuggestion, { suggestion: { ...base, currentUSD: 88.5, decision: 'update' }, onDismiss: () => {} }));
+  assert.match(change, /Oferta guardada · Genérico US\$\s?88[.,]50/);
+  assert.match(change, /Cambiar a US\$\s?80[.,]00/);
+  assert.doesNotMatch(assign + change, /bg-(amber|red|yellow)-/, 'no coloured warning boxes');
+  // Editor del equipo: línea de solo lectura con el genérico.
+  const { EquipmentEditorModal } = await import('../components/common/EquipmentEditorModal');
+  const noop = () => {};
+  const editor = (genericPrice: typeof generic | null | undefined) => renderToStaticMarkup(React.createElement(EquipmentEditorModal, {
+    isDark: false, canEdit: true, isNewItem: false, editingItem: useSimulationStore.getState().equipmentCatalog[1], setEditingItem: noop, setIsEditorOpen: noop,
+    handleSaveEditor: noop, genericPrice, feedbackMessage: null, allUniqueBrands: [], equipmentCatalog: useSimulationStore.getState().equipmentCatalog,
+    assetBusy: false, setAssetBusy: noop, editorRef: { current: null },
+  } as any));
+  assert.match(editor(generic), /Precio genérico: US\$\s?88[.,]50 · .*Se cambia desde las ofertas del equipo\./);
+  assert.match(editor(null), /Sin precio genérico · Se cambia desde las ofertas del equipo\./);
+  assert.doesNotMatch(editor(undefined), /data-generic-price/, 'hidden without a session or for a new equipment');
   // Sin sesión (modo local) la función está apagada.
   useSimulationStore.setState({ syncSettings: { ...session, authToken: null, currentUser: null } });
   Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());

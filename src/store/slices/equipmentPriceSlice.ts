@@ -116,9 +116,18 @@ export interface GenericSuggestion {
   priceUSD: number;
   currentUSD?: number;
   decision: 'assign' | 'update';
+  /** Procedencia capturada al guardar: la cola puede vaciarse (envío automático) antes de que el usuario acepte. */
+  supplierName?: string;
+  supplierOfferId?: string;
+  originalCurrency?: ObservationInput['originalCurrency'];
+  originalPrice?: number;
+  /** Espacio y usuario de la sugerencia: aceptar en otro espacio no hace nada. */
+  scope: string;
+  userId: string;
 }
 export function genericSuggestionFor(state: SimulationStore, observationIds: readonly string[]): GenericSuggestion | null {
-  if (!priceRecordingContext(state) || !observationIds.length) return null;
+  const context = priceRecordingContext(state);
+  if (!context || !observationIds.length) return null;
   const ids = new Set(observationIds);
   const candidates = state.pricePending.observations.filter((entry) => ids.has(entry.id) && entry.kind === 'observation' && entry.priceUSD > 0);
   // One equipment per suggestion: a bulk save across several models never offers a generic price.
@@ -129,7 +138,24 @@ export function genericSuggestionFor(state: SimulationStore, observationIds: rea
   const current = effectiveGenericPrice(state, lowest.equipmentId);
   const decision = genericPriceDecision(current?.priceUSD, lowest.priceUSD);
   if (decision === 'none') return null;
-  return { equipmentId: lowest.equipmentId, observationId: lowest.id, priceUSD: lowest.priceUSD, ...(current ? { currentUSD: current.priceUSD } : {}), decision };
+  return {
+    equipmentId: lowest.equipmentId, observationId: lowest.id, priceUSD: lowest.priceUSD, ...(current ? { currentUSD: current.priceUSD } : {}), decision,
+    supplierName: lowest.supplierName, supplierOfferId: lowest.supplierOfferId, originalCurrency: lowest.originalCurrency, originalPrice: lowest.originalPrice,
+    ...context,
+  };
+}
+
+/** Acepta la sugerencia de la Regla 1: registro `generic` derivado de la oferta. `null` si cambió la sesión o no hay permiso. */
+export function acceptGenericSuggestion(state: SimulationStore, suggestion: GenericSuggestion): string | null {
+  const context = priceRecordingContext(state);
+  if (!context || context.scope !== suggestion.scope || context.userId !== suggestion.userId) return null;
+  return state.setGenericPrice(suggestion.equipmentId, suggestion.priceUSD, 'supplier_offer', {
+    derivedFromId: suggestion.observationId,
+    supplierName: suggestion.supplierName,
+    supplierOfferId: suggestion.supplierOfferId,
+    originalCurrency: suggestion.originalCurrency,
+    originalPrice: suggestion.originalPrice,
+  });
 }
 
 /** Hidratación: un mapa o una cola mal formados (versiones viejas, almacenamiento dañado) se descartan, nunca se reparan a medias. */
@@ -150,6 +176,12 @@ export function normalizePriceState(value: { genericPrices?: unknown; pricePendi
     },
   };
 }
+
+/** El usuario actual tiene registros o anulaciones en cola en este espacio. */
+const hasOwnPending = (state: Pick<SimulationStore, 'syncSettings' | 'pricePending'>) => {
+  const owns = mine(state);
+  return !!owns && (state.pricePending.observations.some(owns) || state.pricePending.voids.some(owns));
+};
 
 const newObservationId = () => `po-${crypto.randomUUID()}`;
 const ACKNOWLEDGED = new Set(['created', 'duplicate', 'conflict', 'rejected', 'voided', 'already_voided']);
@@ -213,10 +245,15 @@ export const createEquipmentPriceSlice: SimulationSlice<EquipmentPriceSlice> = (
     syncPriceObservations: async (options = {}) => {
       const generation = get().sessionGeneration;
       if (inFlight?.generation === generation) {
-        if (options.refresh === false || inFlight.refresh) return inFlight.promise;
-        // A send-only pass is running: wait for it, then send what is left and download the generic prices.
-        const previous = inFlight.promise;
-        return previous.then(() => (inFlight?.promise === previous ? previous : get().syncPriceObservations(options)));
+        // The running pass captured the queue when it started. Once it settles, run once more when this call wants a
+        // download the running pass skips, or when entries of this user were queued meanwhile (immediate send).
+        const previous = inFlight;
+        return previous.promise.then((result) => {
+          if (inFlight?.promise === previous.promise) return result;
+          const wantsRefresh = options.refresh !== false && !previous.refresh;
+          if (!wantsRefresh && (result.status !== 'ok' || !hasOwnPending(get()))) return result;
+          return get().syncPriceObservations(options);
+        });
       }
       const { serverUrl, authToken, currentUser } = get().syncSettings;
       if (!authToken || !currentUser) return { status: 'skipped' };
@@ -228,6 +265,9 @@ export const createEquipmentPriceSlice: SimulationSlice<EquipmentPriceSlice> = (
       };
       const owns = (entry: { scope: string; userId: string }) => entry.scope === scope && entry.userId === currentUser.id;
       const run = async (): Promise<PriceSyncResult> => {
+        // A generic answered other than `created` (e.g. `duplicate` after a lost response) or a void of the current
+        // generic leaves the local map stale: download it even on a send-only pass (the previous generic comes back).
+        let mapStale = false;
         try {
           if (isWriterRole(currentUser.role)) {
             const captured = get().pricePending;
@@ -250,6 +290,8 @@ export const createEquipmentPriceSlice: SimulationSlice<EquipmentPriceSlice> = (
               const doneVoids = new Set(outcome.voids.filter((r) => sentVoidIds.has(r.id) && ACKNOWLEDGED.has(r.status)).map((r) => r.id));
               const voidedIds = new Set(outcome.voids.filter((r) => r.status === 'voided' || r.status === 'already_voided').map((r) => r.id));
               const createdGenerics = sentObservations.filter((entry) => entry.kind === 'generic' && outcome.observations.some((r) => r.id === entry.id && r.status === 'created'));
+              if (sentObservations.some((entry) => entry.kind === 'generic' && !createdGenerics.includes(entry))) mapStale = true;
+              if (Object.values(get().genericPrices).some((info) => voidedIds.has(info.observationId))) mapStale = true;
               set((state) => {
                 const genericPrices = { ...state.genericPrices };
                 // The newest created generic is the current one until the next download corrects it.
@@ -265,7 +307,7 @@ export const createEquipmentPriceSlice: SimulationSlice<EquipmentPriceSlice> = (
               });
             }
           }
-          if (options.refresh === false) return { status: 'ok' };
+          if (options.refresh === false && !mapStale) return { status: 'ok' };
           const fetched = await SyncService.fetchGenericPrices(serverUrl, get().syncSettings.authToken!);
           ensureSession();
           if (fetched.status === 'unsupported') return { status: 'unsupported' };

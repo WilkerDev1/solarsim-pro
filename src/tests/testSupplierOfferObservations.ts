@@ -5,7 +5,7 @@ import { useSimulationStore as store } from '../store/useSimulationStore';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
-import { genericSuggestionFor } from '../store/slices/equipmentPriceSlice';
+import { acceptGenericSuggestion, genericSuggestionFor } from '../store/slices/equipmentPriceSlice';
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipment';
 
 const serverUrl = 'https://offers.invalid';
@@ -70,10 +70,36 @@ try {
   store.setState({ genericPrices: { 'eq-1': { priceUSD: 70, observedAt: '2026-10-01T00:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-000000000001' } } });
   assert.equal(genericSuggestionFor(store.getState(), editorIds), null, 'same price as the generic: nothing to offer');
   store.setState({ genericPrices: { 'eq-1': { priceUSD: 60, observedAt: '2026-10-01T00:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-000000000001' } } });
-  assert.deepEqual({ ...genericSuggestionFor(store.getState(), editorIds), observationId: undefined }, { equipmentId: 'eq-1', priceUSD: 70, currentUSD: 60, decision: 'update', observationId: undefined });
+  const updating = genericSuggestionFor(store.getState(), editorIds)!;
+  assert.deepEqual({ equipmentId: updating.equipmentId, priceUSD: updating.priceUSD, currentUSD: updating.currentUSD, decision: updating.decision }, { equipmentId: 'eq-1', priceUSD: 70, currentUSD: 60, decision: 'update' });
   // Restaurar sin registrar (deshacer de agente).
   store.getState().updateEquipmentItem('eq-1', { supplierPrices: [offer('sp-a', 'Prov A', 1)] }, { recordPrices: false });
   assert.equal(observations().length, 2, 'recordPrices: false records nothing');
+
+  // Regla 1, aceptar: la procedencia se captura al guardar, así que aceptar después de que la cola se envió conserva el proveedor.
+  reset([panel('eq-1', [offer('sp-a', 'Prov A', 100)])]);
+  store.setState({ genericPrices: { 'eq-1': { priceUSD: 60, observedAt: '2026-10-01T00:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-000000000001' } } });
+  const acceptIds = store.getState().updateEquipmentItem('eq-1', { supplierPrices: [offer('sp-a', 'Prov A', 100), offer('sp-b', 'Prov B', 70, { currency: 'DOP', priceDOP: 4200 })] });
+  const update = genericSuggestionFor(store.getState(), acceptIds)!;
+  assert.equal(update.supplierName, 'Prov B');
+  assert.equal(update.supplierOfferId, 'sp-b');
+  store.setState({ pricePending: { observations: [], voids: [] } });
+  const acceptedId = acceptGenericSuggestion(store.getState(), update)!;
+  assert.ok(acceptedId, 'accepting queues a generic');
+  const accepted = observations().find((o) => o.id === acceptedId)!;
+  assert.equal(accepted.kind, 'generic');
+  assert.equal(accepted.priceUSD, 70);
+  assert.equal(accepted.source, 'supplier_offer');
+  assert.equal(accepted.derivedFromId, update.observationId);
+  assert.equal(accepted.supplierName, 'Prov B');
+  assert.equal(accepted.supplierOfferId, 'sp-b');
+  assert.equal(accepted.originalCurrency, 'DOP');
+  assert.equal(accepted.originalPrice, 4200);
+  // Una sugerencia de otro espacio de trabajo nunca se aplica en el actual.
+  store.getState().setSyncSettings({ serverUrl, authToken: 'synthetic', currentUser: { ...ana, organizationId: 'org-b' }, autoSyncEnabled: false });
+  store.setState({ equipmentCatalog: [panel('eq-1', [], 'org-b')] });
+  assert.equal(acceptGenericSuggestion(store.getState(), update), null, 'a suggestion from another workspace is refused');
+  assert.equal(observations().length, 0, 'and records nothing there');
 
   // addEquipmentItem / addEquipmentBatch: un equipo nuevo registra sus ofertas con precio > 0.
   reset([]);
