@@ -248,7 +248,11 @@ export function PriceHistoryView({ item, onBack }: { item: SolarEquipmentItem; o
   const [held, setHeld] = useState<PriceHistoryRecord[]>([]);
   const previousRows = useRef<PriceHistoryRecord[]>([]);
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  // StrictMode monta, desmonta y vuelve a montar en desarrollo: el efecto debe volver a marcar el montaje.
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const load = useCallback(async (before: number | null) => {
     if (!authToken) {

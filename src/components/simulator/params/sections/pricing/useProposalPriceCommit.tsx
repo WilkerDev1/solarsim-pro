@@ -25,6 +25,13 @@ const GenericQuestion: React.FC<{ onUse: () => void; onDismiss: () => void }> = 
 export function useProposalPriceCommit(projectId: string) {
   const active = useSimulationStore((s) => priceFeatureActive(s));
   const [question, setQuestion] = React.useState<RowQuestion | null>(null);
+  // Tras «Usar», una línea gris confirma el guardado unos segundos en esa fila.
+  const [saved, setSaved] = React.useState<RowQuestion | null>(null);
+  React.useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(null), 4000);
+    return () => clearTimeout(timer);
+  }, [saved]);
   // La fila cambió de equipo (otro modelo, o se movieron los grupos): la pregunta se descarta tras el render, no se oculta.
   const stale = React.useRef(false);
   React.useEffect(() => {
@@ -38,13 +45,18 @@ export function useProposalPriceCommit(projectId: string) {
 
   const priceQuestionFor = (kind: PricedKind, index: number, equipmentId: string | undefined): React.ReactNode => {
     const match = rowQuestionFor(question, projectId, kind, index, equipmentId);
+    if (!match && rowQuestionFor(saved, projectId, kind, index, equipmentId))
+      return <span role="status" className="mt-0.5 block text-[11px] text-pd-muted">Guardado como precio genérico</span>;
     if (!match) {
       if (question && question.projectId === projectId && question.kind === kind && question.index === index) stale.current = true;
       return null;
     }
     return (
       <GenericQuestion
-        onUse={() => { acceptProposalGenericQuestion(useSimulationStore.getState(), match); setQuestion(null); }}
+        onUse={() => {
+          if (acceptProposalGenericQuestion(useSimulationStore.getState(), match)) setSaved(match);
+          setQuestion(null);
+        }}
         onDismiss={() => { useSimulationStore.getState().dismissGenericQuestion(match.equipmentId); setQuestion(null); }}
       />
     );
