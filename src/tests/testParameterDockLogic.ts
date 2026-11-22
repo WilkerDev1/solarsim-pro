@@ -61,7 +61,11 @@ const baseSpecs = { panelBrandModel: 'Old', panelPowerW: 400, panelCount: 10, ha
 { // a supplier the new item does not quote is dropped; other kinds' info survives
   const specs = { ...baseSpecs, panels: [{ id: 'p', brandModel: 'Old', powerW: 400, count: 10, selectedSupplierInfo: { supplierName: 'Gone', priceUSD: 1 } }], inverters: [{ id: 'i', brandModel: 'I', powerKW: 8, count: 1, selectedSupplierInfo: { supplierName: 'Keep', priceUSD: 2 } }] } as LegacyProjectSpecs;
   const patch = buildCatalogSelectionUpdate(specs, 'panel', panel);
-  assert.equal(patch.panels?.[0].selectedSupplierInfo, undefined);
+  assert.notEqual(patch.panels?.[0].selectedSupplierInfo?.supplierName, 'Gone', 'el proveedor que no cotiza se suelta');
+  assert.equal(patch.panels?.[0].selectedSupplierInfo?.supplierName, 'Beta', 'y el resolvedor único toma la oferta más barata del modelo nuevo (ADR 0006)');
+  assert.equal(patch.panels?.[0].unitPriceUSD, 95);
+  const bare = buildCatalogSelectionUpdate(specs, 'panel', catalogItem({ id: 'p9', type: 'panel', displayName: 'Sin ofertas' }));
+  assert.equal(bare.panels?.[0].selectedSupplierInfo, undefined, 'sin ofertas no queda proveedor');
   assert.equal(patch.inverters, undefined, 'the inverter group is not part of the patch');
   assert.deepEqual(normalizeEquipmentEdit(specs, patch).inverters?.[0].selectedSupplierInfo, { supplierName: 'Keep', priceUSD: 2 });
 }
@@ -72,7 +76,34 @@ const baseSpecs = { panelBrandModel: 'Old', panelPowerW: 400, panelCount: 10, ha
   assert.equal(patch.panelEfficiency, 22);
   assert.equal(patch.tempCoeff, -0.29);
   assert.equal(patch.annualDegradation, 0.4);
-  assert.equal(patch.panels?.[0].unitPriceUSD, 103.32, 'no supplier price: the group carries the engine default');
+  assert.equal(patch.panels?.[0].unitPriceUSD, undefined, 'sin oferta ni genérico: sin precio, nunca el del modelo anterior');
+  assert.equal('unitPriceUSD' in patch.panels![0], true, 'el precio anterior se quita explícitamente');
+}
+{ // ADR 0006 §5: oferta → genérico → sin precio; el genérico se copia en el grupo sin proveedor
+  const bare = catalogItem({ id: 'p2', type: 'panel', displayName: 'Bare', powerW: 610 });
+  const generic = { priceUSD: 88, observedAt: '2026-11-10T00:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-000000000001' };
+  const viaGeneric = buildCatalogSelectionUpdate({ ...baseSpecs, autoSupplierPricing: true }, 'panel', bare, generic);
+  assert.equal(viaGeneric.panels?.[0].unitPriceUSD, 88);
+  assert.equal(viaGeneric.panels?.[0].priceSource, 'generic');
+  assert.deepEqual(viaGeneric.panels?.[0].genericPriceInfo, generic);
+  assert.equal(viaGeneric.panels?.[0].selectedSupplierInfo, undefined, 'un genérico no tiene proveedor');
+  const manualMode = buildCatalogSelectionUpdate({ ...baseSpecs, autoSupplierPricing: false }, 'panel', bare, generic);
+  assert.equal(manualMode.panels?.[0].priceSource, 'generic', 'también en modo manual, sin proveedor que conservar');
+  const offerWins = buildCatalogSelectionUpdate({ ...baseSpecs, autoSupplierPricing: true }, 'panel', panel, generic);
+  assert.equal(offerWins.panels?.[0].unitPriceUSD, 95, 'la oferta gana sobre el genérico');
+  assert.equal(offerWins.panels?.[0].priceSource, 'supplier');
+  assert.equal(offerWins.panels?.[0].genericPriceInfo, undefined);
+  // Un grupo genérico que pasa a un modelo sin oferta ni genérico no arrastra precio ni copia.
+  const fromGeneric = normalizeEquipmentEdit({ ...baseSpecs, autoSupplierPricing: true }, viaGeneric);
+  const other = catalogItem({ id: 'p3', type: 'panel', displayName: 'Other', powerW: 500 });
+  const stale = buildCatalogSelectionUpdate(fromGeneric, 'panel', other);
+  const next = normalizeEquipmentEdit(fromGeneric, stale).panels![0];
+  assert.equal(next.unitPriceUSD, undefined, 'no arrastra el precio del modelo anterior');
+  assert.equal(next.genericPriceInfo, undefined);
+  assert.equal(next.priceSource, undefined);
+  // Una oferta agotada o sin precio no cuenta (resolvedor único).
+  const soldOut = catalogItem({ id: 'p4', type: 'panel', displayName: 'Agotado', powerW: 600, supplierPrices: [{ ...supplier('s-x', 'X', 70), stockStatus: 'out_of_stock' } as never] });
+  assert.equal(buildCatalogSelectionUpdate({ ...baseSpecs, autoSupplierPricing: true }, 'panel', soldOut, generic).panels?.[0].priceSource, 'generic');
 }
 { // inverter and battery use their own mirror fields and defaults
   const inv = catalogItem({ id: 'i1', type: 'inverter', displayName: 'Inv 10K', powerKW: 10, supplierPrices: [supplier('i-1', 'Alfa', 2000)] });

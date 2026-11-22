@@ -7,6 +7,7 @@ import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
+import { costMatrixPerCapacity } from './costMatrixPerCapacity';
 
 interface PDFPage5CostMatrixProps {
   project: ProjectSimulation;
@@ -144,20 +145,16 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2 space-y-0.5">
               <div className="flex justify-between text-slate-700 text-[10.5px]">
                 <span><EditableText k="costMatrix.summary.costPerKilo" /></span>
-                <span>
-                  RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} &nbsp;|&nbsp;{' '}
-                  <strong className="text-slate-900">
-                    ${summary.costMatrix.precioKilosCostoUSD.toFixed(2)} USD/kWp (${summary.costMatrix.costPerWattUSD.toFixed(2)} USD/W)
-                  </strong>
+                <span className="text-right leading-tight">
+                  <span className="block whitespace-nowrap">{costMatrixPerCapacity(summary.costMatrix, 'cost').perKWp}</span>
+                  <strong className="block whitespace-nowrap text-slate-900">{costMatrixPerCapacity(summary.costMatrix, 'cost').perW}</strong>
                 </span>
               </div>
               <div className="flex justify-between text-slate-900 font-bold text-[10.5px]">
                 <span><EditableText k="costMatrix.summary.salesPerKilo" /></span>
-                <span>
-                  RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
-                  <strong className="text-emerald-800">
-                    ${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${(summary.costMatrix.salePricePerWattUSD || 0).toFixed(2)} USD/W)
-                  </strong>
+                <span className="text-right leading-tight">
+                  <span className="block whitespace-nowrap">{costMatrixPerCapacity(summary.costMatrix, 'sale').perKWp}</span>
+                  <strong className="block whitespace-nowrap text-emerald-800">{costMatrixPerCapacity(summary.costMatrix, 'sale').perW}</strong>
                 </span>
               </div>
               <div className="flex justify-between items-center text-amber-950 font-bold bg-amber-100/70 border border-amber-300/80 px-2 py-0.5 rounded text-[10px]">

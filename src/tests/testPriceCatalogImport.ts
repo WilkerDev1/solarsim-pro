@@ -170,3 +170,28 @@ assert.ok(after.some((item) => item.id === plan.creates[0].id));
 console.log(
   "PASS: duplicate new names, whole-batch scope validation, stable supplier IDs and rejected-write verification",
 );
+
+// ADR 0006 §4: columna «Actualizar genérico» de la revisión (sin diálogo extra).
+{
+  const { genericImportChoice, genericUpdatesFromImport } = await import("../utils/priceCatalogImport");
+  assert.equal(genericImportChoice(undefined, 150), "checked", "no generic price: checked by default");
+  assert.equal(genericImportChoice(null, 150), "checked");
+  assert.equal(genericImportChoice(120, 150), "unchecked", "a different generic: unchecked by default");
+  assert.equal(genericImportChoice(150, 150.004), "hidden", "equal within tolerance: hidden");
+  assert.equal(genericImportChoice(undefined, 0), "hidden", "price <= 0: hidden");
+  const genericPlan = planPriceCatalogImport(
+    [row, { ...update, id: "row-upd", priceUSD: 140 }],
+    [existing],
+    "Supplier QA",
+  );
+  assert.deepEqual(
+    genericPlan.targets.map((target) => [target.rowId, target.priceUSD]),
+    [["row-1", 150], ["row-upd", 140]],
+    "each selected row maps to its equipment and price",
+  );
+  assert.equal(genericPlan.targets[0].equipmentId, genericPlan.creates[0].id, "created rows map to the new equipment id");
+  assert.equal(genericPlan.targets[1].equipmentId, existing.id);
+  assert.deepEqual(genericUpdatesFromImport(genericPlan, new Set(["row-upd"])), [{ equipmentId: existing.id, priceUSD: 140 }]);
+  assert.deepEqual(genericUpdatesFromImport(genericPlan, new Set()), [], "created items get a generic price only when checked");
+  console.log("PASS: price import generic column defaults and checked-row mapping");
+}

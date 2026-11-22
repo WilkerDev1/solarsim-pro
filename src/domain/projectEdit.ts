@@ -2,7 +2,7 @@ import type { ClientInfo, FinancialParams, LegacyProjectSpecs, ProjectSimulation
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipment';
 import { LIST_KEY, editEquipment, migrateLegacySpecs, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
-import { reconcileGridUseCharge } from '../../shared/netMetering';
+import { reconcileGridUseCharge, reconcileLegacySettlement } from '../../shared/netMetering';
 import { reconcileEnergyRateSource } from '../../shared/tariffBilling';
 import { resolveSystemLossesPct } from '../../shared/projectDefaults';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
@@ -114,7 +114,7 @@ export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, 
       // Tipo de conexión: `gridConnection` e `isZeroExport` se escriben siempre juntos y coherentes; alternativa de
       // suministro saneada; cargo por uso de la red reconciliado (SIE-007-2026).
       const patch = withTariffChange(project, normalizeGridConnectionPatch(project.rates, normalizeSupplyAlternativePatch(edit.patch)), ctx.tariffMatrix);
-      const rates = reconcileEnergyRateSource(project.rates, reconcileGridUseCharge(project.rates, { ...project.rates, ...patch }, patch), patch);
+      const rates = reconcileLegacySettlement(project.rates, reconcileEnergyRateSource(project.rates, reconcileGridUseCharge(project.rates, { ...project.rates, ...patch }, patch), patch), patch);
       next = resizeIfNeeded(project, { ...project, rates, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, edit.patch.targetCoveragePct !== undefined);
       break;
     }
@@ -286,7 +286,7 @@ function supplierPricePatch(project: ProjectSimulation, edit: Extract<ProjectEdi
   if (equipmentType === 'battery') system.hasBattery = true;
   if (equipmentType === 'panel' && targetItem?.efficiencyPct) system.panelEfficiency = targetItem.efficiencyPct;
 
-  const extras: Record<string, unknown> = { unitPriceUSD: supplierPrice.priceUSD, selectedSupplierInfo: supplierInfo };
+  const extras: Record<string, unknown> = { unitPriceUSD: supplierPrice.priceUSD, selectedSupplierInfo: supplierInfo, priceSource: 'supplier', genericPriceInfo: undefined };
   if (equipmentType === 'battery' && targetItem) {
     if (targetItem.dodPct) extras.dodPct = targetItem.dodPct;
     if (targetItem.batteryEfficiencyPct) extras.efficiencyPct = targetItem.batteryEfficiencyPct;

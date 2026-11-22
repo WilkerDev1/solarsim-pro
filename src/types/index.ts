@@ -1,5 +1,5 @@
 import type { NetMeteringRegime } from '../../shared/netMetering';
-import type { BillingTariff, EnergyRateSource } from '../../shared/tariffBilling';
+import type { BillingTariff, EnergyRateSource, FixedChargeTierBasis } from '../../shared/tariffBilling';
 import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
 import type { LegacyEquipmentFields } from '../../shared/equipment';
 import type { GridConnectionMode } from '../../shared/gridConnection';
@@ -33,7 +33,10 @@ export interface ClientInfo {
 }
 
 export interface PanelItemSpec {
-  priceSource?: 'manual' | 'supplier';
+  /** `generic`: precio genérico del catálogo sin proveedor (ADR 0006); su copia va en `genericPriceInfo`. */
+  priceSource?: 'manual' | 'supplier' | 'generic';
+  /** Copia del precio genérico aplicado al elegir el modelo: cambiar el genérico después no reprecia la propuesta. */
+  genericPriceInfo?: { priceUSD: number; observedAt: string; observationId: string };
   requestedModel?: string;
   id: string;
   catalogItemId?: string; // ID del equipo del catálogo; se escribe con utils/equipmentGroups.ts
@@ -50,7 +53,10 @@ export interface PanelItemSpec {
 }
 
 export interface InverterItemSpec {
-  priceSource?: 'manual' | 'supplier';
+  /** `generic`: precio genérico del catálogo sin proveedor (ADR 0006); su copia va en `genericPriceInfo`. */
+  priceSource?: 'manual' | 'supplier' | 'generic';
+  /** Copia del precio genérico aplicado al elegir el modelo: cambiar el genérico después no reprecia la propuesta. */
+  genericPriceInfo?: { priceUSD: number; observedAt: string; observationId: string };
   requestedModel?: string;
   id: string;
   catalogItemId?: string;
@@ -65,7 +71,10 @@ export interface InverterItemSpec {
 }
 
 export interface BatteryItemSpec {
-  priceSource?: 'manual' | 'supplier';
+  /** `generic`: precio genérico del catálogo sin proveedor (ADR 0006); su copia va en `genericPriceInfo`. */
+  priceSource?: 'manual' | 'supplier' | 'generic';
+  /** Copia del precio genérico aplicado al elegir el modelo: cambiar el genérico después no reprecia la propuesta. */
+  genericPriceInfo?: { priceUSD: number; observedAt: string; observationId: string };
   requestedModel?: string;
   id: string;
   catalogItemId?: string;
@@ -159,6 +168,15 @@ export interface UtilityRates {
   billingTariff?: BillingTariff;
   /** Precio de liquidación del crédito anual sobrante (RD$/kWh). Ausente = el de fábrica (no confirmado, 0). */
   annualCreditSettlementDOPPerKWh?: number;
+  /** Qué consumo elige el rango del cargo fijo con medición neta (`resolveFixedChargeTierBasis`). Ausente = energía retirada. */
+  fixedChargeTierBasis?: FixedChargeTierBasis;
+  /**
+   * Régimen anterior: liquidar el crédito anual sobrante al 75 % del primer bloque BTS-1 (`legacyAnnualSettlementApplies`).
+   * Ausente o false = el excedente se valora a la tarifa tras la retención, como siempre.
+   */
+  legacyAnnualSettlement?: boolean;
+  /** Precio guardado de esa liquidación (RD$/kWh), sembrado al activarla. Ausente = 75 % del primer bloque BTS-1 de fábrica. */
+  legacyAnnualSettlementDOPPerKWh?: number;
 }
 
 export interface CustomQuotationItem {
@@ -228,7 +246,12 @@ export interface CostMatrixSummary {
   marginOnSalePct?: number;      // % Profit Margin on Sales (e.g. 38.65%)
   markupOnCostPct?: number;      // % Markup on Costs (e.g. 63.00%)
   costPerWattUSD: number;        // Cost/W USD (e.g. $0.90)
-  salePricePerWattUSD: number;   // Total System Sale/W USD (with batteries)
+  /** Costo por W en RD$ (total neto RD$ / W DC). */
+  costPerWattDOP: number;
+  salePricePerWattUSD: number;   // Total System Sale/W USD (with batteries); en Directo $/W, la inversión bruta / W
+  /** Venta por W de las filas de la matriz: la misma venta que «Precio kilos ventas» / 1000 (USD y RD$). */
+  salePerWattUSD: number;
+  salePerWattDOP: number;
   solarSalePricePerWattUSD?: number; // Solar Only Sale/W USD (e.g. $1.13)
   solarOnlyVentaUSD?: number;    // Solar Only Sale USD
   equipmentCostUSD?: number;     // Equipment Cost USD (Panels + Inverters + Batteries)

@@ -155,17 +155,23 @@ export interface EquipmentSlice {
   equipmentCatalog: SolarEquipmentItem[];
   deletedEquipmentIds?: string[];
 
-  addEquipmentItem: (item: SolarEquipmentItem) => void;
-  addEquipmentBatch: (items: SolarEquipmentItem[]) => void;
-  updateEquipmentItem: (id: string, updates: Partial<SolarEquipmentItem>) => void;
+  /**
+   * Las acciones que guardan ofertas devuelven los ids de los registros de precio que crearon (ADR 0006, Regla 1):
+   * solo ofertas nuevas o con precio distinto que de verdad quedaron guardadas; `[]` sin sesión o sin permiso.
+   */
+  addEquipmentItem: (item: SolarEquipmentItem) => string[];
+  addEquipmentBatch: (items: SolarEquipmentItem[]) => string[];
+  /** `recordPrices: false` restaura sin registrar (deshacer de un agente). */
+  updateEquipmentItem: (id: string, updates: Partial<SolarEquipmentItem>, options?: { recordPrices?: boolean }) => string[];
   removeEquipmentItem: (id: string) => void;
   resetEquipmentCatalogToDefaults: () => void;
   syncEquipmentWithServer: () => Promise<{ success: boolean; message: string }>;
 
   // 🏷️ Gestión de Precios por Proveedor
-  addOrUpdateSupplierPrice: (equipmentId: string, supplierPrice: Omit<import('../types/equipment').EquipmentSupplierPrice, 'id' | 'updatedAt'> & { id?: string }) => void;
+  /** `priceSource: 'agent'` registra el cambio con la fuente del agente (`update_supplier_price`). */
+  addOrUpdateSupplierPrice: (equipmentId: string, supplierPrice: Omit<import('../types/equipment').EquipmentSupplierPrice, 'id' | 'updatedAt'> & { id?: string }, options?: { priceSource?: 'agent' }) => string[];
   removeSupplierPrice: (equipmentId: string, supplierPriceId: string) => void;
-  batchUpdateSupplierPrices: (updates: { equipmentId: string; supplierPrice: import('../types/equipment').EquipmentSupplierPrice }[]) => void;
+  batchUpdateSupplierPrices: (updates: { equipmentId: string; supplierPrice: import('../types/equipment').EquipmentSupplierPrice }[]) => string[];
   setPreferredSupplier: (equipmentId: string, supplierPriceId?: string) => void;
   renameSupplier: (oldName: string, newName: string) => void;
   deleteSupplier: (supplierName: string) => void;
@@ -346,6 +352,7 @@ import { TariffSlice } from './slices/tariffSlice';
 import { ClientSlice } from './slices/clientSlice';
 import { FeatureSettingsSlice } from './slices/featureSettingsSlice';
 import { AgentSlice } from './slices/agentSlice';
+import { EquipmentPriceSlice } from './slices/equipmentPriceSlice';
 
 export type SimulationStore = ProjectSlice &
   EquipmentSlice &
@@ -360,7 +367,8 @@ export type SimulationStore = ProjectSlice &
   VersionHistorySlice &
   NotificationSlice &
   FeatureSettingsSlice &
-  AgentSlice;
+  AgentSlice &
+  EquipmentPriceSlice;
 
 export type SimulationState = SimulationStore;
 export type SimulationSlice<T> = StateCreator<SimulationStore, [], [], T>;

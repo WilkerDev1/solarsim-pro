@@ -259,20 +259,23 @@ export function calculateCostMatrixSummary(
   const solarOnlyVentaDOP = solarOnlyTotalNetDOP * margin;
   const solarOnlyVentaUSD = solarOnlyTotalNetUSD * margin;
 
-  const capacityKW = installationQty > 0 ? installationQty : (dcCapacityKWp > 0 ? dcCapacityKWp : 1);
-  const precioKilosCostoDOP = totalNetoDOP / (capacityKW * 800 || 1);
-  const precioKilosCostoUSD = totalNetoUSD / capacityKW;
+  // «Precio kilos costo / ventas»: por kWp DC y por W, en USD y RD$, sobre la misma base. Sin potencia, 0 (no el total).
+  // Antes el costo en RD$ dividía entre kWp × 800 (1000 / 1.25, el margen de fábrica fijo): no era por kWp ni por W.
+  const perKWp = (amount: number) => (dcCapacityKWp > 0 ? amount / dcCapacityKWp : 0);
+  const precioKilosCostoDOP = perKWp(totalNetoDOP);
+  const precioKilosCostoUSD = perKWp(totalNetoUSD);
 
-  const precioKilosVentasDOP = porcentajeVentaDOP / capacityKW;
-  const precioKilosVentasUSD = porcentajeVentaUSD / capacityKW;
+  const precioKilosVentasDOP = perKWp(porcentajeVentaDOP);
+  const precioKilosVentasUSD = perKWp(porcentajeVentaUSD);
 
   // Ganancia neta del proyecto: Diferencia entre Porcentaje Venta Real y Costo Total Neto (fórmula de referencia Excel)
   const gananciaDOP = porcentajeVentaDOP - totalNetoDOP;
   const gananciaUSD = porcentajeVentaUSD - totalNetoUSD;
 
-  const costPerWattUSD = totalNetoUSD / (capacityKW * 1000);
-  const salePricePerWattUSD = porcentajeVentaUSD / (capacityKW * 1000);
-  const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : DEFAULT_PRICE_PER_WATT_USD;
+  const costPerWattUSD = precioKilosCostoUSD / 1000;
+  const costPerWattDOP = precioKilosCostoDOP / 1000;
+  const salePricePerWattUSD = precioKilosVentasUSD / 1000;
+  const solarSalePricePerWattUSD = dcCapacityKWp > 0 ? Math.round((solarOnlyVentaUSD / (dcCapacityKWp * 1000)) * 100) / 100 : DEFAULT_PRICE_PER_WATT_USD;
 
   const marginOnSalePct = porcentajeVentaUSD > 0 ? Math.round((gananciaUSD / porcentajeVentaUSD) * 10000) / 100 : 0;
   const markupOnCostPct = totalNetoUSD > 0 ? Math.round((gananciaUSD / totalNetoUSD) * 10000) / 100 : 0;
@@ -312,7 +315,10 @@ export function calculateCostMatrixSummary(
     marginOnSalePct,
     markupOnCostPct,
     costPerWattUSD,
+    costPerWattDOP,
     salePricePerWattUSD,
+    salePerWattUSD: salePricePerWattUSD,
+    salePerWattDOP: precioKilosVentasDOP / 1000,
     solarSalePricePerWattUSD,
     equipmentCostUSD,
     equipmentTotalUSD,
@@ -463,6 +469,7 @@ export function calculateFinancialSummary(
 
   // Synchronize Cost Matrix with Direct Price in direct_watt mode
   if (isDirectWatt) {
+    const soldCostUSD = Math.round((costMatrix.totalNetoUSD - (costMatrix.customItemsItbisUSD || 0)) * 100) / 100;
     costMatrix.listPorcentajeVentaUSD = listGrossInvestmentUSD;
     costMatrix.listPorcentajeVentaDOP = Math.round(listGrossInvestmentUSD * costMatrix.dopExchangeRate * 100) / 100;
     costMatrix.totalDiscountUSD = totalDiscountUSD;
@@ -475,13 +482,18 @@ export function calculateFinancialSummary(
 
       costMatrix.porcentajeVentaUSD = commercialPreTaxSubtotalUSD;
       costMatrix.porcentajeVentaDOP = Math.round(commercialPreTaxSubtotalUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD)) * 100) / 100;
+      // Ganancia sobre el costo de todo lo vendido (sistema base e ítems adicionales). La venta es antes de ITBIS (el de
+      // los extras no exonerados se cobra aparte al cliente), así que el costo tampoco lleva el ITBIS de esos extras.
+      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - soldCostUSD) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.marginOnSalePct = commercialPreTaxSubtotalUSD > 0 ? Math.round((costMatrix.gananciaUSD / commercialPreTaxSubtotalUSD) * 10000) / 100 : 0;
-      costMatrix.markupOnCostPct = (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD) > 0 ? Math.round((costMatrix.gananciaUSD / (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD)) * 10000) / 100 : 0;
+      costMatrix.markupOnCostPct = soldCostUSD > 0 ? Math.round((costMatrix.gananciaUSD / soldCostUSD) * 10000) / 100 : 0;
       costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((commercialPreTaxSubtotalUSD / dcCapacityKWp) * 100) / 100 : 0;
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.salePricePerWattUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000 : effectivePricePerWatt;
+      // Filas de la matriz: la venta por W es la misma venta que la de kWp (subtotal comercial antes de ITBIS).
+      costMatrix.salePerWattUSD = costMatrix.precioKilosVentasUSD / 1000;
+      costMatrix.salePerWattDOP = costMatrix.precioKilosVentasDOP / 1000;
       costMatrix.laborVentaUSD = surplusLaborVenta;
       costMatrix.equipmentVentaUSD = Math.min(baseGrossInvestmentUSD, baseEquipmentVenta);
     } else {
@@ -491,13 +503,18 @@ export function calculateFinancialSummary(
       costMatrix.saleMarginMultiplier = impliedMargin;
       costMatrix.porcentajeVentaUSD = commercialPreTaxSubtotalUSD;
       costMatrix.porcentajeVentaDOP = Math.round(commercialPreTaxSubtotalUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - baseNetCost) * 100) / 100;
+      // Ganancia sobre el costo de todo lo vendido (sistema base e ítems adicionales). La venta es antes de ITBIS (el de
+      // los extras no exonerados se cobra aparte al cliente), así que el costo tampoco lleva el ITBIS de esos extras.
+      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - soldCostUSD) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.marginOnSalePct = commercialPreTaxSubtotalUSD > 0 ? Math.round((costMatrix.gananciaUSD / commercialPreTaxSubtotalUSD) * 10000) / 100 : 0;
-      costMatrix.markupOnCostPct = baseNetCost > 0 ? Math.round((costMatrix.gananciaUSD / baseNetCost) * 10000) / 100 : 0;
+      costMatrix.markupOnCostPct = soldCostUSD > 0 ? Math.round((costMatrix.gananciaUSD / soldCostUSD) * 10000) / 100 : 0;
       costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((commercialPreTaxSubtotalUSD / dcCapacityKWp) * 100) / 100 : 0;
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.salePricePerWattUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000 : effectivePricePerWatt;
+      // Filas de la matriz: la venta por W es la misma venta que la de kWp (subtotal comercial antes de ITBIS).
+      costMatrix.salePerWattUSD = costMatrix.precioKilosVentasUSD / 1000;
+      costMatrix.salePerWattDOP = costMatrix.precioKilosVentasDOP / 1000;
       costMatrix.equipmentVentaUSD = Math.round((costMatrix.equipmentTotalUSD || 0) * impliedMargin * 100) / 100;
       costMatrix.laborVentaUSD = Math.round((costMatrix.laborTotalUSD || 0) * impliedMargin * 100) / 100;
     }
@@ -676,7 +693,8 @@ export function calculateFinancialSummary(
   // Effective sale price per Watt and per kWp (dynamic across both cost matrix and direct watt modes):
   const salePricePerWattUSD = dcCapacityKWp > 0
     ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000
-    : (costMatrix.salePricePerWattUSD || effectivePricePerWatt || DEFAULT_PRICE_PER_WATT_USD);
+    // Sin potencia: en Directo $/W el precio tecleado; en la matriz no hay precio por W (0, nunca uno inventado).
+    : (isDirectWatt ? (effectivePricePerWatt || DEFAULT_PRICE_PER_WATT_USD) : 0);
 
   const salePricePerKWpUSD = dcCapacityKWp > 0
     ? Math.round((grossInvestmentUSD / dcCapacityKWp) * 100) / 100
@@ -744,25 +762,40 @@ export function engineGridUseCharge(
 }
 
 /**
- * Facturación neta que recibe el motor de energía en el régimen SIE-007-2026 con red:
- * - con la fila de la tarifa y precio de referencia (`energyValuationMethod === 'block_billing'`), los bloques oficiales;
- * - sin fila válida (precio tecleado, de factura o fila de otra tarifa), una tarifa de precio único al precio escalar,
- *   sin cargo fijo. Así el neteo kWh contra kWh, el arrastre del crédito, el cargo por uso de la red y la liquidación
- *   anual del remanente son los mismos: el excedente solo anula consumo, nunca se paga al precio de venta.
- * Régimen anterior, sistema aislado o inyección cero con precio escalar: `undefined` (el ahorro se valora con el escalar).
+ * Facturación neta que recibe el motor de energía:
+ * - SIE-007-2026 con red y la fila de la tarifa y precio de referencia (`energyValuationMethod === 'block_billing'`):
+ *   los bloques oficiales;
+ * - SIE-007-2026 con red sin fila válida (precio tecleado, de factura o fila de otra tarifa): una tarifa de precio único
+ *   al precio escalar, sin cargo fijo. Así el neteo kWh contra kWh, el arrastre del crédito, el cargo por uso de la red y
+ *   la liquidación anual del remanente son los mismos: el excedente solo anula consumo, nunca se paga al precio de venta;
+ * - régimen anterior con la liquidación anual activada (`legacyAnnualSettlementDOPPerKWh`): la misma tarifa de precio
+ *   único sobre el crédito reconocido tras la retención, sin cargo por uso de la red, y el remanente al 75 % del primer
+ *   bloque BTS-1.
+ * Régimen anterior sin liquidación, sistema aislado o inyección cero con precio escalar: `undefined` (el ahorro se
+ * valora con el escalar).
  */
 export function engineBlockBilling(
-  assumptions: Pick<ResolvedAssumptions, 'energyValuationMethod' | 'netMeteringRegime' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate' | 'annualCreditSettlementDOPPerKWh'>,
+  assumptions: Pick<ResolvedAssumptions, 'energyValuationMethod' | 'netMeteringRegime' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate' | 'annualCreditSettlementDOPPerKWh' | 'fixedChargeTierBasis' | 'legacyAnnualSettlementDOPPerKWh'>,
   rates: TariffBillingRatesInput,
   /** Precio escalar con que se valora el ahorro (USD/kWh), el mismo que recibe el motor de energía. */
   flatEnergyCostUSDPerKWh?: number,
 ): BlockBillingInput | undefined {
-  const common = { dopPerUSD: assumptions.dopExchangeRate, gridUseChargeDOPPerKWh: assumptions.appliedGridUseChargeDOPPerKWh, settlementDOPPerKWh: assumptions.annualCreditSettlementDOPPerKWh };
+  const common = {
+    dopPerUSD: assumptions.dopExchangeRate,
+    gridUseChargeDOPPerKWh: assumptions.appliedGridUseChargeDOPPerKWh,
+    settlementDOPPerKWh: assumptions.annualCreditSettlementDOPPerKWh,
+    fixedChargeTierBasis: assumptions.fixedChargeTierBasis,
+  };
   const tariff = assumptions.energyValuationMethod === 'block_billing' ? proposalBillingTariff(rates) : undefined;
   if (tariff) return { tariff, ...common };
-  if (assumptions.netMeteringRegime !== 'sie007_2026' || !exportsToGrid(resolveGridConnection(rates))) return undefined;
-  if (!(typeof flatEnergyCostUSDPerKWh === 'number' && Number.isFinite(flatEnergyCostUSDPerKWh) && flatEnergyCostUSDPerKWh > 0)) return undefined;
-  return { tariff: flatSinglePriceTariff(rates, flatEnergyCostUSDPerKWh * assumptions.dopExchangeRate), ...common };
+  if (!exportsToGrid(resolveGridConnection(rates))) return undefined;
+  const validFlat = typeof flatEnergyCostUSDPerKWh === 'number' && Number.isFinite(flatEnergyCostUSDPerKWh) && flatEnergyCostUSDPerKWh > 0;
+  if (!validFlat) return undefined;
+  const flat = flatSinglePriceTariff(rates, flatEnergyCostUSDPerKWh * assumptions.dopExchangeRate);
+  if (assumptions.netMeteringRegime === 'sie007_2026') return { tariff: flat, ...common };
+  const legacyPrice = assumptions.legacyAnnualSettlementDOPPerKWh;
+  if (legacyPrice === null || !Number.isFinite(legacyPrice)) return undefined;
+  return { ...common, tariff: flat, gridUseChargeDOPPerKWh: 0, settlementDOPPerKWh: legacyPrice, creditBasis: 'net_credit' };
 }
 
 /** Tarifa de precio único (sin cargo fijo ni regla de 701 kWh) para facturar con medición neta al precio escalar. */

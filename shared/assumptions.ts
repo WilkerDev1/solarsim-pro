@@ -20,8 +20,8 @@
  *
  * TypeScript puro, sin dependencias fuera de `shared/` (lo compilan el cliente, el servidor con NodeNext y el Worker).
  */
-import { resolveNetMetering, type NetMeteringRegime } from './netMetering.js';
-import { resolveAnnualCreditSettlementDOPPerKWh, resolveEnergyValuationMethod, type EnergyValuationMethod } from './tariffBilling.js';
+import { legacyAnnualSettlementApplies, resolveLegacySettlementDOPPerKWh, resolveNetMetering, type NetMeteringRegime } from './netMetering.js';
+import { resolveAnnualCreditSettlementDOPPerKWh, resolveEnergyValuationMethod, resolveFixedChargeTierBasis, type EnergyValuationMethod, type FixedChargeTierBasis } from './tariffBilling.js';
 
 // ── Valores por defecto ──
 /** Tasa RD$ por US$. */
@@ -136,6 +136,9 @@ export interface AssumptionsProjectInput {
     energyRateSource?: unknown;
     billingTariff?: unknown;
     annualCreditSettlementDOPPerKWh?: unknown;
+    fixedChargeTierBasis?: unknown;
+    legacyAnnualSettlement?: unknown;
+    legacyAnnualSettlementDOPPerKWh?: unknown;
   } | null;
   financials?: {
     discountRatePct?: Maybe;
@@ -170,6 +173,10 @@ export interface ResolvedAssumptions {
   energyValuationMethod: EnergyValuationMethod;
   /** Precio de liquidación del crédito anual sobrante (RD$/kWh); de fábrica 0 (no confirmado). */
   annualCreditSettlementDOPPerKWh: number;
+  /** Qué consumo elige el rango del cargo fijo con medición neta; de fábrica la energía retirada (no confirmado). */
+  fixedChargeTierBasis: FixedChargeTierBasis;
+  /** Régimen anterior con liquidación anual activada: el precio guardado o el 75 % del primer bloque BTS-1 (RD$/kWh); `null` si no aplica. */
+  legacyAnnualSettlementDOPPerKWh: number | null;
 }
 
 /**
@@ -218,6 +225,8 @@ export function resolveAssumptions(project: AssumptionsProjectInput | null | und
     appliedGridUseChargeDOPPerKWh: netMetering.appliedGridUseChargeDOPPerKWh,
     energyValuationMethod: resolveEnergyValuationMethod(rates),
     annualCreditSettlementDOPPerKWh: resolveAnnualCreditSettlementDOPPerKWh(rates),
+    fixedChargeTierBasis: resolveFixedChargeTierBasis(rates),
+    legacyAnnualSettlementDOPPerKWh: legacyAnnualSettlementApplies(rates) ? resolveLegacySettlementDOPPerKWh(rates) : null,
   };
 }
 

@@ -3,7 +3,7 @@ import { getProjectBatteries, getProjectInverters, getProjectPanels } from './eq
 import type { SolarEquipmentItem } from '../types/equipment';
 
 export type CatalogAuditCode =
-  | 'missing_price' | 'stale_price' | 'missing_datasheet' | 'missing_image' | 'missing_nominal'
+  | 'missing_price' | 'generic_only' | 'stale_price' | 'missing_datasheet' | 'missing_image' | 'missing_nominal'
   | 'duplicate_model' | 'no_stock' | 'price_outlier' | 'unmatched_proposal_equipment';
 
 export interface CatalogAuditFinding {
@@ -39,7 +39,8 @@ const normalizeName = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]
 export function auditCatalog(
   catalog: SolarEquipmentItem[],
   projects: ProjectSimulation[],
-  options: { now: Date; staleDays?: number; type?: SolarEquipmentItem['type'] }
+  /** `genericPrices`: precio genérico efectivo por equipo (ADR 0006); sin él, nadie cuenta como `generic_only`. */
+  options: { now: Date; staleDays?: number; type?: SolarEquipmentItem['type']; genericPrices?: Record<string, { priceUSD: number } | null | undefined> }
 ): CatalogAuditReport {
   const items = catalog.filter((item) => !options.type || item.type === options.type);
   const staleMs = (options.staleDays ?? 90) * DAY;
@@ -60,7 +61,10 @@ export function auditCatalog(
   for (const item of items) {
     const offers = (item.supplierPrices || []).filter((o) => Number.isFinite(o.priceUSD) && o.priceUSD > 0);
     const label = item.displayName || item.id;
-    if (!offers.length) add({ code: 'missing_price', severity: 'warning', equipmentId: item.id, message: `${label} no tiene ofertas con precio.` });
+    const generic = options.genericPrices?.[item.id]?.priceUSD;
+    if (!offers.length && generic !== undefined && Number.isFinite(generic) && generic > 0)
+      add({ code: 'generic_only', severity: 'info', equipmentId: item.id, message: `${label} no tiene ofertas; se cotiza con su precio genérico (US$ ${generic}).` });
+    else if (!offers.length) add({ code: 'missing_price', severity: 'warning', equipmentId: item.id, message: `${label} no tiene ofertas con precio.` });
     else {
       const newest = Math.max(...offers.map((o) => Date.parse(o.updatedAt) || 0));
       if (options.now.getTime() - newest > staleMs)

@@ -1,4 +1,6 @@
 import { auditCatalog } from '../../utils/catalogAudit';
+import { genericPriceDecision } from '../../../shared/equipmentPrices';
+import { effectiveGenericPrice, priceFeatureActive } from '../../store/slices/equipmentPriceSlice';
 import { visibleAssistantEquipment, visibleAssistantProjects } from '../assistant/tools';
 import { canWriteWorkspace, findVisibleEquipment, fingerprint, store, type NativeHandler } from './nativeTools';
 
@@ -6,7 +8,11 @@ const STOCK_LABEL = { in_stock: 'En stock', on_order: 'Bajo pedido', out_of_stoc
 const normalize = (s: unknown) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 const auditCatalogTool: NativeHandler = (args) => {
-  const report = auditCatalog(visibleAssistantEquipment(), visibleAssistantProjects(), { now: new Date(), staleDays: args.staleDays, type: args.type });
+  const s = store();
+  const equipment = visibleAssistantEquipment();
+  // Precio genérico efectivo (ADR 0006); sin sesión la función está apagada y el mapa queda vacío.
+  const genericPrices = priceFeatureActive(s) ? Object.fromEntries(equipment.map((e) => [e.id, effectiveGenericPrice(s, e.id)])) : {};
+  const report = auditCatalog(equipment, visibleAssistantProjects(), { now: new Date(), staleDays: args.staleDays, type: args.type, genericPrices });
   const findings = report.findings.slice(0, 100);
   return {
     data: { summary: report.summary, findings, truncated: report.findings.length > findings.length },
@@ -33,6 +39,18 @@ const listSupplierOffers: NativeHandler = (args) => {
   return { data: { offers, limit: 50 } };
 };
 
+/** Texto del resultado cuando el nuevo precio difiere del precio genérico (sin sesión la función está apagada). */
+function genericPriceNote(equipmentId: string, priceUSD: number): string | undefined {
+  const s = store();
+  if (!priceFeatureActive(s) || !(priceUSD > 0)) return undefined;
+  const generic = effectiveGenericPrice(s, equipmentId);
+  const decision = genericPriceDecision(generic?.priceUSD, priceUSD);
+  if (decision === 'none') return undefined;
+  return generic
+    ? `El nuevo precio (US$ ${priceUSD}) difiere del precio genérico del equipo (US$ ${generic.priceUSD}); el genérico no cambió.`
+    : `El equipo no tiene precio genérico; el nuevo precio (US$ ${priceUSD}) no lo fija.`;
+}
+
 const updateSupplierPrice: NativeHandler = (args) => {
   const check = () => {
     if (!canWriteWorkspace()) throw new Error('Tu cuenta solo puede consultar.');
@@ -57,9 +75,15 @@ const updateSupplierPrice: NativeHandler = (args) => {
         const before = { supplierPrices: structuredClone(fresh.item.supplierPrices) };
         // An explicit USD price replaces the original DOP quote, as in the supplier editor.
         const priceChange = args.priceUSD !== undefined ? { priceUSD: args.priceUSD, currency: 'USD' as const, priceDOP: undefined } : {};
-        store().addOrUpdateSupplierPrice(fresh.item.id, { ...fresh.offer, ...priceChange, ...(args.stockStatus ? { stockStatus: args.stockStatus } : {}) });
+        // ADR 0006: the price change is recorded with source `agent` (never a prompt: the tool may run unattended).
+        const priceObservationIds = store().addOrUpdateSupplierPrice(fresh.item.id, { ...fresh.offer, ...priceChange, ...(args.stockStatus ? { stockStatus: args.stockStatus } : {}) }, { priceSource: 'agent' });
         const after = store().equipmentCatalog.find((e) => e.id === fresh.item.id)!;
-        return { targetId: fresh.item.id, undo: { before, afterFingerprint: fingerprint({ supplierPrices: after.supplierPrices }) } };
+        const genericPrice = args.priceUSD !== undefined ? genericPriceNote(fresh.item.id, Number(args.priceUSD)) : undefined;
+        return {
+          targetId: fresh.item.id,
+          data: genericPrice ? { genericPrice } : undefined,
+          undo: { before, afterFingerprint: fingerprint({ supplierPrices: after.supplierPrices }), ...(priceObservationIds.length ? { priceObservationIds } : {}) },
+        };
       },
     },
   };

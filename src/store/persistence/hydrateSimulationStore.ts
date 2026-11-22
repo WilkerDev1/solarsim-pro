@@ -12,6 +12,7 @@ import { migrateDefaultSimulationSettings } from '../defaultSimulationSettings';
 import { normalizeAgentPolicy } from '../slices/agentSlice';
 import { migrateLegacySpecs } from '../../../shared/equipment';
 import { migrateStoredGeminiModel } from '../slices/aiSlice';
+import { normalizePriceState } from '../slices/equipmentPriceSlice';
 
 /** FNV-1a de 32 bits en hexadecimal: identifica una URL sin escribirla en el código. */
 export function serverUrlFingerprint(url: string): string {
@@ -227,8 +228,10 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
     state.pendingAgentActions = [];
     Object.assign(state, migrateStoredGeminiModel(state.geminiModel, state.geminiModelChosenByUser));
     if (state.defaultSimulationSettings) state.defaultSimulationSettings = migrateDefaultSimulationSettings(state.defaultSimulationSettings);
+    Object.assign(state, normalizePriceState(state));
     for (const workspace of Object.values(state.organizationWorkspaces || {})) {
       if (workspace?.defaultSimulationSettings) workspace.defaultSimulationSettings = migrateDefaultSimulationSettings(workspace.defaultSimulationSettings);
+      if (workspace && ('genericPrices' in workspace || 'pricePending' in workspace || 'proposalPriceLive' in workspace)) Object.assign(workspace, normalizePriceState(workspace));
     }
     state.companies = normalizeCompanyProfiles(state.companies, true);
     if (!state.companies.some(c => c.id === state.activeCompanyId)) state.activeCompanyId = state.companies.find(c => c.isDefault)!.id;

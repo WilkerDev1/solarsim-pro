@@ -24,6 +24,10 @@ for (const def of AGENT_TOOL_DEFINITIONS) {
   assert(['read', 'draft', 'guarded'].includes(def.kind));
 }
 assert.equal(findAgentTool('propose_equipment_update')?.kind, 'guarded', 'catalog edits require confirmation');
+// ADR 0006 §6: price history is a read tool on every surface, with a bounded page and a strict schema.
+assert.equal(findAgentTool('get_price_history')?.kind, 'read');
+assert.deepEqual(findAgentTool('get_price_history')?.inputSchema.required, ['equipmentId']);
+assert.equal(findAgentTool('get_price_history')?.inputSchema.properties?.limit?.maximum, 100);
 assert.match(AGENT_RULES_ES, /Catálogo IA/);
 
 // 2. Validator subset.

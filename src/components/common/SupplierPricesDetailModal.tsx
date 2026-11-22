@@ -21,6 +21,9 @@ import { contentEqual } from "../../store/sync/projectDifferences";
 import "./suppliers/suppliers.css";
 import "./suppliers/equipment-offers.css";
 import { confirmAction } from "./confirmAction";
+import { GenericPriceControl, GenericPriceSuggestion } from "./equipment/GenericPrice";
+import { PriceHistoryView } from "./equipment/PriceHistory";
+import { genericSuggestionFor, type GenericSuggestion } from "../../store/slices/equipmentPriceSlice";
 
 export function SupplierPricesDetailModal() {
   const { supplierPriceModalEquipment, workspaceScope, sessionGeneration } =
@@ -48,6 +51,9 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
   const [stock, setStock] =
     useState<NonNullable<EquipmentSupplierPrice["stockStatus"]>>("in_stock");
   const [feedback, setFeedback] = useState("");
+  const [suggestion, setSuggestion] = useState<GenericSuggestion | null>(null);
+  // Third body state (ADR 0006 §6): the history alternates with the list and the editor; it never opens another modal.
+  const [history, setHistory] = useState(false);
   const user = state.syncSettings.currentUser;
   const writable =
     !!item &&
@@ -86,6 +92,7 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
     setNotes(offer?.notes || "");
     setStock(offer?.stockStatus || "in_stock");
     setFeedback("");
+    setSuggestion(null);
   };
   const offers = item?.supplierPrices || [];
   const names = [
@@ -119,6 +126,22 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
           <h2 id="equipment-offers-title">Ofertas de proveedores</h2>
           <p>{item?.displayName || "Equipo no disponible"}</p>
           <small>{item?.brand} · Precio de compra por unidad · USD</small>
+          {item && (
+            <GenericPriceControl
+              item={item}
+              onHistory={
+                history
+                  ? undefined
+                  : async () => {
+                      if (!(await abandon())) return;
+                      setEditor(null);
+                      setFeedback("");
+                      setSuggestion(null);
+                      setHistory(true);
+                    }
+              }
+            />
+          )}
         </div>
         <button
           className="supplier-icon"
@@ -134,6 +157,8 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
             Este equipo ya no está en el catálogo. Cierra la ventana y revisa la
             lista actual.
           </p>
+        ) : history ? (
+          <PriceHistoryView item={item} onBack={() => setHistory(false)} />
         ) : editor ? (
           <form id="equipment-offer-form"
             onSubmit={(event) => {
@@ -174,7 +199,7 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
                 );
                 return;
               }
-              state.addOrUpdateSupplierPrice(equipmentId, {
+              const recorded = state.addOrUpdateSupplierPrice(equipmentId, {
                 id: editor.id,
                 supplierName: supplier.trim(),
                 priceUSD: value,
@@ -200,8 +225,13 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
                 return;
               }
               setEditor(null);
+              // Rule 1 (ADR 0006): one compact suggestion in place of the saved message, never a blocking dialog.
+              const offered = genericSuggestionFor(useSimulationStore.getState(), recorded);
+              setSuggestion(offered);
               setFeedback(
-                "Oferta guardada en este equipo. La sincronización del catálogo enviará los cambios pendientes.",
+                offered
+                  ? ""
+                  : "Oferta guardada en este equipo. La sincronización del catálogo enviará los cambios pendientes.",
               );
             }}
           >
@@ -334,6 +364,12 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
               <p role="status" className="offers-feedback">
                 {feedback}
               </p>
+            )}
+            {suggestion && (
+              <GenericPriceSuggestion
+                suggestion={suggestion}
+                onDismiss={() => setSuggestion(null)}
+              />
             )}
             {!offers.length ? (
               <div className="offers-empty">

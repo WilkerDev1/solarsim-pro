@@ -1,10 +1,18 @@
 import React from 'react';
 import type { ProjectSimulation, UtilityRates } from '../../../../../types';
 import type { EnergyCalculationMode } from '../../../../../../shared/applicationFeatures';
-import { MAX_SETTLEMENT_DOP_PER_KWH, resolveAnnualCreditSettlementDOPPerKWh } from '../../../../../../shared/tariffBilling';
-import { CommitNumberField, InfoTip, ParamRow } from '../../ui';
+import {
+  ESTIMATED_ANNUAL_CREDIT_SETTLEMENT,
+  MAX_SETTLEMENT_DOP_PER_KWH,
+  resolveAnnualCreditSettlementDOPPerKWh,
+  resolveFixedChargeTierBasis,
+  type FixedChargeTierBasis,
+} from '../../../../../../shared/tariffBilling';
+import { CommitNumberField, FieldMenu, InfoTip, ParamRow, ToggleGroup } from '../../ui';
 import {
   UNVERIFIED_ESTIMATE_LABEL,
+  fixedChargeTierBasisOptions,
+  settlementPriceOptions,
   buildBillBreakdown,
   describeValuationMethod,
   formatDOP,
@@ -29,11 +37,16 @@ export const TariffValuationPanel: React.FC<TariffValuationPanelProps> = ({ proj
   const breakdown = React.useMemo(() => buildBillBreakdown(project, calculationMode), [project, calculationMode]);
   const assumptions = unverifiedAssumptions(rates);
   const settlement = assumptions.find((item) => item.id === 'annual_settlement_price');
+  const tierBasis = assumptions.find((item) => item.id === 'fixed_charge_tier_basis');
   const assumptionsTip = [
     `${UNVERIFIED_ESTIMATE_LABEL}:`,
     ...assumptions.map((item) => `• ${item.title}: ${item.valueText}. ${item.note}`),
   ].join('\n');
   const settlementValue = resolveAnnualCreditSettlementDOPPerKWh(rates);
+  const settlementOptions = settlementPriceOptions(settlementValue);
+  const basis = resolveFixedChargeTierBasis(rates);
+  const tierBasisOptions = fixedChargeTierBasisOptions();
+  const estimateTip = `Estimado: ${ESTIMATED_ANNUAL_CREDIT_SETTLEMENT.source}`;
 
   return (
     <div className="space-y-2" data-tariff-valuation={method.method}>
@@ -87,8 +100,35 @@ export const TariffValuationPanel: React.FC<TariffValuationPanelProps> = ({ proj
             max={MAX_SETTLEMENT_DOP_PER_KWH}
             value={settlementValue}
             onCommit={(price) => updateRates({ annualCreditSettlementDOPPerKWh: price })}
-            right={<InfoTip text={settlement.note} />}
+            right={(
+              <>
+                <FieldMenu
+                  ariaLabel={`Opciones de la liquidación anual: ${settlementOptions.find((option) => option.checked)?.label ?? 'precio tecleado'}`}
+                  items={settlementOptions.map((option) => ({
+                    label: option.label,
+                    hint: option.hint,
+                    checked: option.checked,
+                    onSelect: () => updateRates(option.patch),
+                  }))}
+                />
+                <InfoTip text={`${settlement.note}\n${estimateTip}`} />
+              </>
+            )}
           />
+        </ParamRow>
+      )}
+
+      {tierBasis && (
+        <ParamRow label="Rango cargo fijo" hint={<InfoTip label="Más información: Rango cargo fijo" text={tierBasis.note} />}>
+          <div data-fixed-charge-tier-basis={basis}>
+            <ToggleGroup<FixedChargeTierBasis>
+              ariaLabel="Qué consumo elige el rango del cargo fijo"
+              compact
+              value={basis}
+              options={tierBasisOptions}
+              onChange={(value) => updateRates(tierBasisOptions.find((option) => option.value === value)?.patch ?? {})}
+            />
+          </div>
         </ParamRow>
       )}
 

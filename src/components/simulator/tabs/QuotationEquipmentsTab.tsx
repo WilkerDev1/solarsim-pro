@@ -7,6 +7,7 @@ import { MANUAL_BRAND_PLACEHOLDER, QUOTATION_PANEL_BRAND_FALLBACK, SAMPLE_PHONE_
 import { resolveAssumptions } from '../../../../shared/assumptions';
 import { visibleQuotationItems } from '../../../../shared/quotationItems';
 import { formatProposalDate } from '../../../utils/formatDateUtils';
+import { costMatrixPerCapacity } from '../../pdf/pages/costMatrixPerCapacity';
 
 interface QuotationEquipmentsTabProps {
   project: ProjectSimulation;
@@ -554,11 +555,11 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                 <span>Precio kilos costo :</span>
                 <span>
                   {costTableCurrency === 'USD' ? (
-                    <strong className="text-slate-900">${summary.costMatrix.precioKilosCostoUSD.toFixed(2)} USD/kWp (${summary.costMatrix.costPerWattUSD.toFixed(2)} USD/W)</strong>
+                    <strong className="text-slate-900">{costMatrixPerCapacity(summary.costMatrix, 'cost').usd}</strong>
                   ) : costTableCurrency === 'DOP' ? (
-                    <strong className="text-slate-900">RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} /kWp</strong>
+                    <strong className="text-slate-900">{costMatrixPerCapacity(summary.costMatrix, 'cost').dop}</strong>
                   ) : (
-                    <>RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioKilosCostoUSD.toFixed(2)} USD/kWp (${summary.costMatrix.costPerWattUSD.toFixed(2)} USD/W)</strong></>
+                    <>{costMatrixPerCapacity(summary.costMatrix, 'cost').dop} &nbsp;|&nbsp; <strong className="text-slate-900">{costMatrixPerCapacity(summary.costMatrix, 'cost').usd}</strong></>
                   )}
                 </span>
               </div>
@@ -568,11 +569,11 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                 <span>Precio kilos ventas :</span>
                 <span>
                   {costTableCurrency === 'USD' ? (
-                    <strong className="text-emerald-800">${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${(summary.costMatrix.salePricePerWattUSD || 0).toFixed(2)} USD/W)</strong>
+                    <strong className="text-emerald-800">{costMatrixPerCapacity(summary.costMatrix, 'sale').usd}</strong>
                   ) : costTableCurrency === 'DOP' ? (
-                    <strong className="text-emerald-800">RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /kWp</strong>
+                    <strong className="text-emerald-800">{costMatrixPerCapacity(summary.costMatrix, 'sale').dop}</strong>
                   ) : (
-                    <>RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${(summary.costMatrix.salePricePerWattUSD || 0).toFixed(2)} USD/W)</strong></>
+                    <>{costMatrixPerCapacity(summary.costMatrix, 'sale').dop} &nbsp;|&nbsp; <strong className="text-emerald-800">{costMatrixPerCapacity(summary.costMatrix, 'sale').usd}</strong></>
                   )}
                 </span>
               </div>

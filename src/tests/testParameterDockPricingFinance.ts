@@ -148,6 +148,31 @@ const equipment = (type: 'panel' | 'inverter' | 'battery', displayName: string, 
   assert.match(html, /id="pd-cost-installation"[^>]*value="185"|value="185"[^>]*id="pd-cost-installation"/);
 }
 
+// ── Precio genérico (ADR 0006 §5): etiqueta «Genérico» y edición a mano que lo vuelve manual ──
+{
+  const generic = { priceUSD: 88, observedAt: '2026-11-10T12:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-000000000001' };
+  const genericSpecs = (extra: Record<string, unknown> = {}) => specsOf({ hasBattery: false, panels: [{ id: 'g', brandModel: 'PANEL-G', powerW: 600, count: 10, unitPriceUSD: 88, priceSource: 'generic', genericPriceInfo: generic, ...extra }] as never });
+  const costs = (specs: LegacyProjectSpecs, showGenericLabel = true) =>
+    render(h(UnitCosts, { specs, equipmentCatalog: [], selected: {}, openSupplierPriceModal: noop, updateSpecs: noop, showGenericLabel }));
+  const labeled = costs(genericSpecs());
+  assert.match(labeled, />Genérico</, 'la fila muestra «Genérico»');
+  assert.match(labeled, /no cambia el precio de esta propuesta/, 'el ⓘ explica que la copia no se reprecia');
+  assert.doesNotMatch(costs(genericSpecs({ unitPriceUSD: 90 })), />Genérico</, 'con otro precio deja de ser genérico');
+  assert.doesNotMatch(costs(genericSpecs({ selectedSupplierInfo: { supplierName: 'Alfa', priceUSD: 88 } })), />Genérico</, 'con proveedor asignado no se etiqueta');
+  assert.doesNotMatch(costs(genericSpecs(), false), />Genérico</, 'sin sesión no hay etiqueta');
+
+  const edited = manualUnitPricePatch(genericSpecs(), 'panel', 0, 91);
+  assert.equal(edited.panels?.[0].unitPriceUSD, 91);
+  assert.equal(edited.panels?.[0].priceSource, 'manual', 'editar a mano vuelve el precio manual');
+  assert.equal(edited.panels?.[0].genericPriceInfo, undefined, 'y suelta la copia del genérico');
+  const keystroke = manualUnitPricePatch(genericSpecs(), 'panel', 0, 9);
+  assert.equal(keystroke.panels?.[0].unitPriceUSD, 9, 'cada tecla sigue escribiendo el precio (onValue)');
+
+  const best = bestSupplierPricingPatch(genericSpecs(), { panel: equipment('panel', 'PANEL-G', [sp('x', 'Alfa', 80)]) });
+  assert.equal(best.panels?.[0].priceSource, 'supplier', '«Mejor proveedor» marca la fuente');
+  assert.equal(best.panels?.[0].genericPriceInfo, undefined);
+}
+
 // ── Cableado del componente (UnitCosts no usa hooks: se invoca como función y se recorre el árbol) ──
 {
   const findProps = (node: unknown, pred: (props: Record<string, any>) => boolean, out: Record<string, any>[] = []): Record<string, any>[] => {

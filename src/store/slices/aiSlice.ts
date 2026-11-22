@@ -15,6 +15,7 @@ import { resolveAssumption, resolveAssumptions } from '../../../shared/assumptio
 import { DEFAULT_GEMINI_MODEL, INHERITED_DEFAULT_GEMINI_MODELS } from '../../../shared/geminiTransport';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
 import { RD_PROVINCES, getProvinceHSP } from '../../data/rdProvinces';
+import { effectiveGenericPriceMap } from './equipmentPriceSlice';
 
 const normalizeProvinceName = (raw?: string): string => {
   if (!raw) return 'Santo Domingo / Distrito Nacional';
@@ -38,7 +39,7 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
     const data=isGrounded?normalizeProposalDraft(input,state.equipmentCatalog,{province,systemLosses:losses,
       annualSpecificYieldKWhPerKWp:calculateRecommendedPanelCount(province,Array(12).fill(0),620,95,losses,base.client.customMonthlyHSP).annualSpecificYieldKWhPerKWp,
       monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses,base.client.customMonthlyHSP),
-      tariffReference:buildAITariffContext(state.tariffMatrix)}):input;
+      tariffReference:buildAITariffContext(state.tariffMatrix),genericPrices:effectiveGenericPriceMap(state)}):input;
     if(isGrounded && data.requiresReview) return {error:data.validationIssues?.find(i=>i.severity==='error')?.message || 'Revisa los datos pendientes antes de aplicar.'};
     if(data.monthlyConsumptionKWh.length!==12 || data.monthlyConsumptionKWh.some(n=>!Number.isFinite(n) || n<0)) return {error:'Completa los doce consumos mensuales antes de aplicar.'};
     const now=new Date().toISOString();

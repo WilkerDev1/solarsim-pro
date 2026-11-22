@@ -4,6 +4,8 @@ import { Sun, Cpu, BatteryCharging, Edit2, Check, X } from "lucide-react";
 import { DEFAULT_BATTERY_EFFICIENCY_PCT } from "../../../shared/projectDefaults";
 import { EquipmentOffersEditor } from "./equipment/EquipmentOffersEditor";
 import { EquipmentAssetsEditor } from "./equipment/EquipmentAssetsEditor";
+import { formatGenericDate, formatGenericUSD } from "./equipment/GenericPrice";
+import type { GenericPriceInfo } from "../../../shared/equipmentPrices";
 
 interface EquipmentEditorModalProps {
   isDark: boolean;
@@ -13,6 +15,8 @@ interface EquipmentEditorModalProps {
   setEditingItem: React.Dispatch<React.SetStateAction<Partial<SolarEquipmentItem> | null>>;
   setIsEditorOpen: React.Dispatch<React.SetStateAction<boolean>>;
   handleSaveEditor: (e: React.FormEvent) => void;
+  /** Precio genérico de solo lectura (ADR 0006): `undefined` lo oculta (sin sesión o equipo nuevo). */
+  genericPrice?: GenericPriceInfo | null;
   feedbackMessage: { type: "success" | "error"; text: string } | null;
   allUniqueBrands: string[];
   equipmentCatalog: SolarEquipmentItem[];
@@ -30,6 +34,7 @@ export const EquipmentEditorModal: React.FC<EquipmentEditorModalProps> = ({
   setEditingItem,
   setIsEditorOpen,
   handleSaveEditor,
+  genericPrice,
   feedbackMessage,
   allUniqueBrands,
   equipmentCatalog,
@@ -605,6 +610,12 @@ export const EquipmentEditorModal: React.FC<EquipmentEditorModalProps> = ({
             </div>
           )}
 
+          {genericPrice !== undefined && (
+            <p data-generic-price className="text-xs text-slate-500 dark:text-zinc-400">
+              {genericPrice ? `Precio genérico: ${formatGenericUSD(genericPrice.priceUSD)} · ${formatGenericDate(genericPrice.observedAt)}` : 'Sin precio genérico'}
+              {' · '}Se cambia desde las ofertas del equipo.
+            </p>
+          )}
           <EquipmentOffersEditor prices={editingItem.supplierPrices || []} onChange={prices => setEditingItem({ ...editingItem, supplierPrices: prices, preferredSupplierId: prices.some(p => p.id === editingItem.preferredSupplierId) ? editingItem.preferredSupplierId : undefined })} dark={isDark} disabled={!canEdit || assetBusy} suppliers={Array.from(new Set(equipmentCatalog.flatMap(item => (item.supplierPrices || []).map(price => price.supplierName))))}/>
           <EquipmentAssetsEditor item={editingItem} onChange={patch => setEditingItem(previous => previous ? { ...previous, ...patch } : previous)} dark={isDark} disabled={!canEdit} onBusy={setAssetBusy}/>
 
