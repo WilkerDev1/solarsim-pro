@@ -61,7 +61,7 @@ Toda propuesta creada o editada por agentes cotiza en modo **Simple (Catálogo I
 | `search_equipment`, `get_equipment`, `get_tariffs` | read | Sin oferta en stock no significa agotado |
 | `propose_project_update` | draft | Propuesta abierta: cliente, parámetros, tarifas, finanzas, consumos y grupos del catálogo |
 | `propose_equipment_update` | guarded | Especificaciones del catálogo; conserva id, ofertas y adjuntos |
-| `create_proposal` | draft | Cliente, tarifa, 12 consumos o promedio, grupos `{catalogItemId, count}`; no navega |
+| `create_proposal` | draft | Cliente, tarifa, 12 consumos o promedio, grupos `{catalogItemId, count}`; no navega. Precio: oferta del proveedor, si no el precio genérico (avisado en `warnings`), nunca inventado |
 | `duplicate_proposal` | draft | Versión enlazada sin cambiar la propuesta activa |
 | `open_proposal` | read | Abre resumen, simulador o PDF a petición |
 | `set_proposal_status`, `set_commercial_status`, `add_commercial_report`, `move_proposal_to_trash` | guarded | |
