@@ -259,20 +259,23 @@ export function calculateCostMatrixSummary(
   const solarOnlyVentaDOP = solarOnlyTotalNetDOP * margin;
   const solarOnlyVentaUSD = solarOnlyTotalNetUSD * margin;
 
-  const capacityKW = installationQty > 0 ? installationQty : (dcCapacityKWp > 0 ? dcCapacityKWp : 1);
-  const precioKilosCostoDOP = totalNetoDOP / (capacityKW * 800 || 1);
-  const precioKilosCostoUSD = totalNetoUSD / capacityKW;
+  // «Precio kilos costo / ventas»: por kWp DC y por W, en USD y RD$, sobre la misma base. Sin potencia, 0 (no el total).
+  // Antes el costo en RD$ dividía entre kWp × 800 (1000 / 1.25, el margen de fábrica fijo): no era por kWp ni por W.
+  const perKWp = (amount: number) => (dcCapacityKWp > 0 ? amount / dcCapacityKWp : 0);
+  const precioKilosCostoDOP = perKWp(totalNetoDOP);
+  const precioKilosCostoUSD = perKWp(totalNetoUSD);
 
-  const precioKilosVentasDOP = porcentajeVentaDOP / capacityKW;
-  const precioKilosVentasUSD = porcentajeVentaUSD / capacityKW;
+  const precioKilosVentasDOP = perKWp(porcentajeVentaDOP);
+  const precioKilosVentasUSD = perKWp(porcentajeVentaUSD);
 
   // Ganancia neta del proyecto: Diferencia entre Porcentaje Venta Real y Costo Total Neto (fórmula de referencia Excel)
   const gananciaDOP = porcentajeVentaDOP - totalNetoDOP;
   const gananciaUSD = porcentajeVentaUSD - totalNetoUSD;
 
-  const costPerWattUSD = totalNetoUSD / (capacityKW * 1000);
-  const salePricePerWattUSD = porcentajeVentaUSD / (capacityKW * 1000);
-  const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : DEFAULT_PRICE_PER_WATT_USD;
+  const costPerWattUSD = precioKilosCostoUSD / 1000;
+  const costPerWattDOP = precioKilosCostoDOP / 1000;
+  const salePricePerWattUSD = precioKilosVentasUSD / 1000;
+  const solarSalePricePerWattUSD = dcCapacityKWp > 0 ? Math.round((solarOnlyVentaUSD / (dcCapacityKWp * 1000)) * 100) / 100 : DEFAULT_PRICE_PER_WATT_USD;
 
   const marginOnSalePct = porcentajeVentaUSD > 0 ? Math.round((gananciaUSD / porcentajeVentaUSD) * 10000) / 100 : 0;
   const markupOnCostPct = totalNetoUSD > 0 ? Math.round((gananciaUSD / totalNetoUSD) * 10000) / 100 : 0;
@@ -312,7 +315,10 @@ export function calculateCostMatrixSummary(
     marginOnSalePct,
     markupOnCostPct,
     costPerWattUSD,
+    costPerWattDOP,
     salePricePerWattUSD,
+    salePerWattUSD: salePricePerWattUSD,
+    salePerWattDOP: precioKilosVentasDOP / 1000,
     solarSalePricePerWattUSD,
     equipmentCostUSD,
     equipmentTotalUSD,
@@ -475,13 +481,17 @@ export function calculateFinancialSummary(
 
       costMatrix.porcentajeVentaUSD = commercialPreTaxSubtotalUSD;
       costMatrix.porcentajeVentaDOP = Math.round(commercialPreTaxSubtotalUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD)) * 100) / 100;
+      // Ganancia sobre el costo de todo lo vendido (sistema base e ítems adicionales), como en el modo matriz.
+      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - costMatrix.totalNetoUSD) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.marginOnSalePct = commercialPreTaxSubtotalUSD > 0 ? Math.round((costMatrix.gananciaUSD / commercialPreTaxSubtotalUSD) * 10000) / 100 : 0;
-      costMatrix.markupOnCostPct = (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD) > 0 ? Math.round((costMatrix.gananciaUSD / (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD)) * 10000) / 100 : 0;
+      costMatrix.markupOnCostPct = costMatrix.totalNetoUSD > 0 ? Math.round((costMatrix.gananciaUSD / costMatrix.totalNetoUSD) * 10000) / 100 : 0;
       costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((commercialPreTaxSubtotalUSD / dcCapacityKWp) * 100) / 100 : 0;
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.salePricePerWattUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000 : effectivePricePerWatt;
+      // Filas de la matriz: la venta por W es la misma venta que la de kWp (subtotal comercial antes de ITBIS).
+      costMatrix.salePerWattUSD = costMatrix.precioKilosVentasUSD / 1000;
+      costMatrix.salePerWattDOP = costMatrix.precioKilosVentasDOP / 1000;
       costMatrix.laborVentaUSD = surplusLaborVenta;
       costMatrix.equipmentVentaUSD = Math.min(baseGrossInvestmentUSD, baseEquipmentVenta);
     } else {
@@ -491,13 +501,17 @@ export function calculateFinancialSummary(
       costMatrix.saleMarginMultiplier = impliedMargin;
       costMatrix.porcentajeVentaUSD = commercialPreTaxSubtotalUSD;
       costMatrix.porcentajeVentaDOP = Math.round(commercialPreTaxSubtotalUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - baseNetCost) * 100) / 100;
+      // Ganancia sobre el costo de todo lo vendido (sistema base e ítems adicionales), como en el modo matriz.
+      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - costMatrix.totalNetoUSD) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.marginOnSalePct = commercialPreTaxSubtotalUSD > 0 ? Math.round((costMatrix.gananciaUSD / commercialPreTaxSubtotalUSD) * 10000) / 100 : 0;
-      costMatrix.markupOnCostPct = baseNetCost > 0 ? Math.round((costMatrix.gananciaUSD / baseNetCost) * 10000) / 100 : 0;
+      costMatrix.markupOnCostPct = costMatrix.totalNetoUSD > 0 ? Math.round((costMatrix.gananciaUSD / costMatrix.totalNetoUSD) * 10000) / 100 : 0;
       costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((commercialPreTaxSubtotalUSD / dcCapacityKWp) * 100) / 100 : 0;
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.salePricePerWattUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000 : effectivePricePerWatt;
+      // Filas de la matriz: la venta por W es la misma venta que la de kWp (subtotal comercial antes de ITBIS).
+      costMatrix.salePerWattUSD = costMatrix.precioKilosVentasUSD / 1000;
+      costMatrix.salePerWattDOP = costMatrix.precioKilosVentasDOP / 1000;
       costMatrix.equipmentVentaUSD = Math.round((costMatrix.equipmentTotalUSD || 0) * impliedMargin * 100) / 100;
       costMatrix.laborVentaUSD = Math.round((costMatrix.laborTotalUSD || 0) * impliedMargin * 100) / 100;
     }
