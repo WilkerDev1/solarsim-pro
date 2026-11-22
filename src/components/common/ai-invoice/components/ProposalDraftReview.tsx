@@ -153,7 +153,7 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
             <div className="proposal-eq-total" data-missing={total===undefined || undefined}><span>Total</span><strong>{total===undefined?'—':usd(total)}</strong></div>
             <button type="button" className="proposal-icon-button" aria-label={`Quitar ${row.brandModel || group.label}`} onClick={()=>{const next=rows.filter((_,j)=>i!==j);update({[group.key]:next,...(group.type==='battery'?{hasBattery:next.length>0}:{})});}}><Trash2 size={16}/></button>
             <div className="proposal-eq-meta">
-              <span className="proposal-origin" data-missing={row.unitPriceUSD===undefined || undefined}>{row.unitPriceUSD===undefined?<><AlertTriangle size={12} aria-hidden/>Falta costo</>:row.priceSource==='manual'?'Costo particular de esta cotización':'Oferta del inventario'}</span>
+              <span className="proposal-origin" data-missing={row.unitPriceUSD===undefined || undefined}>{row.unitPriceUSD===undefined?<><AlertTriangle size={12} aria-hidden/>Falta costo</>:row.priceSource==='manual'?'Costo particular de esta cotización':row.priceSource==='generic'?'Precio genérico (sin proveedor)':'Oferta del inventario'}</span>
               {row.priceSource==='manual'&&<button type="button" className="proposal-tertiary" onClick={()=>update({[group.key]:rows.map((r,j)=>j===i?{...r,unitPriceUSD:undefined,priceSource:'supplier'}:r)})}><PackageOpen size={13} aria-hidden/>Usar oferta del inventario</button>}
             </div>
             {rowIssues.length>0 && <div className="proposal-row-alert" data-tier={rowTier} id={notesId}>

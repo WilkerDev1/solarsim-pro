@@ -39,9 +39,10 @@ const keys = [
   "projectSyncCursor",
   "genericPrices",
   "pricePending",
+  "proposalPriceLive",
 ] as const;
 // Keys added after 2.6 are optional: archives written by older versions lack them and fall back to emptyWorkspace().
-type OptionalWorkspaceKey = "agentActivity" | "projectSyncCursor" | "genericPrices" | "pricePending";
+type OptionalWorkspaceKey = "agentActivity" | "projectSyncCursor" | "genericPrices" | "pricePending" | "proposalPriceLive";
 export type OrganizationWorkspace = Pick<
   SimulationStore,
   Exclude<(typeof keys)[number], OptionalWorkspaceKey>
@@ -90,6 +91,7 @@ export function emptyWorkspace(): OrganizationWorkspace {
     projectSyncCursor: null,
     genericPrices: {},
     pricePending: { observations: [], voids: [] },
+    proposalPriceLive: {},
   });
 }
 /** One-time partition of legacy mixed project caches. No document is reassigned. */

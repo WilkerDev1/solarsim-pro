@@ -286,7 +286,7 @@ function supplierPricePatch(project: ProjectSimulation, edit: Extract<ProjectEdi
   if (equipmentType === 'battery') system.hasBattery = true;
   if (equipmentType === 'panel' && targetItem?.efficiencyPct) system.panelEfficiency = targetItem.efficiencyPct;
 
-  const extras: Record<string, unknown> = { unitPriceUSD: supplierPrice.priceUSD, selectedSupplierInfo: supplierInfo };
+  const extras: Record<string, unknown> = { unitPriceUSD: supplierPrice.priceUSD, selectedSupplierInfo: supplierInfo, priceSource: 'supplier', genericPriceInfo: undefined };
   if (equipmentType === 'battery' && targetItem) {
     if (targetItem.dodPct) extras.dodPct = targetItem.dodPct;
     if (targetItem.batteryEfficiencyPct) extras.efficiencyPct = targetItem.batteryEfficiencyPct;

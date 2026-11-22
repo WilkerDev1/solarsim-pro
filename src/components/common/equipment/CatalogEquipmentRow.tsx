@@ -94,10 +94,14 @@ export function CatalogEquipmentRow({
           >
             {prices.length
               ? `$${Math.min(...prices.map((p) => p.priceUSD)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-              : "Sin precio disponible"}
+              : genericPrice
+                ? "Sin ofertas"
+                : "Sin precio disponible"}
           </button>
           <p className={`mt-1 text-xs text-slate-600 dark:text-zinc-400`}>
-            {item.supplierPrices?.length || 0} ofertas registradas
+            {(item.supplierPrices?.length || 0) === 1
+              ? "1 oferta registrada"
+              : `${item.supplierPrices?.length || 0} ofertas registradas`}
           </p>
           {genericPrice && (
             <p className={`mt-0.5 text-xs text-slate-500 dark:text-zinc-500`}>

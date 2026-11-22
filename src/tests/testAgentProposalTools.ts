@@ -6,6 +6,7 @@ import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { executeAgentTool, executeForAssistant } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { findAgentTool } from '../../shared/agentTools/definitions';
+import { featureScope } from '../../shared/applicationFeatures';
 
 const store = useSimulationStore;
 const catalog = structuredClone(DEFAULT_EQUIPMENT_CATALOG);
@@ -75,6 +76,30 @@ const unpriced = await executeAgentTool({ name: 'create_proposal', args: { clien
   panels: [{ catalogItemId: unpricedPanel.id, count: 6 }], inverters: [{ catalogItemId: inverter.id, count: 1 }] } }, ctx());
 assert(unpriced.status === 'applied');
 assert.match((unpriced.data as { warnings: string[] }).warnings[0], /Sin oferta de proveedor/);
+
+// 2c. Precio genérico (ADR 0006): con sesión, un equipo sin oferta toma el genérico y el resultado lo avisa.
+{
+  const saved = store.getState().syncSettings;
+  const savedCatalog = store.getState().equipmentCatalog;
+  store.setState({
+    workspaceScope: featureScope('https://prices.invalid', 'org-a'),
+    equipmentCatalog: savedCatalog.map((e) => ({ ...e, organizationId: 'org-a' })),
+    syncSettings: { ...saved, serverUrl: 'https://prices.invalid', authToken: 'token', currentUser: { id: 'ana', name: 'Ana', email: 'ana@example.invalid', role: 'EDITOR', organizationId: 'org-a' }, autoSyncEnabled: false },
+    genericPrices: { [unpricedPanel.id]: { priceUSD: 77, observedAt: '2026-11-10T00:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-000000000077' } },
+    pricePending: { observations: [], voids: [] },
+  });
+  const genericResult = await executeAgentTool({ name: 'create_proposal', args: { clientName: 'Genérico', distributor: 'EDESUR', tariffCode: 'BTS1', averageMonthlyKWh: 400,
+    panels: [{ catalogItemId: unpricedPanel.id, count: 6 }], inverters: [{ catalogItemId: inverter.id, count: 1 }] } }, ctx());
+  assert(genericResult.status === 'applied', JSON.stringify(genericResult));
+  const made = store.getState().projects.find((p) => p.id === (genericResult.data as { proposalId: string }).proposalId)!;
+  assert.equal(made.specs.panels?.[0].unitPriceUSD, 77);
+  assert.equal(made.specs.panels?.[0].priceSource, 'generic');
+  assert.equal(made.specs.autoSupplierPricing, true, 'el genérico no apaga el precio automático');
+  const warnings = (genericResult.data as { warnings: string[] }).warnings;
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Precio genérico, sin proveedor/);
+  store.setState({ workspaceScope: 'local', equipmentCatalog: savedCatalog, syncSettings: saved, genericPrices: {}, projects: store.getState().projects.filter((p) => p.id !== made.id) });
+}
 
 // 3. Invalid creations are rejected without side effects.
 const before = store.getState().projects.length;

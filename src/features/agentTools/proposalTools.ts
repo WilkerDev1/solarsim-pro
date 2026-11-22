@@ -58,11 +58,14 @@ const createProposal: NativeHandler = (args) => {
         const project = built.project;
         insertProject(project);
         // Equipment without a supplier offer quotes at 0: say so in the result instead of leaving it to the simulation.
-        const unpriced = [...(project.specs.panels ?? []), ...(project.specs.inverters ?? []), ...(project.specs.batteries ?? [])]
-          .filter((g) => g.count > 0 && !(typeof g.unitPriceUSD === 'number' && g.unitPriceUSD > 0)).map((g) => g.brandModel);
-        const warnings = unpriced.length
-          ? [`Sin oferta de proveedor con precio: ${unpriced.join(', ')}. El precio de contrato no es válido hasta cargar precios en el catálogo (update_supplier_price o el editor de ofertas).`]
-          : [];
+        const groups = [...(project.specs.panels ?? []), ...(project.specs.inverters ?? []), ...(project.specs.batteries ?? [])].filter((g) => g.count > 0);
+        const unpriced = groups.filter((g) => !(typeof g.unitPriceUSD === 'number' && g.unitPriceUSD > 0)).map((g) => g.brandModel);
+        // Precio genérico (ADR 0006): respaldo etiquetado, nunca una oferta; el resultado lo dice para que el asistente lo repita.
+        const generic = groups.filter((g) => g.priceSource === 'generic' && typeof g.unitPriceUSD === 'number' && g.unitPriceUSD > 0);
+        const warnings = [
+          ...(unpriced.length ? [`Sin oferta de proveedor ni precio genérico: ${unpriced.join(', ')}. El precio de contrato no es válido hasta cargar precios en el catálogo (update_supplier_price o el editor de ofertas).`] : []),
+          ...(generic.length ? [`Precio genérico, sin proveedor: ${generic.map((g) => `${g.brandModel} (US$ ${g.unitPriceUSD!.toFixed(2)})`).join(', ')}. Confirma el costo con una oferta de proveedor antes de enviar la propuesta.`] : []),
+        ];
         return { targetId: project.id, data: { proposalId: project.id, code: project.client.projectId, warnings }, cards: [proposalCard(project)],
           undo: { op: 'trash', before: {}, afterFingerprint: '' } };
       },

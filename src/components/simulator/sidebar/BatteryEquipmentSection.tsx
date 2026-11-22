@@ -8,6 +8,7 @@ import { BATTERY_PCT_RANGE, resolveBatteryDodPct, resolveBatteryEfficiencyPct } 
 import { CommitNumberField, Field, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { AdvancedDisclosure } from '../params/sections/equipment/AdvancedDisclosure';
 import { EquipmentGroupList } from '../params/sections/equipment/EquipmentGroupList';
+import { storeGenericPriceFor } from '../params/logic/storeGenericPrice';
 
 interface BatteryEquipmentSectionProps {
   project: ProjectSimulation;
@@ -45,6 +46,7 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
       catalog={equipmentCatalog}
       updateSpecs={updateSpecs}
       onOpenScanner={openAIDatasheetModal}
+      genericPriceFor={storeGenericPriceFor}
       enabled={hasBattery}
       intro={
         <ParamRow label="Incluir batería" labelId="dock-battery-label">

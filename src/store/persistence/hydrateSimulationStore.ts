@@ -231,7 +231,7 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
     Object.assign(state, normalizePriceState(state));
     for (const workspace of Object.values(state.organizationWorkspaces || {})) {
       if (workspace?.defaultSimulationSettings) workspace.defaultSimulationSettings = migrateDefaultSimulationSettings(workspace.defaultSimulationSettings);
-      if (workspace && ('genericPrices' in workspace || 'pricePending' in workspace)) Object.assign(workspace, normalizePriceState(workspace));
+      if (workspace && ('genericPrices' in workspace || 'pricePending' in workspace || 'proposalPriceLive' in workspace)) Object.assign(workspace, normalizePriceState(workspace));
     }
     state.companies = normalizeCompanyProfiles(state.companies, true);
     if (!state.companies.some(c => c.id === state.activeCompanyId)) state.activeCompanyId = state.companies.find(c => c.isDefault)!.id;

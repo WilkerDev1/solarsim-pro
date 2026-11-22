@@ -53,6 +53,17 @@ export interface EquipmentPriceSlice {
   voidPriceObservation: (id: string) => boolean;
   /** Envía la cola del usuario actual en lotes y, con `refresh` (por defecto), vuelve a descargar los genéricos. Nunca lanza. */
   syncPriceObservations: (options?: { refresh?: boolean }) => Promise<PriceSyncResult>;
+  /**
+   * Regla 2: registro vivo por (propuesta, equipo), `"<projectId>|<equipmentId>"` → id del registro. Se guarda con el
+   * espacio de trabajo (un mapa por organización) para anular el anterior al registrar otro precio del mismo par.
+   */
+  proposalPriceLive: Record<string, string>;
+  /** Equipos (`"<scope>|<equipmentId>"`) por los que el usuario contestó «No» a la pregunta: solo en memoria, por sesión. */
+  genericQuestionDismissed: Record<string, true>;
+  /** Registra el precio de una propuesta (`proposal`) y anula el registro vivo anterior del mismo par. Sin condiciones: ver `commitProposalPrice`. */
+  recordProposalPrice: (projectId: string, equipmentId: string, priceUSD: number) => string | null;
+  /** «No» a «¿Usar como precio genérico?»: deja de preguntar por ese equipo durante la sesión. */
+  dismissGenericQuestion: (equipmentId: string) => void;
 }
 
 export const EMPTY_PRICE_QUEUE: PricePendingQueue = { observations: [], voids: [] };
@@ -109,6 +120,22 @@ export function effectiveGenericPrice(
   return server && !voided.has(server.observationId) ? server : null;
 }
 
+/**
+ * Mapa de precios genéricos efectivos de los equipos del catálogo (contexto de las propuestas automáticas). Vacío sin
+ * sesión: en modo local la función está apagada.
+ */
+export function effectiveGenericPriceMap(
+  state: Pick<SimulationStore, 'syncSettings' | 'genericPrices' | 'pricePending'> & { equipmentCatalog: readonly { id: string }[] },
+): Record<string, GenericPriceInfo> {
+  if (!priceFeatureActive(state)) return {};
+  const map: Record<string, GenericPriceInfo> = {};
+  for (const item of state.equipmentCatalog) {
+    const generic = effectiveGenericPrice(state, item.id);
+    if (generic) map[item.id] = generic;
+  }
+  return map;
+}
+
 /** Regla 1: qué ofrecer tras guardar ofertas. Toma la más baja de las registradas (un solo equipo) y la compara con el genérico. */
 export interface GenericSuggestion {
   equipmentId: string;
@@ -158,8 +185,70 @@ export function acceptGenericSuggestion(state: SimulationStore, suggestion: Gene
   });
 }
 
+/** Clave del registro vivo de la Regla 2. */
+export const proposalPriceKey = (projectId: string, equipmentId: string) => `${projectId}|${equipmentId}`;
+
+export interface ProposalPriceCommitInput {
+  projectId: string;
+  equipmentId: string | undefined;
+  /** Precio al entrar en el campo (o tras el último Enter). */
+  previousUSD: number | undefined;
+  priceUSD: number;
+  /** Precio del proveedor asignado al grupo, si lo hay. */
+  supplierPriceUSD?: number;
+}
+/** Pregunta compacta bajo el precio; los datos se capturan al confirmar, no al responder. */
+export interface ProposalGenericQuestion {
+  projectId: string;
+  equipmentId: string;
+  priceUSD: number;
+  observationId: string;
+  scope: string;
+  userId: string;
+}
+
+const differs = (a: number | null | undefined, b: number) => !(typeof a === 'number' && Number.isFinite(a) && genericPriceDecision(a, b) === 'none');
+
+/**
+ * Regla 2 (ADR 0006 §4): al confirmar un precio escrito a mano en la fila de costo unitario. Registra una observación
+ * `proposal` si hay sesión con permiso de escritura, la propuesta es de la organización actual y no está en la papelera, el
+ * equipo está resuelto (y se le puede poner precio), el precio es > 0, cambió y difiere del proveedor asignado y del genérico
+ * vigente. Devuelve la pregunta solo si el equipo no tiene genérico y el usuario no la descartó en esta sesión.
+ */
+export function commitProposalPrice(state: SimulationStore, input: ProposalPriceCommitInput): { observationId: string | null; question: ProposalGenericQuestion | null } {
+  const none = { observationId: null, question: null };
+  const context = priceRecordingContext(state);
+  const user = state.syncSettings.currentUser;
+  if (!context || !user || !input.equipmentId) return none;
+  const { priceUSD, previousUSD } = input;
+  if (!(Number.isFinite(priceUSD) && priceUSD > 0) || !differs(previousUSD, priceUSD) || !differs(input.supplierPriceUSD, priceUSD)) return none;
+  const project = state.projects.find((entry) => entry.id === input.projectId);
+  if (!project || project.isDeleted || project.deletedAt || project.organizationId !== user.organizationId) return none;
+  if (project.syncServerUrl && !sameServer(project.syncServerUrl, state.syncSettings.serverUrl)) return none;
+  const item = state.equipmentCatalog.find((entry) => entry.id === input.equipmentId);
+  if (!canPriceEquipment(state, item)) return none;
+  const current = effectiveGenericPrice(state, input.equipmentId);
+  if (!differs(current?.priceUSD, priceUSD)) return none;
+  const observationId = state.recordProposalPrice(project.id, input.equipmentId, priceUSD);
+  if (!observationId) return none;
+  const dismissed = state.genericQuestionDismissed?.[`${context.scope}|${input.equipmentId}`];
+  return {
+    observationId,
+    question: current || dismissed ? null : { projectId: project.id, equipmentId: input.equipmentId, priceUSD, observationId, ...context },
+  };
+}
+
+/** «Usar»: fija el genérico con el precio capturado al confirmar, derivado de su registro. `null` si cambió la sesión. */
+export function acceptProposalGenericQuestion(state: SimulationStore, question: ProposalGenericQuestion): string | null {
+  const context = priceRecordingContext(state);
+  if (!context || context.scope !== question.scope || context.userId !== question.userId) return null;
+  return state.setGenericPrice(question.equipmentId, question.priceUSD, 'proposal', { derivedFromId: question.observationId });
+}
+
 /** Hidratación: un mapa o una cola mal formados (versiones viejas, almacenamiento dañado) se descartan, nunca se reparan a medias. */
-export function normalizePriceState(value: { genericPrices?: unknown; pricePending?: unknown }): Pick<EquipmentPriceSlice, 'genericPrices' | 'pricePending'> {
+export function normalizePriceState(value: { genericPrices?: unknown; pricePending?: unknown; proposalPriceLive?: unknown }): Pick<EquipmentPriceSlice, 'genericPrices' | 'pricePending' | 'proposalPriceLive'> {
+  const live = value.proposalPriceLive && typeof value.proposalPriceLive === 'object' && !Array.isArray(value.proposalPriceLive) ? (value.proposalPriceLive as Record<string, unknown>) : {};
+  const proposalPriceLive = Object.fromEntries(Object.entries(live).filter((entry): entry is [string, string] => isObservationId(entry[1])));
   const map = value.genericPrices && typeof value.genericPrices === 'object' && !Array.isArray(value.genericPrices) ? (value.genericPrices as Record<string, GenericPriceInfo>) : {};
   const genericPrices = Object.fromEntries(
     Object.entries(map).filter(([, info]) => info && Number.isFinite(info.priceUSD) && info.priceUSD > 0 && typeof info.observedAt === 'string' && isObservationId(info.observationId)),
@@ -167,9 +256,10 @@ export function normalizePriceState(value: { genericPrices?: unknown; pricePendi
   const queue = value.pricePending as Partial<PricePendingQueue> | undefined;
   const tagged = (entry: unknown): entry is { id: string; scope: string; userId: string } =>
     !!entry && typeof entry === 'object' && isObservationId((entry as PendingPriceVoid).id) && typeof (entry as PendingPriceVoid).scope === 'string' && typeof (entry as PendingPriceVoid).userId === 'string';
-  if (!queue || typeof queue !== 'object' || !Array.isArray(queue.observations) || !Array.isArray(queue.voids)) return { genericPrices, pricePending: { observations: [], voids: [] } };
+  if (!queue || typeof queue !== 'object' || !Array.isArray(queue.observations) || !Array.isArray(queue.voids)) return { genericPrices, pricePending: { observations: [], voids: [] }, proposalPriceLive };
   return {
     genericPrices,
+    proposalPriceLive,
     pricePending: {
       observations: queue.observations.filter((entry): entry is PendingPriceObservation => tagged(entry) && validateObservation(entry).ok),
       voids: queue.voids.filter(tagged).map(({ id, scope, userId }) => ({ id, scope, userId })),
@@ -199,6 +289,26 @@ export const createEquipmentPriceSlice: SimulationSlice<EquipmentPriceSlice> = (
   return {
     genericPrices: {},
     pricePending: EMPTY_PRICE_QUEUE,
+    proposalPriceLive: {},
+    genericQuestionDismissed: {},
+
+    recordProposalPrice: (projectId, equipmentId, priceUSD) => {
+      const [id] = get().recordPriceObservations([{ equipmentId, kind: 'observation', priceUSD, source: 'proposal', projectId, originalCurrency: 'USD', originalPrice: priceUSD }]);
+      if (!id) return null;
+      const key = proposalPriceKey(projectId, equipmentId);
+      const previous = get().proposalPriceLive[key];
+      set((state) => ({ proposalPriceLive: { ...state.proposalPriceLive, [key]: id } }));
+      // Un registro vivo por par: anular el anterior también envía (con la sincronización automática); si no había, se envía aquí.
+      if (!(previous && get().voidPriceObservation(previous))) autoSync();
+      return id;
+    },
+
+    dismissGenericQuestion: (equipmentId) => {
+      const user = get().syncSettings.currentUser;
+      if (!user) return;
+      const key = `${featureScope(get().syncSettings.serverUrl, user.organizationId)}|${equipmentId}`;
+      set((state) => ({ genericQuestionDismissed: { ...state.genericQuestionDismissed, [key]: true } }));
+    },
 
     recordPriceObservations: (inputs) => {
       const context = priceRecordingContext(get());
