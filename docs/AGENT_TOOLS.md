@@ -67,7 +67,7 @@ Toda propuesta creada o editada por agentes cotiza en modo **Simple (Catálogo I
 | `set_proposal_status`, `set_commercial_status`, `add_commercial_report`, `move_proposal_to_trash` | guarded | |
 | `audit_catalog` | read | Precios ausentes o vencidos, sin ficha o imagen, sin potencia nominal, duplicados, sin stock, atípicos y equipos de propuestas fuera del catálogo; tarjeta interactiva |
 | `list_supplier_offers` | read | Máximo 50 |
-| `update_supplier_price` | guarded | Precio USD y/o disponibilidad de una oferta existente |
+| `update_supplier_price` | guarded | Precio USD y/o disponibilidad de una oferta existente. Con sesión, un precio nuevo crea un registro de precio con fuente `agent` (nunca pregunta), el resultado (`genericPrice`) dice si difiere del precio genérico y deshacer anula ese registro ([ADR 0006](adr/0006-precio-generico-e-historial.md)) |
 | `apply_proposal_draft` | draft | Solo el asistente de propuestas |
 | `get_agent_action_status` | read | Espera hasta 20 s la decisión de una acción pendiente |
 | `list_document_texts` | read | Textos editables del PDF por clave (p. ej. `quotation.warranty.panel`, `client.phone`), con sección, personalización y plantilla. Filtros `section` y `query` (clave, etiqueta o texto, sin tildes) |
