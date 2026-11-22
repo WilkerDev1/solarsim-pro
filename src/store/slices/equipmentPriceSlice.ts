@@ -121,7 +121,8 @@ export function genericSuggestionFor(state: SimulationStore, observationIds: rea
   if (!priceRecordingContext(state) || !observationIds.length) return null;
   const ids = new Set(observationIds);
   const candidates = state.pricePending.observations.filter((entry) => ids.has(entry.id) && entry.kind === 'observation' && entry.priceUSD > 0);
-  if (!candidates.length) return null;
+  // One equipment per suggestion: a bulk save across several models never offers a generic price.
+  if (!candidates.length || new Set(candidates.map((entry) => entry.equipmentId)).size > 1) return null;
   const lowest = candidates.reduce((best, entry) => (entry.priceUSD < best.priceUSD ? entry : best));
   const item = state.equipmentCatalog.find((entry) => entry.id === lowest.equipmentId);
   if (!canPriceEquipment(state, item)) return null;

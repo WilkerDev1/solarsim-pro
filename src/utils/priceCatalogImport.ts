@@ -1,4 +1,5 @@
 import { isWriterRole } from '../../shared/permissions';
+import { genericPriceDecision } from '../../shared/equipmentPrices';
 import type {
   EquipmentSupplierPrice,
   ExtractedPriceCatalogItem,
@@ -31,6 +32,8 @@ export function planPriceCatalogImport(
     supplierPrice: EquipmentSupplierPrice;
   }[] = [];
   const creates: SolarEquipmentItem[] = [];
+  /** Fila revisada → equipo que recibe su precio (existente o recién creado). */
+  const targets: { rowId: string; equipmentId: string; priceUSD: number }[] = [];
   const names = new Set<string>();
   const targetIds = new Set<string>();
   const server = scope.serverUrl?.trim().replace(/\/+$/, "");
@@ -100,10 +103,12 @@ export function planPriceCatalogImport(
       updatedAt: now,
       source: "ai_scan",
     };
+    const equipmentId = target?.id ?? `eq-${crypto.randomUUID()}`;
+    targets.push({ rowId: item.id, equipmentId, priceUSD: item.priceUSD });
     if (target) updates.push({ equipmentId: target.id, supplierPrice: offer });
     else
       creates.push({
-        id: `eq-${crypto.randomUUID()}`,
+        id: equipmentId,
         type: item.equipmentType,
         brand: item.brand || "Fabricante",
         modelSeries: item.extractedModelName.trim(),
@@ -114,7 +119,21 @@ export function planPriceCatalogImport(
         updatedAt: now,
       });
   }
-  return { updates, creates };
+  return { updates, creates, targets };
+}
+
+/**
+ * Columna «Actualizar genérico» de la revisión (ADR 0006 §4): marcada si el equipo no tiene precio genérico, sin
+ * marcar si tiene otro distinto, oculta si es igual o el precio no es > 0.
+ */
+export function genericImportChoice(currentGeneric: number | null | undefined, priceUSD: number): 'hidden' | 'checked' | 'unchecked' {
+  const decision = genericPriceDecision(currentGeneric, priceUSD);
+  return decision === 'none' ? 'hidden' : decision === 'assign' ? 'checked' : 'unchecked';
+}
+
+/** Precios genéricos a fijar tras aplicar el lote: solo las filas marcadas (también las de equipos nuevos). */
+export function genericUpdatesFromImport(plan: ReturnType<typeof planPriceCatalogImport>, checkedRowIds: ReadonlySet<string>) {
+  return plan.targets.filter((target) => checkedRowIds.has(target.rowId) && target.priceUSD > 0).map(({ equipmentId, priceUSD }) => ({ equipmentId, priceUSD }));
 }
 
 /** A rejected store mutation must not be presented as a completed import. */

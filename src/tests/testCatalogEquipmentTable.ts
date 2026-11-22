@@ -55,3 +55,34 @@ assert.equal(isInsideEquipmentPreview(node(true) as unknown as EventTarget), tru
 assert.equal(isInsideEquipmentPreview(node(false) as unknown as EventTarget), false);
 assert.equal(isInsideEquipmentPreview(null), false);
 console.log('Catalog equipment table rows, offers, nominal values, conflict row and preview icons passed.');
+
+// ADR 0006 §5: con sesión, la fila muestra «Genérico US$ X» bajo el precio de ofertas; el modal de ofertas lo muestra
+// en la cabecera con «Cambiar»/«Quitar» (también para equipos de referencia); sin sesión, nada.
+{
+  const generic = { priceUSD: 88.5, observedAt: '2026-11-01T12:00:00.000Z', observationId: 'po-00000000-0000-4000-8000-000000000123' };
+  const session = { ...useSimulationStore.getState().syncSettings, serverUrl: 'https://catalog.invalid', authToken: 'synthetic', currentUser: { id: 'qa', name: 'QA', email: 'qa@example.invalid', role: 'EDITOR' as const, organizationId: 'org-qa' } };
+  const { REFERENCE_EQUIPMENT_IDS } = await import('../../shared/referenceEquipment');
+  const reference = item(REFERENCE_EQUIPMENT_IDS[0], 'panel', 'QA Referencia', { powerW: 550, organizationId: 'org-electsun-default' });
+  useSimulationStore.setState({
+    syncSettings: session, genericPrices: { i: generic, [reference.id]: generic }, pricePending: { observations: [], voids: [] }, equipmentConflicts: {},
+    equipmentCatalog: [...useSimulationStore.getState().equipmentCatalog, reference],
+  });
+  Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());
+  const withGeneric = renderToStaticMarkup(React.createElement(EquipmentManagerSettingsTab, { isDark: false }));
+  const genericRows = withGeneric.slice(withGeneric.indexOf('<tbody'), withGeneric.indexOf('</tbody>')).split('<tr').slice(1);
+  assert.match(genericRows[1], /Genérico US\$\s?88[.,]50/, 'inverter row shows its generic price');
+  assert.doesNotMatch(genericRows[0], /Genérico/, 'no generic price, no line');
+  const { SupplierPricesDetailModal } = await import('../components/common/SupplierPricesDetailModal');
+  useSimulationStore.setState({ supplierPriceModalEquipment: reference });
+  Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());
+  const modal = renderToStaticMarkup(React.createElement(SupplierPricesDetailModal));
+  assert.match(modal, /Genérico US\$\s?88[.,]50/, 'offers header shows the generic price');
+  assert.match(modal, />Cambiar</);
+  assert.match(modal, />Quitar</);
+  // Sin sesión (modo local) la función está apagada.
+  useSimulationStore.setState({ syncSettings: { ...session, authToken: null, currentUser: null } });
+  Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());
+  assert.doesNotMatch(renderToStaticMarkup(React.createElement(SupplierPricesDetailModal)), /genérico/i, 'local mode shows nothing');
+  assert.doesNotMatch(renderToStaticMarkup(React.createElement(EquipmentManagerSettingsTab, { isDark: false })), /Genérico US/);
+  console.log('Generic price line in catalog rows and offers header passed.');
+}

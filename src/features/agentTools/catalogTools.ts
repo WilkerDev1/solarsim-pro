@@ -8,7 +8,11 @@ const STOCK_LABEL = { in_stock: 'En stock', on_order: 'Bajo pedido', out_of_stoc
 const normalize = (s: unknown) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 const auditCatalogTool: NativeHandler = (args) => {
-  const report = auditCatalog(visibleAssistantEquipment(), visibleAssistantProjects(), { now: new Date(), staleDays: args.staleDays, type: args.type });
+  const s = store();
+  const equipment = visibleAssistantEquipment();
+  // Precio genérico efectivo (ADR 0006); sin sesión la función está apagada y el mapa queda vacío.
+  const genericPrices = priceFeatureActive(s) ? Object.fromEntries(equipment.map((e) => [e.id, effectiveGenericPrice(s, e.id)])) : {};
+  const report = auditCatalog(equipment, visibleAssistantProjects(), { now: new Date(), staleDays: args.staleDays, type: args.type, genericPrices });
   const findings = report.findings.slice(0, 100);
   return {
     data: { summary: report.summary, findings, truncated: report.findings.length > findings.length },

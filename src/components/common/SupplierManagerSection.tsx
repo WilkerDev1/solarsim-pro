@@ -25,6 +25,8 @@ import {
   type StockStatus,
 } from "../../utils/supplierOfferUpdates";
 import { SupplierOfferRow } from "./suppliers/SupplierOfferRow";
+import { GenericPriceSuggestion } from "./equipment/GenericPrice";
+import { genericSuggestionFor, type GenericSuggestion } from "../../store/slices/equipmentPriceSlice";
 import "./suppliers/suppliers.css";
 
 type Props = { isDark: boolean };
@@ -67,6 +69,8 @@ function SupplierWorkspace({ isDark }: Props) {
     error: boolean;
     text: string;
   } | null>(null);
+  // Rule 1 (ADR 0006): at most one suggestion, from the latest save; it replaces that save's message.
+  const [suggestion, setSuggestion] = useState<GenericSuggestion | null>(null);
   const [form, setForm] = useState<"new" | "add" | "rename" | null>(null);
   const [formName, setFormName] = useState("");
   const [formEquipment, setFormEquipment] = useState("");
@@ -139,7 +143,8 @@ function SupplierWorkspace({ isDark }: Props) {
     if (confirmation) dialog.current?.showModal();
     else dialog.current?.close();
   }, [confirmation]);
-  const fail = (error: unknown) =>
+  const fail = (error: unknown) => {
+    setSuggestion(null);
     setFeedback({
       error: true,
       text:
@@ -147,6 +152,7 @@ function SupplierWorkspace({ isDark }: Props) {
           ? error.message
           : "No se pudieron guardar los cambios.",
     });
+  };
   function apply(
     references: OfferReference[],
     patch: { stockStatus?: StockStatus; priceUSD?: number },
@@ -172,6 +178,7 @@ function SupplierWorkspace({ isDark }: Props) {
         patch,
       );
       current.batchUpdateSupplierPrices(updates);
+      setSuggestion(null);
       const after = useSimulationStore.getState().equipmentCatalog;
       if (
         !updates.every((update) =>
@@ -233,17 +240,23 @@ function SupplierWorkspace({ isDark }: Props) {
         sku: sku.trim() || undefined,
         notes: notes.trim() || undefined,
       };
-      current.batchUpdateSupplierPrices(updates);
+      const recorded = current.batchUpdateSupplierPrices(updates);
       const saved = useSimulationStore
         .getState()
         .equipmentCatalog.find((item) => item.id === reference.equipmentId)
         ?.supplierPrices?.find((offer) => offer.id === reference.offerId);
       if (!contentEqual(saved, updates[0].supplierPrice))
         throw new Error("No se confirmó el guardado de la oferta.");
-      setFeedback({
-        error: false,
-        text: "Oferta guardada en este equipo; pendiente de sincronización con la nube.",
-      });
+      const offered = genericSuggestionFor(useSimulationStore.getState(), recorded);
+      setSuggestion(offered);
+      setFeedback(
+        offered
+          ? null
+          : {
+              error: false,
+              text: "Oferta guardada en este equipo; pendiente de sincronización con la nube.",
+            },
+      );
       return true;
     } catch (error) {
       fail(error);
@@ -259,11 +272,13 @@ function SupplierWorkspace({ isDark }: Props) {
     setFormNotes("");
     setFormStock("in_stock");
     setFeedback(null);
+    setSuggestion(null);
   }
   function submitForm(event: React.FormEvent) {
     event.preventDefault();
     if (!writable()) return;
     const current = useSimulationStore.getState();
+    let recorded: string[] = [];
     if (form === "rename") {
       const next = formName.trim();
       if (!next || !active) return;
@@ -321,7 +336,7 @@ function SupplierWorkspace({ isDark }: Props) {
         return;
       }
       const id = `sp-${crypto.randomUUID()}`;
-      current.addOrUpdateSupplierPrice(formEquipment, {
+      recorded = current.addOrUpdateSupplierPrice(formEquipment, {
         id,
         supplierName: name,
         priceUSD: Number(formPrice),
@@ -348,10 +363,16 @@ function SupplierWorkspace({ isDark }: Props) {
     }
     setForm(null);
     setSelected(new Set());
-    setFeedback({
-      error: false,
-      text: "Cambios guardados en este equipo; se enviarán al sincronizar.",
-    });
+    const offered = genericSuggestionFor(useSimulationStore.getState(), recorded);
+    setSuggestion(offered);
+    setFeedback(
+      offered
+        ? null
+        : {
+            error: false,
+            text: "Cambios guardados en este equipo; se enviarán al sincronizar.",
+          },
+    );
   }
   function confirmRemoval() {
     const current = useSimulationStore.getState();
@@ -381,6 +402,7 @@ function SupplierWorkspace({ isDark }: Props) {
     }
     setConfirmation(null);
     setSelected(new Set());
+    setSuggestion(null);
     setFeedback({
       error: false,
       text: "Ofertas retiradas del catálogo local. Los equipos y las propuestas se conservan.",
@@ -421,6 +443,12 @@ function SupplierWorkspace({ isDark }: Props) {
             <X size={16} />
           </button>
         </div>
+      )}
+      {suggestion && (
+        <GenericPriceSuggestion
+          suggestion={suggestion}
+          onDismiss={() => setSuggestion(null)}
+        />
       )}
       <div className="suppliers-layout">
         <aside className="supplier-directory" aria-label="Proveedores">

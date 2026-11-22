@@ -33,6 +33,8 @@ import { CatalogEquipmentRow } from "./equipment/CatalogEquipmentRow";
 import { EquipmentEditorModal } from "./EquipmentEditorModal";
 import { normalizeBrandName } from "../../utils/equipmentBrandUtils";
 import { confirmAction } from "./confirmAction";
+import { GenericPriceSuggestion } from "./equipment/GenericPrice";
+import { effectiveGenericPrice, genericSuggestionFor, priceFeatureActive, type GenericSuggestion } from "../../store/slices/equipmentPriceSlice";
 
 interface EquipmentManagerSettingsTabProps {
   isDark: boolean;
@@ -76,6 +78,11 @@ export const EquipmentManagerSettingsTab: React.FC<
   // Modal State for Edit / Add
   const [assetBusy, setAssetBusy] = useState(false);
   const sessionGeneration = useSimulationStore(s => s.sessionGeneration);
+  // Precio genérico (ADR 0006): sin sesión la función está apagada y nada se muestra.
+  const priceState = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, genericPrices: s.genericPrices, pricePending: s.pricePending })));
+  const pricesActive = priceFeatureActive(priceState);
+  const genericFor = (id: string | undefined) => (pricesActive && id ? effectiveGenericPrice(priceState, id) : null);
+  const [genericSuggestion, setGenericSuggestion] = useState<GenericSuggestion | null>(null);
   useEffect(() => { setIsEditorOpen(false); setEditingItem(null); setItemToDelete(null); setAssetBusy(false); }, [sessionGeneration]);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingItem, setEditingItem] =
@@ -406,14 +413,15 @@ export const EquipmentManagerSettingsTab: React.FC<
       createdAt: editingItem.createdAt || new Date().toISOString(),
     };
 
+    let recorded: string[];
     if (isNewItem) {
-      addEquipmentItem(itemToSave);
+      recorded = addEquipmentItem(itemToSave);
       setFeedbackMessage({
         type: "success",
         text: `¡Equipo "${itemToSave.displayName}" agregado con éxito!`,
       });
     } else {
-      updateEquipmentItem(itemToSave.id, itemToSave);
+      recorded = updateEquipmentItem(itemToSave.id, itemToSave);
       setFeedbackMessage({
         type: "success",
         text: `¡Equipo "${itemToSave.displayName}" actualizado!`,
@@ -436,6 +444,8 @@ export const EquipmentManagerSettingsTab: React.FC<
       });
       return;
     }
+    // Rule 1 (ADR 0006): offered once per save, for the lowest changed offer, after the save was verified.
+    setGenericSuggestion(genericSuggestionFor(useSimulationStore.getState(), recorded));
     setIsEditorOpen(false);
     setEditingItem(null);
     setTimeout(() => setFeedbackMessage(null), 4000);
@@ -587,6 +597,12 @@ export const EquipmentManagerSettingsTab: React.FC<
           {feedbackMessage.text}
         </p>
       )}
+      {genericSuggestion && (
+        <GenericPriceSuggestion
+          suggestion={genericSuggestion}
+          onDismiss={() => setGenericSuggestion(null)}
+        />
+      )}
       {!canEdit && (
         <p className={`text-sm text-slate-600 dark:text-zinc-400`}>
           Tu cuenta puede consultar modelos y ofertas. Un administrador o editor
@@ -686,6 +702,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                     key={item.id}
                     item={item}
                     conflict={equipmentConflicts[item.id]}
+                    genericPrice={genericFor(item.id)}
                     canEdit={canEdit}
                     button={button}
                     handleOpenEdit={handleOpenEdit}
@@ -751,6 +768,7 @@ export const EquipmentManagerSettingsTab: React.FC<
           setEditingItem={setEditingItem}
           setIsEditorOpen={setIsEditorOpen}
           handleSaveEditor={handleSaveEditor}
+          genericPrice={pricesActive && !isNewItem ? genericFor(editingItem.id) : undefined}
           feedbackMessage={feedbackMessage}
           allUniqueBrands={allUniqueBrands}
           equipmentCatalog={equipmentCatalog}

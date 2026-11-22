@@ -3,6 +3,8 @@ import { Trash2 } from "lucide-react";
 import type { SolarEquipmentItem } from "../../../types/equipment";
 import { EquipmentPreviewThumb } from "./EquipmentPreviewThumb";
 import type { EquipmentSlice } from "../../../store/types";
+import type { GenericPriceInfo } from "../../../../shared/equipmentPrices";
+import { formatGenericUSD } from "./GenericPrice";
 
 type EquipmentConflict = EquipmentSlice["equipmentConflicts"][string];
 
@@ -10,6 +12,7 @@ type EquipmentConflict = EquipmentSlice["equipmentConflicts"][string];
 export function CatalogEquipmentRow({
   item,
   conflict,
+  genericPrice,
   canEdit,
   button,
   handleOpenEdit,
@@ -19,6 +22,8 @@ export function CatalogEquipmentRow({
 }: {
   item: SolarEquipmentItem;
   conflict?: EquipmentConflict;
+  /** Precio genérico efectivo (ADR 0006); `null`/ausente sin sesión o sin genérico. */
+  genericPrice?: GenericPriceInfo | null;
   canEdit: boolean;
   button: string;
   handleOpenEdit: (item: SolarEquipmentItem) => void;
@@ -94,6 +99,11 @@ export function CatalogEquipmentRow({
           <p className={`mt-1 text-xs text-slate-600 dark:text-zinc-400`}>
             {item.supplierPrices?.length || 0} ofertas registradas
           </p>
+          {genericPrice && (
+            <p className={`mt-0.5 text-xs text-slate-500 dark:text-zinc-500`}>
+              Genérico {formatGenericUSD(genericPrice.priceUSD)}
+            </p>
+          )}
         </td>
         <td className="px-4 py-3">
           <div className="flex gap-2">
