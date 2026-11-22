@@ -9,12 +9,8 @@ import type { SolarEquipmentItem } from '../../../types/equipment';
 import type { GenericPriceInfo } from '../../../../shared/equipmentPrices';
 import { confirmAction } from '../confirmAction';
 
-export const formatGenericUSD = (value: number) =>
-  `US$ ${value.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-export const formatGenericDate = (iso: string) => {
-  const time = Date.parse(iso);
-  return Number.isFinite(time) ? new Date(time).toLocaleDateString('es-DO') : '';
-};
+import { formatGenericDate, formatGenericUSD } from './genericPriceFormat';
+export { formatGenericDate, formatGenericUSD };
 
 /** Precio genérico efectivo de un equipo, o `undefined` sin sesión (la función está apagada). */
 export function useGenericPrice(equipmentId: string | undefined): { active: boolean; generic: GenericPriceInfo | null } {

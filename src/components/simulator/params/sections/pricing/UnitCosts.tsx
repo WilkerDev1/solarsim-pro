@@ -6,7 +6,9 @@ import { getProjectBatteries, getProjectInverters, getProjectPanels } from '../.
 import type { SystemSpecs } from '../../../../../types';
 import type { SolarEquipmentItem } from '../../../../../types/equipment';
 import { resolveAssumption } from '../../../../../../shared/assumptions';
-import { bestSupplierPricingPatch, displayedUnitPrice, manualUnitPricePatch, type PricedKind } from './supplierPricing';
+import { resolveGroupCatalogItem } from '../../../../../utils/equipmentGroups';
+import { bestSupplierPricingPatch, displayedUnitPrice, isGenericPriced, manualUnitPricePatch, type PricedKind } from './supplierPricing';
+import { formatGenericDate, formatGenericUSD } from '../../../../common/equipment/genericPriceFormat';
 import { UnitCostRow } from './UnitCostRow';
 
 interface UnitCostsProps {
@@ -18,12 +20,28 @@ interface UnitCostsProps {
   selected: { panel?: SolarEquipmentItem | null; inverter?: SolarEquipmentItem | null; battery?: SolarEquipmentItem | null };
   openSupplierPriceModal: (item: SolarEquipmentItem) => void;
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
+  /** Con sesión (ADR 0006): la fila muestra «Genérico» mientras el precio sea la copia del genérico. */
+  showGenericLabel?: boolean;
+  /**
+   * Regla 2: precio confirmado a mano. `equipmentId` es el equipo resuelto con `resolveGroupCatalogItem` (estricto) o
+   * `undefined`; `supplierPriceUSD` es el precio del proveedor asignado al grupo.
+   */
+  onPriceCommit?: (target: PriceCommitTarget, previousUSD: number | undefined, priceUSD: number) => void;
+  /** Pregunta compacta bajo el precio de una fila (o `null`). */
+  priceQuestionFor?: (kind: PricedKind, index: number) => React.ReactNode;
+}
+
+export interface PriceCommitTarget {
+  kind: PricedKind;
+  index: number;
+  equipmentId: string | undefined;
+  supplierPriceUSD: number | undefined;
 }
 
 const LABELS: Record<PricedKind, string> = { panel: 'Panel', inverter: 'Inversor', battery: 'Batería' };
 
 /** Costos unitarios por modelo y «Mejor proveedor». Solo se dibuja en modo Desglosado. */
-export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, installationUsdPerKwp, equipmentCatalog, selected, openSupplierPriceModal, updateSpecs }) => {
+export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, installationUsdPerKwp, equipmentCatalog, selected, openSupplierPriceModal, updateSpecs, showGenericLabel, onPriceCommit, priceQuestionFor }) => {
   const hasAnySupplierPrices =
     (selected.panel?.supplierPrices?.length || 0) > 0 ||
     (selected.inverter?.supplierPrices?.length || 0) > 0 ||
@@ -35,15 +53,19 @@ export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, installationUsdPerK
     kind: PricedKind,
     models: Array<{
       id?: string;
+      catalogItemId?: string;
+      manualModel?: boolean;
       brandModel: string;
       unitPriceUSD?: number;
       selectedSupplierInfo?: { supplierName: string; priceUSD: number };
+      genericPriceInfo?: { priceUSD: number; observedAt: string };
       equipment: SolarEquipmentItem | undefined;
     }>
   ) =>
     models.map((model, idx) => {
       const count = model.equipment?.supplierPrices?.length || 0;
       const info = model.selectedSupplierInfo;
+      const generic = showGenericLabel && isGenericPriced(model) ? model.genericPriceInfo : undefined;
       return (
         <UnitCostRow
           key={model.id || idx}
@@ -54,8 +76,18 @@ export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, installationUsdPerK
           onOpenSuppliers={model.equipment ? () => openSupplierPriceModal(model.equipment!) : undefined}
           supplierName={info?.supplierName}
           supplierTitle={info ? `Proveedor: ${info.supplierName} ($${info.priceUSD} USD)` : undefined}
+          genericLabel={generic ? {
+            tip: `Precio genérico del catálogo: ${formatGenericUSD(generic.priceUSD)}, del ${formatGenericDate(generic.observedAt)}. Es una copia: cambiar el genérico en el catálogo no cambia el precio de esta propuesta.`,
+          } : undefined}
           value={displayedUnitPrice(model.unitPriceUSD)}
           onChange={(value) => updateSpecs(manualUnitPricePatch(specs, kind, idx, value))}
+          onCommit={onPriceCommit ? (previousUSD, priceUSD) => onPriceCommit({
+            kind, index: idx,
+            // Estricto: catalogItemId → id del grupo → nombre exacto único (nunca «el primer equipo del tipo»).
+            equipmentId: resolveGroupCatalogItem(model, kind, equipmentCatalog)?.id,
+            supplierPriceUSD: info?.priceUSD,
+          }, previousUSD, priceUSD) : undefined}
+          footer={priceQuestionFor?.(kind, idx) ?? undefined}
         />
       );
     });

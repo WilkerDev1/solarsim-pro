@@ -59,6 +59,9 @@ const catalog = [panelCatalog, inverterCatalog, batteryCatalog];
   assert.equal(readEquipment(specsOf()).panels[0].count, 52);
   assert.equal(specsOf().autoCalculatePanels, false, 'editar la cantidad de paneles desde el dock apaga el cálculo automático');
 
+  // El catálogo del store es el de la selección: con otro catálogo el proveedor elegido quedaría huérfano y se soltaría.
+  const savedCatalog = store.getState().equipmentCatalog;
+  store.setState({ equipmentCatalog: catalog });
   updateSpecs(buildCatalogSelectionUpdate(specsOf(), 'panel', panelCatalog));
   let panel = specsOf().panels![0];
   assert.deepEqual(mirror(specsOf()), [], 'seleccionar del catálogo no escribe el espejo');
@@ -77,6 +80,7 @@ const catalog = [panelCatalog, inverterCatalog, batteryCatalog];
   assert.deepEqual(mirror(specsOf()), []);
   assert.equal(specsOf().batteries![0].dodPct, 90);
   assert.equal(specsOf().batteries![0].efficiencyPct, 96);
+  store.setState({ equipmentCatalog: savedCatalog });
 }
 
 // 3. Precio de proveedor aplicado al proyecto.

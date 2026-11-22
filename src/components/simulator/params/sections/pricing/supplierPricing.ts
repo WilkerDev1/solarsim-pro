@@ -27,7 +27,7 @@ export function bestSupplierPricingPatch(
   let patch: Partial<SystemSpecs> = { autoSupplierPricing: true };
   const apply = (kind: PricedKind, best: EquipmentSupplierPrice | null) => {
     if (!best) return;
-    patch = { ...patch, ...editEquipmentGroup({ ...specs, ...patch }, kind, { type: 'update', index: 0, patch: { unitPriceUSD: best.priceUSD, selectedSupplierInfo: supplierSnapshot(best) } }) };
+    patch = { ...patch, ...editEquipmentGroup({ ...specs, ...patch }, kind, { type: 'update', index: 0, patch: { unitPriceUSD: best.priceUSD, selectedSupplierInfo: supplierSnapshot(best), priceSource: 'supplier', genericPriceInfo: undefined } }) };
   };
   apply('panel', bestSupplierPrice(items.panel));
   apply('inverter', bestSupplierPrice(items.inverter));
@@ -35,9 +35,18 @@ export function bestSupplierPricingPatch(
   return patch;
 }
 
-/** Edición manual de un precio por modelo: apaga el modo automático y escribe el precio en el grupo. */
+/**
+ * Edición manual de un precio por modelo (cada tecla): apaga el modo automático, escribe el precio en el grupo y lo marca
+ * `manual`, soltando la copia del precio genérico (ADR 0006 §5). El registro de la Regla 2 va aparte, al confirmar.
+ */
 export function manualUnitPricePatch(specs: SystemSpecs, kind: PricedKind, index: number, value: number): Partial<SystemSpecs> {
-  return { autoSupplierPricing: false, ...editEquipmentGroup(specs, kind, { type: 'update', index, patch: { unitPriceUSD: value } }) };
+  return { autoSupplierPricing: false, ...editEquipmentGroup(specs, kind, { type: 'update', index, patch: { unitPriceUSD: value, priceSource: 'manual', genericPriceInfo: undefined } }) };
+}
+
+/** La fila muestra «Genérico» solo mientras el precio sea el de la copia y no haya proveedor asignado. */
+export function isGenericPriced(group: { unitPriceUSD?: number; selectedSupplierInfo?: unknown; genericPriceInfo?: { priceUSD: number } }): boolean {
+  const info = group.genericPriceInfo;
+  return !!info && !group.selectedSupplierInfo && typeof group.unitPriceUSD === 'number' && Math.abs(group.unitPriceUSD - info.priceUSD) < 0.005;
 }
 
 /**
