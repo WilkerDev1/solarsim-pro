@@ -9,7 +9,7 @@ import {
 
 import { fieldDisplayValue } from '../components/simulator/params/ui/Field';
 import { FieldMenu, fieldMenuKey } from '../components/simulator/params/ui/FieldMenu';
-import { computeTipPosition } from '../components/simulator/params/ui/infoTipPosition';
+import { computeTipPosition, scrollMovesAnchor } from '../components/simulator/params/ui/infoTipPosition';
 import { commitStepperDraft } from '../components/simulator/params/ui/Stepper';
 import { nextRadioIndex } from '../components/simulator/params/ui/ToggleGroup';
 
@@ -336,9 +336,21 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   assert.match(source, /createPortal\(tooltip, document\.body\)/, 'portal a body');
   assert.match(source, /z-\[1200\]/, 'por encima de menús y barra lateral');
   assert.match(source, /document\.addEventListener\('keydown'[\s\S]*document\.removeEventListener\('keydown'/, 'Escape a nivel de documento mientras está abierto, con limpieza');
-  assert.match(source, /addEventListener\('scroll', onScroll, true\)[\s\S]*removeEventListener\('scroll', onScroll, true\)/, 'scroll en captura: reposiciona o cierra');
-  assert.match(source, /isInView\(button\)/, 'cierra si el ⓘ sale de la vista');
+  assert.match(source, /addEventListener\('scroll', onScroll, true\)[\s\S]*removeEventListener\('scroll', onScroll, true\)/, 'scroll en captura de cualquier ancestro');
+  assert.match(source, /scrollMovesAnchor\(event\.target, buttonRef\.current\)\) setDismissed\(true\)/, 'si el scroll mueve el ⓘ, el tooltip se cierra (no queda fijo tapando controles)');
+  assert.match(source, /addEventListener\('resize', onResize\)[\s\S]*removeEventListener\('resize', onResize\)/, 'redimensionar la ventana también lo cierra');
   assert.match(source, /aria-describedby=\{id\}/, 'el botón sigue describiéndose con el tooltip');
+}
+
+// --- InfoTip: ¿el scroll mueve el ⓘ? (ventana, documento o un ancestro sí; un contenedor ajeno no) ---
+{
+  const anchor = { name: 'ⓘ' };
+  const node = (...inside: object[]) => ({ contains: (other: unknown) => inside.includes(other as object) });
+  assert.equal(scrollMovesAnchor(node(anchor), anchor), true, 'scroll del dock (ancestro del ⓘ): se cierra');
+  assert.equal(scrollMovesAnchor({}, anchor), true, 'scroll de la ventana (sin contains): se cierra');
+  assert.equal(scrollMovesAnchor(null, anchor), true, 'sin destino conocido: se cierra por seguridad');
+  assert.equal(scrollMovesAnchor(node(), anchor), false, 'un contenedor que no contiene el ⓘ (otra lista) no lo cierra');
+  assert.equal(scrollMovesAnchor(node(anchor), null), false, 'sin ⓘ montado no hay nada que cerrar');
 }
 
 // --- InfoTip: posición pura, acotada a la ventana y volteable ---

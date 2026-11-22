@@ -20,3 +20,15 @@ export function computeTipPosition(anchor: TipRect, tip: TipSize, viewport: TipV
   const top = Math.max(TIP_MARGIN, Math.min(below, viewport.height - tip.height - TIP_MARGIN));
   return { left, top, placement: 'bottom' };
 }
+
+/**
+ * ¿Un evento `scroll` (escuchado en captura en la ventana) mueve el ⓘ? Sí si viene de la ventana o el documento, o de
+ * un contenedor que contiene el ⓘ (el dock); no si viene de otro contenedor ajeno. Sin destino conocido, sí (se cierra
+ * por seguridad). Pura: recibe cualquier objeto con `contains`, para probarla sin DOM.
+ */
+export function scrollMovesAnchor(target: unknown, anchor: object | null): boolean {
+  if (!anchor) return false;
+  const contains = (target as { contains?: unknown } | null)?.contains;
+  if (typeof contains !== 'function') return true;
+  return Boolean((contains as (other: unknown) => boolean).call(target, anchor));
+}
