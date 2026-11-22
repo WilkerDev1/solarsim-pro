@@ -54,10 +54,10 @@ export function GenericPriceSuggestion({ suggestion, onDismiss }: { suggestion: 
 }
 
 /**
- * Cabecera del modal de ofertas: «Genérico US$ X · fecha» con «Cambiar» (edición en línea, `manual`, > 0) y «Quitar»
- * (anula el vigente tras confirmar). Funciona también con equipos de referencia: el genérico no vive en el equipo.
+ * Cabecera del modal de ofertas: «Genérico US$ X · fecha» con «Cambiar» (edición en línea, `manual`, > 0), «Quitar»
+ * (anula el vigente tras confirmar) e «Historial» (vista del historial en el mismo cuerpo del modal, también LECTOR). Funciona también con equipos de referencia: el genérico no vive en el equipo.
  */
-export function GenericPriceControl({ item }: { item: SolarEquipmentItem }) {
+export function GenericPriceControl({ item, onHistory }: { item: SolarEquipmentItem; onHistory?: () => void }) {
   const { active, generic } = useGenericPrice(item.id);
   const writable = useSimulationStore((s) => canPriceEquipment(s, item));
   const [draft, setDraft] = useState<string | null>(null);
@@ -115,6 +115,11 @@ export function GenericPriceControl({ item }: { item: SolarEquipmentItem }) {
       {writable && generic && (
         <button type="button" className="offers-link" onClick={() => void remove()}>
           Quitar
+        </button>
+      )}
+      {onHistory && (
+        <button type="button" className="offers-link" onClick={onHistory}>
+          Historial
         </button>
       )}
     </p>
