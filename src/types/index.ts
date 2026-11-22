@@ -166,6 +166,8 @@ export interface UtilityRates {
    * Ausente o false = el excedente se valora a la tarifa tras la retención, como siempre.
    */
   legacyAnnualSettlement?: boolean;
+  /** Precio guardado de esa liquidación (RD$/kWh), sembrado al activarla. Ausente = 75 % del primer bloque BTS-1 de fábrica. */
+  legacyAnnualSettlementDOPPerKWh?: number;
 }
 
 export interface CustomQuotationItem {

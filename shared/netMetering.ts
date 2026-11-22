@@ -86,6 +86,8 @@ export interface NetMeteringRatesInput {
   gridUseChargeDOPPerKWh?: number | null;
   /** Régimen anterior: liquidar el crédito anual sobrante (`legacyAnnualSettlementApplies`); solo `true` la activa. */
   legacyAnnualSettlement?: unknown;
+  /** Precio guardado de esa liquidación (RD$/kWh), sembrado al activarla (`reconcileLegacySettlement`). */
+  legacyAnnualSettlementDOPPerKWh?: unknown;
 }
 
 /** Cargo por kWh inyectado de la propuesta (RD$/kWh): el guardado si es válido (0 explícito se respeta); si no, el de fábrica. */
@@ -219,9 +221,44 @@ export function factoryLegacyFirstBlock(distributor: unknown): GridUseChargeSour
   return rows.reduce((low, row) => (row.dopPerKWh < low.dopPerKWh ? row : low));
 }
 
-/** Precio al que se paga cada kWh del crédito sobrante en el régimen anterior (RD$/kWh): 75 % del primer bloque BTS-1. */
+/** ¿La distribuidora tiene primer bloque BTS-1 de fábrica propio? Si no (CEPM, desconocida), se usa el menor de las EDE. */
+export function hasOwnLegacyFirstBlock(distributor: unknown): boolean {
+  const key = typeof distributor === 'string' ? distributor.trim().toUpperCase() : '';
+  return Object.prototype.hasOwnProperty.call(FACTORY_LEGACY_FIRST_BLOCK, key);
+}
+
+/** Precio de fábrica al que se paga cada kWh del crédito sobrante en el régimen anterior (RD$/kWh): 75 % del primer bloque BTS-1. */
 export function legacySettlementDOPPerKWh(distributor: unknown): number {
   return LEGACY_SETTLEMENT_SHARE * factoryLegacyFirstBlock(distributor).dopPerKWh;
+}
+
+const isValidLegacySettlementPrice = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_GRID_USE_CHARGE_DOP_PER_KWH;
+
+/**
+ * Precio de la liquidación del régimen anterior de una propuesta: el guardado si es válido (así un cambio futuro de los
+ * bloques de fábrica no cambia una propuesta guardada); si no, el de fábrica de su distribuidora.
+ */
+export function resolveLegacySettlementDOPPerKWh(rates: NetMeteringRatesInput | null | undefined): number {
+  return isValidLegacySettlementPrice(rates?.legacyAnnualSettlementDOPPerKWh) ? rates.legacyAnnualSettlementDOPPerKWh : legacySettlementDOPPerKWh(rates?.distributor);
+}
+
+/**
+ * Precio guardado de la liquidación del régimen anterior tras un cambio de tarifas (misma idea que `reconcileGridUseCharge`):
+ * 1. Al activarla sin precio válido guardado, se siembra el de fábrica de la distribuidora.
+ * 2. Al cambiar de distribuidora, un precio igual al de fábrica de la anterior pasa al de la nueva.
+ * 3. Un precio distinto del de fábrica se conserva; apagar la opción no borra el precio (volver a activarla lo recupera).
+ */
+export function reconcileLegacySettlement<R extends NetMeteringRatesInput>(before: R, after: R, change: Partial<NetMeteringRatesInput>): R {
+  const stored = after.legacyAnnualSettlementDOPPerKWh;
+  if (after.legacyAnnualSettlement === true && !isValidLegacySettlementPrice(stored)) {
+    return { ...after, legacyAnnualSettlementDOPPerKWh: legacySettlementDOPPerKWh(after.distributor) };
+  }
+  const distributorChanged = change.distributor !== undefined && change.distributor !== before.distributor;
+  if (distributorChanged && isValidLegacySettlementPrice(stored) && Math.abs(stored - legacySettlementDOPPerKWh(before.distributor)) < 1e-9) {
+    return { ...after, legacyAnnualSettlementDOPPerKWh: legacySettlementDOPPerKWh(after.distributor) };
+  }
+  return after;
 }
 
 /**

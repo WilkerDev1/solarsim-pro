@@ -3,7 +3,6 @@ import type { ProjectSimulation, UtilityRates } from '../../../../../types';
 import type { EnergyCalculationMode } from '../../../../../../shared/applicationFeatures';
 import {
   ESTIMATED_ANNUAL_CREDIT_SETTLEMENT,
-  FIXED_CHARGE_TIER_BASES,
   MAX_SETTLEMENT_DOP_PER_KWH,
   resolveAnnualCreditSettlementDOPPerKWh,
   resolveFixedChargeTierBasis,
@@ -11,8 +10,8 @@ import {
 } from '../../../../../../shared/tariffBilling';
 import { CommitNumberField, FieldMenu, InfoTip, ParamRow, ToggleGroup } from '../../ui';
 import {
-  FIXED_CHARGE_TIER_BASIS_LABELS,
   UNVERIFIED_ESTIMATE_LABEL,
+  fixedChargeTierBasisOptions,
   settlementPriceOptions,
   buildBillBreakdown,
   describeValuationMethod,
@@ -46,6 +45,7 @@ export const TariffValuationPanel: React.FC<TariffValuationPanelProps> = ({ proj
   const settlementValue = resolveAnnualCreditSettlementDOPPerKWh(rates);
   const settlementOptions = settlementPriceOptions(settlementValue);
   const basis = resolveFixedChargeTierBasis(rates);
+  const tierBasisOptions = fixedChargeTierBasisOptions();
   const estimateTip = `Estimado: ${ESTIMATED_ANNUAL_CREDIT_SETTLEMENT.source}`;
 
   return (
@@ -108,7 +108,7 @@ export const TariffValuationPanel: React.FC<TariffValuationPanelProps> = ({ proj
                     label: option.label,
                     hint: option.hint,
                     checked: option.checked,
-                    onSelect: () => updateRates({ annualCreditSettlementDOPPerKWh: option.dopPerKWh }),
+                    onSelect: () => updateRates(option.patch),
                   }))}
                 />
                 <InfoTip text={`${settlement.note}\n${estimateTip}`} />
@@ -125,8 +125,8 @@ export const TariffValuationPanel: React.FC<TariffValuationPanelProps> = ({ proj
               ariaLabel="Qué consumo elige el rango del cargo fijo"
               compact
               value={basis}
-              options={FIXED_CHARGE_TIER_BASES.map((value) => ({ value, label: FIXED_CHARGE_TIER_BASIS_LABELS[value] }))}
-              onChange={(value) => updateRates({ fixedChargeTierBasis: value })}
+              options={tierBasisOptions}
+              onChange={(value) => updateRates(tierBasisOptions.find((option) => option.value === value)?.patch ?? {})}
             />
           </div>
         </ParamRow>

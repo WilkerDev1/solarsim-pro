@@ -23,7 +23,9 @@ import {
 import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { referenceRatesPatch } from '../components/simulator/params/sections/rates/ratesLogic';
 import { RatesFields } from '../components/simulator/params/sections/rates/RatesFields';
-import { buildBillBreakdown, settlementPriceOptions, unverifiedAssumptions } from '../components/simulator/params/sections/rates/tariffPresentation';
+import { buildBillBreakdown, describeValuationMethod, fixedChargeTierBasisOptions, settlementPriceOptions, unverifiedAssumptions } from '../components/simulator/params/sections/rates/tariffPresentation';
+import { applyProjectEdit } from '../domain/projectEdit';
+import { reconcileLegacySettlement, resolveLegacySettlementDOPPerKWh } from '../../shared/netMetering';
 import type { LegacyProjectSpecs, ProjectSimulation, UtilityRates } from '../types';
 
 /**
@@ -82,6 +84,13 @@ const legacy = (rates: Partial<UtilityRates> = {}, options: { panels?: number; c
   assert.match(atFactory[1].hint, /RD\$5\.00/);
   assert.deepEqual(settlementPriceOptions(5).map((o) => o.checked), [false, true]);
   assert.deepEqual(settlementPriceOptions(4.2).map((o) => o.checked), [false, false], 'un precio tecleado no marca ninguna opción');
+  // Lo que el menú pasa a `updateRates`, aplicado por la misma regla de edición que el dock.
+  const ctx = { equipmentCatalog: [], tariffMatrix: DEFAULT_RD_TARIFF_MATRIX } as never;
+  const withEstimate = applyProjectEdit(project(), { kind: 'rates', patch: settlementPriceOptions(0)[1].patch }, ctx);
+  assert.equal(withEstimate.rates.annualCreditSettlementDOPPerKWh, 5, 'el menú aplica el estimado');
+  assert.equal(resolveAssumptions(withEstimate).annualCreditSettlementDOPPerKWh, 5);
+  const settlementDock = render(h(RatesFields, { project: project(), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never));
+  assert.match(settlementDock, /aria-label="Opciones de la liquidación anual: Valor de fábrica aplicado"/, 'el campo tiene el menú del estimado');
 
   const note = unverifiedAssumptions(project().rates).find((item) => item.id === 'annual_settlement_price');
   assert.ok(note, 'SIE-007 con red: el supuesto de liquidación se lista');
@@ -122,8 +131,23 @@ const legacy = (rates: Partial<UtilityRates> = {}, options: { panels?: number; c
   assert.equal(resolveAssumptions(legacy()).legacyAnnualSettlementDOPPerKWh, null);
   close(resolveAssumptions(legacy({ legacyAnnualSettlement: true })).legacyAnnualSettlementDOPPerKWh as number, 0.75 * 6.05, 'supuesto resuelto', 1e-9);
 
+  // El precio se guarda en la propuesta al activarla: un cambio futuro de los bloques de fábrica no la cambia.
+  const ctx = { equipmentCatalog: [], tariffMatrix: DEFAULT_RD_TARIFF_MATRIX } as never;
+  const activated = applyProjectEdit(legacy(), { kind: 'rates', patch: { legacyAnnualSettlement: true } }, ctx);
+  close(activated.rates.legacyAnnualSettlementDOPPerKWh as number, 0.75 * 6.05, 'al activarla se siembra el de fábrica de EDESUR', 1e-9);
+  const moved = applyProjectEdit(activated, { kind: 'rates', patch: { distributor: 'EDENORTE' } }, ctx);
+  close(moved.rates.legacyAnnualSettlementDOPPerKWh as number, 0.75 * 5.97, 'cambiar de distribuidora con el de fábrica: pasa al de la nueva', 1e-9);
+  const custom = reconcileLegacySettlement({ ...activated.rates, legacyAnnualSettlementDOPPerKWh: 4 }, { ...activated.rates, legacyAnnualSettlementDOPPerKWh: 4, distributor: 'EDENORTE' }, { distributor: 'EDENORTE' });
+  assert.equal(custom.legacyAnnualSettlementDOPPerKWh, 4, 'un precio distinto del de fábrica se conserva');
+  const switchedOff = applyProjectEdit(activated, { kind: 'rates', patch: { legacyAnnualSettlement: false } }, ctx);
+  assert.equal(switchedOff.rates.legacyAnnualSettlementDOPPerKWh, activated.rates.legacyAnnualSettlementDOPPerKWh, 'apagarla no borra el precio');
+  assert.equal(resolveLegacySettlementDOPPerKWh({ distributor: 'EDESUR', legacyAnnualSettlementDOPPerKWh: 4 }), 4, 'el guardado manda sobre el de fábrica');
+  assert.equal(resolveAssumptions(legacy({ legacyAnnualSettlement: true, legacyAnnualSettlementDOPPerKWh: 4 })).legacyAnnualSettlementDOPPerKWh, 4);
+
   // Sistema sobredimensionado: produce más de lo que consume, sobra crédito al cierre.
   const big = { panels: 10, consumption: 250 };
+  const stored = calculateProjectFinancialSummary(legacy({ legacyAnnualSettlement: true, legacyAnnualSettlementDOPPerKWh: 4 }, big));
+  close(stored.annualCreditSettlementUSD ?? 0, ((stored.annualCreditSettlementKWh ?? 0) * 4) / 60, 'el motor usa el precio guardado', 0.06);
   const off = calculateProjectFinancialSummary(legacy({}, big));
   const offExplicit = calculateProjectFinancialSummary(legacy({ legacyAnnualSettlement: false }, big));
   assert.deepEqual(offExplicit.monthlyBreakdown, off.monthlyBreakdown, 'false explícito = sin el campo');
@@ -174,6 +198,11 @@ const legacy = (rates: Partial<UtilityRates> = {}, options: { panels?: number; c
   assert.match(dock(legacy({ legacyAnnualSettlement: true })), /aria-checked="true"[^>]*id="pd-rates-legacy-settlement"|id="pd-rates-legacy-settlement"[^>]*aria-checked="true"/, 'activada: encendido');
   assert.doesNotMatch(dock(project()), /pd-rates-legacy-settlement/, 'SIE-007: sin interruptor');
   assert.doesNotMatch(dock(legacy({ ...gridConnectionFields('zero_export') })), /pd-rates-legacy-settlement/, 'inyección cero: sin interruptor');
+  assert.match(dock(legacy({ distributor: 'CEPM' })), /se usa el menor de las EDE/, 'CEPM: el tip dice que el bloque es un sustituto');
+
+  // El método de valoración describe la opción cuando aplica.
+  assert.match(describeValuationMethod(legacy({ legacyAnnualSettlement: true }).rates).detail, /liquidación anual.*RD\$4\.54\/kWh/);
+  assert.doesNotMatch(describeValuationMethod(legacy().rates).detail, /liquidación/, 'sin activarla, la descripción de siempre');
 }
 
 // ── 3. Rango del cargo fijo: energía retirada o consumo neto ──
@@ -218,6 +247,11 @@ const legacy = (rates: Partial<UtilityRates> = {}, options: { panels?: number; c
   assert.match(dock, /data-fixed-charge-tier-basis="withdrawn"/, 'el dock muestra el criterio vigente');
   assert.match(dock, />Retirada</, 'opción corta: cabe en el control de 172 px');
   assert.match(dock, />Neto</);
+  const options = fixedChargeTierBasisOptions();
+  assert.deepEqual(options.map((o) => o.patch), [{ fixedChargeTierBasis: 'withdrawn' }, { fixedChargeTierBasis: 'net' }]);
+  const ctx = { equipmentCatalog: [], tariffMatrix: DEFAULT_RD_TARIFF_MATRIX } as never;
+  const toggled = applyProjectEdit(project(), { kind: 'rates', patch: options[1].patch }, ctx);
+  assert.equal(resolveAssumptions(toggled).fixedChargeTierBasis, 'net', 'el selector aplica el criterio por la regla de edición');
   const flatDock = render(h(RatesFields, { project: project({ energyRateSource: 'manual' }), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never));
   assert.doesNotMatch(flatDock, /data-fixed-charge-tier-basis/, 'precio único sin cargo por rango: sin selector');
 }

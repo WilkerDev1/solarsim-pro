@@ -5,11 +5,12 @@
  */
 import { resolveAssumptions } from '../../../../../../shared/assumptions';
 import { exportsToGrid, resolveGridConnection } from '../../../../../../shared/gridConnection';
-import { FACTORY_GRID_USE_CHARGES, gridUseChargeApplies, resolveNetMeteringRegime } from '../../../../../../shared/netMetering';
+import { FACTORY_GRID_USE_CHARGES, gridUseChargeApplies, legacyAnnualSettlementApplies, resolveLegacySettlementDOPPerKWh, resolveNetMeteringRegime } from '../../../../../../shared/netMetering';
 import {
   ENERGY_VALUATION_METHOD_LABELS,
   ESTIMATED_ANNUAL_CREDIT_SETTLEMENT,
   FACTORY_ANNUAL_CREDIT_SETTLEMENT,
+  FIXED_CHARGE_TIER_BASES,
   resolveFixedChargeTierBasis,
   type FixedChargeTierBasis,
   calculateBillingYear,
@@ -55,6 +56,7 @@ export function describeValuationMethod(rates: UtilityRates): ValuationMethodVie
   // SIE-007 con red y precio escalar: mismo neteo, arrastre y liquidación que con bloques (`engineBlockBilling`).
   const netted = !exportsToGrid(resolveGridConnection(rates)) ? '' : ' Con medición neta el excedente solo descuenta consumo; el crédito que sobra al cierre del año se liquida al precio de liquidación.';
   if (resolveGridConnection(rates) === 'off_grid') detail = 'Sistema aislado: se compara contra su alternativa de suministro, sin factura de la distribuidora.';
+  else if (legacyAnnualSettlementApplies(rates)) detail = `Régimen anterior (retención %) con liquidación anual: el autoconsumo y lo exportado menos la retención se netean kWh contra kWh con lo retirado de la red, al precio por kWh; el crédito que sobra al cierre del año se paga a RD$${resolveLegacySettlementDOPPerKWh(rates).toFixed(2)}/kWh (75 % del primer bloque BTS-1).`;
   else if (resolveNetMeteringRegime(rates.netMeteringRegime) !== 'sie007_2026') detail = 'Régimen anterior (retención %): cada kWh autoconsumido y lo exportado, menos la retención, se valoran al precio por kWh.';
   else if (rates.energyRateSource === 'manual') detail = 'Precio tecleado a mano: se respeta como precio único. «Aplicar tarifa oficial» devuelve la factura por bloques.' + netted;
   else if (rates.energyRateSource === 'invoice') detail = 'Precio tomado de una factura: se respeta como precio único.' + netted;
@@ -209,6 +211,8 @@ export interface SettlementPriceOption {
   hint: string;
   /** La propuesta ya usa este precio. */
   checked: boolean;
+  /** Cambio de tarifas que aplica la opción (lo que el menú pasa a `updateRates`). */
+  patch: Pick<UtilityRates, 'annualCreditSettlementDOPPerKWh'>;
 }
 
 /**
@@ -220,9 +224,14 @@ export function settlementPriceOptions(current: number): SettlementPriceOption[]
   const factory = FACTORY_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh;
   const estimate = ESTIMATED_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh;
   return [
-    { label: same(factory) ? 'Valor de fábrica aplicado' : 'Aplicar valor de fábrica', dopPerKWh: factory, hint: `RD$${fmt2(factory)}`, checked: same(factory) },
-    { label: same(estimate) ? 'Estimado CNE aplicado' : 'Aplicar estimado CNE', dopPerKWh: estimate, hint: `RD$${fmt2(estimate)}`, checked: same(estimate) },
+    { label: same(factory) ? 'Valor de fábrica aplicado' : 'Aplicar valor de fábrica', dopPerKWh: factory, hint: `RD$${fmt2(factory)}`, checked: same(factory), patch: { annualCreditSettlementDOPPerKWh: factory } },
+    { label: same(estimate) ? 'Estimado CNE aplicado' : 'Aplicar estimado CNE', dopPerKWh: estimate, hint: `RD$${fmt2(estimate)}`, checked: same(estimate), patch: { annualCreditSettlementDOPPerKWh: estimate } },
   ];
+}
+
+/** Opciones del selector del rango del cargo fijo, con el cambio que aplica cada una. */
+export function fixedChargeTierBasisOptions(): Array<{ value: FixedChargeTierBasis; label: string; patch: Pick<UtilityRates, 'fixedChargeTierBasis'> }> {
+  return FIXED_CHARGE_TIER_BASES.map((value) => ({ value, label: FIXED_CHARGE_TIER_BASIS_LABELS[value], patch: { fixedChargeTierBasis: value } }));
 }
 
 /** RD$ con separador de miles y dos decimales. */

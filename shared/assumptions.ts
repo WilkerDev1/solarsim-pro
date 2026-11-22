@@ -20,7 +20,7 @@
  *
  * TypeScript puro, sin dependencias fuera de `shared/` (lo compilan el cliente, el servidor con NodeNext y el Worker).
  */
-import { legacyAnnualSettlementApplies, legacySettlementDOPPerKWh, resolveNetMetering, type NetMeteringRegime } from './netMetering.js';
+import { legacyAnnualSettlementApplies, resolveLegacySettlementDOPPerKWh, resolveNetMetering, type NetMeteringRegime } from './netMetering.js';
 import { resolveAnnualCreditSettlementDOPPerKWh, resolveEnergyValuationMethod, resolveFixedChargeTierBasis, type EnergyValuationMethod, type FixedChargeTierBasis } from './tariffBilling.js';
 
 // ── Valores por defecto ──
@@ -138,6 +138,7 @@ export interface AssumptionsProjectInput {
     annualCreditSettlementDOPPerKWh?: unknown;
     fixedChargeTierBasis?: unknown;
     legacyAnnualSettlement?: unknown;
+    legacyAnnualSettlementDOPPerKWh?: unknown;
   } | null;
   financials?: {
     discountRatePct?: Maybe;
@@ -174,7 +175,7 @@ export interface ResolvedAssumptions {
   annualCreditSettlementDOPPerKWh: number;
   /** Qué consumo elige el rango del cargo fijo con medición neta; de fábrica la energía retirada (no confirmado). */
   fixedChargeTierBasis: FixedChargeTierBasis;
-  /** Régimen anterior con liquidación anual activada: 75 % del primer bloque BTS-1 (RD$/kWh); `null` si no aplica. */
+  /** Régimen anterior con liquidación anual activada: el precio guardado o el 75 % del primer bloque BTS-1 (RD$/kWh); `null` si no aplica. */
   legacyAnnualSettlementDOPPerKWh: number | null;
 }
 
@@ -225,7 +226,7 @@ export function resolveAssumptions(project: AssumptionsProjectInput | null | und
     energyValuationMethod: resolveEnergyValuationMethod(rates),
     annualCreditSettlementDOPPerKWh: resolveAnnualCreditSettlementDOPPerKWh(rates),
     fixedChargeTierBasis: resolveFixedChargeTierBasis(rates),
-    legacyAnnualSettlementDOPPerKWh: legacyAnnualSettlementApplies(rates) ? legacySettlementDOPPerKWh(rates?.distributor) : null,
+    legacyAnnualSettlementDOPPerKWh: legacyAnnualSettlementApplies(rates) ? resolveLegacySettlementDOPPerKWh(rates) : null,
   };
 }
 

@@ -10,7 +10,9 @@ import {
   factoryGridUseCharge,
   factoryLegacyFirstBlock,
   gridUseChargeApplies,
+  hasOwnLegacyFirstBlock,
   legacySettlementDOPPerKWh,
+  resolveLegacySettlementDOPPerKWh,
   type NetMeteringRegime,
 } from '../../../../../../shared/netMetering';
 import { exportsToGrid, resolveGridConnection } from '../../../../../../shared/gridConnection';
@@ -59,7 +61,11 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
   const showsLegacySettlement = regime === 'legacy_retention' && exportsToGrid(resolveGridConnection(rates));
   const firstBlock = factoryLegacyFirstBlock(rates.distributor);
   const sharePct = Math.round(LEGACY_SETTLEMENT_SHARE * 100);
-  const legacySettlementTip = `Reglamento de Medición Neta, art. 11.3.c: el crédito que sobra al cierre del año se paga al ${sharePct} % del primer bloque BTS-1 de diciembre: ${sharePct} % × RD$${firstBlock.dopPerKWh.toFixed(2)} = RD$${legacySettlementDOPPerKWh(rates.distributor).toFixed(2)}/kWh (Resolución ${firstBlock.resolutionCode}, ${firstBlock.period}). El crédito reconocido (tras la retención) se netea mes a mes contra lo retirado de la red.\nApagado: el excedente se valora a la tarifa completa, como en las propuestas anteriores (optimista si el sistema produce más de lo que se consume en el año).`;
+  const factoryLegacyPrice = legacySettlementDOPPerKWh(rates.distributor);
+  const appliedLegacyPrice = resolveLegacySettlementDOPPerKWh(rates);
+  const fallbackNote = hasOwnLegacyFirstBlock(rates.distributor) ? '' : ` ${rates.distributor ? `${rates.distributor} no tiene` : 'Sin distribuidora no hay'} primer bloque BTS-1 de fábrica: se usa el menor de las EDE (estimación a la baja).`;
+  const storedNote = rates.legacyAnnualSettlement === true && Math.abs(appliedLegacyPrice - factoryLegacyPrice) >= 0.005 ? ` Precio guardado en la propuesta: RD$${appliedLegacyPrice.toFixed(2)}/kWh.` : '';
+  const legacySettlementTip = `Reglamento de Medición Neta, art. 11.3.c: el crédito que sobra al cierre del año se paga al ${sharePct} % del primer bloque BTS-1 de diciembre: ${sharePct} % × RD$${firstBlock.dopPerKWh.toFixed(2)} = RD$${factoryLegacyPrice.toFixed(2)}/kWh (Resolución ${firstBlock.resolutionCode}, ${firstBlock.period}).${fallbackNote}${storedNote} El crédito reconocido (tras la retención) se netea mes a mes contra lo retirado de la red.\nApagado: el excedente se valora a la tarifa completa, como en las propuestas anteriores (optimista si el sistema produce más de lo que se consume en el año).`;
 
   return (
     <>
