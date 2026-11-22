@@ -5,6 +5,7 @@ import type { SolarEquipmentItem } from '../../../../../types/equipment';
 import type { EquipmentKind } from '../../../../../utils/equipmentGroups';
 import { SearchableEquipmentSelect } from '../../../sidebar/SearchableEquipmentSelect';
 import { Field, InfoTip, ItemCard, SquareSwitch, Stepper, SubHeader, SubHeaderIconButton } from '../../ui';
+import type { GenericPriceLookup } from '../../logic/catalogSelection';
 import { KIND_CONFIG, createGroupActions, groupViews, type EquipmentMode, type GroupModelView } from './equipmentGroupModel';
 
 export interface AutoCalculateProps {
@@ -29,6 +30,8 @@ export interface EquipmentGroupListProps {
   intro?: React.ReactNode;
   /** Contenido tras los modelos (Avanzado, indicadores). */
   children?: React.ReactNode;
+  /** Precio genérico efectivo de un equipo al elegirlo (ADR 0006); ausente sin sesión. */
+  genericPriceFor?: GenericPriceLookup;
 }
 
 const fieldLabel = 'mb-1.5 block text-xs text-pd-muted';
@@ -45,10 +48,10 @@ const AutoCalculateRow: React.FC<{ kindNoun: string; auto: AutoCalculateProps }>
  * Lista de modelos de paneles, inversores o baterías, en modo Catálogo o Manual. Es la única vista de
  * esos tres grupos: todo cambio sale de `createGroupActions` y por tanto de `editEquipmentGroup`.
  */
-export const EquipmentGroupList: React.FC<EquipmentGroupListProps> = ({ kind, mode, specs, catalog, updateSpecs, onOpenScanner, autoCalculate, enabled = true, intro, children }) => {
+export const EquipmentGroupList: React.FC<EquipmentGroupListProps> = ({ kind, mode, specs, catalog, updateSpecs, onOpenScanner, autoCalculate, enabled = true, intro, children, genericPriceFor }) => {
   const config = KIND_CONFIG[kind];
   const baseId = React.useId();
-  const actions = createGroupActions(kind, specs, catalog, updateSpecs);
+  const actions = createGroupActions(kind, specs, catalog, updateSpecs, genericPriceFor);
   const views = enabled ? groupViews(specs, kind) : [];
 
   const stepper = (view: GroupModelView, index: number, disabled?: boolean, tall?: boolean) => (

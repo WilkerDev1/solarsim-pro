@@ -45,5 +45,7 @@ export function serializeSimulationStore(state: SimulationStore) {
     // Precio genérico (ADR 0006): solo el mapa acotado y la cola; el historial nunca se guarda.
     genericPrices: state.genericPrices,
     pricePending: state.pricePending,
+    // Regla 2: registro vivo por (propuesta, equipo); la supresión de la pregunta no se guarda (solo la sesión).
+    proposalPriceLive: state.proposalPriceLive,
   };
 }

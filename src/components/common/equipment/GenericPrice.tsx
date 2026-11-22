@@ -9,12 +9,8 @@ import type { SolarEquipmentItem } from '../../../types/equipment';
 import type { GenericPriceInfo } from '../../../../shared/equipmentPrices';
 import { confirmAction } from '../confirmAction';
 
-export const formatGenericUSD = (value: number) =>
-  `US$ ${value.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-export const formatGenericDate = (iso: string) => {
-  const time = Date.parse(iso);
-  return Number.isFinite(time) ? new Date(time).toLocaleDateString('es-DO') : '';
-};
+import { formatGenericDate, formatGenericUSD } from './genericPriceFormat';
+export { formatGenericDate, formatGenericUSD };
 
 /** Precio genérico efectivo de un equipo, o `undefined` sin sesión (la función está apagada). */
 export function useGenericPrice(equipmentId: string | undefined): { active: boolean; generic: GenericPriceInfo | null } {
@@ -58,10 +54,10 @@ export function GenericPriceSuggestion({ suggestion, onDismiss }: { suggestion: 
 }
 
 /**
- * Cabecera del modal de ofertas: «Genérico US$ X · fecha» con «Cambiar» (edición en línea, `manual`, > 0) y «Quitar»
- * (anula el vigente tras confirmar). Funciona también con equipos de referencia: el genérico no vive en el equipo.
+ * Cabecera del modal de ofertas: «Genérico US$ X · fecha» con «Cambiar» (edición en línea, `manual`, > 0), «Quitar»
+ * (anula el vigente tras confirmar) e «Historial» (vista del historial en el mismo cuerpo del modal, también LECTOR). Funciona también con equipos de referencia: el genérico no vive en el equipo.
  */
-export function GenericPriceControl({ item }: { item: SolarEquipmentItem }) {
+export function GenericPriceControl({ item, onHistory }: { item: SolarEquipmentItem; onHistory?: () => void }) {
   const { active, generic } = useGenericPrice(item.id);
   const writable = useSimulationStore((s) => canPriceEquipment(s, item));
   const [draft, setDraft] = useState<string | null>(null);
@@ -119,6 +115,11 @@ export function GenericPriceControl({ item }: { item: SolarEquipmentItem }) {
       {writable && generic && (
         <button type="button" className="offers-link" onClick={() => void remove()}>
           Quitar
+        </button>
+      )}
+      {onHistory && (
+        <button type="button" className="offers-link" onClick={onHistory}>
+          Historial
         </button>
       )}
     </p>

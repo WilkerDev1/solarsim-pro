@@ -233,6 +233,68 @@ test("SDK oficial: un lector solo consulta aunque pida escribir", async () => {
     arguments: { name: "No" },
   });
   assert.equal(denied.isError, true);
+
+  // ADR 0006: the editor records prices from the desktop; the reader's agent reads history and generic price.
+  const saved = await apiCall("POST", "/api/equipment/batch", editor.token, {
+    items: [
+      {
+        id: "e2e-eq-1",
+        type: "panel",
+        brand: "Marca",
+        modelSeries: "Serie",
+        displayName: "Panel e2e",
+        powerW: 600,
+        supplierPrices: [],
+      },
+    ],
+  });
+  assert.equal(saved.status, 200);
+  const priced = await apiCall(
+    "POST",
+    "/api/equipment-prices/batch",
+    editor.token,
+    {
+      observations: [
+        {
+          id: "po-00000000-0000-4000-8000-0000000e2e01",
+          equipmentId: "e2e-eq-1",
+          kind: "observation",
+          priceUSD: 100,
+          source: "supplier_offer",
+          supplierName: "Proveedor A",
+          observedAt: "2026-03-10T12:00:00.000Z",
+        },
+        {
+          id: "po-00000000-0000-4000-8000-0000000e2e02",
+          equipmentId: "e2e-eq-1",
+          kind: "generic",
+          priceUSD: 98,
+          source: "manual",
+          observedAt: "2026-03-11T12:00:00.000Z",
+        },
+      ],
+      voids: [],
+    },
+  );
+  assert.equal(priced.status, 200);
+  const history = structured(
+    await client.callTool({
+      name: "get_price_history",
+      arguments: { equipmentId: "e2e-eq-1" },
+    }),
+  );
+  assert.equal(history.status, "ok");
+  assert.equal(history.data.records.length, 2);
+  assert.equal(history.data.genericPrice.priceUSD, 98);
+  assert.equal(history.data.records[1].author, "e2e-editor");
+  assert.equal(history.data.stats.byCalendarMonth[2].avg, 100);
+  const detail = structured(
+    await client.callTool({
+      name: "get_equipment",
+      arguments: { id: "e2e-eq-1" },
+    }),
+  );
+  assert.equal(detail.data.genericPriceUSD, 98);
   await client.close();
   await apiCall(
     "DELETE",

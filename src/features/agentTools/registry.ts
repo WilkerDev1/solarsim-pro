@@ -14,12 +14,13 @@ import { CATALOG_TOOL_HANDLERS } from './catalogTools';
 import { DOCUMENT_TOOL_HANDLERS } from './documentTools';
 import { ATTACHMENT_TOOL_HANDLERS } from './attachmentTools';
 import { CLIENT_TOOL_HANDLERS } from './clientTools';
+import { PRICE_TOOL_HANDLERS } from './priceTools';
 import { touchesPricing } from '../assistant/pricingFields';
 import { assistantFieldLabel, assistantValueLabel } from '../assistant/labels';
 import type { AssistantAction, AssistantCard, AssistantToolResult } from '../assistant/types';
 
 export type { AgentToolContext } from './nativeTools';
-const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS, ...ATTACHMENT_TOOL_HANDLERS, ...CLIENT_TOOL_HANDLERS };
+const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS, ...ATTACHMENT_TOOL_HANDLERS, ...CLIENT_TOOL_HANDLERS, ...PRICE_TOOL_HANDLERS };
 
 const MAX_RESULT_BYTES = 64000;
 /**

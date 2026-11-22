@@ -13,6 +13,11 @@ import {
 } from "../../shared/clients.js";
 import { readEquipment } from "../../shared/equipment/index.js";
 import { isWriterRole } from "../../shared/permissions.js";
+import type { GenericPriceInfo } from "../../shared/equipmentPrices.js";
+import {
+  PRICE_HISTORY_TOOL_LIMITS,
+  agentPriceHistory,
+} from "../../shared/agentTools/priceHistory.js";
 import { ApiError, type ApiClient } from "./apiClient.js";
 
 /** Same 64 KB cap as the in-app registry: agents must narrow the query instead of receiving huge payloads. */
@@ -84,6 +89,25 @@ async function equipmentList(api: ApiClient) {
   );
   const deleted = new Set(result.deletedIds ?? []);
   return (result.items ?? []).filter((e) => !deleted.has(e.id));
+}
+/**
+ * Current generic price per equipment (ADR 0006). An API without price records (404) or any other failure leaves
+ * the catalog answering: `null` = unknown. A revoked token (401) still surfaces as a protocol error.
+ */
+async function genericPrices(
+  api: ApiClient,
+): Promise<Record<string, GenericPriceInfo> | null> {
+  try {
+    const result = await api.request<{
+      prices?: Record<string, GenericPriceInfo>;
+    }>("GET", "/api/equipment-prices/generic");
+    return result.prices && typeof result.prices === "object"
+      ? result.prices
+      : {};
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) throw error;
+    return null;
+  }
 }
 async function clientList(api: ApiClient) {
   return (
@@ -182,7 +206,11 @@ const TOOLS: RemoteTool[] = [
       )
         return fail("invalid_input", "Filtro de disponibilidad inválido.");
       const query = normalize(args.query);
-      const found = (await equipmentList(api))
+      const [catalog, generic] = await Promise.all([
+        equipmentList(api),
+        genericPrices(api),
+      ]);
+      const found = catalog
         .filter(
           (e) =>
             normalize(`${e.brand} ${e.displayName} ${e.modelSeries}`).includes(
@@ -201,6 +229,8 @@ const TOOLS: RemoteTool[] = [
           name: e.displayName,
           brand: e.brand,
           offers: e.supplierPrices,
+          // Reference price without a supplier: never an offer, and it says nothing about stock.
+          genericPriceUSD: generic?.[e.id]?.priceUSD ?? null,
           stockNote: !e.supplierPrices?.length
             ? "Sin ofertas; disponibilidad desconocida"
             : undefined,
@@ -213,10 +243,61 @@ const TOOLS: RemoteTool[] = [
     definition: shared("get_equipment"),
     scope: "read",
     run: async (args, api) => {
-      const e = (await equipmentList(api)).find((item) => item.id === args.id);
+      const [catalog, generic] = await Promise.all([
+        equipmentList(api),
+        genericPrices(api),
+      ]);
+      const e = catalog.find((item) => item.id === args.id);
       if (!e)
         return fail("not_found", "Equipo no disponible en esta organización.");
-      return ok({ ...e, datasheetUrl: undefined, syncServerUrl: undefined });
+      return ok({
+        ...e,
+        datasheetUrl: undefined,
+        syncServerUrl: undefined,
+        genericPriceUSD: generic?.[e.id]?.priceUSD ?? null,
+        genericPriceObservedAt: generic?.[e.id]?.observedAt ?? null,
+      });
+    },
+  },
+  {
+    definition: shared("get_price_history"),
+    scope: "read",
+    run: async (args, api) => {
+      // Records of equipment that does not exist (or the organization hid) are never shown (ADR 0006 §2).
+      const item = (await equipmentList(api)).find(
+        (e) => e.id === args.equipmentId,
+      );
+      if (!item)
+        return fail("not_found", "Equipo no disponible en esta organización.");
+      const limit = Number.isInteger(args.limit)
+        ? args.limit
+        : PRICE_HISTORY_TOOL_LIMITS.defaultLimit;
+      let history: { observations?: any[]; nextBefore?: number | null };
+      try {
+        history = await api.request(
+          "GET",
+          `/api/equipment-prices?equipmentId=${encodeURIComponent(item.id)}&limit=${limit}`,
+        );
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404)
+          return fail(
+            "unsupported",
+            "El historial de precios no está disponible en este servidor.",
+          );
+        throw error;
+      }
+      const generic = await genericPrices(api);
+      return ok(
+        agentPriceHistory({
+          equipmentId: item.id,
+          equipmentName: item.displayName,
+          records: Array.isArray(history.observations)
+            ? history.observations
+            : [],
+          generic: generic?.[item.id] ?? null,
+          hasMore: Number.isSafeInteger(history.nextBefore),
+        }),
+      );
     },
   },
   {

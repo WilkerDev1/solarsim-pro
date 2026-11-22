@@ -33,7 +33,10 @@ export interface ClientInfo {
 }
 
 export interface PanelItemSpec {
-  priceSource?: 'manual' | 'supplier';
+  /** `generic`: precio genérico del catálogo sin proveedor (ADR 0006); su copia va en `genericPriceInfo`. */
+  priceSource?: 'manual' | 'supplier' | 'generic';
+  /** Copia del precio genérico aplicado al elegir el modelo: cambiar el genérico después no reprecia la propuesta. */
+  genericPriceInfo?: { priceUSD: number; observedAt: string; observationId: string };
   requestedModel?: string;
   id: string;
   catalogItemId?: string; // ID del equipo del catálogo; se escribe con utils/equipmentGroups.ts
@@ -50,7 +53,10 @@ export interface PanelItemSpec {
 }
 
 export interface InverterItemSpec {
-  priceSource?: 'manual' | 'supplier';
+  /** `generic`: precio genérico del catálogo sin proveedor (ADR 0006); su copia va en `genericPriceInfo`. */
+  priceSource?: 'manual' | 'supplier' | 'generic';
+  /** Copia del precio genérico aplicado al elegir el modelo: cambiar el genérico después no reprecia la propuesta. */
+  genericPriceInfo?: { priceUSD: number; observedAt: string; observationId: string };
   requestedModel?: string;
   id: string;
   catalogItemId?: string;
@@ -65,7 +71,10 @@ export interface InverterItemSpec {
 }
 
 export interface BatteryItemSpec {
-  priceSource?: 'manual' | 'supplier';
+  /** `generic`: precio genérico del catálogo sin proveedor (ADR 0006); su copia va en `genericPriceInfo`. */
+  priceSource?: 'manual' | 'supplier' | 'generic';
+  /** Copia del precio genérico aplicado al elegir el modelo: cambiar el genérico después no reprecia la propuesta. */
+  genericPriceInfo?: { priceUSD: number; observedAt: string; observationId: string };
   requestedModel?: string;
   id: string;
   catalogItemId?: string;

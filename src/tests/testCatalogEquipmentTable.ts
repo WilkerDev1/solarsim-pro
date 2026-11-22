@@ -18,7 +18,7 @@ useSimulationStore.setState({
   equipmentCatalog: [
     item('p', 'panel', 'QA Panel 600', { powerW: 600, efficiencyPct: 22.1, supplierPrices: [offer('o1', 95), offer('o2', 80, 'out_of_stock')], imageAssetIds: ['img-p'] }),
     item('i', 'inverter', 'QA Inversor 8K', { powerKW: 8, datasheetAssetId: 'ds-i', datasheetName: 'abc.pdf' }),
-    item('b', 'battery', 'QA Batería 16', { capacityKWh: 16, dodPct: 90 }),
+    item('b', 'battery', 'QA Batería 16', { capacityKWh: 16, dodPct: 90, supplierPrices: [offer('o3', 500)] }),
   ],
   equipmentConflicts: { b: { localItem: {} as SolarEquipmentItem, serverItem: {} as SolarEquipmentItem } } as any,
 });
@@ -39,6 +39,7 @@ assert.match(rows[1], /MPPT sin dato/);
 assert.match(rows[1], /Sin precio disponible/);
 assert.match(rows[2], /16 kWh/);
 assert.match(rows[2], /90% DoD/);
+assert.match(rows[2], /1 oferta registrada</, 'singular for one offer');
 assert.match(rows[3], /pendientes de resolver/);
 assert.match(rows[3], /Usar servidor/);
 assert.match(rows[3], /Guardar copia/);
@@ -72,6 +73,9 @@ console.log('Catalog equipment table rows, offers, nominal values, conflict row 
   const genericRows = withGeneric.slice(withGeneric.indexOf('<tbody'), withGeneric.indexOf('</tbody>')).split('<tr').slice(1);
   assert.match(genericRows[1], /Genérico US\$\s?88[.,]50/, 'inverter row shows its generic price');
   assert.doesNotMatch(genericRows[0], /Genérico/, 'no generic price, no line');
+  assert.match(genericRows[1], /Sin ofertas/, 'generic-only row does not claim it has no price');
+  assert.doesNotMatch(genericRows[1], /Sin precio disponible/);
+  assert.match(genericRows[1], /0 ofertas registradas/);
   const { SupplierPricesDetailModal } = await import('../components/common/SupplierPricesDetailModal');
   useSimulationStore.setState({ supplierPriceModalEquipment: reference });
   Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());

@@ -18,6 +18,7 @@ import { ChipGroup, CommitNumberField, ParamRow, StatStrip, ToggleGroup } from '
 import { DirectPrice } from '../params/sections/pricing/DirectPrice';
 import { NumberField } from '../params/sections/pricing/NumberField';
 import { UnitCosts } from '../params/sections/pricing/UnitCosts';
+import { useProposalPriceCommit } from '../params/sections/pricing/useProposalPriceCommit';
 import { usd } from '../params/sections/pricing/format';
 
 interface PricingParamsSectionProps {
@@ -40,6 +41,8 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
     useShallow((s) => ({ equipmentCatalog: s.equipmentCatalog, openSupplierPriceModal: s.openSupplierPriceModal }))
   );
   const specs = project.specs;
+  // Precio genérico (ADR 0006): etiqueta, registro al confirmar un precio a mano y pregunta (solo con sesión).
+  const genericPricing = useProposalPriceCommit(project.id);
   // Modelo principal de cada tipo y su proveedor: salen del primer grupo (shared/equipment), no de campos sueltos.
   const { panels, inverters, batteries } = readEquipment(specs);
   const [panel, inverter, battery] = [panels[0], inverters[0], batteries[0]];
@@ -119,6 +122,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
             selected={{ panel: selectedPanel, inverter: selectedInverter, battery: selectedBattery }}
             openSupplierPriceModal={openSupplierPriceModal}
             updateSpecs={updateSpecs}
+            {...genericPricing}
           />
           <StatStrip
             items={[

@@ -11,7 +11,8 @@ interface SupplierInfo {
 }
 
 interface ItemSpecBase {
-  priceSource?: 'manual' | 'supplier';
+  priceSource?: 'manual' | 'supplier' | 'generic';
+  genericPriceInfo?: { priceUSD: number; observedAt: string; observationId: string };
   requestedModel?: string;
   id: string;
   catalogItemId?: string;

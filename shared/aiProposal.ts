@@ -7,6 +7,7 @@ import type { ExtractedInvoiceData } from '../src/types/aiInvoice';
 import type { PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../src/types';
 import { fitEquipment, magnitudesMatch, matchEquipment } from './equipmentMatch';
 import { AI_DRAFT_DOCUMENT_TEXT_KEYS, normalizeDraftDocumentTexts, type AIDocumentTextEntry } from './documentTexts/aiDraft';
+import { resolveAutoPrice, type GenericPriceInfo } from './equipmentPrices';
 
 export interface AIProposalFile { fileBase64: string; mimeType: string; fileName: string }
 export interface AIProposalContext {
@@ -23,7 +24,10 @@ export interface AIProposalContext {
   tariffReference?: unknown;
   currentDraft?: unknown;
   commercial?: AIProposalCommercial;
-  equipmentPrices?: {id:string;unitPriceUSD:number}[];
+  /** Precios de la propuesta existente; solo los `manual` (o sin fuente, guardados antes de 2.9) se reutilizan como manuales. */
+  equipmentPrices?: {id:string;unitPriceUSD:number;priceSource?:'manual'|'supplier'|'generic'}[];
+  /** Precio genérico efectivo por equipo (ADR 0006); vacío sin sesión. No viaja en el prompt: el catálogo lo marca. */
+  genericPrices?: Record<string, GenericPriceInfo>;
   /** Textos del documento editables por el borrador: clave, etiqueta y valor actual (ver documentTexts/aiDraft). */
   documentTexts?: AIDocumentTextEntry[];
   /** Avisos vigentes de la revisión (texto) que el modelo debe atender en la ronda. */
@@ -47,7 +51,7 @@ La petición llega en partes: catalog (CATÁLOGO) y tariffReference; project (co
 Extrae cliente, dirección, distribuidora, código tarifario, precio unitario de ENERGÍA y consumos observados. No derives RD$/kWh del total a pagar (incluye impuestos, demanda y deuda). Si la factura cobra la energía por bloques (p. ej. 200 kWh × 6.05, 100 kWh × 8.59, 73 kWh × 12.89), no pongas el precio de un bloque en energyCostPerKWhDOP: déjalo null, copia los bloques en energyTiers y el precio del último bloque en marginalRateDOP; la app valora con los bloques oficiales de la tarifa. Conserva ceros reales. monthlyConsumptionKWh corresponde enero a diciembre: usa el año más reciente para meses repetidos. Si falta historial, devuelve los meses conocidos como null; no inventes 1200 kWh ni datos personales. averageMonthlyKWh sólo si un consumo mensual explícito permite proyectarlo. Para consumo diario explícito, convierte a promedio mensual y explica la estimación. Sin consumo devuelve array vacío.
 Usa CATÁLOGO como única fuente de IDs/tipo/especificaciones; selecciona cada modelo solicitado por separado en panels, inverters y batteries. Cada grupo lleva equipmentId exacto y quantity entera; cuando el usuario pide potencia/capacidad unitaria explícita, conserva requestedPowerW/requestedPowerKW/requestedCapacityKWh para verificar coincidencia; cantidad 0 en un panel indica dimensionar con motor de la app. No elijas un sustituto silenciosamente ni cambies marca por precio. Equipo sin precio sigue siendo válido. Si modelo/potencia/fase solicitados no existen o son ambiguos, deja grupo sin ID y registra unresolvedRequests. Potencia nominal unitaria no equivale a potencia total ni energía mensual. No conviertas un inversor de 16kW en 2x8kW salvo solicitud explícita de reparto. No mezcles kw, kWp, kWh. Si no hay indicaciones de inversor puedes recomendar uno real del catálogo justificándolo, pero su compatibilidad se revisará. Baterías sólo si solicitadas. Sin baterías => batteries vacío y hasBattery=false.
 Usa tarifas de referencia exclusivamente para contrastar códigos; no inventes tarifas oficiales ni resolución. La tarifa leída directamente de factura tiene prioridad y se conservará con su origen. Si falta distribuidora/código/tasa no los inventes. commercial.markupPct significa recargo sobre costo (40=>factor1.4). commercial.marginOnSalePct es margen sobre venta. Usa únicamente commercial para condiciones comerciales y respeta los cambios explícitos por encima de los defaults. No declares ahorro, VAN, TIR o cobertura calculados: esos los determina el motor.
-commercial contiene condiciones comerciales de esta cotización, nunca cambios al catálogo. Las propuestas automáticas cotizan siempre en modo Simple (Catálogo IA): equipos reales del catálogo con precios de proveedor y matriz de costos; nunca precio por Wp. Toma costos conocidos del contexto; los unitPriceUSD explícitos del usuario reemplazan el costo por grupo en USD, convirtiendo DOP con exchangeRate. Preserva precio 0 explícito. No inventes costos de equipos o extras. Puedes modificar instalación USD/kWp o installationTotalUSD (mutuamente excluyentes; no dupliques el total en extras), recargo markupPct o margen sobre venta marginOnSalePct (mutuamente excluyentes), extras y descuentos por petición. customItems/customDiscounts son listas completas: conserva filas anteriores no modificadas (con su id y su hideInQuotation, que oculta el extra en la factura sin quitarlo del cobro); [] elimina explícitamente. Cada extra requiere cantidad, costo unitario, unidad, exonerateITBIS y applyMargin. Sin autorización fiscal no asumas exoneración de un nuevo extra. Descuento porcentual máximo100; fixed es USD. Si destino fiscal no está indicado usa general y pide revisar. Un porcentaje de utilidad ambiguo requiere unresolvedRequests. No copies specifications, validationIssues, selectedSupplierInfo ni currentDraft entero: sólo las claves del esquema; las calculadas las añade la app.
+commercial contiene condiciones comerciales de esta cotización, nunca cambios al catálogo. Las propuestas automáticas cotizan siempre en modo Simple (Catálogo IA): equipos reales del catálogo con precios de proveedor y matriz de costos; nunca precio por Wp. El precio de cada equipo lo pone la app: primero la oferta de proveedor; sin oferta, el precio genérico del catálogo (priceKind=generic en CATÁLOGO), que se avisa como «precio genérico, sin proveedor»; nunca inventes un precio. Toma costos conocidos del contexto; los unitPriceUSD explícitos del usuario reemplazan el costo por grupo en USD, convirtiendo DOP con exchangeRate. Preserva precio 0 explícito. No inventes costos de equipos o extras. Puedes modificar instalación USD/kWp o installationTotalUSD (mutuamente excluyentes; no dupliques el total en extras), recargo markupPct o margen sobre venta marginOnSalePct (mutuamente excluyentes), extras y descuentos por petición. customItems/customDiscounts son listas completas: conserva filas anteriores no modificadas (con su id y su hideInQuotation, que oculta el extra en la factura sin quitarlo del cobro); [] elimina explícitamente. Cada extra requiere cantidad, costo unitario, unidad, exonerateITBIS y applyMargin. Sin autorización fiscal no asumas exoneración de un nuevo extra. Descuento porcentual máximo100; fixed es USD. Si destino fiscal no está indicado usa general y pide revisar. Un porcentaje de utilidad ambiguo requiere unresolvedRequests. No copies specifications, validationIssues, selectedSupplierInfo ni currentDraft entero: sólo las claves del esquema; las calculadas las añade la app.
 Si no hay consumo observado y el usuario pide explícitamente una propuesta de autoconsumo con consumo teórico igual a producción, usa consumptionSource=theoretical y monthlyConsumptionKWh vacío: la app calculará los doce meses desde equipos, ubicación y pérdidas. No inventes consumos, ni deduzcas esta autorización sólo de tener paneles. Con consumo observado conserva sus datos. Si falta tarifa de energía puedes usar la referencia del catálogo para una distribuidora y código válidos, indicando aproximación/vigencia pendiente; pregunta si falta contexto para elegir código. Un nombre genérico de misma marca y especificación (Panel JA Solar630watts o HinaESS15.0kWh) puede seleccionar el modelo detallado más cercano: explica cuál, no lo llames alternativa salvo diferencia de serie, potencia, tensión o fase. No sustituyas códigos específicos.
 Hoja de costos: columnas unitarias USD tienen prioridad; no conviertas otra vez a USD. Lee dopExchangeRate del documento cuando exista. Distingue cantidades, precios unitarios y totales; si sólo hay total y cantidad válidos deriva costo unitario=total/cantidad, indicando la derivación. Una etiqueta porcentual puede contener un multiplicador: contrástalo con formato y totales y pregunta si no es claro. Un factor de venta f se convierte en markupPct=(f-1)*100; no es margen sobre venta. La tarifa de mano de obra/materiales en USD por kWp se registra como installationUnitPriceUSD; total y USD/kWp son excluyentes, no añadas el mismo costo a extras. ITBIS/subtotal/total/ganancia sólo en sourceTotals para conciliar; nunca como extras. Detecta purchase/sale/unknown y pregunta en assistantMessage si ambiguo. Conserva sourceTotals y condiciones previas hasta cambio explícito.
 Textos del PDF: project.documentTexts lista {key,label,text} de los textos impresos que el borrador puede cambiar (garantías de paneles, inversor, baterías y mano de obra, vigencia en días, nota legal y términos, servicios, alcance, párrafos, datos de la empresa). Si el usuario pide que el documento diga algo concreto (p. ej. «garantía de 12 años en paneles», «válida por 15 días»), devuelve documentTexts con la clave y el texto completo nuevo, conservando estilo y formato del texto actual y cambiando sólo lo pedido; text null restablece el predeterminado. documentTexts es la lista completa de cambios de texto del borrador: conserva los de currentDraft salvo cambio explícito; [] los descarta. No dupliques en documentTexts datos con campo propio (cliente, dirección, teléfono, correo, equipos, precios, consumos, tarifas) ni inventes condiciones no pedidas. Una entrada con truncated=true sólo muestra el inicio del texto: no la reescribas salvo petición explícita. Una entrada con dynamic=true no trae text porque se calcula con los datos de la propuesta nueva (cifras, equipos, cliente, tarifa, vigencia): no la incluyas salvo petición explícita y, si lo haces, usa marcadores como {clientName} o {validityDays} en lugar de cifras.
@@ -95,12 +99,16 @@ export function robustParseJson(raw: string): any {
   try { const parsed = JSON.parse(clean); if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error(); return parsed; }
   catch { throw new Error(PROPOSAL_INVALID_JSON); }
 }
-function priceFor(item: SolarEquipmentItem) {
-  const offers = (item.supplierPrices || []).filter(p => num(p.priceUSD) !== undefined && p.priceUSD > 0 && p.stockStatus !== 'out_of_stock');
-  return offers.find(p => p.id === item.preferredSupplierId) || offers.sort((a,b) => a.priceUSD-b.priceUSD)[0];
+/** Precio automático de un equipo: el resolvedor único (oferta preferida o la más barata utilizable → precio genérico → nada). */
+function priceFor(item: SolarEquipmentItem, genericPrices?: Record<string, GenericPriceInfo>) {
+  return resolveAutoPrice(item, genericPrices?.[item.id]);
 }
+/** Fuentes que la app recalcula en cada normalización: nunca se congelan como manuales. */
+const isAutomaticSource = (source: unknown) => source === 'supplier' || source === 'generic';
 /** Claves de contexto que cambian en cada ronda del chat; el resto describe el proyecto y es estable entre rondas. */
 const VARIABLE_CONTEXT_KEYS = new Set(['conversation', 'currentDraft', 'reviewNotes', 'tariffReference']);
+/** Contexto que solo usa la normalización y nunca va al modelo (el catálogo ya marca los precios genéricos). */
+const LOCAL_CONTEXT_KEYS = new Set(['genericPrices']);
 const GROUP_KEYS = Object.keys(groupSchema.items.properties);
 /** El borrador vigente con solo las claves del esquema (lo calculado lo añade la app): sin avisos, espejos ni datos de proveedor. */
 /** `catalogIds`: ids del catálogo de la petición; una fila con uno de ellos está resuelta aunque no traiga `catalogItemId`. */
@@ -113,7 +121,9 @@ export function draftForPrompt(draft: unknown, catalogIds?: ReadonlySet<string>)
     if (key === 'panels' || key === 'inverters' || key === 'batteries') {
       out[key] = Array.isArray(source[key]) ? source[key].map((group: any) => {
         const row: Record<string, unknown> = { equipmentId: group?.equipmentId ?? group?.id, quantity: group?.quantity ?? group?.count };
-        for (const field of GROUP_KEYS) if (!(field in row) && group?.[field] !== undefined) row[field] = group[field];
+        // Un grupo con precio genérico lo recalcula la app: no se reenvía su precio ni su fuente (el modelo los devolvería como manuales).
+        const generic = group?.priceSource === 'generic';
+        for (const field of GROUP_KEYS) if (!(field in row) && group?.[field] !== undefined && !(generic && (field === 'unitPriceUSD' || field === 'priceSource'))) row[field] = group[field];
         // Un grupo sin equipo del catálogo guarda lo pedido en brandModel (la normalización no lo deja en requestedModel).
         const id = group?.catalogItemId ?? group?.id ?? group?.equipmentId;
         const resolved = !!group?.catalogItemId || (!!catalogIds && typeof id === 'string' && catalogIds.has(id));
@@ -132,16 +142,17 @@ export function draftForPrompt(draft: unknown, catalogIds?: ReadonlySet<string>)
  * conversación, borrador vigente, avisos, cambio). Cada parte se serializa de forma determinista.
  */
 export function buildProposalRequest(payload: AIProposalPayload) {
+  const genericPrices = payload.context?.genericPrices;
   const catalog = (payload.equipmentCatalog || []).map(item => {
-    const price = priceFor(item);
+    const price = priceFor(item, genericPrices);
     return { id:item.id,type:item.type,brand:item.brand,model:item.displayName,powerW:item.powerW,powerKW:item.powerKW,capacityKWh:item.capacityKWh,
       category:item.category,voltageMPPT:item.voltageMPPT,batteryVoltageRange:item.batteryVoltageRange,voltageV:item.voltageV,maxPvPowerKW:item.maxPvPowerKW,
-      priceUSD:price?.priceUSD, supplier:price?.supplierName };
+      priceUSD:price?.priceUSD, supplier:price?.kind==='supplier'?price.offer.supplierName:undefined, ...(price?.kind==='generic'?{priceKind:'generic'}:{}) };
   });
   const files = payload.files ?? (payload.fileBase64 ? [{fileBase64:payload.fileBase64,mimeType:payload.mimeType || '',fileName:payload.fileName || 'Documento'}] : []);
   if (files.length > 4) throw new Error('Adjunta como máximo cuatro archivos por análisis.');
   const context: Record<string, any> = payload.context || {};
-  const project = Object.fromEntries(Object.entries(context).filter(([key]) => !VARIABLE_CONTEXT_KEYS.has(key)));
+  const project = Object.fromEntries(Object.entries(context).filter(([key]) => !VARIABLE_CONTEXT_KEYS.has(key) && !LOCAL_CONTEXT_KEYS.has(key)));
   const parts: any[] = [
     {text: JSON.stringify({ catalog, tariffReference: context.tariffReference })},
     {text: JSON.stringify({ project })},
@@ -203,16 +214,20 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
       const requestedMagnitude=num(row[type==='panel'?'requestedPowerW':type==='inverter'?'requestedPowerKW':'requestedCapacityKWh']);
       const magnitudeMismatch=requestedMagnitude!==undefined && !magnitudesMatch(type,requestedMagnitude,magnitude);
       if (magnitudeMismatch) issue(`requested_${type}_mismatch`,`${item.displayName} no coincide con la potencia/capacidad solicitada (${requestedMagnitude}). Confirma la elección o selecciona el modelo correcto.`);
-      const price = priceFor(item);
+      const price = priceFor(item, context.genericPrices);
+      const offer = price?.kind==='supplier' ? price.offer : undefined;
       const prior=(context.currentDraft as any)?.[key]?.find((g:any)=>(g.id || g.equipmentId)===item.id);
-      const contextual=context.equipmentPrices?.find(g=>g.id===item.id);
-      const manualPrice=row.priceSource==='supplier'?undefined:row.priceSource==='manual'?row.unitPriceUSD:row.unitPriceUSD!==undefined && row.priceSource!=='supplier' ? row.unitPriceUSD : prior?.priceSource==='manual'?prior.unitPriceUSD:contextual?.unitPriceUSD;
+      const contextual=context.equipmentPrices?.find(g=>g.id===item.id && (g.priceSource===undefined || g.priceSource==='manual'));
+      // Oferta y precio genérico son automáticos: se recalculan siempre (normalizar dos veces da lo mismo) y nunca se vuelven manuales.
+      const manualPrice=isAutomaticSource(row.priceSource)?undefined:row.priceSource==='manual'?row.unitPriceUSD:row.unitPriceUSD!==undefined ? row.unitPriceUSD : prior?.priceSource==='manual'?prior.unitPriceUSD:contextual?.unitPriceUSD;
       if(manualPrice!==undefined && num(manualPrice)===undefined)issue(`invalid_${type}_price`,`${item.displayName}: el costo debe ser finito y no negativo.`);
       const isManual=row.priceSource==='manual'||manualPrice!==undefined;
       const effectivePrice=isManual?manualPrice:price?.priceUSD;
-      const priceSource=isManual?'manual':'supplier';
+      const priceSource=isManual?'manual':price?.kind==='generic'?'generic':'supplier';
+      const genericPriceInfo=!isManual && price?.kind==='generic' ? {...price.generic} : undefined;
       if (effectivePrice===undefined) issue(`missing_${type}_price`,`${item.displayName} no tiene oferta disponible; revisa el coste antes de cotizar.`,'warning');
-      const supplier = price ? {supplierName:price.supplierName,priceUSD:price.priceUSD,updatedAt:price.updatedAt,supplierPriceId:price.id} : undefined;
+      if (genericPriceInfo) issue(`generic_${type}_price`,`${item.displayName}: precio genérico, sin proveedor (US$ ${genericPriceInfo.priceUSD.toFixed(2)}${genericPriceInfo.observedAt?` del ${genericPriceInfo.observedAt.slice(0,10)}`:''}). Confirma el costo antes de cotizar.`,'warning');
+      const supplier = offer ? {supplierName:offer.supplierName,priceUSD:offer.priceUSD,updatedAt:offer.updatedAt,supplierPriceId:offer.id} : undefined;
       const requestedKey=type==='panel'?'requestedPowerW':type==='inverter'?'requestedPowerKW':'requestedCapacityKWh';
       // Keep invalid duplicate rows separate so their constraints are not erased by another valid row.
       if(result.some(group=>group.id===id && (group.unitPriceUSD!==effectivePrice || group.priceSource!==priceSource)))issue('conflicting_group_prices',`${item.displayName}: un mismo modelo tiene costos distintos. Unifica el costo de sus grupos.`);
@@ -224,7 +239,7 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
         if (existing.count>100000) issue(`invalid_${type}_count`,`${item.displayName}: la cantidad total excede 100.000 unidades.`);
         continue;
       }
-      const common={id:item.id,catalogItemId:item.id,brandModel:item.displayName,count,...(requestedModel?{requestedModel}:{}),...(requestedMagnitude!==undefined?{[type==='panel'?'requestedPowerW':type==='inverter'?'requestedPowerKW':'requestedCapacityKWh']:requestedMagnitude}:{}),unitPriceUSD:effectivePrice,priceSource,weightKilos:item.weightKg,selectedSupplierInfo:supplier};
+      const common={id:item.id,catalogItemId:item.id,brandModel:item.displayName,count,...(requestedModel?{requestedModel}:{}),...(requestedMagnitude!==undefined?{[type==='panel'?'requestedPowerW':type==='inverter'?'requestedPowerKW':'requestedCapacityKWh']:requestedMagnitude}:{}),unitPriceUSD:effectivePrice,priceSource,...(genericPriceInfo?{genericPriceInfo}:{}),weightKilos:item.weightKg,selectedSupplierInfo:supplier};
       result.push(type==='panel'?{...common,powerW:item.powerW,efficiencyPct:item.efficiencyPct,tempCoeff:item.tempCoeff,annualDegradation:item.annualDegradation}
         :type==='inverter'?{...common,powerKW:item.powerKW,efficiencyPct:item.maxEfficiencyPct}
         :{...common,capacityKWh:item.capacityKWh,dodPct:item.dodPct,efficiencyPct:item.batteryEfficiencyPct});
