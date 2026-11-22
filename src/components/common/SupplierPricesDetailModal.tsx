@@ -22,6 +22,7 @@ import "./suppliers/suppliers.css";
 import "./suppliers/equipment-offers.css";
 import { confirmAction } from "./confirmAction";
 import { GenericPriceControl, GenericPriceSuggestion } from "./equipment/GenericPrice";
+import { PriceHistoryView } from "./equipment/PriceHistory";
 import { genericSuggestionFor, type GenericSuggestion } from "../../store/slices/equipmentPriceSlice";
 
 export function SupplierPricesDetailModal() {
@@ -51,6 +52,8 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
     useState<NonNullable<EquipmentSupplierPrice["stockStatus"]>>("in_stock");
   const [feedback, setFeedback] = useState("");
   const [suggestion, setSuggestion] = useState<GenericSuggestion | null>(null);
+  // Third body state (ADR 0006 §6): the history alternates with the list and the editor; it never opens another modal.
+  const [history, setHistory] = useState(false);
   const user = state.syncSettings.currentUser;
   const writable =
     !!item &&
@@ -123,7 +126,22 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
           <h2 id="equipment-offers-title">Ofertas de proveedores</h2>
           <p>{item?.displayName || "Equipo no disponible"}</p>
           <small>{item?.brand} · Precio de compra por unidad · USD</small>
-          {item && <GenericPriceControl item={item} />}
+          {item && (
+            <GenericPriceControl
+              item={item}
+              onHistory={
+                history
+                  ? undefined
+                  : async () => {
+                      if (!(await abandon())) return;
+                      setEditor(null);
+                      setFeedback("");
+                      setSuggestion(null);
+                      setHistory(true);
+                    }
+              }
+            />
+          )}
         </div>
         <button
           className="supplier-icon"
@@ -139,6 +157,8 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
             Este equipo ya no está en el catálogo. Cierra la ventana y revisa la
             lista actual.
           </p>
+        ) : history ? (
+          <PriceHistoryView item={item} onBack={() => setHistory(false)} />
         ) : editor ? (
           <form id="equipment-offer-form"
             onSubmit={(event) => {
