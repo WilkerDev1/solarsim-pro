@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useShallow } from 'zustand/react/shallow';
-import { currentGenericPrice, priceHistoryStats, type PriceObservationSource } from '../../../../shared/equipmentPrices';
+import { priceHistoryStats, type PriceObservationSource } from '../../../../shared/equipmentPrices';
 import { statsInput } from '../../../../shared/agentTools/priceHistory';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { canPriceEquipment, effectiveGenericPrice, priceFeatureActive } from '../../../store/slices/equipmentPriceSlice';
@@ -13,7 +13,11 @@ import { SyncService } from '../../../services/syncService';
 import {
   PRICE_KIND_LABELS,
   PRICE_SOURCE_LABELS,
+  applyFirstPage,
+  currentHistoryGenericId,
+  holdSettled,
   mergePriceHistory,
+  settledRows,
   voidHistoryRecord,
   type PriceHistoryRecord,
 } from '../../../features/equipmentPrices/priceHistory';
@@ -56,13 +60,13 @@ function rowStatus(row: PriceHistoryRecord, currentId: string | undefined): stri
   return row.pendingSync ? `${base} · pendiente de sincronizar` : base;
 }
 
-function PriceChart({ rows, now, dark }: { rows: PriceHistoryRecord[]; now: Date; dark: boolean }) {
+function PriceChart({ rows, currentId, now, dark }: { rows: PriceHistoryRecord[]; currentId: string | undefined; now: Date; dark: boolean }) {
   const live = rows.filter((row) => !row.voidedAt && !row.voidPending && row.priceUSD > 0 && Number.isFinite(Date.parse(row.observedAt)));
   if (!live.length) return null;
   const points: Record<string, number>[] = live
     .map((row) => ({ time: Date.parse(row.observedAt), [row.kind === 'generic' ? 'generic' : row.source]: row.priceUSD }))
     .sort((a, b) => a.time - b.time);
-  const current = currentGenericPrice(live);
+  const current = live.find((row) => row.kind === 'generic' && row.id === currentId);
   // The step keeps today's generic price to the right edge: it is the current value, not an invented one.
   if (current && now.getTime() > points[points.length - 1].time) points.push({ time: now.getTime(), generic: current.priceUSD });
   const sources = [...new Set(live.filter((row) => row.kind === 'observation').map((row) => row.source))];
@@ -98,10 +102,14 @@ function PriceChart({ rows, now, dark }: { rows: PriceHistoryRecord[]; now: Date
 
 export interface PriceHistoryContentProps {
   rows: PriceHistoryRecord[];
+  /** Genérico vigente (la vista pasa el de `effectiveGenericPrice`, como la cabecera). */
+  currentId?: string;
   status: PriceHistoryStatus;
   message?: string;
   hasMore: boolean;
   loadingMore?: boolean;
+  /** Fallo de «Cargar más»: se muestra junto al botón, que sigue disponible. */
+  loadMoreError?: string;
   canVoid: boolean;
   onVoid: (row: PriceHistoryRecord) => void;
   onLoadMore: () => void;
@@ -110,9 +118,12 @@ export interface PriceHistoryContentProps {
 }
 
 /** Contenido de la vista (sin efectos): gráfico, variación, resumen por mes del año y tabla de registros. */
-export function PriceHistoryContent({ rows, status, message, hasMore, loadingMore = false, canVoid, onVoid, onLoadMore, now = new Date(), dark = false }: PriceHistoryContentProps) {
+export function PriceHistoryContent({ rows, currentId: currentIdProp, status, message, hasMore, loadingMore = false, loadMoreError, canVoid, onVoid, onLoadMore, now = new Date(), dark = false }: PriceHistoryContentProps) {
   const stats = priceHistoryStats(statsInput(rows), now);
-  const currentId = currentGenericPrice(rows.filter((row) => !row.voidPending))?.id;
+  const fallbackId = currentHistoryGenericId(rows);
+  const currentId = currentIdProp && rows.some((row) => row.id === currentIdProp && !row.voidedAt && !row.voidPending) ? currentIdProp : fallbackId;
+  // With older pages still on the server, figures cover only the loaded records: say so, never claim a start date.
+  const partial = hasMore ? ' (registros cargados)' : '';
   const note =
     status === 'loading' ? 'Cargando historial…'
       : status === 'offline' ? 'Sin conexión con el servidor: solo se muestra lo pendiente de sincronizar.'
@@ -127,10 +138,14 @@ export function PriceHistoryContent({ rows, status, message, hasMore, loadingMor
       )}
       {rows.length > 0 && (
         <>
-          {stats.firstObservedAt && <p className="offers-history-note">El historial empieza el {formatGenericDate(stats.firstObservedAt)}.</p>}
-          <PriceChart rows={rows} now={now} dark={dark} />
+          {stats.firstObservedAt && (
+            <p className="offers-history-note">
+              {hasMore ? `Registros cargados desde ${formatGenericDate(stats.firstObservedAt)}.` : `El historial empieza el ${formatGenericDate(stats.firstObservedAt)}.`}
+            </p>
+          )}
+          <PriceChart rows={rows} currentId={currentId} now={now} dark={dark} />
           <p className="offers-history-change">
-            <span className="offers-history-label">Variación del promedio mensual</span>
+            <span className="offers-history-label">Variación del promedio mensual{partial}</span>
             {([['3 meses', stats.change.m3], ['6 meses', stats.change.m6], ['12 meses', stats.change.m12]] as const).map(([label, value]) => (
               <span key={label} className="offers-history-change-item">
                 <span>{label}</span> <strong className="offers-history-num">{formatChange(value)}</strong>
@@ -139,7 +154,7 @@ export function PriceHistoryContent({ rows, status, message, hasMore, loadingMor
           </p>
           <div className="offers-history-scroll">
             <table data-history-months>
-              <caption>Por mes del año (todos los años): precios vistos con importe mayor que cero</caption>
+              <caption>Por mes del año (todos los años): precios vistos con importe mayor que cero{partial}</caption>
               <thead>
                 <tr><th scope="col">Mes</th><th scope="col">Promedio</th><th scope="col">Mínimo</th><th scope="col">Máximo</th><th scope="col">Registros</th></tr>
               </thead>
@@ -202,9 +217,14 @@ export function PriceHistoryContent({ rows, status, message, hasMore, loadingMor
         </>
       )}
       {hasMore && (
-        <button type="button" className="supplier-button offers-history-more" disabled={loadingMore} onClick={onLoadMore}>
-          {loadingMore ? 'Cargando…' : 'Cargar más'}
-        </button>
+        <div className="offers-history-more-row">
+          <button type="button" className="supplier-button offers-history-more" disabled={loadingMore} onClick={onLoadMore}>
+            {loadingMore ? 'Cargando…' : 'Cargar más'}
+          </button>
+          {loadMoreError && !loadingMore && (
+            <span className="offers-history-note" role="status">No se pudieron cargar más registros: {loadMoreError}</span>
+          )}
+        </div>
       )}
     </div>
   );
@@ -212,9 +232,9 @@ export function PriceHistoryContent({ rows, status, message, hasMore, loadingMor
 
 /** Contenedor: carga bajo demanda, fusión con lo pendiente y anulación con confirmación (solo escritores). */
 export function PriceHistoryView({ item, onBack }: { item: SolarEquipmentItem; onBack: () => void }) {
-  const { active, serverUrl, authToken, pricePending, syncSettings, projects, dark, canVoid } = useSimulationStore(
+  const { active, serverUrl, authToken, pricePending, genericPrices, syncSettings, projects, dark, canVoid } = useSimulationStore(
     useShallow((s) => ({
-      active: priceFeatureActive(s), serverUrl: s.syncSettings.serverUrl, authToken: s.syncSettings.authToken, pricePending: s.pricePending,
+      active: priceFeatureActive(s), serverUrl: s.syncSettings.serverUrl, authToken: s.syncSettings.authToken, pricePending: s.pricePending, genericPrices: s.genericPrices,
       syncSettings: s.syncSettings, projects: s.projects, dark: s.sidebarTheme === 'dark', canVoid: canPriceEquipment(s, item),
     })),
   );
@@ -223,6 +243,10 @@ export function PriceHistoryView({ item, onBack }: { item: SolarEquipmentItem; o
   const [message, setMessage] = useState<string | undefined>();
   const [nextBefore, setNextBefore] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | undefined>();
+  // Rows that left the pending queue while the view is open: held as they were until the server page confirms them.
+  const [held, setHeld] = useState<PriceHistoryRecord[]>([]);
+  const previousRows = useRef<PriceHistoryRecord[]>([]);
   const mounted = useRef(true);
   useEffect(() => () => { mounted.current = false; }, []);
 
@@ -231,12 +255,17 @@ export function PriceHistoryView({ item, onBack }: { item: SolarEquipmentItem; o
       setStatus('offline');
       return;
     }
-    if (before !== null) setLoadingMore(true);
+    if (before !== null) {
+      setLoadingMore(true);
+      setLoadMoreError(undefined);
+    }
     const result = await SyncService.fetchPriceHistory(serverUrl, authToken, item.id, { limit: PAGE_SIZE, before });
     if (!mounted.current) return;
     setLoadingMore(false);
     if (result.status === 'unsupported') return setStatus('unsupported');
     if (result.status === 'error') {
+      // A failed «Cargar más» keeps the loaded rows and the button, so the user can retry.
+      if (before !== null) return setLoadMoreError(result.error || 'error de conexión');
       setMessage(result.error);
       return setStatus('error');
     }
@@ -253,9 +282,32 @@ export function PriceHistoryView({ item, onBack }: { item: SolarEquipmentItem; o
     void load(null);
   }, [load]);
 
+  // Refetch the first page (older loaded pages stay) once queued rows of this equipment are acknowledged.
+  const refresh = useCallback(async (settling: PriceHistoryRecord[]) => {
+    const ids = new Set(settling.map((row) => row.id));
+    const release = () => setHeld((rows) => rows.filter((row) => !ids.has(row.id)));
+    if (!authToken) return release();
+    const result = await SyncService.fetchPriceHistory(serverUrl, authToken, item.id, { limit: PAGE_SIZE, before: null });
+    if (!mounted.current) return;
+    if (result.status !== 'ok') return; // unconfirmed: the held rows keep saying «pendiente de sincronizar»
+    setServer((rows) => applyFirstPage(rows, result.observations));
+    release();
+  }, [authToken, serverUrl, item.id]);
+
+  const merged = active ? mergePriceHistory(server, { syncSettings, pricePending }, item.id) : [];
+  const flaggedKey = merged.filter((row) => row.pendingSync || row.voidPending).map((row) => `${row.id}:${row.pendingSync ? 'p' : 'v'}`).join(',');
+  useEffect(() => {
+    const settling = settledRows(previousRows.current, merged);
+    previousRows.current = merged.filter((row) => row.pendingSync || row.voidPending);
+    if (!settling.length) return;
+    setHeld((rows) => [...rows.filter((row) => !settling.some((s) => s.id === row.id)), ...settling]);
+    void refresh(settling);
+    // merged is derived from the keyed inputs; the key captures every change that matters here.
+  }, [flaggedKey, refresh]);
+
   if (!active) return null;
   // Pending proposal records carry no server-resolved name yet: take it from the local proposal while it exists.
-  const rows = mergePriceHistory(server, { syncSettings, pricePending }, item.id).map((row) => {
+  const rows = holdSettled(merged, held).map((row) => {
     if (!row.pendingSync || !row.projectId) return row;
     const project = projects.find((p) => p.id === row.projectId && !p.isDeleted);
     return project ? { ...row, projectName: project.client.name, projectCode: project.client.projectId } : { ...row, projectName: null, projectCode: null };
@@ -272,6 +324,7 @@ export function PriceHistoryView({ item, onBack }: { item: SolarEquipmentItem; o
     });
     if (confirmed) voidHistoryRecord(item.id, row.id, rows);
   };
+  const currentId = effectiveGenericPrice({ syncSettings, genericPrices, pricePending }, item.id)?.observationId;
   return (
     <section aria-labelledby="price-history-title">
       <button type="button" className="offers-back" onClick={onBack}>
@@ -280,7 +333,7 @@ export function PriceHistoryView({ item, onBack }: { item: SolarEquipmentItem; o
       </button>
       <h3 id="price-history-title">Historial de precios</h3>
       <PriceHistoryContent
-        rows={rows} status={status} message={message} hasMore={status === 'ready' && nextBefore !== null} loadingMore={loadingMore}
+        rows={rows} currentId={currentId} status={status} message={message} hasMore={status === 'ready' && nextBefore !== null} loadingMore={loadingMore} loadMoreError={loadMoreError}
         canVoid={canVoid} onVoid={(row) => void voidRow(row)} onLoadMore={() => void load(nextBefore)} dark={dark}
       />
     </section>

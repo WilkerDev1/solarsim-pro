@@ -69,3 +69,46 @@ export function voidHistoryRecord(equipmentId: string, id: string, rows: readonl
   if (previous) useSimulationStore.setState((s) => ({ genericPrices: { ...s.genericPrices, [equipmentId]: previous } }));
   return true;
 }
+
+/**
+ * Registros que salieron de la cola entre dos fusiones: un pendiente que ya no está como pendiente o una anulación en
+ * cola que ya no lo está. La vista los mantiene como estaban (`holdSettled`) y vuelve a pedir la primera página: la
+ * cola también suelta lo rechazado, así que solo el servidor dice si la anulación o el registro quedaron.
+ */
+export function settledRows(previous: readonly PriceHistoryRecord[], next: readonly PriceHistoryRecord[]): PriceHistoryRecord[] {
+  const now = new Map(next.map((row) => [row.id, row]));
+  return previous.filter((row) => {
+    const current = now.get(row.id);
+    if (row.pendingSync) return !current?.pendingSync;
+    if (row.voidPending) return !current?.voidPending && !current?.voidedAt;
+    return false;
+  });
+}
+
+/** Mantiene lo que se está confirmando como estaba hasta que llegue la página del servidor. */
+export function holdSettled(rows: readonly PriceHistoryRecord[], held: readonly PriceHistoryRecord[]): PriceHistoryRecord[] {
+  if (!held.length) return [...rows];
+  const present = new Set(rows.map((row) => row.id));
+  const voiding = new Set(held.filter((row) => row.voidPending).map((row) => row.id));
+  const restored = held.filter((row) => row.pendingSync && !present.has(row.id));
+  return [...restored, ...rows].map((row) => (voiding.has(row.id) && !row.voidedAt && !row.voidPending ? { ...row, voidPending: true } : row));
+}
+
+/** Sustituye en la instantánea lo que trae una primera página nueva; las páginas más antiguas ya cargadas se quedan. */
+export function applyFirstPage(snapshot: readonly PriceHistoryRecord[], page: readonly PriceHistoryRecord[]): PriceHistoryRecord[] {
+  const fresh = new Set(page.map((row) => row.id));
+  return [...page, ...snapshot.filter((row) => !fresh.has(row.id))];
+}
+
+/**
+ * Genérico vigente entre filas fusionadas (más recientes primero): el primer `generic` pendiente vivo (el más reciente,
+ * como `effectiveGenericPrice`) y, si no hay, el del servidor no anulado con mayor `seq`.
+ */
+export function currentHistoryGenericId(rows: readonly PriceHistoryRecord[]): string | undefined {
+  const live = rows.filter((row) => row.kind === 'generic' && !row.voidedAt && !row.voidPending);
+  const pending = live.find((row) => row.seq === undefined || row.seq === null);
+  if (pending) return pending.id;
+  let best: PriceHistoryRecord | undefined;
+  for (const row of live) if (!best || (best.seq as number) < (row.seq as number)) best = row;
+  return best?.id;
+}

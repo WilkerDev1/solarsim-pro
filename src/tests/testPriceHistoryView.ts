@@ -10,7 +10,7 @@ import type { SolarEquipmentItem } from '../types/equipment';
 registerHooks({ load: (url, context, next) => (url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context)) });
 const { useSimulationStore } = await import('../store/useSimulationStore');
 const { effectiveGenericPrice } = await import('../store/slices/equipmentPriceSlice');
-const { mergePriceHistory, previousGenericPrice, voidHistoryRecord, PRICE_SOURCE_LABELS } = await import('../features/equipmentPrices/priceHistory');
+const { mergePriceHistory, previousGenericPrice, voidHistoryRecord, PRICE_SOURCE_LABELS, settledRows, holdSettled, applyFirstPage, currentHistoryGenericId } = await import('../features/equipmentPrices/priceHistory');
 const { PriceHistoryContent } = await import('../components/common/equipment/PriceHistory');
 
 const serverUrl = 'https://history.invalid';
@@ -122,6 +122,78 @@ assert.equal(effectiveGenericPrice(useSimulationStore.getState(), panel.id)?.pri
 // LECTOR no anula.
 useSimulationStore.getState().setSyncSettings(session({ ...editor, role: 'LECTOR' }));
 assert.equal(voidHistoryRecord(panel.id, id(6), fresh), false);
+
+// --- Revisión: la cola se vacía con la vista abierta (anulación y registro aceptados por el servidor).
+useSimulationStore.getState().setSyncSettings(session());
+const queued = {
+  observations: [{ id: id(60), equipmentId: panel.id, kind: 'observation' as const, priceUSD: 140, source: 'manual' as const, observedAt: '2026-11-20T12:00:00.000Z', scope, userId: 'ana' }],
+  voids: [{ id: id(6), scope, userId: 'ana' }],
+};
+useSimulationStore.setState({ pricePending: queued });
+const before = mergePriceHistory(server, useSimulationStore.getState(), panel.id);
+assert.equal(before.find((row) => row.id === id(6))?.voidPending, true);
+useSimulationStore.setState({ pricePending: { observations: [], voids: [] } }); // the sync acknowledged both
+const after = mergePriceHistory(server, useSimulationStore.getState(), panel.id);
+const settled = settledRows(before, after);
+assert.deepEqual(settled.map((row) => row.id).sort(), [id(6), id(60)].sort(), 'rows that left the queue are detected');
+const held = holdSettled(after, settled);
+assert.equal(held.find((row) => row.id === id(6))?.voidPending, true, 'a void being confirmed never flips back to «Activo»');
+assert.equal(held.find((row) => row.id === id(60))?.pendingSync, true, 'an acknowledged pending record does not vanish');
+assert.doesNotMatch(
+  renderToStaticMarkup(React.createElement(PriceHistoryContent, { rows: held, status: 'ready', hasMore: false, canVoid: true, onVoid: () => {}, onLoadMore: () => {} })),
+  /aria-label="Anular registro de US\$\s?120/,
+  'no «Anular» link on the void being confirmed',
+);
+// The view then refetches the first page: server truth replaces the snapshot rows, older pages stay.
+const older = record(0, { priceUSD: 80, observedAt: '2025-12-01T12:00:00.000Z' });
+const snapshot = [...server, older];
+const page = [record(60, { priceUSD: 140, source: 'manual', observedAt: '2026-11-20T12:00:00.000Z' }), ...server.map((row) => (row.id === id(6) ? { ...row, voidedAt: '2026-11-21T10:00:00.000Z' } : row))];
+const refreshed = applyFirstPage(snapshot, page);
+assert.equal(refreshed[0].id, id(60), 'the acknowledged record arrives from the server');
+assert.ok(refreshed.find((row) => row.id === id(6))?.voidedAt, 'the void is confirmed by the server');
+assert.equal(refreshed[refreshed.length - 1].id, older.id, 'older loaded pages are kept');
+assert.equal(new Set(refreshed.map((row) => row.id)).size, refreshed.length, 'no duplicates');
+assert.deepEqual(settledRows(after, after), [], 'nothing settles when the queue does not change');
+
+// --- Revisión: con dos genéricos pendientes, el vigente es el más reciente (como la cabecera).
+const twoPending = {
+  observations: [
+    { id: id(70), equipmentId: panel.id, kind: 'generic' as const, priceUSD: 150, source: 'manual' as const, observedAt: '2026-11-20T10:00:00.000Z', scope, userId: 'ana' },
+    { id: id(71), equipmentId: panel.id, kind: 'generic' as const, priceUSD: 160, source: 'manual' as const, observedAt: '2026-11-20T11:00:00.000Z', scope, userId: 'ana' },
+  ],
+  voids: [],
+};
+useSimulationStore.setState({ pricePending: twoPending });
+const pendingRows = mergePriceHistory(server, useSimulationStore.getState(), panel.id);
+assert.equal(effectiveGenericPrice(useSimulationStore.getState(), panel.id)?.observationId, id(71));
+assert.equal(currentHistoryGenericId(pendingRows), id(71), 'the newest pending generic is the current one');
+const twoHtml = renderToStaticMarkup(React.createElement(PriceHistoryContent, {
+  rows: pendingRows, status: 'ready', hasMore: false, canVoid: false, onVoid: () => {}, onLoadMore: () => {}, now: new Date('2026-11-21T12:00:00.000Z'),
+}));
+const statusOf = (price: string) => twoHtml.slice(twoHtml.indexOf('data-history-records')).split('<tr').find((row) => new RegExp(`US\\$\\s?${price}[.,]00`).test(row)) ?? '';
+assert.match(statusOf('160'), /Genérico vigente/);
+assert.doesNotMatch(statusOf('150'), /Genérico vigente/);
+assert.match(twoHtml, /precio genérico vigente US\$\s?160/, 'the chart summary uses the newest pending generic');
+// An explicit currentId (the view passes effectiveGenericPrice) wins.
+const explicit = renderToStaticMarkup(React.createElement(PriceHistoryContent, {
+  rows: pendingRows, currentId: id(70), status: 'ready', hasMore: false, canVoid: false, onVoid: () => {}, onLoadMore: () => {}, now: new Date('2026-11-21T12:00:00.000Z'),
+}));
+assert.match(explicit, /precio genérico vigente US\$\s?150/);
+useSimulationStore.setState({ pricePending: { observations: [], voids: [] } });
+
+// --- Revisión: con páginas sin cargar no se afirma el inicio del historial.
+const partial = render(true, { hasMore: true });
+assert.doesNotMatch(partial, /El historial empieza/, 'no start date while older pages exist');
+assert.match(partial, /Registros cargados desde \d/);
+assert.match(partial, /Variación del promedio mensual \(registros cargados\)/);
+assert.match(partial, /<caption>[^<]*\(registros cargados\)<\/caption>/);
+assert.doesNotMatch(html, /registros cargados/, 'complete history: no partial captions');
+
+// --- Revisión: un fallo de «Cargar más» se muestra junto al botón, que sigue disponible para reintentar.
+const retry = render(true, { hasMore: true, loadMoreError: 'Tiempo agotado' });
+assert.match(retry, />Cargar más</);
+assert.match(retry, /No se pudieron cargar más registros: Tiempo agotado/);
+assert.doesNotMatch(retry, /No se pudo cargar el historial/, 'the loaded rows are not replaced by a page-level error');
 
 // --- Botón «Historial» en la cabecera del modal: con sesión (también LECTOR), nunca sin sesión.
 const { SupplierPricesDetailModal } = await import('../components/common/SupplierPricesDetailModal');

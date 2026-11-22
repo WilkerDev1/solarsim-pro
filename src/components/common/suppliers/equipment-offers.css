@@ -217,4 +217,4 @@
 .offers-history td small {display:block;color:var(--sp-muted);font-size:12px;margin-top:2px;}
 .offers-history [data-history-months] td {font-variant-numeric:tabular-nums;}
 .offers-history tr[data-voided="true"] td {color:var(--sp-muted);}
-.offers-history-more {justify-self:start;}
+.offers-history-more-row {display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;}
