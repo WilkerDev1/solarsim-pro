@@ -54,7 +54,14 @@ export interface AgentActivityEntry {
    * `fields` lists them so absent values survive JSON persistence.
    * `trash`: the agent created the proposal, so undo moves it to the trash. `restore`: the agent trashed it, undo restores it.
    */
-  undo?: { op?: 'fields' | 'trash' | 'restore'; before: Record<string, unknown>; fields?: string[]; afterFingerprint: string };
+  undo?: {
+    op?: 'fields' | 'trash' | 'restore';
+    before: Record<string, unknown>;
+    fields?: string[];
+    afterFingerprint: string;
+    /** Registros de precio (ADR 0006) que creó el cambio: deshacer los anula. */
+    priceObservationIds?: string[];
+  };
 }
 
 export type PendingAgentActionStatus = 'pending' | 'applied' | 'rejected' | 'expired' | 'failed';
