@@ -28,7 +28,7 @@ const DISTRIBUTORS = ['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'];
 const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
   {
     name: 'create_proposal', title: 'Crear propuesta', kind: 'draft', category: 'proposals', card: 'proposal', surfaces: [...ALL],
-    description: 'Crea una propuesta nueva en modo Simple (Catálogo IA): equipos reales del catálogo con precio de la oferta preferida o la más barata disponible. Indica doce consumos mensuales o un promedio. No abre la propuesta; usa open_proposal si el usuario quiere verla.',
+    description: 'Crea una propuesta nueva en modo Simple (Catálogo IA): equipos reales del catálogo con precio de la oferta preferida o la más barata disponible; sin oferta, el precio genérico del catálogo (avisado como precio genérico, sin proveedor); sin ninguno queda sin precio, nunca inventado. Indica doce consumos mensuales o un promedio. No abre la propuesta; usa open_proposal si el usuario quiere verla.',
     inputSchema: object({
       clientName: { type: 'string', minLength: 1, maxLength: 200 },
       company: { type: 'string', maxLength: 200 },

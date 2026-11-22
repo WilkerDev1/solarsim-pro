@@ -109,6 +109,22 @@ export function effectiveGenericPrice(
   return server && !voided.has(server.observationId) ? server : null;
 }
 
+/**
+ * Mapa de precios genéricos efectivos de los equipos del catálogo (contexto de las propuestas automáticas). Vacío sin
+ * sesión: en modo local la función está apagada.
+ */
+export function effectiveGenericPriceMap(
+  state: Pick<SimulationStore, 'syncSettings' | 'genericPrices' | 'pricePending'> & { equipmentCatalog: readonly { id: string }[] },
+): Record<string, GenericPriceInfo> {
+  if (!priceFeatureActive(state)) return {};
+  const map: Record<string, GenericPriceInfo> = {};
+  for (const item of state.equipmentCatalog) {
+    const generic = effectiveGenericPrice(state, item.id);
+    if (generic) map[item.id] = generic;
+  }
+  return map;
+}
+
 /** Regla 1: qué ofrecer tras guardar ofertas. Toma la más baja de las registradas (un solo equipo) y la compara con el genérico. */
 export interface GenericSuggestion {
   equipmentId: string;
