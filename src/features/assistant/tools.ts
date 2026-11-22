@@ -16,6 +16,7 @@ import { preserveHiddenInQuotation } from '../../../shared/quotationItems';
 import type { CustomQuotationItem } from '../../types';
 import type { SolarEquipmentItem } from '../../types/equipment';
 import { searchEquipmentByRequest } from '../../../shared/equipmentMatch';
+import { effectiveGenericPrice } from '../../store/slices/equipmentPriceSlice';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
 import { resolveGridConnection } from '../../../shared/gridConnection';
@@ -152,6 +153,7 @@ export function executeAssistantTool(
           name: e.displayName,
           brand: e.brand,
           offers: e.supplierPrices,
+          genericPriceUSD: effectiveGenericPrice(s, e.id)?.priceUSD ?? null,
           stockNote: !e.supplierPrices?.length
             ? 'Sin ofertas; disponibilidad desconocida'
             : undefined,
@@ -170,8 +172,15 @@ export function executeAssistantTool(
   if (name === 'get_equipment') {
     const e = visibleAssistantEquipment().find((e) => e.id === args.id);
     if (!e) throw new Error('Equipo no disponible en este espacio.');
+    const generic = effectiveGenericPrice(s, e.id);
     return {
-      data: { ...e, datasheetUrl: undefined, syncServerUrl: undefined },
+      data: {
+        ...e,
+        datasheetUrl: undefined,
+        syncServerUrl: undefined,
+        genericPriceUSD: generic?.priceUSD ?? null,
+        genericPriceObservedAt: generic?.observedAt ?? null,
+      },
       cards: [
         { kind: 'equipment', id: e.id, title: e.displayName, detail: e.brand },
       ],
