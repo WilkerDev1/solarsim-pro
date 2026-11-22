@@ -145,16 +145,16 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2 space-y-0.5">
               <div className="flex justify-between text-slate-700 text-[10.5px]">
                 <span><EditableText k="costMatrix.summary.costPerKilo" /></span>
-                <span>
-                  {costMatrixPerCapacity(summary.costMatrix, 'cost').dop} &nbsp;|&nbsp;{' '}
-                  <strong className="text-slate-900">{costMatrixPerCapacity(summary.costMatrix, 'cost').usd}</strong>
+                <span className="text-right leading-tight">
+                  <span className="block whitespace-nowrap">{costMatrixPerCapacity(summary.costMatrix, 'cost').perKWp}</span>
+                  <strong className="block whitespace-nowrap text-slate-900">{costMatrixPerCapacity(summary.costMatrix, 'cost').perW}</strong>
                 </span>
               </div>
               <div className="flex justify-between text-slate-900 font-bold text-[10.5px]">
                 <span><EditableText k="costMatrix.summary.salesPerKilo" /></span>
-                <span>
-                  {costMatrixPerCapacity(summary.costMatrix, 'sale').dop} &nbsp;|&nbsp;{' '}
-                  <strong className="text-emerald-800">{costMatrixPerCapacity(summary.costMatrix, 'sale').usd}</strong>
+                <span className="text-right leading-tight">
+                  <span className="block whitespace-nowrap">{costMatrixPerCapacity(summary.costMatrix, 'sale').perKWp}</span>
+                  <strong className="block whitespace-nowrap text-emerald-800">{costMatrixPerCapacity(summary.costMatrix, 'sale').perW}</strong>
                 </span>
               </div>
               <div className="flex justify-between items-center text-amber-950 font-bold bg-amber-100/70 border border-amber-300/80 px-2 py-0.5 rounded text-[10px]">

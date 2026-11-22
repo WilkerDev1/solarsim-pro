@@ -7,6 +7,9 @@ import type { CostMatrixSummary } from '../../../types';
 export interface PerCapacityText {
   dop: string;
   usd: string;
+  /** Formato compacto en dos líneas (página 5 del PDF, columna de ~370 px): kWp y W, cada una en RD$ y USD. */
+  perKWp: string;
+  perW: string;
 }
 
 const money = (value: number, locale: string) => value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -21,5 +24,7 @@ export function costMatrixPerCapacity(matrix: CostMatrixSummary, kind: 'cost' | 
   return {
     dop: `RD$ ${money(dopPerKWp, 'es-DO')} /kWp (RD$ ${money(dopPerW, 'es-DO')} /W)`,
     usd: `$${money(usdPerKWp, 'en-US')} USD/kWp ($${usdPerW.toFixed(2)} USD/W)`,
+    perKWp: `RD$ ${money(dopPerKWp, 'es-DO')} | $${money(usdPerKWp, 'en-US')} /kWp`,
+    perW: `RD$ ${money(dopPerW, 'es-DO')} | $${usdPerW.toFixed(2)} /W`,
   };
 }

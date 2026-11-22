@@ -77,8 +77,11 @@ const summary = (specs = specsFor(), customItems: CustomQuotationItem[] = []) =>
 
   const withExtras = summary(direct, extras).costMatrix;
   assert.ok(withExtras.totalNetoUSD > plain.totalNetoUSD, 'el costo total incluye los extras');
-  close(withExtras.gananciaUSD, withExtras.porcentajeVentaUSD - withExtras.totalNetoUSD, 'con extras: venta − costo total (antes restaba solo el del sistema base)');
-  close(withExtras.markupOnCostPct ?? 0, Math.round((withExtras.gananciaUSD / withExtras.totalNetoUSD) * 10000) / 100, 'markup sobre el costo total', 0.02);
+  // Venta antes de ITBIS contra el costo de todo lo vendido sin el ITBIS de los extras no exonerados (se cobra aparte).
+  const soldCost = withExtras.totalNetoUSD - (withExtras.customItemsItbisUSD ?? 0);
+  assert.ok((withExtras.customItemsItbisUSD ?? 0) > 0, 'el flete no exonerado lleva ITBIS');
+  close(withExtras.gananciaUSD, withExtras.porcentajeVentaUSD - soldCost, 'con extras: venta − costo vendido (antes restaba solo el del sistema base)');
+  close(withExtras.markupOnCostPct ?? 0, Math.round((withExtras.gananciaUSD / soldCost) * 10000) / 100, 'markup sobre el costo vendido', 0.02);
   close(withExtras.marginOnSalePct ?? 0, Math.round((withExtras.gananciaUSD / withExtras.porcentajeVentaUSD) * 10000) / 100, 'margen sobre la venta', 0.02);
 
   // Las filas de venta por kWp y por W de la matriz usan la misma venta (subtotal comercial antes de ITBIS).
@@ -102,6 +105,35 @@ const summary = (specs = specsFor(), customItems: CustomQuotationItem[] = []) =>
   const old = { ...m, costPerWattDOP: undefined, salePerWattUSD: undefined, salePerWattDOP: undefined } as unknown as CostMatrixSummary;
   assert.equal(costMatrixPerCapacity(old, 'sale').dop, sale.dop);
   assert.equal(costMatrixPerCapacity(old, 'cost').dop, cost.dop);
+}
+
+// 5. Directo $/W: un extra no exonerado sin margen (se cobra al costo más su ITBIS) no da pérdida; con margen gana lo mismo
+// que uno exonerado (el ITBIS se cobra aparte al cliente).
+{
+  const direct = specsFor({ pricingMode: 'direct_watt', pricePerWattUSD: 1.3 });
+  const base = summary(direct).costMatrix.gananciaUSD;
+  const gain = (item: Partial<CustomQuotationItem>) => summary(direct, [{ id: 'x', description: 'Extra', quantity: 1, unitPriceUSD: 1000, ...item } as CustomQuotationItem]).costMatrix.gananciaUSD - base;
+  close(gain({ exonerateITBIS: false, applyMargin: false }), 0, 'no exonerado al costo: sin pérdida', 0.02);
+  close(gain({ exonerateITBIS: true, applyMargin: false }), 0, 'exonerado al costo: sin ganancia', 0.02);
+  close(gain({ exonerateITBIS: false, applyMargin: true }), 400, 'no exonerado con margen ×1.4: +400', 0.02);
+  close(gain({ exonerateITBIS: true, applyMargin: true }), 400, 'exonerado con margen ×1.4: +400', 0.02);
+}
+
+// 6. Sin paneles en modo matriz el precio por W de la propuesta es 0, no un $/W inventado.
+{
+  const bessOnly = summary(specsFor({ panelCount: 0 }));
+  assert.equal(bessOnly.salePricePerWattUSD, 0, 'sin potencia: sin precio por W');
+  assert.equal(bessOnly.salePricePerKWpUSD, 0, 'sin potencia: sin precio por kWp');
+  const directNoPanels = summary(specsFor({ panelCount: 0, pricingMode: 'direct_watt', pricePerWattUSD: 1.3 }));
+  assert.equal(directNoPanels.salePricePerWattUSD, 1.3, 'Directo $/W sin potencia: el precio tecleado');
+}
+
+// 7. Formato compacto del PDF: dos líneas cortas (kWp y W).
+{
+  const text = costMatrixPerCapacity(summary().costMatrix, 'sale');
+  assert.match(text.perKWp, /^RD\$ [\d.,]+ \| \$[\d,]+\.\d{2} \/kWp$/);
+  assert.match(text.perW, /^RD\$ [\d.,]+ \| \$\d+\.\d{2} \/W$/);
+  assert.ok(text.perKWp.length <= 40 && text.perW.length <= 30, `caben en la columna del PDF: ${text.perKWp} / ${text.perW}`);
 }
 
 console.log('testCostMatrixPerCapacity: OK');

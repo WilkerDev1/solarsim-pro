@@ -469,6 +469,7 @@ export function calculateFinancialSummary(
 
   // Synchronize Cost Matrix with Direct Price in direct_watt mode
   if (isDirectWatt) {
+    const soldCostUSD = Math.round((costMatrix.totalNetoUSD - (costMatrix.customItemsItbisUSD || 0)) * 100) / 100;
     costMatrix.listPorcentajeVentaUSD = listGrossInvestmentUSD;
     costMatrix.listPorcentajeVentaDOP = Math.round(listGrossInvestmentUSD * costMatrix.dopExchangeRate * 100) / 100;
     costMatrix.totalDiscountUSD = totalDiscountUSD;
@@ -481,11 +482,12 @@ export function calculateFinancialSummary(
 
       costMatrix.porcentajeVentaUSD = commercialPreTaxSubtotalUSD;
       costMatrix.porcentajeVentaDOP = Math.round(commercialPreTaxSubtotalUSD * costMatrix.dopExchangeRate * 100) / 100;
-      // Ganancia sobre el costo de todo lo vendido (sistema base e ítems adicionales), como en el modo matriz.
-      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - costMatrix.totalNetoUSD) * 100) / 100;
+      // Ganancia sobre el costo de todo lo vendido (sistema base e ítems adicionales). La venta es antes de ITBIS (el de
+      // los extras no exonerados se cobra aparte al cliente), así que el costo tampoco lleva el ITBIS de esos extras.
+      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - soldCostUSD) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.marginOnSalePct = commercialPreTaxSubtotalUSD > 0 ? Math.round((costMatrix.gananciaUSD / commercialPreTaxSubtotalUSD) * 10000) / 100 : 0;
-      costMatrix.markupOnCostPct = costMatrix.totalNetoUSD > 0 ? Math.round((costMatrix.gananciaUSD / costMatrix.totalNetoUSD) * 10000) / 100 : 0;
+      costMatrix.markupOnCostPct = soldCostUSD > 0 ? Math.round((costMatrix.gananciaUSD / soldCostUSD) * 10000) / 100 : 0;
       costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((commercialPreTaxSubtotalUSD / dcCapacityKWp) * 100) / 100 : 0;
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.salePricePerWattUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000 : effectivePricePerWatt;
@@ -501,11 +503,12 @@ export function calculateFinancialSummary(
       costMatrix.saleMarginMultiplier = impliedMargin;
       costMatrix.porcentajeVentaUSD = commercialPreTaxSubtotalUSD;
       costMatrix.porcentajeVentaDOP = Math.round(commercialPreTaxSubtotalUSD * costMatrix.dopExchangeRate * 100) / 100;
-      // Ganancia sobre el costo de todo lo vendido (sistema base e ítems adicionales), como en el modo matriz.
-      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - costMatrix.totalNetoUSD) * 100) / 100;
+      // Ganancia sobre el costo de todo lo vendido (sistema base e ítems adicionales). La venta es antes de ITBIS (el de
+      // los extras no exonerados se cobra aparte al cliente), así que el costo tampoco lleva el ITBIS de esos extras.
+      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - soldCostUSD) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.marginOnSalePct = commercialPreTaxSubtotalUSD > 0 ? Math.round((costMatrix.gananciaUSD / commercialPreTaxSubtotalUSD) * 10000) / 100 : 0;
-      costMatrix.markupOnCostPct = costMatrix.totalNetoUSD > 0 ? Math.round((costMatrix.gananciaUSD / costMatrix.totalNetoUSD) * 10000) / 100 : 0;
+      costMatrix.markupOnCostPct = soldCostUSD > 0 ? Math.round((costMatrix.gananciaUSD / soldCostUSD) * 10000) / 100 : 0;
       costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((commercialPreTaxSubtotalUSD / dcCapacityKWp) * 100) / 100 : 0;
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.salePricePerWattUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000 : effectivePricePerWatt;
@@ -690,7 +693,8 @@ export function calculateFinancialSummary(
   // Effective sale price per Watt and per kWp (dynamic across both cost matrix and direct watt modes):
   const salePricePerWattUSD = dcCapacityKWp > 0
     ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000
-    : (costMatrix.salePricePerWattUSD || effectivePricePerWatt || DEFAULT_PRICE_PER_WATT_USD);
+    // Sin potencia: en Directo $/W el precio tecleado; en la matriz no hay precio por W (0, nunca uno inventado).
+    : (isDirectWatt ? (effectivePricePerWatt || DEFAULT_PRICE_PER_WATT_USD) : 0);
 
   const salePricePerKWpUSD = dcCapacityKWp > 0
     ? Math.round((grossInvestmentUSD / dcCapacityKWp) * 100) / 100
