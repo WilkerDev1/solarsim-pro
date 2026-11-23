@@ -46,6 +46,21 @@ const read = executeAssistantTool(
   owner
 );
 assert.equal(read.cards?.[0].id, project.id);
+{
+  // «La última propuesta»: la búsqueda vacía viene de la más reciente a la más antigua y trae sus fechas.
+  const at = (day: number) => `2026-11-${String(day).padStart(2, '0')}T12:00:00.000Z`;
+  const older = { ...structuredClone(project), id: 'older', createdAt: at(1), updatedAt: at(2) };
+  const newest = { ...structuredClone(project), id: 'newest', createdAt: at(20), updatedAt: at(21) };
+  const touched = { ...structuredClone(project), id: 'touched', createdAt: at(3), updatedAt: at(22) };
+  state.setState({ projects: [older, newest, touched] });
+  const recent = executeAssistantTool({ name: 'search_projects', args: { query: '' } }, owner).data as {
+    projects: { id: string; createdAt?: string; updatedAt?: string }[];
+  };
+  assert.deepEqual(recent.projects.map((p) => p.id), ['touched', 'newest', 'older'], 'most recently modified first');
+  assert.equal(recent.projects.find((p) => p.id === 'newest')?.createdAt, at(20), 'creation date lets the model tell «la última creada»');
+  assert.equal(recent.projects.find((p) => p.id === 'touched')?.updatedAt, at(22));
+  state.setState({ projects: [project] });
+}
 // Texto libre sin coincidencia literal: el emparejador compartido encuentra el equipo por marca y capacidad.
 const freeText = executeAssistantTool(
   { name: 'search_equipment', args: { query: 'batería de litio HinaESS 16.1 kWh' } },

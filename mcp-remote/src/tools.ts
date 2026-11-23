@@ -148,7 +148,7 @@ const TOOLS: RemoteTool[] = [
   {
     definition: shared("search_projects", {
       description:
-        "Busca propuestas sincronizadas de la organización por nombre del cliente, código o provincia. Máximo 12. No incluye la papelera.",
+        "Busca propuestas sincronizadas de la organización por nombre del cliente, código o provincia. Máximo 12, de la modificada más recientemente a la más antigua (updatedAt). Query vacío: las más recientes. No incluye la papelera.",
     }),
     scope: "read",
     run: async (args, api) => {

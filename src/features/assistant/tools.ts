@@ -75,6 +75,11 @@ export function visibleAssistantEquipment() {
     (e) => !(s.deletedEquipmentIds || []).includes(e.id) && inScope(e)
   );
 }
+const timestamp = (value: unknown) => {
+  const t = typeof value === 'string' ? Date.parse(value) : NaN;
+  return Number.isFinite(t) ? t : 0;
+};
+const recency = (p: { updatedAt?: string; createdAt?: string }) => timestamp(p.updatedAt) || timestamp(p.createdAt);
 function canWrite() {
   const s = useSimulationStore.getState();
   const user = s.syncSettings.currentUser;
@@ -103,6 +108,8 @@ export function executeAssistantTool(
           `${p.client.name} ${p.client.projectId} ${p.client.province}`
         ).includes(query)
       )
+      // Most recently modified first, like the API's search: an empty query answers «la última propuesta».
+      .sort((a, b) => recency(b) - recency(a))
       .slice(0, 12);
     return {
       data: {
@@ -112,8 +119,11 @@ export function executeAssistantTool(
           code: p.client.projectId,
           province: p.client.province,
           status: p.status,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
         })),
         limit: 12,
+        order: 'updatedAt desc',
       },
       cards: found.map((p) => ({
         kind: 'project',

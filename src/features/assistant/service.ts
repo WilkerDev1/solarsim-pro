@@ -7,6 +7,7 @@ import { toGeminiFunctionDeclarations } from '../../../shared/agentTools/jsonSch
 import { ASSISTANT_SYSTEM_PROMPT, assistantTurnContext } from '../../../shared/agentTools/rules';
 import { listAgentTools } from '../agentTools/registry';
 import { chatFileParts, type ChatFile } from './chatFiles';
+import { selectAnswerCards } from './cardSelection';
 import type {
   AssistantAction,
   AssistantCard,
@@ -66,7 +67,8 @@ async function runAssistantLoop(
   options: AssistantRunOptions,
   applied: { activityId: string; title: string }[]
 ): Promise<AssistantMessage> {
-  const cards: AssistantCard[] = [];
+  // One group per tool call: broad listings only contribute the cards the final answer names.
+  const cardGroups: AssistantCard[][] = [];
   const agentCards: NonNullable<AssistantMessage['agentCards']> = [];
   const actions: AssistantAction[] = [];
   // Prefijo cacheable: instrucción y herramientas fijas, luego el historial; el contexto variable cierra el turno.
@@ -123,17 +125,17 @@ async function runAssistantLoop(
     const calls = parts
       .filter((p: any) => p.functionCall)
       .map((p: any) => p.functionCall);
-    if (!calls.length)
+    if (!calls.length) {
+      const text = geminiResponseText(result.response);
       return {
         role: 'assistant',
-        text: geminiResponseText(result.response),
-        cards: [
-          ...new Map(cards.map((c) => [`${c.kind}:${c.id}`, c])).values(),
-        ].slice(0, 12),
+        text,
+        cards: selectAnswerCards(cardGroups, text),
         actions,
         ...(applied.length ? { applied } : {}),
         ...(agentCards.length ? { agentCards: agentCards.slice(0, 6) } : {}),
       };
+    }
     // The model turn goes back unchanged: Gemini 3/4 require its thought signatures on the next request.
     contents.push({ role: 'model', parts });
     // Sequential on purpose: tool calls may mutate the proposal, and the activity/undo order must match the model's order.
@@ -146,7 +148,7 @@ async function runAssistantLoop(
       try {
         // Size limits are enforced by the agent registry before anything is applied.
         const result = await options.execute({ name: call.name, args: { ...call.args } });
-        if (result.cards) cards.push(...result.cards);
+        if (result.cards?.length) cardGroups.push(result.cards);
         if (result.agentCards) agentCards.push(...result.agentCards);
         if (result.activityId)
           applied.push({ activityId: result.activityId, title: String(call.args?.title || 'Cambio aplicado').slice(0, 150) });

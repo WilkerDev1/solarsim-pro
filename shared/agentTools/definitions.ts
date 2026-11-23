@@ -235,7 +235,7 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
 export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
   {
     name: 'search_projects', title: 'Buscar propuestas', kind: 'read', category: 'proposals', card: 'proposal', surfaces: [...ALL],
-    description: 'Busca propuestas del espacio actual por nombre, código o provincia. Máximo 12.',
+    description: 'Busca propuestas del espacio actual por nombre, código o provincia. Máximo 12, de la modificada más recientemente a la más antigua (updatedAt; createdAt indica cuándo se creó). Query vacío: las más recientes; úsalo para «la última propuesta».',
     inputSchema: object({ query }),
   },
   {
