@@ -119,3 +119,21 @@ console.log('Catalog equipment table rows, offers, nominal values, conflict row 
   assert.doesNotMatch(renderToStaticMarkup(React.createElement(EquipmentManagerSettingsTab, { isDark: false })), /Genérico US/);
   console.log('Generic price line in catalog rows and offers header passed.');
 }
+
+{ // Ids de equipos nuevos: el prefijo sigue al tipo elegido en el editor; los existentes nunca cambian
+  const { newEquipmentItemId, savedEquipmentItemId } = await import('../utils/equipmentIds');
+  const { readFileSync } = await import('node:fs');
+  assert.equal(newEquipmentItemId('battery', 1700000000000, () => 0.5), 'eq-battery-1700000000000-i');
+  assert.match(newEquipmentItemId('inverter'), /^eq-inverter-\d+-[a-z0-9]+$/);
+  const draft = newEquipmentItemId('panel', 1700000000000, () => 0.123456);
+  assert.equal(savedEquipmentItemId(draft, 'battery', true), draft.replace('eq-panel-', 'eq-battery-'), 'nuevo: abierto como panel y guardado como batería');
+  assert.equal(savedEquipmentItemId(draft, 'inverter', true), draft.replace('eq-panel-', 'eq-inverter-'));
+  assert.equal(savedEquipmentItemId(draft, 'panel', true), draft, 'mismo tipo: igual');
+  assert.equal(savedEquipmentItemId('eq-panel-123-abcd', 'battery', false), 'eq-panel-123-abcd', 'existente: el id no cambia nunca');
+  assert.equal(savedEquipmentItemId('eq-6f1c-uuid', 'battery', false), 'eq-6f1c-uuid');
+  assert.match(savedEquipmentItemId('', 'battery', true), /^eq-battery-\d+-[a-z0-9]+$/, 'sin id: se genera con su tipo');
+  const tab = readFileSync('src/components/common/EquipmentManagerSettingsTab.tsx', 'utf8');
+  assert.match(tab, /id: newEquipmentItemId\(type\)/, 'el borrador usa el generador');
+  assert.match(tab, /id: savedEquipmentItemId\(editingItem\.id, editingItem\.type \|\| "panel", isNewItem\)/, 'al guardar, el prefijo sigue al tipo final');
+  console.log('New equipment ids follow the item type passed.');
+}

@@ -3,6 +3,7 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SettingsSidebar } from './SettingsSidebar';
 import { settingsSections, resolveSettingsSection, SettingsSectionId } from './settingsNavigation';
+import { settingsEscapeCloses } from './settingsEscape';
 import { ProfileSection } from './sections/ProfileSection';
 import { SimulationPreferencesSection } from './sections/SimulationPreferencesSection';
 import { IntegrationsSection } from './sections/IntegrationsSection';
@@ -37,7 +38,8 @@ export const SettingsModal: React.FC = () => {
   useEffect(() => {
     if (!isSettingsModalOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.defaultPrevented) closeSettingsModal();
+      // Un Escape que nace dentro de un modal abierto (ofertas, confirmación) es de ese modal, no de Ajustes.
+      if (settingsEscapeCloses(event)) closeSettingsModal();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

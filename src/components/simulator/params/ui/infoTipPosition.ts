@@ -20,3 +20,41 @@ export function computeTipPosition(anchor: TipRect, tip: TipSize, viewport: TipV
   const top = Math.max(TIP_MARGIN, Math.min(below, viewport.height - tip.height - TIP_MARGIN));
   return { left, top, placement: 'bottom' };
 }
+
+/**
+ * ¿Un evento `scroll` (escuchado en captura en la ventana) mueve el ⓘ? Sí si viene de la ventana o el documento, o de
+ * un contenedor que contiene el ⓘ (el dock); no si viene de otro contenedor ajeno. Sin destino conocido, sí (se cierra
+ * por seguridad). Pura: recibe cualquier objeto con `contains`, para probarla sin DOM.
+ */
+export function scrollMovesAnchor(target: unknown, anchor: object | null): boolean {
+  if (!anchor) return false;
+  const contains = (target as { contains?: unknown } | null)?.contains;
+  if (typeof contains !== 'function') return true;
+  return Boolean((contains as (other: unknown) => boolean).call(target, anchor));
+}
+
+export type ScrollReaction = 'ignore' | 'follow' | 'close';
+
+/**
+ * Qué hace el tooltip ante un `scroll`. Si el scroll no mueve el ⓘ, nada. Si el ⓘ tiene el foco (teclado: al llegar
+ * con Tab el navegador desplaza el dock para mostrarlo), el tooltip sigue al ⓘ mientras esté a la vista y se cierra si
+ * sale de ella. Si se abrió con el puntero, se cierra: no queda fijo tapando otros controles.
+ */
+export function scrollReaction({ movesAnchor, focused, anchorInView }: { movesAnchor: boolean; focused: boolean; anchorInView: boolean }): ScrollReaction {
+  if (!movesAnchor) return 'ignore';
+  if (focused && anchorInView) return 'follow';
+  return 'close';
+}
+
+/** ¿El rectángulo del ⓘ se ve dentro de la ventana y de los rectángulos de recorte de sus ancestros con scroll? Pura. */
+export function anchorVisible(anchor: TipRect, clips: readonly TipRect[], viewport: TipViewport): boolean {
+  let left = 0;
+  let top = 0;
+  let right = viewport.width;
+  let bottom = viewport.height;
+  for (const box of clips) {
+    left = Math.max(left, box.left); top = Math.max(top, box.top);
+    right = Math.min(right, box.right); bottom = Math.min(bottom, box.bottom);
+  }
+  return anchor.bottom > top && anchor.top < bottom && anchor.right > left && anchor.left < right;
+}
