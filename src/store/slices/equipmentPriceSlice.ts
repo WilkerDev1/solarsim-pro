@@ -242,7 +242,10 @@ export function commitProposalPrice(state: SimulationStore, input: ProposalPrice
 export function acceptProposalGenericQuestion(state: SimulationStore, question: ProposalGenericQuestion): string | null {
   const context = priceRecordingContext(state);
   if (!context || context.scope !== question.scope || context.userId !== question.userId) return null;
-  return state.setGenericPrice(question.equipmentId, question.priceUSD, 'proposal', { derivedFromId: question.observationId });
+  // Los precios de propuesta están en USD: moneda y precio original como en su observación y en los derivados de ofertas.
+  return state.setGenericPrice(question.equipmentId, question.priceUSD, 'proposal', {
+    derivedFromId: question.observationId, originalCurrency: 'USD', originalPrice: question.priceUSD,
+  });
 }
 
 /** Hidratación: un mapa o una cola mal formados (versiones viejas, almacenamiento dañado) se descartan, nunca se reparan a medias. */

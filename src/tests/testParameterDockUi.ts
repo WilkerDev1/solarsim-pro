@@ -9,7 +9,7 @@ import {
 
 import { fieldDisplayValue } from '../components/simulator/params/ui/Field';
 import { FieldMenu, fieldMenuKey } from '../components/simulator/params/ui/FieldMenu';
-import { computeTipPosition } from '../components/simulator/params/ui/infoTipPosition';
+import { computeTipPosition, scrollMovesAnchor, scrollReaction, anchorVisible } from '../components/simulator/params/ui/infoTipPosition';
 import { commitStepperDraft } from '../components/simulator/params/ui/Stepper';
 import { nextRadioIndex } from '../components/simulator/params/ui/ToggleGroup';
 
@@ -336,9 +336,37 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   assert.match(source, /createPortal\(tooltip, document\.body\)/, 'portal a body');
   assert.match(source, /z-\[1200\]/, 'por encima de menús y barra lateral');
   assert.match(source, /document\.addEventListener\('keydown'[\s\S]*document\.removeEventListener\('keydown'/, 'Escape a nivel de documento mientras está abierto, con limpieza');
-  assert.match(source, /addEventListener\('scroll', onScroll, true\)[\s\S]*removeEventListener\('scroll', onScroll, true\)/, 'scroll en captura: reposiciona o cierra');
-  assert.match(source, /isInView\(button\)/, 'cierra si el ⓘ sale de la vista');
+  assert.match(source, /addEventListener\('scroll', onScroll, true\)[\s\S]*removeEventListener\('scroll', onScroll, true\)/, 'scroll en captura de cualquier ancestro');
+  assert.match(source, /movesAnchor = scrollMovesAnchor\(event\.target, button\)[\s\S]*focused = document\.activeElement === button[\s\S]*scrollReaction\(\{ movesAnchor, focused/, 'la reacción al scroll depende de si mueve el ⓘ y de si el ⓘ tiene el foco');
+  assert.match(source, /reaction === 'follow'\) place\(\)[\s\S]*reaction === 'close'\) setDismissed\(true\)/, 'con foco sigue al ⓘ; abierto con puntero se cierra');
+  assert.match(source, /addEventListener\('resize', onResize\)[\s\S]*removeEventListener\('resize', onResize\)/, 'redimensionar la ventana también lo cierra');
   assert.match(source, /aria-describedby=\{id\}/, 'el botón sigue describiéndose con el tooltip');
+}
+
+// --- InfoTip: ¿el scroll mueve el ⓘ? (ventana, documento o un ancestro sí; un contenedor ajeno no) ---
+{
+  const anchor = { name: 'ⓘ' };
+  const node = (...inside: object[]) => ({ contains: (other: unknown) => inside.includes(other as object) });
+  assert.equal(scrollMovesAnchor(node(anchor), anchor), true, 'scroll del dock (ancestro del ⓘ): se cierra');
+  assert.equal(scrollMovesAnchor({}, anchor), true, 'scroll de la ventana (sin contains): se cierra');
+  assert.equal(scrollMovesAnchor(null, anchor), true, 'sin destino conocido: se cierra por seguridad');
+  assert.equal(scrollMovesAnchor(node(), anchor), false, 'un contenedor que no contiene el ⓘ (otra lista) no lo cierra');
+  assert.equal(scrollMovesAnchor(node(anchor), null), false, 'sin ⓘ montado no hay nada que cerrar');
+}
+
+// --- InfoTip: reacción al scroll (puntero: se cierra; foco de teclado: sigue al ⓘ mientras esté a la vista) ---
+{
+  assert.equal(scrollReaction({ movesAnchor: false, focused: false, anchorInView: true }), 'ignore', 'scroll ajeno: nada');
+  assert.equal(scrollReaction({ movesAnchor: false, focused: true, anchorInView: false }), 'ignore', 'scroll ajeno con foco: nada');
+  assert.equal(scrollReaction({ movesAnchor: true, focused: false, anchorInView: true }), 'close', 'abierto con puntero: se cierra');
+  assert.equal(scrollReaction({ movesAnchor: true, focused: true, anchorInView: true }), 'follow', 'Tab hasta un ⓘ fuera de vista: el auto-scroll no cierra el tooltip, lo recoloca');
+  assert.equal(scrollReaction({ movesAnchor: true, focused: true, anchorInView: false }), 'close', 'con foco pero el ⓘ salió de la vista: se cierra');
+  const vp = { width: 1000, height: 800 };
+  const r = (left: number, top: number, right: number, bottom: number) => ({ left, top, right, bottom });
+  assert.equal(anchorVisible(r(10, 10, 30, 30), [], vp), true, 'dentro de la ventana');
+  assert.equal(anchorVisible(r(10, 810, 30, 830), [], vp), false, 'debajo de la ventana');
+  assert.equal(anchorVisible(r(10, 500, 30, 520), [r(0, 0, 400, 400)], vp), false, 'recortado por el dock (fuera de su área visible)');
+  assert.equal(anchorVisible(r(10, 300, 30, 320), [r(0, 0, 400, 400)], vp), true, 'visible dentro del dock');
 }
 
 // --- InfoTip: posición pura, acotada a la ventana y volteable ---

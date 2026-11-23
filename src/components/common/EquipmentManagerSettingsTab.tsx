@@ -34,6 +34,7 @@ import { EquipmentEditorModal } from "./EquipmentEditorModal";
 import { normalizeBrandName } from "../../utils/equipmentBrandUtils";
 import { confirmAction } from "./confirmAction";
 import { GenericPriceSuggestion } from "./equipment/GenericPrice";
+import { newEquipmentItemId, savedEquipmentItemId } from "../../utils/equipmentIds";
 import { effectiveGenericPrice, genericSuggestionFor, priceFeatureActive, type GenericSuggestion } from "../../store/slices/equipmentPriceSlice";
 
 interface EquipmentManagerSettingsTabProps {
@@ -224,7 +225,7 @@ export const EquipmentManagerSettingsTab: React.FC<
   const handleOpenAdd = (type: EquipmentType = "panel") => {
     setIsNewItem(true);
     setEditingItem({
-      id: `eq-${type}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: newEquipmentItemId(type),
       type,
       brand: "",
       modelSeries: "",
@@ -335,7 +336,8 @@ export const EquipmentManagerSettingsTab: React.FC<
     }
     const itemToSave: SolarEquipmentItem = {
       ...editingItem,
-      id: editingItem.id || `eq-${editingItem.type}-${Date.now()}`,
+      // Nuevo: el prefijo sigue al tipo elegido en el editor; existente: el id no cambia.
+      id: savedEquipmentItemId(editingItem.id, editingItem.type || "panel", isNewItem),
       type: editingItem.type || "panel",
       brand: normalizeBrandName(editingItem.brand) || editingItem.brand.trim(),
       modelSeries: editingItem.modelSeries?.trim() || "",
