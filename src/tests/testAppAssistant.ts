@@ -59,6 +59,12 @@ assert.equal(read.cards?.[0].id, project.id);
   assert.deepEqual(recent.projects.map((p) => p.id), ['touched', 'newest', 'older'], 'most recently modified first');
   assert.equal(recent.projects.find((p) => p.id === 'newest')?.createdAt, at(20), 'creation date lets the model tell «la última creada»');
   assert.equal(recent.projects.find((p) => p.id === 'touched')?.updatedAt, at(22));
+  // Fecha de modificación inválida: cuenta la de creación; sin ninguna fecha válida, al final.
+  const legacy = { ...structuredClone(project), id: 'legacy', createdAt: at(10), updatedAt: 'n/d' };
+  const undated = { ...structuredClone(project), id: 'undated', createdAt: '', updatedAt: '' };
+  state.setState({ projects: [undated, older, legacy, newest] });
+  const fallback = executeAssistantTool({ name: 'search_projects', args: { query: '' } }, owner).data as { projects: { id: string }[] };
+  assert.deepEqual(fallback.projects.map((p) => p.id), ['newest', 'legacy', 'older', 'undated']);
   state.setState({ projects: [project] });
 }
 // Texto libre sin coincidencia literal: el emparejador compartido encuentra el equipo por marca y capacidad.
