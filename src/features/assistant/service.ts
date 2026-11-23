@@ -127,10 +127,12 @@ async function runAssistantLoop(
       .map((p: any) => p.functionCall);
     if (!calls.length) {
       const text = geminiResponseText(result.response);
+      const { cards, lists } = selectAnswerCards(cardGroups, text);
       return {
         role: 'assistant',
         text,
-        cards: selectAnswerCards(cardGroups, text),
+        cards,
+        ...(lists.length ? { lists } : {}),
         actions,
         ...(applied.length ? { applied } : {}),
         ...(agentCards.length ? { agentCards: agentCards.slice(0, 6) } : {}),
