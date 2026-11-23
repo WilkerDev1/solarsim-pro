@@ -14,11 +14,14 @@ const normalize = (s: string) =>
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const key = (c: AssistantCard) => `${c.kind}:${c.id}`;
 
-/** `needle` aparece completo en `text` (ya normalizado): SP-2026-105 no coincide dentro de SP-2026-105-V3. */
+/**
+ * `needle` aparece completo en `text` (ya normalizado): SP-2026-105 no coincide dentro de SP-2026-105-V3, ni
+ * SG04LP1 dentro de SUN-8K-SG04LP1. Un guion suelto delante (viñeta o separador: «-SP-2026-149») sí vale.
+ */
 function mentions(text: string, needle: string): boolean {
   const n = normalize(needle);
   if (n.length < 3) return false;
-  return new RegExp(`(^|[^a-z0-9-])${escapeRegExp(n)}(?![a-z0-9]|-[a-z0-9])`).test(text);
+  return new RegExp(`(?<![a-z0-9])(?<![a-z0-9]-)${escapeRegExp(n)}(?![a-z0-9]|-[a-z0-9])`).test(text);
 }
 
 /**
