@@ -31,7 +31,7 @@ export function CatalogAuditCard({ card }: { card: AuditCard }) {
               <li key={`${f.code}-${f.equipmentId || i}`} data-severity={f.severity}>
                 <span className="assistant-audit-badge">{SEVERITY[f.severity]}</span>
                 <span>{f.message}</span>
-                {item && <button type="button" onClick={() => openSettings('equipment')}>Abrir inventario</button>}
+                {item && <button type="button" title="Abrir inventario" aria-label={`Abrir inventario: ${item.displayName}`} onClick={() => openSettings('equipment')}>Inventario</button>}
               </li>
             );
           })}

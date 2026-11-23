@@ -1,5 +1,6 @@
 // Single catalog of agent tools shared by the proposal assistant, the general assistant and the local MCP server.
 import type { AgentToolDefinition, JsonSchema } from './types.js';
+import { CATALOG_AUDIT_CODES } from '../catalogAuditCodes.js';
 import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES } from '../netMetering.js';
 import { PRICE_HISTORY_TOOL_LIMITS } from './priceHistory.js';
 
@@ -205,8 +206,11 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
   },
   {
     name: 'audit_catalog', title: 'Auditar inventario', kind: 'read', category: 'catalog', card: 'catalog-audit', surfaces: [...ALL],
-    description: 'Audita el catálogo: precios ausentes o vencidos, sin ficha o imagen, sin potencia nominal, duplicados, sin stock, precios atípicos y equipos de propuestas que no están en el catálogo.',
-    inputSchema: object({ staleDays: { type: 'integer', minimum: 1, maximum: 3650 }, type: { type: 'string', enum: ['panel', 'inverter', 'battery'] } }),
+    description: 'Audita el catálogo: precios ausentes o vencidos, sin ficha o imagen, sin potencia nominal, duplicados, sin stock, precios atípicos y equipos de propuestas que no están en el catálogo. codes limita a esos tipos de hallazgo: «equipos sin precio» = ["missing_price"] (sin oferta ni precio genérico); añade "generic_only" si también quieren los que solo tienen precio genérico.',
+    inputSchema: object({
+      staleDays: { type: 'integer', minimum: 1, maximum: 3650 }, type: { type: 'string', enum: ['panel', 'inverter', 'battery'] },
+      codes: { type: 'array', maxItems: CATALOG_AUDIT_CODES.length, items: { type: 'string', enum: [...CATALOG_AUDIT_CODES] }, description: 'Tipos de hallazgo a incluir; vacío u omitido, todos.' },
+    }),
   },
   {
     name: 'list_supplier_offers', title: 'Consultar ofertas', kind: 'read', category: 'pricing', surfaces: [...ALL],
@@ -235,7 +239,7 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
 export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
   {
     name: 'search_projects', title: 'Buscar propuestas', kind: 'read', category: 'proposals', card: 'proposal', surfaces: [...ALL],
-    description: 'Busca propuestas del espacio actual por nombre, código o provincia. Máximo 12.',
+    description: 'Busca propuestas del espacio actual por nombre, código o provincia. Máximo 12, de la modificada más recientemente a la más antigua (updatedAt; createdAt indica cuándo se creó). Query vacío: las más recientes; úsalo para «la última propuesta».',
     inputSchema: object({ query }),
   },
   {
@@ -250,8 +254,8 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
   },
   {
     name: 'search_equipment', title: 'Buscar equipos', kind: 'read', category: 'catalog', card: 'equipment', surfaces: [...ALL],
-    description: 'Busca catálogo por marca/modelo. unavailableOnly indica sin oferta confirmada in_stock, no implica agotado.',
-    inputSchema: object({ query, unavailableOnly: { type: 'boolean' } }),
+    description: 'Busca catálogo por marca/modelo. type limita a paneles, inversores o baterías («muéstrame los paneles» = type panel, query vacío). unavailableOnly indica sin oferta confirmada in_stock, no implica agotado.',
+    inputSchema: object({ query, type: { type: 'string', enum: ['panel', 'inverter', 'battery'] }, unavailableOnly: { type: 'boolean' } }),
   },
   {
     name: 'get_equipment', title: 'Consultar equipo', kind: 'read', category: 'catalog', card: 'equipment', surfaces: [...ALL],

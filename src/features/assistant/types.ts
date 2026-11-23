@@ -24,10 +24,17 @@ export interface AssistantCard {
   title: string;
   detail: string;
 }
+/** Long search result shown as a compact list under the answer; `collapsed` folds it behind a one-line summary. */
+export interface AssistantResultListData {
+  kind: AssistantCard['kind'];
+  items: AssistantCard[];
+  collapsed: boolean;
+}
 export interface AssistantMessage {
   role: 'user' | 'assistant';
   text: string;
   cards?: AssistantCard[];
+  lists?: AssistantResultListData[];
   actions?: AssistantAction[];
   /** Changes already applied under the drafts-free policy; each one can be undone. */
   applied?: { activityId: string; title: string }[];
