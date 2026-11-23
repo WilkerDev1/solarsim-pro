@@ -254,8 +254,8 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
   },
   {
     name: 'search_equipment', title: 'Buscar equipos', kind: 'read', category: 'catalog', card: 'equipment', surfaces: [...ALL],
-    description: 'Busca catálogo por marca/modelo. unavailableOnly indica sin oferta confirmada in_stock, no implica agotado.',
-    inputSchema: object({ query, unavailableOnly: { type: 'boolean' } }),
+    description: 'Busca catálogo por marca/modelo. type limita a paneles, inversores o baterías («muéstrame los paneles» = type panel, query vacío). unavailableOnly indica sin oferta confirmada in_stock, no implica agotado.',
+    inputSchema: object({ query, type: { type: 'string', enum: ['panel', 'inverter', 'battery'] }, unavailableOnly: { type: 'boolean' } }),
   },
   {
     name: 'get_equipment', title: 'Consultar equipo', kind: 'read', category: 'catalog', card: 'equipment', surfaces: [...ALL],

@@ -139,10 +139,13 @@ export function executeAssistantTool(
       typeof args.unavailableOnly !== 'boolean'
     )
       throw new Error('Filtro de disponibilidad inválido.');
+    if (args.type !== undefined && !['panel', 'inverter', 'battery'].includes(String(args.type)))
+      throw new Error('Tipo de equipo inválido: panel, inverter o battery.');
     const query = normalize(args.query);
     const available = (e: SolarEquipmentItem) =>
-      !args.unavailableOnly ||
-      !e.supplierPrices?.some((p) => p.stockStatus === 'in_stock');
+      (!args.type || e.type === args.type) &&
+      (!args.unavailableOnly ||
+        !e.supplierPrices?.some((p) => p.stockStatus === 'in_stock'));
     const visible = visibleAssistantEquipment();
     let found = visible
       .filter(

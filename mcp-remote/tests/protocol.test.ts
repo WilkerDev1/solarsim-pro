@@ -870,6 +870,14 @@ test("precios: get_price_history lee el historial y genericPriceUSD va aparte de
     found.equipment.find((e: any) => e.id === "eq-2").genericPriceUSD,
     null,
   );
+  const inverters = (
+    await rpc(app, call(31, "search_equipment", { query: "", type: "inverter" }))
+  ).body.result.structuredContent.data;
+  assert.equal(inverters.equipment.length, 0, "type filters the search");
+  const panels = (
+    await rpc(app, call(32, "search_equipment", { query: "", type: "panel" }))
+  ).body.result.structuredContent.data;
+  assert.equal(panels.equipment.length, 2);
   const detail = (await rpc(app, call(4, "get_equipment", { id: "eq-1" }))).body
     .result.structuredContent.data;
   assert.equal(detail.genericPriceUSD, 95);

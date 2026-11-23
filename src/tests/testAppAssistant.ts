@@ -75,6 +75,17 @@ const freeText = executeAssistantTool(
 assert.equal(freeText.equipment[0]?.id, 'eq-bat-hinaess-16k');
 assert.equal(freeText.equipment[0]?.match, 'spec');
 assert.match(freeText.equipment[0]?.matchReason || '', /16\.08 kWh/);
+{
+  // «Muéstrame los paneles»: el tipo filtra la búsqueda (sin él, un listado vacío mezcla inversores y baterías).
+  const byType = (type: string, query = '') =>
+    (executeAssistantTool({ name: 'search_equipment', args: { query, type } }, owner).data as { equipment: { type: string }[] }).equipment;
+  const panels = byType('panel');
+  assert(panels.length > 0 && panels.every((e) => e.type === 'panel'));
+  assert(byType('inverter').every((e) => e.type === 'inverter'));
+  assert(byType('battery', 'HinaESS 16.1 kWh').every((e) => e.type === 'battery'), 'the spec matcher honours the type too');
+  assert.equal(byType('panel', 'HinaESS 16.1 kWh').length, 0);
+  assert.throws(() => executeAssistantTool({ name: 'search_equipment', args: { query: '', type: 'cable' } }, owner), /tipo/i);
+}
 const pending = executeAssistantTool(
   {
     name: 'propose_project_update',

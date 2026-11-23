@@ -205,6 +205,11 @@ const TOOLS: RemoteTool[] = [
         typeof args.unavailableOnly !== "boolean"
       )
         return fail("invalid_input", "Filtro de disponibilidad inválido.");
+      if (
+        args.type !== undefined &&
+        !["panel", "inverter", "battery"].includes(String(args.type))
+      )
+        return fail("invalid_input", "Tipo de equipo inválido.");
       const query = normalize(args.query);
       const [catalog, generic] = await Promise.all([
         equipmentList(api),
@@ -216,6 +221,7 @@ const TOOLS: RemoteTool[] = [
             normalize(`${e.brand} ${e.displayName} ${e.modelSeries}`).includes(
               query,
             ) &&
+            (!args.type || e.type === args.type) &&
             (!args.unavailableOnly ||
               !e.supplierPrices?.some(
                 (p: any) => p.stockStatus === "in_stock",
