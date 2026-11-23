@@ -871,7 +871,10 @@ test("precios: get_price_history lee el historial y genericPriceUSD va aparte de
     null,
   );
   const inverters = (
-    await rpc(app, call(31, "search_equipment", { query: "", type: "inverter" }))
+    await rpc(
+      app,
+      call(31, "search_equipment", { query: "", type: "inverter" }),
+    )
   ).body.result.structuredContent.data;
   assert.equal(inverters.equipment.length, 0, "type filters the search");
   const panels = (
