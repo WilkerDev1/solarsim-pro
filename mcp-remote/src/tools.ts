@@ -148,7 +148,7 @@ const TOOLS: RemoteTool[] = [
   {
     definition: shared("search_projects", {
       description:
-        "Busca propuestas sincronizadas de la organización por nombre del cliente, código o provincia. Máximo 12. No incluye la papelera.",
+        "Busca propuestas sincronizadas de la organización por nombre del cliente, código o provincia. Máximo 12, de la modificada más recientemente a la más antigua (updatedAt). Query vacío: las más recientes. No incluye la papelera.",
     }),
     scope: "read",
     run: async (args, api) => {
@@ -205,6 +205,11 @@ const TOOLS: RemoteTool[] = [
         typeof args.unavailableOnly !== "boolean"
       )
         return fail("invalid_input", "Filtro de disponibilidad inválido.");
+      if (
+        args.type !== undefined &&
+        !["panel", "inverter", "battery"].includes(String(args.type))
+      )
+        return fail("invalid_input", "Tipo de equipo inválido.");
       const query = normalize(args.query);
       const [catalog, generic] = await Promise.all([
         equipmentList(api),
@@ -216,6 +221,7 @@ const TOOLS: RemoteTool[] = [
             normalize(`${e.brand} ${e.displayName} ${e.modelSeries}`).includes(
               query,
             ) &&
+            (!args.type || e.type === args.type) &&
             (!args.unavailableOnly ||
               !e.supplierPrices?.some(
                 (p: any) => p.stockStatus === "in_stock",

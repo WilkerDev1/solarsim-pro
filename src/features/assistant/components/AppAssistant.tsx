@@ -22,6 +22,7 @@ import {
   AssistantAppliedCard,
   AssistantResultCard,
 } from './AssistantResultCard';
+import { AssistantResultList } from './AssistantResultList';
 import '../chat.css';
 import type { GeminiTransport } from '../../../../shared/geminiTransport';
 
@@ -190,6 +191,9 @@ function AssistantPanel({
                     key={`${card.kind}:${card.id}`}
                     card={card}
                   />
+                ))}
+                {m.lists?.map((list, index) => (
+                  <AssistantResultList key={`list-${index}`} list={list} />
                 ))}
                 {m.actions?.map((action) => (
                   <AssistantActionCard

@@ -297,6 +297,19 @@
 .assistant-audit-badge { font-weight: 600; border-radius: 0.375rem; padding: 0 0.375rem; background: #2e3e54; color: #dbe5f1; }
 .assistant-audit-list li[data-severity='error'] .assistant-audit-badge { background: #5b2430; color: #ffc9d0; }
 .assistant-audit-list li[data-severity='warning'] .assistant-audit-badge { background: #5a4419; color: #ffe2a3; }
+/* Listado compacto de resultados largos (búsquedas): filas de una línea con su acción; un equipo se despliega en su tarjeta. */
+.assistant-result-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.assistant-result-list > li + li { border-top: 1px solid var(--assistant-border); }
+.assistant-result-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0; }
+.assistant-result-row-text { flex: 1; min-width: 0; display: grid; }
+.assistant-result-row-text strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assistant-result-row-text small { color: #bac7d8; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assistant-result .assistant-result-row button { margin: 0; flex: none; }
+.assistant-result-list .assistant-result { margin: 0 0 0.5rem; }
+.assistant-result .assistant-result-more { margin-top: 0.375rem; }
+.assistant-result.assistant-result-fold { display: block; padding: 8px 12px; }
+.assistant-result-fold > summary { cursor: pointer; color: #bac7d8; font-size: 12px; }
+.assistant-result-fold[open] > summary { margin-bottom: 0.25rem; }
 label.assistant-icon { cursor: pointer; }
 
 /* ── Conversación tipo chat (ambos asistentes; azul marino en ambos temas) ─────────────────────────

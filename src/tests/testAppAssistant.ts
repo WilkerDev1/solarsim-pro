@@ -46,6 +46,27 @@ const read = executeAssistantTool(
   owner
 );
 assert.equal(read.cards?.[0].id, project.id);
+{
+  // «La última propuesta»: la búsqueda vacía viene de la más reciente a la más antigua y trae sus fechas.
+  const at = (day: number) => `2026-11-${String(day).padStart(2, '0')}T12:00:00.000Z`;
+  const older = { ...structuredClone(project), id: 'older', createdAt: at(1), updatedAt: at(2) };
+  const newest = { ...structuredClone(project), id: 'newest', createdAt: at(20), updatedAt: at(21) };
+  const touched = { ...structuredClone(project), id: 'touched', createdAt: at(3), updatedAt: at(22) };
+  state.setState({ projects: [older, newest, touched] });
+  const recent = executeAssistantTool({ name: 'search_projects', args: { query: '' } }, owner).data as {
+    projects: { id: string; createdAt?: string; updatedAt?: string }[];
+  };
+  assert.deepEqual(recent.projects.map((p) => p.id), ['touched', 'newest', 'older'], 'most recently modified first');
+  assert.equal(recent.projects.find((p) => p.id === 'newest')?.createdAt, at(20), 'creation date lets the model tell «la última creada»');
+  assert.equal(recent.projects.find((p) => p.id === 'touched')?.updatedAt, at(22));
+  // Fecha de modificación inválida: cuenta la de creación; sin ninguna fecha válida, al final.
+  const legacy = { ...structuredClone(project), id: 'legacy', createdAt: at(10), updatedAt: 'n/d' };
+  const undated = { ...structuredClone(project), id: 'undated', createdAt: '', updatedAt: '' };
+  state.setState({ projects: [undated, older, legacy, newest] });
+  const fallback = executeAssistantTool({ name: 'search_projects', args: { query: '' } }, owner).data as { projects: { id: string }[] };
+  assert.deepEqual(fallback.projects.map((p) => p.id), ['newest', 'legacy', 'older', 'undated']);
+  state.setState({ projects: [project] });
+}
 // Texto libre sin coincidencia literal: el emparejador compartido encuentra el equipo por marca y capacidad.
 const freeText = executeAssistantTool(
   { name: 'search_equipment', args: { query: 'batería de litio HinaESS 16.1 kWh' } },
@@ -54,6 +75,17 @@ const freeText = executeAssistantTool(
 assert.equal(freeText.equipment[0]?.id, 'eq-bat-hinaess-16k');
 assert.equal(freeText.equipment[0]?.match, 'spec');
 assert.match(freeText.equipment[0]?.matchReason || '', /16\.08 kWh/);
+{
+  // «Muéstrame los paneles»: el tipo filtra la búsqueda (sin él, un listado vacío mezcla inversores y baterías).
+  const byType = (type: string, query = '') =>
+    (executeAssistantTool({ name: 'search_equipment', args: { query, type } }, owner).data as { equipment: { type: string }[] }).equipment;
+  const panels = byType('panel');
+  assert(panels.length > 0 && panels.every((e) => e.type === 'panel'));
+  assert(byType('inverter').every((e) => e.type === 'inverter'));
+  assert(byType('battery', 'HinaESS 16.1 kWh').every((e) => e.type === 'battery'), 'the spec matcher honours the type too');
+  assert.equal(byType('panel', 'HinaESS 16.1 kWh').length, 0);
+  assert.throws(() => executeAssistantTool({ name: 'search_equipment', args: { query: '', type: 'cable' } }, owner), /tipo/i);
+}
 const pending = executeAssistantTool(
   {
     name: 'propose_project_update',

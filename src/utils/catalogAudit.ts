@@ -2,9 +2,8 @@ import type { ProjectSimulation } from '../types';
 import { getProjectBatteries, getProjectInverters, getProjectPanels } from './equipmentSpecsUtils';
 import type { SolarEquipmentItem } from '../types/equipment';
 
-export type CatalogAuditCode =
-  | 'missing_price' | 'generic_only' | 'stale_price' | 'missing_datasheet' | 'missing_image' | 'missing_nominal'
-  | 'duplicate_model' | 'no_stock' | 'price_outlier' | 'unmatched_proposal_equipment';
+import type { CatalogAuditCode } from '../../shared/catalogAuditCodes';
+export type { CatalogAuditCode } from '../../shared/catalogAuditCodes';
 
 export interface CatalogAuditFinding {
   code: CatalogAuditCode;

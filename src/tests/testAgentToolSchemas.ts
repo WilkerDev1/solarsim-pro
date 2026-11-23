@@ -35,6 +35,7 @@ const schema = findAgentTool('search_equipment')!.inputSchema;
 assert.deepEqual(validateJsonSchema(schema, { query: 'ja', unavailableOnly: true }), []);
 assert.match(validateJsonSchema(schema, { query: 'ja', extra: 1 })[0], /no permitido/);
 assert.match(validateJsonSchema(schema, { unavailableOnly: 'yes' })[0], /boolean/);
+assert.match(validateJsonSchema(schema, { type: 'cable' })[0], /no permitido/);
 assert.match(validateJsonSchema(findAgentTool('get_equipment')!.inputSchema, {})[0], /obligatorio/);
 assert.match(validateJsonSchema({ type: 'number', maximum: 3 }, 4)[0], /máximo 3/);
 assert.deepEqual(validateJsonSchema({ type: 'number' }, 4), []);
@@ -45,6 +46,7 @@ assert.deepEqual(toGeminiSchema(schema), {
   type: 'OBJECT',
   properties: {
     query: { type: 'STRING', description: 'Texto a buscar; vacío lista los primeros resultados.' },
+    type: { type: 'STRING', enum: ['panel', 'inverter', 'battery'] },
     unavailableOnly: { type: 'BOOLEAN' },
   },
 });

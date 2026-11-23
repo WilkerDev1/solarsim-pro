@@ -1,4 +1,5 @@
-import { auditCatalog } from '../../utils/catalogAudit';
+import { auditCatalog, type CatalogAuditCode } from '../../utils/catalogAudit';
+import { CATALOG_AUDIT_CODE_LABELS } from '../../../shared/catalogAuditCodes';
 import { genericPriceDecision } from '../../../shared/equipmentPrices';
 import { effectiveGenericPrice, priceFeatureActive } from '../../store/slices/equipmentPriceSlice';
 import { visibleAssistantEquipment, visibleAssistantProjects } from '../assistant/tools';
@@ -13,13 +14,17 @@ const auditCatalogTool: NativeHandler = (args) => {
   // Precio genérico efectivo (ADR 0006); sin sesión la función está apagada y el mapa queda vacío.
   const genericPrices = priceFeatureActive(s) ? Object.fromEntries(equipment.map((e) => [e.id, effectiveGenericPrice(s, e.id)])) : {};
   const report = auditCatalog(equipment, visibleAssistantProjects(), { now: new Date(), staleDays: args.staleDays, type: args.type, genericPrices });
-  const findings = report.findings.slice(0, 100);
+  // «Equipos sin precio» y similares: solo los tipos de hallazgo pedidos (el esquema ya validó los códigos).
+  const codes = Array.isArray(args.codes) && args.codes.length ? new Set(args.codes as CatalogAuditCode[]) : undefined;
+  const matching = codes ? report.findings.filter((f) => codes.has(f.code)) : report.findings;
+  const findings = matching.slice(0, 100);
+  const filterLabel = codes ? ` (${[...codes].map((c) => CATALOG_AUDIT_CODE_LABELS[c]).join(', ')})` : '';
   return {
-    data: { summary: report.summary, findings, truncated: report.findings.length > findings.length },
+    data: { summary: report.summary, ...(codes ? { codes: [...codes], matching: matching.length } : {}), findings, truncated: matching.length > findings.length },
     cards: [{
       type: 'catalog-audit', id: `audit-${Date.now()}`, title: 'Auditoría del inventario',
-      detail: `${report.summary.total} hallazgos en ${report.summary.equipmentCount} equipos`,
-      findings: findings.slice(0, 30).map((f) => ({ code: f.code, severity: f.severity, equipmentId: f.equipmentId, message: f.message })),
+      detail: `${matching.length} hallazgos${filterLabel} en ${report.summary.equipmentCount} equipos`,
+      findings: findings.slice(0, 60).map((f) => ({ code: f.code, severity: f.severity, equipmentId: f.equipmentId, message: f.message })),
     }],
   };
 };
