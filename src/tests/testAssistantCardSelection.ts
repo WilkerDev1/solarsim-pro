@@ -72,6 +72,14 @@ assert.deepEqual(selectAnswerCards([equipment], 'Recomiendo **JA Solar** _JAM72_
 assert.equal(selectAnswerCards([search.slice(0, 3)], 'Listo.').cards.length, 3);
 assert.equal(selectAnswerCards([search.slice(0, 4)], 'Listo.').cards.length, 0);
 
+// Guion como viñeta o separador pegado al código («-SP-2026-149», «Cliente -SP-2026-148»): se reconoce.
+assert.deepEqual(selectAnswerCards([search], '-SP-2026-149 es la última.').cards.map((c) => c.id), ['p149']);
+assert.deepEqual(selectAnswerCards([search], 'La anterior:\n-SP-2026-148').cards.map((c) => c.id), ['p148']);
+// Pero un código o modelo que solo es la cola de otro más largo («X1-SP-2026-149», «SUN-8K-SG04LP1») no cuenta.
+assert.deepEqual(selectAnswerCards([search], 'Ver X1-SP-2026-149.').cards, []);
+const tails: AssistantCard[] = ['SG04LP1', 'Deye SUN-8K-SG04LP1', 'Deye SUN-5K', 'Deye SUN-12K'].map((t, i) => ({ kind: 'equipment', id: `t${i}`, title: t, detail: 'Deye' }));
+assert.deepEqual(selectAnswerCards([tails], 'Usa el SUN-8K-SG04LP1.').cards, []);
+
 // Integración: el servicio aplica la selección a la respuesta final.
 let round = 0;
 const transport: GeminiTransport = async () => {
