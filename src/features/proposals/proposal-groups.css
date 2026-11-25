@@ -49,6 +49,35 @@
 .dark .proposal-drop-message {
   color: #6be0b5;
 }
+.proposal-unlink-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: min(480px, calc(100vw - 32px));
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #182230;
+  background: #fff;
+  border: 1px solid #dce2e8;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgb(15 23 42 / 0.12);
+  pointer-events: none;
+}
+.proposal-unlink-hint[data-active] {
+  color: #067451;
+  border-color: #087b58;
+}
+.dark .proposal-unlink-hint {
+  color: #e4e8ee;
+  background: #1a1f29;
+  border-color: #313846;
+}
+.dark .proposal-unlink-hint[data-active] {
+  color: #6be0b5;
+  border-color: #2f9e78;
+}
 .proposal-group-dialog {
   --group-bg: #fff;
   --group-line: #dce2e8;

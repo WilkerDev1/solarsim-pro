@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { offsetWithin, resendStep, composerKeyAction, toolStepLabel, createStickController, fitTextarea, composerDropEffect, leavesContainer, shouldRefocusComposer } from '../features/assistant/chatUi';
+import { offsetWithin, resendStep, composerKeyAction, toolStepLabel, createStickController, fitTextarea, composerDropEffect, leavesContainer, shouldRefocusComposer, createStopLatch } from '../features/assistant/chatUi';
 import { ChatComposer, ChatThinking, ChatSuggestions } from '../features/assistant/components/ChatComposer';
 import { ChatMessage } from '../features/assistant/components/ChatMessage';
 
@@ -124,5 +124,18 @@ assert.equal(leavesContainer(box, null), true);
 assert.equal(shouldRefocusComposer(true, false), true);
 assert.equal(shouldRefocusComposer(false, false), false, 'never on a plain mount/re-render');
 assert.equal(shouldRefocusComposer(false, true), false);
+
+// 10. Stop must not resend: the click that stops a reply must not become a submit once the button turns into «Enviar».
+{
+  const tasks: Array<() => void> = [];
+  const latch = createStopLatch((fn) => { tasks.push(fn); });
+  assert.equal(latch.blocks(), false, 'nothing blocked before a stop');
+  latch.stop();
+  assert.equal(latch.blocks(), true, 'a submit in the same click as Detener is swallowed');
+  tasks.splice(0).forEach((fn) => fn());
+  assert.equal(latch.blocks(), false, 'a later, deliberate send works again');
+  const busy = renderToStaticMarkup(React.createElement(ChatComposer, { ...base, busy: true, canSend: false, attachments: [] }));
+  assert.match(busy.match(/<button[^>]*aria-label="Detener"[^>]*>/)?.[0] || '', /type="button"/, 'stop is never a submit button');
+}
 
 console.log('PASS: chat composer keyboard, disabled reasons, chips, thinking steps and turn styles.');

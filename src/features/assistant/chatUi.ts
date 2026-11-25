@@ -70,6 +70,19 @@ export function shouldRefocusComposer(previousBusy: boolean, busy: boolean): boo
   return previousBusy && !busy;
 }
 
+/**
+ * Detener y Enviar ocupan el mismo sitio: al detener, React cambia el botón a `type="submit"` antes de que el
+ * navegador ejecute la acción por defecto del clic, y el formulario se enviaba de nuevo con los mismos adjuntos.
+ * El cerrojo bloquea cualquier envío hasta la siguiente tarea (`schedule`), es decir, solo el de ese mismo clic.
+ */
+export function createStopLatch(schedule: (fn: () => void) => void = (fn) => { setTimeout(fn, 0); }) {
+  let stopped = false;
+  return {
+    stop() { stopped = true; schedule(() => { stopped = false; }); },
+    blocks: () => stopped,
+  };
+}
+
 /** Dónde dejar la vista al llegar una respuesta: por su inicio si no cabe, o al final. */
 export function replyScrollTarget(turnHeight: number, viewportHeight: number): 'start' | 'end' {
   return turnHeight > viewportHeight - 24 ? 'start' : 'end';

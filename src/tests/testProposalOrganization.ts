@@ -4,6 +4,7 @@ import { BENCHMARK_PROJECT } from "../engine/referenceCase";
 import {
   orderProposalFamilies,
   proposalFamily,
+  unlinkableDrag,
 } from "../features/proposals/proposalGroups";
 import { projectDifferences } from "../store/sync/projectDifferences";
 import { serializeSimulationStore } from "../store/persistence/serializeSimulationStore";
@@ -281,3 +282,15 @@ console.log(
 
 const ancestor=make('ancestor'),hidden={...make('hidden'),proposalLink:{parentId:'ancestor'}},descendant={...make('descendant'),proposalLink:{parentId:'hidden'}};
 assert.deepEqual(orderProposalFamilies([descendant,ancestor],[ancestor,hidden,descendant]).map(p=>p.id),['ancestor','descendant'],'Hidden intermediary must not reorder descendants above their visible ancestor');
+
+// Dragging a linked proposal out of its family (onto empty space) unlinks it, like taking it out of a folder.
+{
+  const root=make('u-root'),child={...make('u-child'),proposalLink:{parentId:'u-root'}},loose=make('u-loose'),gone={...make('u-gone'),isDeleted:true,proposalLink:{parentId:'u-root'}};
+  const all=[root,child,loose,gone];
+  assert.equal(unlinkableDrag('u-child',all)?.id,'u-child','a linked proposal can be dragged out');
+  assert.equal(unlinkableDrag('u-root',all),null,'a principal has nothing to unlink from');
+  assert.equal(unlinkableDrag('u-loose',all),null,'an independent proposal has nothing to unlink from');
+  assert.equal(unlinkableDrag('u-gone',all),null,'trashed proposals are ignored');
+  assert.equal(unlinkableDrag(null,all),null);
+  assert.equal(unlinkableDrag('missing',all),null);
+}
