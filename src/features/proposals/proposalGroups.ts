@@ -53,6 +53,14 @@ export function orderProposalFamilies(
   roots.forEach((family,id)=>{const root=all.find(p=>p.id===id);if(root)visit(root);family.forEach(visit);});
   return result;
 }
+/** Propuesta que se desenlaza si se suelta fuera de toda propuesta (como sacarla de una carpeta). */
+export function unlinkableDrag(sourceId: string | null, all: ProjectSimulation[]) {
+  if (!sourceId) return null;
+  const project = all.find((p) => p.id === sourceId && !p.isDeleted);
+  return project?.proposalLink?.parentId ? project : null;
+}
+/** Marca de los destinos con su propia lógica de soltar (propuestas, carpetas): ahí no se desenlaza. */
+export const PROPOSAL_DROP_TARGET = "data-proposal-drop-target";
 let draggingId: string | null = null;
 export function startProposalDrag(event: React.DragEvent, id: string) {
   draggingId = id;

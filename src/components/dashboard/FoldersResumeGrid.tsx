@@ -20,7 +20,7 @@ export const FoldersResumeGrid: React.FC = () => {
     </div>
     {folders.length === 0 ? <p className="text-sm text-slate-500 dark:text-zinc-400">Crea una carpeta para organizar propuestas por cliente, licitación o región.</p> :
       <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
-        {folders.map((folder) => <li key={folder.id} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }} onDrop={(event) => {
+        {folders.map((folder) => <li key={folder.id} data-proposal-drop-target onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }} onDrop={(event) => {
           event.preventDefault(); const id = event.dataTransfer.getData('text/plain');
           if (id) moveProjectToFolder(id, folder.id);
         }} className={`flex items-center gap-3 rounded-xl border bg-white px-4 py-3 dark:bg-zinc-900 ${activeFolderId === folder.id ? 'border-emerald-600 dark:border-emerald-500' : 'border-slate-200 dark:border-zinc-800'}`}>

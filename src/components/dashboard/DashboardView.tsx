@@ -1,4 +1,5 @@
 import { orderProposalFamilies } from '../../features/proposals/proposalGroups';
+import { useProposalUnlinkZone } from '../../features/proposals/ProposalGroupControls';
 import { PROPOSAL_DECISIONS, commercialState } from '../../../shared/proposalCommercial';
 import { ProposalDecisionFilter, ProposalResultsLine, useSalesPerformance } from '../../features/proposals/ProposalSalesSummary';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -202,8 +203,10 @@ export const DashboardView: React.FC<{ initialStatusFilter?: string }> = ({ init
   const activeFolder = activeFolderId ? folders.find((f) => f.id === activeFolderId) : null;
   const activeFolderName = activeFolder?.name || null;
 
+  const unlinkZone = useProposalUnlinkZone();
   return (
     <div
+      {...unlinkZone.events}
       className={`flex-1 overflow-y-auto w-full h-full p-6 lg:p-8 font-sans transition-colors duration-200 bg-slate-50 text-slate-900 dark:bg-zinc-950 dark:text-zinc-100`}
     >
       <div className="max-w-[1500px] mx-auto w-full flex flex-col gap-5 pb-12">
@@ -568,6 +571,12 @@ export const DashboardView: React.FC<{ initialStatusFilter?: string }> = ({ init
         {/* ========================================================================= */}
         <FoldersResumeGrid />
       </div>
+
+      {(unlinkZone.active || unlinkZone.feedback) && (
+        <p role="status" className="proposal-unlink-hint" data-active={unlinkZone.active ? true : undefined}>
+          {unlinkZone.active ? `Soltar para desenlazar «${unlinkZone.active}»` : unlinkZone.feedback}
+        </p>
+      )}
 
       <CreateFolderModal
         isOpen={isFolderModalOpen}

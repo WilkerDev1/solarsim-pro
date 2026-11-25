@@ -36,7 +36,8 @@ export function ProjectDocumentList({
       <table className="w-full min-w-[760px] xl:min-w-[1120px] border-collapse text-left text-sm">
         <caption className="sr-only">
           Propuestas. Abrir un documento con su nombre; arrastrarlo para moverlo
-          a una carpeta.
+          a una carpeta, sobre otra para enlazarlo o a un espacio vacío para
+          desenlazarlo.
         </caption>
         <thead className="bg-slate-50 text-xs font-medium text-slate-600 dark:bg-zinc-800/60 dark:text-zinc-300">
           <tr>
@@ -80,6 +81,7 @@ function ProjectDocumentRow({ project }: { project: ProjectSimulation }) {
   return (
     <tr
       key={project.id}
+      data-proposal-drop-target
       draggable
       onDragStart={(event) => startProposalDrag(event, project.id)}
       onDragEnd={stopProposalDrag}

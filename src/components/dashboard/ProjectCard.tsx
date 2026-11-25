@@ -35,6 +35,7 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
   const capacity = calculateTotalDCCapacityKWp(project.specs);
   return (
     <article
+      data-proposal-drop-target
       draggable
       onDragStart={(event) => startProposalDrag(event, project.id)}
       onDragEnd={stopProposalDrag}

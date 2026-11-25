@@ -5,7 +5,7 @@ import type { ProjectSimulation } from "../../types";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { useShallow } from 'zustand/react/shallow';
 import { canEditCommercial } from "./commercial";
-import { proposalFamily, currentProposalDrag } from "./proposalGroups";
+import { proposalFamily, currentProposalDrag, unlinkableDrag, PROPOSAL_DROP_TARGET } from "./proposalGroups";
 import { PROPOSAL_GROUP_COLORS } from "../../../shared/proposalLinks";
 import "./proposal-groups.css";
 export function requestProposalGroupMenu(id:string,x:number,y:number) {
@@ -82,6 +82,60 @@ export function useProposalLinkDrop(project: ProjectSimulation) {
             "Mantén la propuesta sobre el destino hasta ver «Soltar para enlazar».",
           );
         clear();
+      },
+    },
+  };
+}
+/**
+ * Zona que rodea las propuestas: soltar una propuesta enlazada en un hueco (fuera de cualquier propuesta o carpeta)
+ * la desenlaza de su principal. Sus propias vinculadas la siguen, como una subcarpeta.
+ */
+export function useProposalUnlinkZone() {
+  const { projects, linkProposals } = useSimulationStore(useShallow((s) => ({ projects: s.projects, linkProposals: s.linkProposals })));
+  const [active, setActive] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState("");
+  useEffect(() => {
+    const clear = () => setActive(null);
+    document.addEventListener("dragend", clear, true);
+    window.addEventListener("blur", clear);
+    return () => { document.removeEventListener("dragend", clear, true); window.removeEventListener("blur", clear); };
+  }, []);
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = setTimeout(() => setFeedback(""), 4000);
+    return () => clearTimeout(timer);
+  }, [feedback]);
+  const candidate = (event: React.DragEvent) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest(`[${PROPOSAL_DROP_TARGET}]`)) return null;
+    return unlinkableDrag(currentProposalDrag(), projects);
+  };
+  const source = active ? projects.find((p) => p.id === active) : undefined;
+  return {
+    active: source ? source.client.name || "Sin nombre" : null,
+    feedback,
+    events: {
+      // En captura: al pasar a una propuesta o carpeta el aviso se apaga aunque esas paren la propagación.
+      onDragOverCapture: (event: React.DragEvent) => {
+        const next = candidate(event)?.id ?? null;
+        if (next !== active) setActive(next);
+      },
+      onDragOver: (event: React.DragEvent) => {
+        if (!candidate(event)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      },
+      onDragLeave: (event: React.DragEvent) => {
+        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+        setActive(null);
+      },
+      onDrop: (event: React.DragEvent) => {
+        const project = candidate(event);
+        setActive(null);
+        if (!project || event.defaultPrevented) return;
+        event.preventDefault();
+        const result = linkProposals(project.id, null);
+        setFeedback(result.success ? `«${project.client.name || "Sin nombre"}» ya no está enlazada.` : result.error || "No se pudo desenlazar.");
       },
     },
   };
