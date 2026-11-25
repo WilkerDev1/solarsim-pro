@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, FileText, Paperclip, Sparkles, Square, X } from 'lucide-react';
-import { composerDropEffect, composerKeyAction, leavesContainer, shouldRefocusComposer, useAutoGrow } from '../chatUi';
+import { createStopLatch, composerDropEffect, composerKeyAction, leavesContainer, shouldRefocusComposer, useAutoGrow } from '../chatUi';
 
 export interface ComposerAttachment { key: string; name: string; onRemove: () => void }
 
@@ -54,7 +54,9 @@ export function ChatComposer(props: ComposerProps) {
     if (!active || active === document.body || active === input.current) input.current?.focus({ preventScroll: true });
   }, [props.busy, input]);
   const hintId = `${props.id}-hint`;
-  const submit = () => { if (props.canSend && !props.busy) props.onSubmit(); };
+  const stopLatch = useRef(createStopLatch());
+  const stop = () => { stopLatch.current.stop(); props.onCancel(); };
+  const submit = () => { if (props.canSend && !props.busy && !stopLatch.current.blocks()) props.onSubmit(); };
   return (
     <form
       className="chat-composer"
@@ -100,7 +102,7 @@ export function ChatComposer(props: ComposerProps) {
           aria-describedby={hintId}
           onChange={(e) => props.onChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Escape' && props.busy) { e.preventDefault(); e.stopPropagation(); props.onCancel(); return; }
+            if (e.key === 'Escape' && props.busy) { e.preventDefault(); e.stopPropagation(); stop(); return; }
             if (composerKeyAction({ key: e.key, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, isComposing: e.nativeEvent.isComposing }) === 'send') {
               e.preventDefault();
               submit();
@@ -117,11 +119,12 @@ export function ChatComposer(props: ComposerProps) {
             {props.busy ? <span className="chat-composer-hint-busy">Esc detiene</span> : props.value.trim() ? <span className="chat-composer-hint-keys">Enter envía · Shift+Enter salta línea</span> : null}
           </span>
           {props.busy ? (
-            <button type="button" className="chat-send chat-stop" aria-label="Detener" title="Detener" onClick={props.onCancel}>
+            // `key` distinto: Detener y Enviar son elementos DOM diferentes, así el clic de Detener no se convierte en envío.
+            <button key="stop" type="button" className="chat-send chat-stop" aria-label="Detener" title="Detener" onClick={stop}>
               <Square size={14} fill="currentColor" />
             </button>
           ) : (
-            <button type="submit" className="chat-send" aria-label="Enviar mensaje" title="Enviar (Enter)" disabled={!props.canSend}>
+            <button key="send" type="submit" className="chat-send" aria-label="Enviar mensaje" title="Enviar (Enter)" disabled={!props.canSend}>
               <ArrowUp size={18} strokeWidth={2.5} />
             </button>
           )}
