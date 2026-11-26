@@ -11,11 +11,15 @@ const loadPDFProposalView = () => import('./components/pdf/PDFProposalView');
 const loadProjectHubView = () => import('./components/hub/ProjectHubView');
 const loadCompanyProfileHubView = () => import('./components/companies/CompanyProfileHubView');
 const loadClientsHubView = () => import('./components/clients/ClientsHubView');
+const loadQuotationsHubView = () => import('./components/quotations/QuotationsHubView');
+const loadQuotationEditorView = () => import('./components/quotations/editor/QuotationEditorView');
 const SimulatorView = lazy(() => loadSimulatorView().then((module) => ({ default: module.SimulatorView })));
 const PDFProposalView = lazy(() => loadPDFProposalView().then((module) => ({ default: module.PDFProposalView })));
 const ProjectHubView = lazy(() => loadProjectHubView().then((module) => ({ default: module.ProjectHubView })));
 const CompanyProfileHubView = lazy(() => loadCompanyProfileHubView().then((module) => ({ default: module.CompanyProfileHubView })));
 const ClientsHubView = lazy(() => loadClientsHubView().then((module) => ({ default: module.ClientsHubView })));
+const QuotationsHubView = lazy(() => loadQuotationsHubView().then((module) => ({ default: module.QuotationsHubView })));
+const QuotationEditorView = lazy(() => loadQuotationEditorView().then((module) => ({ default: module.QuotationEditorView })));
 import { ConflictResolutionModal } from './components/common/ConflictResolutionModal';
 import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
@@ -127,6 +131,8 @@ export const App: React.FC = () => {
               {activeView === 'project-hub' && <ProjectHubView />}
               {activeView === 'companies-hub' && <CompanyProfileHubView />}
               {activeView === 'clients-hub' && <ClientsHubView />}
+              {activeView === 'quotations-hub' && <QuotationsHubView />}
+              {activeView === 'quotation-editor' && <QuotationEditorView />}
               {activeView === 'simulator' && <SimulatorView />}
               {activeView === 'pdf-preview' && <PDFProposalView />}
             </Suspense>
