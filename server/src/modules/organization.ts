@@ -4,7 +4,7 @@ import type { Hono } from "hono";
 import type { Dependencies } from "../dependencies.js";
 import {
   featureSettingsForClient,
-  isFeatureSettings,
+  isFeatureSettingsForClient,
 } from "../../../shared/applicationFeatures.js";
 import { CLIENT_HEADER } from "../../../shared/clientVersion.js";
 import { isAdminRole } from "../../../shared/permissions.js";
@@ -23,7 +23,7 @@ export function registerOrganizationRoutes(
     return c.json({
       organizationId: user.organizationId,
       version: row.feature_policy_version,
-      // Forma según la versión del cliente: los anteriores validan exactamente una clave.
+      // Forma según la versión del cliente: cada uno recibe solo las claves que gestiona.
       settings: featureSettingsForClient(
         row.feature_settings,
         c.req.header(CLIENT_HEADER),
@@ -39,10 +39,12 @@ export function registerOrganizationRoutes(
         403,
       );
     const body = await readObjectBody(c);
-    // Solo la forma completa de esta versión (todas las claves, booleanas): un cliente anterior que envía una sola
-    // clave recibe 400 y no puede borrar la configuración que no conoce.
+    const clientHeader = c.req.header(CLIENT_HEADER);
+    // Exactamente las claves que gestiona la versión del cliente (`featureKeysForClient`), booleanas; las demás se
+    // conservan como están guardadas. Un cliente anterior a V3 no puede cambiar ni reiniciar `quotations` (tres claves
+    // desde 2.9.x: 400) y uno anterior a V2 no guarda.
     if (
-      !isFeatureSettings(body.settings) ||
+      !isFeatureSettingsForClient(body.settings, clientHeader) ||
       !Number.isSafeInteger(body.baseVersion) ||
       body.baseVersion < 1
     )
@@ -56,7 +58,7 @@ export function registerOrganizationRoutes(
         return c.json({ error: "Permisos cambiaron" }, denied);
       }
       const result = await client.query(
-        `UPDATE organizations SET feature_settings = $1, feature_policy_version = feature_policy_version + 1 WHERE id = $2 AND feature_policy_version = $3 RETURNING feature_settings, feature_policy_version`,
+        `UPDATE organizations SET feature_settings = feature_settings || $1::jsonb, feature_policy_version = feature_policy_version + 1 WHERE id = $2 AND feature_policy_version = $3 RETURNING feature_settings, feature_policy_version`,
         [JSON.stringify(body.settings), user.organizationId, body.baseVersion],
       );
       if (!result.rows.length) {
@@ -72,7 +74,7 @@ export function registerOrganizationRoutes(
         version: result.rows[0].feature_policy_version,
         settings: featureSettingsForClient(
           result.rows[0].feature_settings,
-          c.req.header(CLIENT_HEADER),
+          clientHeader,
         ),
       });
     } catch (error) {

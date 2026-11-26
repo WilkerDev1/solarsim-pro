@@ -227,17 +227,18 @@ assert.ok(legacyNote.includes('equivalente al 25% del valor de la energía exced
 const selector = APPLICATION_FEATURES.find((f) => f.id === 'netMeteringRegimeSelector');
 assert.ok(selector && selector.defaultEnabled === true && selector.available && selector.stage === 'beta');
 assert.ok(!DEVICE_APPLICATION_FEATURES.some((f) => (f.id as string) === 'netMeteringRegimeSelector'));
-assert.deepEqual(DEFAULT_FEATURE_SETTINGS, { selfConsumptionProjection: false, netMeteringRegimeSelector: true });
+assert.deepEqual(DEFAULT_FEATURE_SETTINGS, { selfConsumptionProjection: false, netMeteringRegimeSelector: true, quotations: true });
 // Política de una sola clave (API o cliente anteriores): se lee y el selector queda visible.
-assert.deepEqual(normalizeFeatureSettings({ selfConsumptionProjection: true }), { selfConsumptionProjection: true, netMeteringRegimeSelector: true });
+assert.deepEqual(normalizeFeatureSettings({ selfConsumptionProjection: true }), { selfConsumptionProjection: true, netMeteringRegimeSelector: true, quotations: true });
 assert.equal(isCompatibleFeatureSettings({ selfConsumptionProjection: false }), true);
 assert.equal(isCompatibleFeatureSettings({ selfConsumptionProjection: false, netMeteringRegimeSelector: false }), true);
 assert.equal(isCompatibleFeatureSettings({ selfConsumptionProjection: false, other: true }), false);
-// Al guardar solo vale la forma completa: un cliente anterior no puede sobrescribir la clave nueva.
+// Al guardar solo vale la forma completa (hoy tres claves, con `quotations`): un cliente anterior no puede sobrescribir las claves nuevas.
 assert.equal(isFeatureSettings({ selfConsumptionProjection: true }), false);
-assert.equal(isFeatureSettings({ selfConsumptionProjection: true, netMeteringRegimeSelector: false }), true);
+assert.equal(isFeatureSettings({ selfConsumptionProjection: true, netMeteringRegimeSelector: false }), false);
+assert.equal(isFeatureSettings({ selfConsumptionProjection: true, netMeteringRegimeSelector: false, quotations: true }), true);
 assert.equal(netMeteringRegimeSelectorVisible(DEFAULT_FEATURE_SETTINGS), true);
-assert.equal(netMeteringRegimeSelectorVisible({ selfConsumptionProjection: false, netMeteringRegimeSelector: false }), false);
+assert.equal(netMeteringRegimeSelectorVisible({ selfConsumptionProjection: false, netMeteringRegimeSelector: false, quotations: true }), false);
 {
   const snapshot = store.getState();
   try {
@@ -249,7 +250,7 @@ assert.equal(netMeteringRegimeSelectorVisible({ selfConsumptionProjection: false
     store.setState({ syncSettings: { ...snapshot.syncSettings, serverUrl: 'https://qa.example.invalid', authToken: 't', currentUser: user }, organizationFeaturePolicies: {} });
     assert.equal(netMeteringRegimeSelectorVisible(effectiveFeatureSettings(store.getState())), true);
     // La política de la organización manda.
-    store.setState({ organizationFeaturePolicies: { [featureScope('https://qa.example.invalid', 'org-x')]: { organizationId: 'org-x', version: 3, settings: { selfConsumptionProjection: false, netMeteringRegimeSelector: false } } } });
+    store.setState({ organizationFeaturePolicies: { [featureScope('https://qa.example.invalid', 'org-x')]: { organizationId: 'org-x', version: 3, settings: { selfConsumptionProjection: false, netMeteringRegimeSelector: false, quotations: true } } } });
     assert.equal(netMeteringRegimeSelectorVisible(effectiveFeatureSettings(store.getState())), false);
   } finally {
     store.setState(snapshot, true);

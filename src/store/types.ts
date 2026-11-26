@@ -77,8 +77,12 @@ export interface DefaultSimulationSettings {
   annualEnergyTariffEscalationPct: number;
 }
 
-/** Vistas principales de la aplicación. `clients-hub` lo implementa el directorio de clientes. */
-export type AppView = 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub' | 'clients-hub';
+/**
+ * Vistas principales de la aplicación. `clients-hub` lo implementa el directorio de clientes; `quotations-hub` y
+ * `quotation-editor`, el módulo de cotizaciones. `activeView` se persiste y `activeQuotationId` no: al hidratar,
+ * `quotation-editor` pasa a `quotations-hub`.
+ */
+export type AppView = 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub' | 'clients-hub' | 'quotations-hub' | 'quotation-editor';
 /** Pestañas del modal de Ajustes. `agents` agrupa permisos, actividad y conexión MCP. */
 export type SettingsTab = 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features' | 'agents';
 
@@ -236,6 +240,12 @@ export interface AISlice {
 }
 
 export interface UISlice {
+  /** Cotización abierta en el editor; no se persiste (al reabrir la app el editor vuelve al catálogo). */
+  activeQuotationId: string | null;
+  /** Abre una cotización en el editor. */
+  openQuotation: (id: string) => void;
+  /** Cierra el editor y vuelve al catálogo de cotizaciones. */
+  closeQuotation: () => void;
   appAssistantEnabled: boolean;
   setAppAssistantEnabled: (enabled: boolean) => void;
   isNewProjectModalOpen: boolean;

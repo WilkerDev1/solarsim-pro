@@ -18,6 +18,13 @@ export const DEFAULT_MIN_CLIENT_VERSION = '2.7.1';
  * alcance este valor, la distinción deja de tener efecto.
  */
 export const FEATURE_POLICY_V2_CLIENT_VERSION = '2.8.0';
+/**
+ * Primera versión que entiende la política de tres claves (`quotations`, catálogo de cotizaciones). La API devuelve
+ * a los clientes desde `FEATURE_POLICY_V2_CLIENT_VERSION` hasta la anterior a esta solo las dos claves que validan, y
+ * las tres a esta versión o posteriores. Debe ser la versión de la release que incluye el cambio (ajustarla si esa
+ * release no es la 2.10.0); cuando `MIN_CLIENT_VERSION` alcance este valor, la distinción deja de tener efecto.
+ */
+export const FEATURE_POLICY_V3_CLIENT_VERSION = '2.10.0';
 
 export interface ClientIdentity {
   name: string;

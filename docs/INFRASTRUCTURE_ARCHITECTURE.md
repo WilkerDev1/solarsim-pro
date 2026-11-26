@@ -153,6 +153,19 @@ Orden (ya no es frágil):
 
 Rollback: la imagen 2.7.4 es compatible con los datos (normaliza `feature_settings` a una clave e ignora la otra). Si una política se guardó con `netMeteringRegimeSelector: false` y un cliente 2.7.4 la vuelve a guardar con la API anterior, la clave se pierde y vuelve al valor por defecto (visible).
 
+### Cotizaciones: política de funciones con tres claves (`FEATURE_POLICY_V3_CLIENT_VERSION`)
+
+La política gana la clave `quotations` (función «Cotizaciones», activada por defecto). Sin migración: la fila que no la tiene vale el defecto al leerse.
+
+- **Reparto por versión.** La API lee y guarda según `X-SolarSim-Client` (`featureKeysForClient`): antes de `FEATURE_POLICY_V2_CLIENT_VERSION` (2.8.0), una clave; desde 2.8.0 y antes de `FEATURE_POLICY_V3_CLIENT_VERSION` (`shared/clientVersion.ts`, `2.10.0`; una prerrelease `2.10.0-beta.N` es anterior), dos; desde esa versión, tres. El PATCH acepta exactamente las claves de esa versión y las **fusiona** con la fila guardada: un cliente 2.9.x (o una compilación de `beta` que aún se identifica como 2.9.4) guarda sus dos claves sin tocar `quotations`, y uno que envíe tres recibe 400. Los anteriores a 2.8.0 no guardan.
+- **Cliente.** Guarda solo las claves que el servidor le devolvió (`managedFeatures` de la política); las demás se muestran deshabilitadas en Ajustes con «Disponible para la organización a partir de la versión X del cliente», así nunca inventa ni pisa un valor.
+- **Orden: API antes que el cliente.**
+  1. Checkpoint y ensayo de restauración.
+  2. **API** (y Worker) de la versión nueva. Los clientes 2.9.x siguen leyendo y guardando sus dos claves.
+  3. **Release de escritorio** con versión ≥ `FEATURE_POLICY_V3_CLIENT_VERSION` (lo exigen `release:bump` y `release:manifests`, ver [Mantenimiento](MAINTENANCE_AND_UPDATES.md#publicar-una-versión-de-escritorio)). Contra una API anterior el cliente nuevo funciona con dos claves, pero la organización no puede gestionar las cotizaciones (quedan visibles por defecto) hasta que la API sea la nueva.
+- **Marcha atrás.** Volver a una API 2.9.x es compatible con los datos (lee dos claves), pero su PATCH **reemplaza** la fila con esas dos: la primera vez que alguien guarde la política, `quotations` se pierde y vuelve al defecto (visible). Además, la API 2.9.x tampoco devuelve esa clave al leer: desde el momento de la marcha atrás, y aunque nadie guarde, los clientes 2.10 de las organizaciones que la apagaron vuelven a mostrar Cotizaciones. Antes de volver atrás, anotar el valor de `quotations` de cada organización que la haya apagado y reaplicarlo tras recuperar la API nueva.
+- **Versión mínima.** No cambia. Cuando `MIN_CLIENT_VERSION` alcance `FEATURE_POLICY_V3_CLIENT_VERSION`, el reparto por versión deja de tener efecto.
+
 ### Versión 2.8.2: imágenes del documento una sola vez (migración 009)
 
 Migración aditiva 009 (`document_assets`) con relleno: mueve logos y miniaturas de anexos de cada propuesta a la tabla y deja referencias, sin cambiar `version` ni `updated_at` ([API](DATABASE_AND_API_SPECIFICATION.md#imágenes-del-documento-migración-009)). Los clientes que no piden `?assetRefs=1` (2.8.1 y anteriores, agentes) siguen recibiendo las imágenes en línea: `MIN_CLIENT_VERSION` no cambia.

@@ -4,6 +4,7 @@ import { QuotationSyncService } from '../services/quotationSyncService';
 import { ClientSyncService } from '../services/clientSyncService';
 import { canTransitionQuotation, formatQuotationNumber, quotationNumberYear, validateQuotationContent } from '../../shared/quotations';
 import { isAssetRef } from '../../shared/documentAssets';
+import { quotationSyncIssue } from '../utils/quotationSummary';
 import { contentEqual } from '../store/sync/projectDifferences';
 import type { QuotationContent, QuotationLine, QuotationRecord } from '../types/quotation';
 
@@ -22,6 +23,8 @@ let dropResponseFor: string | null = null;
 let holdList: Promise<void> | null = null;
 let forbidDelete = false;
 let onPut: ((id: string) => void) | null = null;
+/** Next PUT answers this 4xx instead of the server's response (after `onPut`). */
+let failNextPut: { status: number; error: string; code?: string } | null = null;
 const invalidClients = new Set<string>();
 const invalidFolders = new Set<string>();
 const calls: string[] = [];
@@ -120,6 +123,11 @@ QuotationSyncService.setTransportFactory((url, token) => async (path, init = {})
   assert.deepEqual(Object.keys(body).sort(), ['baseVersion', 'content']);
   const response = serverPut(id, body.baseVersion, body.content);
   onPut?.(id);
+  if (failNextPut) {
+    const { status, ...rest } = failNextPut;
+    failNextPut = null;
+    return json(rest, status);
+  }
   if (id === dropResponseFor) {
     dropResponseFor = null;
     throw new Error('Conexión interrumpida tras enviar');
@@ -636,6 +644,21 @@ try {
   assert.equal(api().quotationChanges[racing.quotation.id], undefined, 'The resolved conflict stays resolved');
   assert.equal(find(racing.quotation.id).notes, 'v3', 'and the newest copy is installed by the same pass');
   assert.equal(api().quotationSyncFeedback, null);
+
+  // 11b. An edit made while a PUT is in flight that ends in a 4xx: the rejection belongs to the previous revision, so
+  // the catalog shows a pending change (not an active rejection) and the next pass retries the new revision.
+  begin();
+  const inFlight = api().createQuotationRecord({ client: printed, items: [line('l1')] });
+  assert.ok(inFlight.ok);
+  failNextPut = { status: 400, error: 'Rechazado por validación', code: 'invalid' };
+  onPut = (putId) => { if (putId === inFlight.quotation.id) api().updateQuotationRecord(putId, { notes: 'Editada durante el PUT' }); };
+  await sync();
+  onPut = null;
+  const afterFlight = api().quotationChanges[inFlight.quotation.id];
+  assert.ok(afterFlight.rejected, 'the 4xx is recorded');
+  assert.notEqual(afterFlight.rejected!.revision, afterFlight.revision, 'for the revision that was sent, not the new one');
+  const flightIssue = quotationSyncIssue(inFlight.quotation.id, { changes: api().quotationChanges, deletionQueue: api().quotationDeletionQueue, userId: user.id, signedIn: true });
+  assert.equal(flightIssue?.kind, 'pending', 'a superseded rejection is shown as pending, not as rejected');
 
   // 12. Project sync runs quotations right after clients; a quotation failure does not block proposals.
   const order: string[] = [];

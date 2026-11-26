@@ -1,5 +1,6 @@
 import { isAdminRole } from '../../../shared/permissions';
-import { ApplicationFeatureSettings, DEFAULT_FEATURE_SETTINGS, featureScope, normalizeFeatureSettings, OrganizationFeaturePolicy } from '../../../shared/applicationFeatures';
+import { ApplicationFeatureSettings, DEFAULT_FEATURE_SETTINGS, featureScope, normalizeFeatureSettings, OrganizationFeaturePolicy, pickFeatureSettings } from '../../../shared/applicationFeatures';
+import { organizationManagedFeatures } from '../../features/application/featurePolicy';
 import { requestFeaturePolicy } from '../../services/featurePolicyService';
 import { SimulationSlice } from '../types';
 
@@ -29,7 +30,7 @@ export const createFeatureSettingsSlice: SimulationSlice<FeatureSettingsSlice> =
       const confirmed = get().organizationFeaturePolicies[scope];
       if (settings && !isAdminRole(currentUser.role)) throw new Error('Solo un administrador puede cambiar esta configuración.');
       if (settings && !confirmed) throw new Error('Consulta primero la configuración del servidor.');
-      const policy = await requestFeaturePolicy(serverUrl, authToken, currentUser.organizationId, settings ? { settings: normalizeFeatureSettings(settings), baseVersion: confirmed.version } : undefined);
+      const policy = await requestFeaturePolicy(serverUrl, authToken, currentUser.organizationId, settings ? { settings: pickFeatureSettings(normalizeFeatureSettings(settings), organizationManagedFeatures(confirmed)), baseVersion: confirmed.version } : undefined);
       if (!stillCurrent()) return;
       set((state) => ({ organizationFeaturePolicies: { ...state.organizationFeaturePolicies, [scope]: policy }, featurePolicyRequest: { scope, status: 'ready' } }));
     } catch (error) {

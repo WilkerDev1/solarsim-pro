@@ -41,9 +41,9 @@ try {
   // 2. Respuesta HTTP sintética de una clave (API anterior o lectura para cliente anterior): aceptada y completada.
   globalThis.fetch = (async () => Response.json({ organizationId: user.organizationId, version: 4, settings: { selfConsumptionProjection: true } })) as typeof fetch;
   const policy = await requestFeaturePolicy(serverUrl, 'synthetic', user.organizationId);
-  assert.deepEqual(policy.settings, { selfConsumptionProjection: true, netMeteringRegimeSelector: true });
+  assert.deepEqual(policy.settings, { selfConsumptionProjection: true, netMeteringRegimeSelector: true, quotations: true });
   globalThis.fetch = (async () => Response.json({ organizationId: user.organizationId, version: 5, settings: { selfConsumptionProjection: false, netMeteringRegimeSelector: false } })) as typeof fetch;
-  assert.deepEqual((await requestFeaturePolicy(serverUrl, 'synthetic', user.organizationId)).settings, { selfConsumptionProjection: false, netMeteringRegimeSelector: false });
+  assert.deepEqual((await requestFeaturePolicy(serverUrl, 'synthetic', user.organizationId)).settings, { selfConsumptionProjection: false, netMeteringRegimeSelector: false, quotations: true });
   globalThis.fetch = (async () => Response.json({ organizationId: user.organizationId, version: 5, settings: { selfConsumptionProjection: false, unknown: true } })) as typeof fetch;
   await assert.rejects(() => requestFeaturePolicy(serverUrl, 'synthetic', user.organizationId), /inválida/);
 } finally {

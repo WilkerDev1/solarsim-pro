@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { execFileSync } from 'child_process';
 import { RELEASE_SIGNER_FINGERPRINT, RELEASE_PUBLIC_KEY } from '../electron/updater/trustedReleaseKey';
 import { validateReleaseVersion } from '../electron/updater/releaseVersion';
+import { assertReleaseVersionSupportsFeaturePolicy } from './qa/releaseVersionGuard';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +22,7 @@ function getHash(filePath: string, algorithm: 'sha256' | 'sha512'): string {
 export function generateManifests() {
   const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8'));
   const version = pkg.version;
+  assertReleaseVersionSupportsFeaturePolicy(version);
   console.log(`\n📋 Generando manifiestos de actualización para SolarSim Pro v${version}...`);
 
   // GitHub rejects assets differing only by case. Keep only the distinct Debian alias.
@@ -182,6 +184,7 @@ export function signLinuxPackages() {
 
 export function bumpVersion(newVersion: string) {
   validateReleaseVersion(newVersion);
+  assertReleaseVersionSupportsFeaturePolicy(newVersion);
   console.log(`\n🔄 Sincronizando versión a ${newVersion} en todos los JSON y servicios...`);
 
   // 1. package.json raíz

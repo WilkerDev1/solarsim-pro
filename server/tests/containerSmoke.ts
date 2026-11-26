@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { FEATURE_POLICY_V3_CLIENT_VERSION } from "../../shared/clientVersion.js";
 
 // Explicit image smoke test, isolated from production and cleaned in finally.
 const suffix = randomUUID();
@@ -121,14 +122,19 @@ try {
     version: number;
   };
   assert.equal(policy.settings.selfConsumptionProjection, false);
+  // Guardar la política exige la forma completa de un cliente que la gestiona entera (FEATURE_POLICY_V3_CLIENT_VERSION).
   const changed = await fetch(`${base}/api/organization/features`, {
     method: "PATCH",
-    headers,
+    headers: {
+      ...headers,
+      "X-SolarSim-Client": `desktop/${FEATURE_POLICY_V3_CLIENT_VERSION}`,
+    },
     body: JSON.stringify({
       baseVersion: policy.version,
       settings: {
         selfConsumptionProjection: true,
         netMeteringRegimeSelector: true,
+        quotations: true,
       },
     }),
   });
