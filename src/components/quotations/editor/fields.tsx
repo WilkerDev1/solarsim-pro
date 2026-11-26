@@ -1,11 +1,13 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useId, useReducer } from 'react';
 import { parseDecimalInput } from '../../../domain/quotationEdit';
+import { fieldDraftReducer, initialFieldDraft, pendingCommit } from './fieldState';
 
 /** Guarda un valor confirmado; devuelve el mensaje de error (validación del store) o `null` si se guardó. */
 export type Commit<T> = (value: T) => string | null;
 
 interface DraftOptions<T> {
   display: string;
+  readOnly: boolean;
   commit: Commit<T>;
   /** Texto → valor; `null` si no se entiende (muestra `invalidMessage`). */
   parse: (text: string) => T | null;
@@ -15,40 +17,34 @@ interface DraftOptions<T> {
 }
 
 /**
- * Borrador local de un campo: lo tecleado no se reescribe a mitad; se confirma al salir del campo o con Enter
- * (Escape lo descarta). Un valor rechazado queda en el campo con su mensaje y no se guarda.
+ * Borrador local de un campo (reglas en `fieldState.ts`): lo tecleado no se reescribe a mitad; se confirma al salir
+ * del campo o con Enter, solo si el usuario lo modificó (Escape lo descarta). Un valor rechazado queda en el campo con
+ * su mensaje y no se guarda.
  */
-function useDraft<T>({ display, commit, parse, same, invalidMessage = 'Escribe un valor válido.' }: DraftOptions<T>) {
-  const [draft, setDraft] = useState(display);
-  const [focused, setFocused] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Lo guardado cambió por otra vía (otra pestaña, sincronización, cambio de moneda): el campo lo refleja si no se edita.
-  useEffect(() => {
-    if (!focused && !error) setDraft(display);
-  }, [display, focused, error]);
+function useDraft<T>({ display, readOnly, commit, parse, same, invalidMessage = 'Escribe un valor válido.' }: DraftOptions<T>) {
+  const [state, dispatch] = useReducer(fieldDraftReducer, undefined, () => initialFieldDraft(display, readOnly));
+  // Lo guardado o el permiso cambiaron por otra vía (sincronización, cambio de moneda, reabrir): se ajusta al dibujar.
+  if (state.display !== display || state.readOnly !== readOnly) dispatch({ type: 'stored', display, readOnly });
   const settle = () => {
-    const value = parse(draft);
-    if (value === null) {
-      setError(invalidMessage);
+    const text = pendingCommit(state);
+    if (text === null) {
+      if (state.dirty || state.error) dispatch({ type: 'escape' });
       return;
     }
-    if (same(value)) {
-      setError(null);
-      setDraft(display);
-      return;
-    }
-    const failure = commit(value);
-    setError(failure);
+    const value = parse(text);
+    if (value === null) return dispatch({ type: 'result', error: invalidMessage });
+    if (same(value)) return dispatch({ type: 'escape' });
+    dispatch({ type: 'result', error: commit(value) });
   };
   return {
-    draft,
-    error,
-    onChange: (text: string) => { setDraft(text); setError(null); },
-    onFocus: () => setFocused(true),
-    onBlur: () => { setFocused(false); settle(); },
+    draft: state.draft,
+    error: state.error,
+    onChange: (text: string) => dispatch({ type: 'input', text }),
+    onFocus: () => dispatch({ type: 'focus' }),
+    onBlur: () => { dispatch({ type: 'blur' }); settle(); },
     onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>, multiline = false) => {
       if (event.key === 'Enter' && !multiline) { event.preventDefault(); settle(); }
-      if (event.key === 'Escape') { setDraft(display); setError(null); }
+      if (event.key === 'Escape') dispatch({ type: 'escape' });
     },
   };
 }
@@ -88,7 +84,7 @@ export interface TextFieldProps extends FieldShell {
 
 export const TextField: React.FC<TextFieldProps> = ({ value, onCommit, type = 'text', multiline, rows = 3, maxLength, placeholder, autoComplete = 'off', readOnly, ...shell }) => {
   const id = useId();
-  const field = useDraft<string>({ display: value, commit: onCommit, parse: (text) => text, same: (text) => text.trim() === value.trim() });
+  const field = useDraft<string>({ display: value, readOnly: !!readOnly, commit: onCommit, parse: (text) => text, same: (text) => text.trim() === value.trim() });
   const common = {
     id,
     value: field.draft,
@@ -98,7 +94,7 @@ export const TextField: React.FC<TextFieldProps> = ({ value, onCommit, type = 't
     'aria-invalid': field.error ? true : undefined,
     'aria-describedby': describedBy(id, field.error, shell.hint),
     onFocus: field.onFocus,
-    onBlur: readOnly ? undefined : field.onBlur,
+    onBlur: field.onBlur,
   };
   return (
     <Shell {...shell} id={id} error={field.error}>
@@ -124,6 +120,7 @@ export const NumberField: React.FC<NumberFieldProps> = ({ value, onCommit, forma
   const id = useId();
   const field = useDraft<number>({
     display: format(value),
+    readOnly: !!readOnly,
     commit: onCommit,
     parse: (text) => {
       const parsed = parseDecimalInput(text);
@@ -147,7 +144,7 @@ export const NumberField: React.FC<NumberFieldProps> = ({ value, onCommit, forma
           aria-describedby={describedBy(id, field.error, shell.hint)}
           onChange={(e) => field.onChange(e.target.value)}
           onFocus={field.onFocus}
-          onBlur={readOnly ? undefined : field.onBlur}
+          onBlur={field.onBlur}
           onKeyDown={(e) => field.onKeyDown(e)}
         />
         {suffix && <span aria-hidden="true">{suffix}</span>}
