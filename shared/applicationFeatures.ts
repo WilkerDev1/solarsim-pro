@@ -4,9 +4,10 @@ export type FeatureStage = 'stable' | 'beta' | 'experimental';
 export type EnergyCalculationMode = 'legacy' | 'self_consumption';
 /**
  * Política de funciones de la organización. Tiene tres claves desde la versión que introduce las cotizaciones (dos
- * desde el régimen de medición neta); la API solo guarda la forma completa (`isFeatureSettings`), así que un cliente
- * anterior (una o dos claves) no puede sobrescribirla. Una respuesta o una política guardada con menos claves se sigue
- * leyendo (`isCompatibleFeatureSettings`) y la clave que falta toma su valor por defecto.
+ * desde el régimen de medición neta). La API lee y guarda exactamente las claves que gestiona la versión del cliente
+ * (`featureKeysForClient`, `isFeatureSettingsForClient`) y las fusiona con la fila guardada, así que un cliente
+ * anterior no puede cambiar ni resetear una clave que no conoce. Una respuesta o una política guardada con menos
+ * claves se sigue leyendo (`isCompatibleFeatureSettings`) y la clave que falta toma su valor por defecto.
  */
 export interface ApplicationFeatureSettings { selfConsumptionProjection: boolean; netMeteringRegimeSelector: boolean; quotations: boolean }
 export interface OrganizationFeaturePolicy {

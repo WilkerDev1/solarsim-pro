@@ -23,7 +23,7 @@ export function registerOrganizationRoutes(
     return c.json({
       organizationId: user.organizationId,
       version: row.feature_policy_version,
-      // Forma según la versión del cliente: los anteriores validan exactamente una clave.
+      // Forma según la versión del cliente: cada uno recibe solo las claves que gestiona.
       settings: featureSettingsForClient(
         row.feature_settings,
         c.req.header(CLIENT_HEADER),
