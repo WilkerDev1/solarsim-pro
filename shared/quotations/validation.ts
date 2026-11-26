@@ -306,6 +306,16 @@ function parse(data: Record<string, unknown>): QuotationContent {
   return value;
 }
 
+/** Diseño de cotización o de plantilla normalizado (mismas reglas que `design` del contenido); nunca lanza. */
+export function validateQuotationDesign(data: unknown): { ok: true; value: QuotationDesign } | { ok: false; error: string } {
+  try {
+    return { ok: true, value: design(data) };
+  } catch (error) {
+    if (error instanceof Invalid) return { ok: false, error: error.message };
+    throw error;
+  }
+}
+
 /** Valida y normaliza contenido no confiable; descarta claves desconocidas y nunca lanza. */
 export function validateQuotationContent(data: unknown): QuotationValidation {
   if (!isRecord(data)) return { ok: false, error: 'Cotización inválida' };

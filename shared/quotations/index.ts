@@ -13,3 +13,10 @@ export {
   QUOTATION_SHEET_TEXTS, currencySymbol, formatExchangeRate, formatQuantity, formatSheetDate, itbisPercentLabel, sheetCurrencyLabel, sheetPageLabel,
 } from './sheetTexts.js';
 export { quotationFromProposal, type ProposalQuotationSource, type QuotationFromProposalOptions } from './fromProposal.js';
+export { validateQuotationDesign } from './validation.js';
+export {
+  QUOTATION_LIBRARY_LIMITS, addDaysIso, applyTemplateToNewContent, checkSignatureImage, defaultQuotationSignature, defaultQuotationTemplate,
+  designFromTemplate, templateFromQuotation, validateQuotationSignature, validateQuotationTemplate,
+  type LibraryValidation, type QuotationLibraryMeta, type QuotationSignature, type QuotationSignatureContent, type QuotationSignatureKind,
+  type QuotationTemplate, type QuotationTemplateContent, type QuotationTemplateDesign,
+} from './library.js';

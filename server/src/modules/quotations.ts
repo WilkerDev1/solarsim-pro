@@ -74,7 +74,7 @@ const current = (row: Record<string, any> | undefined) =>
 const ISO_INSTANT =
   /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/;
 const MAX_INSTANT = Date.UTC(9999, 11, 31, 23, 59, 59, 999);
-function normalizeSince(value: string): string | null {
+export function normalizeSince(value: string): string | null {
   const match = ISO_INSTANT.exec(value);
   if (!match) return null;
   const [year, month, day] = [
