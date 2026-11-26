@@ -40,6 +40,9 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 | GET /api/clients | Clientes activos de la organización y `deletedIds`; también lectores. |
 | PUT /api/clients/:id | Escritores; `{...cliente, baseVersion}` CAS (0 = crear). 409 con `client` actual o `null` si está borrado. |
 | DELETE /api/clients/:id | `?baseVersion=N`; borrado lógico que quita `clientId` de las propuestas y sube su versión. |
+| GET /api/quotations | `?since=<ISO>` opcional; también lectores. `{quotations, deletedIds, serverTimestamp}`: sin `since`, todas las vivas y todos los ids borrados; con `since`, solo las filas con `updated_at` en `[since, serverTimestamp]` (mismo corte que `/api/sync/pull`). `since` inválido → 400. [Cotizaciones](#cotizaciones-migración-011). |
+| PUT /api/quotations/:id | Escritores; `{baseVersion, content}` CAS (0 = crear; la API asigna `number`). 400 `{error}` si el contenido no valida, `inline_image_not_allowed`, `invalid_transition` o `quotation_locked`; 409 `{error, quotation}` (`null` si está borrada; un id borrado no se revive) o `{error, code:'invalid_client', reason:'invalid_client', quotation}`. |
+| DELETE /api/quotations/:id | Escritores; `?baseVersion=N`, borrado lógico CAS (409 con el registro actual o `null`; repetir con la versión borrada es idempotente; 404 si no existe). |
 | GET /api/projects | `?query=&clientId=&limit=` (máx. 50): resumen de propuestas fuera de la papelera, sin el documento completo. También lectores. |
 | GET /api/projects/:id | Propuesta canónica del tenant; con sesión de escritorio incluye la papelera (`isDeleted`), con token de agente una propuesta en papelera responde 404. 404 si es ajena. El escritorio la usa para leer una sola propuesta (abrir un conflicto, borrados en cola tras una descarga parcial). |
 | PUT /api/projects/:id/client-link | Escritores; `{clientId: string \| null, baseVersion}` CAS. Solo cambia el enlace; el cliente debe existir y no estar borrado (404); 409 si la versión cambió o la propuesta está en la papelera. |
@@ -97,6 +100,29 @@ La migración aditiva 004 incorpora `project_folders` y `equipment_assets`. Las 
 ## Clientes
 
 La migración aditiva 005 incorpora `clients` (PK `(organization_id, id)`, versión, autoría y `deleted_at`) y los índices `clients(id)`, `clients(organization_id, tax_id)` y `projects(organization_id, data_json->>'clientId')`. El enlace vive en `data_json.clientId` de la propuesta. Es independiente de los datos impresos y la restauración de historial lo conserva. Contrato completo: [directorio de clientes](CLIENTS.md).
+
+## Cotizaciones (migración 011)
+
+La migración aditiva 011 crea `quotations` y `quotation_counters` ([ADR 0007](adr/0007-cotizaciones-entidad-propia.md); reglas del documento en `shared/quotations/`, que la API importa sin reimplementar). Rutas en `server/src/modules/quotations.ts`; no están en `AGENT_ROUTES` (un token `ssm_…` recibe 403 `agent_route_forbidden`) y exigen `X-SolarSim-Client`.
+
+| Tabla / columna | Contrato |
+| --- | --- |
+| `quotations` | PK `(organization_id, id)`, `UNIQUE (organization_id, number)`; borrado en cascada con la organización. |
+| `number` | `COT-AAAA-NNNN` (`formatQuotationNumber`), asignado al crear y nunca cambiado (aunque cambie `issueDate`) ni reutilizado tras un borrado. |
+| `status` | `draft`, `issued`, `accepted`, `rejected`, `void` (copia de `data_json.status`). |
+| `client_id`, `source_project_id`, `folder_id` | Copias indexables de los enlaces del contenido (nulas si no hay enlace). |
+| `data_json` | `QuotationContent` normalizado por `validateQuotationContent`. |
+| `created_by_id`, `created_by_name`, `version`, `created_at`, `updated_at`, `deleted_at` | Autoría, CAS, marcas de `clock_timestamp()` y borrado lógico. |
+| `quotation_counters` | PK `(organization_id, year)`, `last_number`: último número emitido por organización y año de emisión. |
+
+Índices `(organization_id, updated_at)`, `(organization_id, client_id)` y `(organization_id, folder_id)` (parciales, sin nulos).
+
+- **Numeración.** Al crear, el año es `quotationNumberYear(content.issueDate)` y la secuencia sale de `INSERT … ON CONFLICT DO UPDATE SET last_number = last_number + 1` en la misma transacción que inserta la cotización: dos creaciones concurrentes nunca comparten número, un fallo revierte también el contador y un borrado no devuelve el número.
+- **Escritura.** El rol escritor se revalida con `lockCurrentMembership`. `content` pasa por `validateQuotationContent` (400). La API no guarda imágenes en línea: `issuer.logo` y `attachments[].thumbnailDataUrl` deben ser `''` o `asset:sha256:<hex>` (400 `inline_image_not_allowed`); no comprueba que el activo exista. Al actualizar, un cambio de estado debe cumplir `canTransitionQuotation` (400 `invalid_transition`) y, si el estado guardado bloquea el contenido (`isQuotationContentLocked`: todo menos `draft`), el resto del contenido normalizado debe ser idéntico (400 `quotation_locked`): desde borrador se edita y emite en el mismo PUT; una emitida se reabre (`issued → draft`) y se edita en un PUT posterior.
+- **Enlaces.** `clientId` sigue la regla del push de propuestas: malformado, de otra organización o borrado → 409 `invalid_client`; un id desconocido se acepta (cliente creado sin conexión). `folderId` y `sourceProjectId` se aceptan si están bien formados.
+- **Bloqueo y corte.** Escrituras, borrados y desenlaces toman el bloqueo transaccional `solarsim-quotations:<organización>` (exclusivo) antes del de membresía y, cuando también hace falta, después del de proyectos; la lectura lo toma compartido y calcula el cursor dentro de él, así una descarga parcial no pierde escrituras concurrentes.
+- **Desenlace en cascada.** Borrar un cliente o una carpeta quita en la misma transacción `clientId`/`client_id` o `folderId`/`folder_id` de las cotizaciones vivas de la organización y sube su `version` y `updated_at`; los datos impresos (`client`) no cambian.
+- Pruebas: `server/tests/quotations.test.ts` (PostgreSQL efímero).
 
 ## Tokens de agente (MCP remoto)
 

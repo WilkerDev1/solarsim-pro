@@ -3,6 +3,7 @@ import type { Dependencies } from "../dependencies.js";
 import { lockCurrentMembership } from "../membership.js";
 import { readObjectBody } from "../request.js";
 import { lockOrganization } from "./projectRepository.js";
+import { lockQuotations, unlinkQuotations } from "./quotations.js";
 const folder = (r: Record<string, any>) => ({
   id: r.id,
   organizationId: r.organization_id,
@@ -143,6 +144,7 @@ export function registerFolderRoutes(
       await client.query("BEGIN");
       // Project mutations acquire this lock first; preserve ordering and delta cursor consistency.
       await lockOrganization(client, user.organizationId);
+      await lockQuotations(client, user.organizationId);
       const denied = await lockCurrentMembership(client, user);
       if (denied) {
         await client.query("ROLLBACK");
@@ -185,6 +187,7 @@ export function registerFolderRoutes(
           "UPDATE projects SET data_json=data_json-'folderId',version=version+1,updated_at=clock_timestamp() WHERE organization_id=$1 AND data_json->>'folderId'=$2",
           [user.organizationId, row.id],
         );
+        await unlinkQuotations(client, user.organizationId, "folderId", row.id);
       }
       await client.query("COMMIT");
       return c.json({ success: true });
