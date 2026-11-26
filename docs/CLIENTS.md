@@ -22,6 +22,7 @@ Registro de clientes por organización (o por equipo, en modo local) al que se e
 
 `DELETE /api/clients/:id?baseVersion=N` hace un borrado lógico.
 - En la misma transacción quita `clientId` de las propuestas enlazadas y sube su versión.
+- También desenlaza sus cotizaciones (quita `clientId` y sube su versión; los datos impresos no cambian): ver [cotizaciones](DATABASE_AND_API_SPECIFICATION.md#cotizaciones-migración-011).
 - Toma el bloqueo de proyectos (`lockOrganization`) antes del de membresía, igual que carpetas.
 
 En el push de propuestas, un `clientId` malformado, de otra organización o borrado produce el conflicto `invalid_client`. Los ids desconocidos se aceptan: son clientes creados sin conexión que aún no se han publicado.

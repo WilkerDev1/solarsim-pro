@@ -130,7 +130,7 @@ before(
        ON CONFLICT (id) DO NOTHING`,
     );
   },
-  { timeout: 60000 },
+  { timeout: 120000 },
 );
 after(async () => {
   await database?.stop();

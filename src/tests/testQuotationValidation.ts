@@ -327,4 +327,20 @@ fail(draft({ issueDate: '2199-12-01', validUntil: '2200-01-01' }), /vigencia.*20
   ok(draft({ exchangeRate: QUOTATION_LIMITS.maxExchangeRate }));
 }
 
+// texto: ni carácter nulo ni sustitutos UTF-16 sueltos (PostgreSQL jsonb los rechaza), en cualquier campo de texto
+{
+  const bad = /caracteres no válidos/i;
+  for (const value of ['a\u0000b', 'a\ud800b', 'a\udc00b', '\ud800', 'fin\udbff']) {
+    fail(draft({ notes: value }), bad, `notas ${JSON.stringify(value)}`);
+    fail(draft({ client: { name: value } }), bad, `cliente ${JSON.stringify(value)}`);
+    fail(draft({ items: [itemLine({ description: value })] }), bad, `línea ${JSON.stringify(value)}`);
+    fail(draft({ items: [itemLine({ id: value })] }), bad, `id de línea ${JSON.stringify(value)}`);
+    fail(draft({ issuer: { name: value } }), bad, `emisor ${JSON.stringify(value)}`);
+    fail(draft({ clientId: value }), bad, `clientId ${JSON.stringify(value)}`);
+    fail(draft({ discounts: [{ id: 'd', label: value, type: 'fixed', value: 1 }] }), bad, `descuento ${JSON.stringify(value)}`);
+  }
+  // Los pares bien formados (emoji) siguen siendo válidos.
+  assert.equal(ok(draft({ notes: 'Gracias ☀️ 😀' })).notes, 'Gracias ☀️ 😀');
+}
+
 console.log('Quotation validation tests passed.');

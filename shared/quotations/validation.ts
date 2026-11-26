@@ -71,10 +71,15 @@ export function isIsoDate(value: unknown): value is string {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
+/** Carácter nulo o sustituto UTF-16 sin pareja: PostgreSQL (jsonb) no los admite y no son texto válido. */
+const INVALID_TEXT = /\u0000|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+const INVALID_TEXT_MESSAGE = 'El texto contiene caracteres no válidos (carácter nulo o sustituto UTF-16 suelto)';
+
 /** Cadena recortada; ausente = ''; otro tipo o más larga que `max` rechaza con `message`. */
 function text(raw: unknown, max: number, message: string): string {
   if (raw == null) return '';
   if (typeof raw !== 'string') return reject(message);
+  if (INVALID_TEXT.test(raw)) return reject(INVALID_TEXT_MESSAGE);
   const value = raw.trim();
   return value.length > max ? reject(message) : value;
 }
@@ -96,6 +101,7 @@ function list(raw: unknown, max: number, tooMany: string, notList: string): unkn
 }
 
 function uniqueId(raw: unknown, seen: Set<string>, what: string): string {
+  if (typeof raw === 'string' && INVALID_TEXT.test(raw)) return reject(INVALID_TEXT_MESSAGE);
   const id = typeof raw === 'string' ? raw.trim() : '';
   if (!id || id.length > QUOTATION_LIMITS.id) return reject(`Id de ${what} inválido`);
   if (seen.has(id)) return reject(`Id de ${what} duplicado`);
