@@ -56,10 +56,10 @@ export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ in
   const matches = useMemo(() => convertibleProposals(projects, folders, query), [projects, folders, query]);
   const shown = useMemo(() => {
     const list = matches.slice(0, CONVERT_LIST_LIMIT);
-    // La preseleccionada siempre se ve, aunque la búsqueda la deje fuera del primer tramo.
-    const selected = selectedId ? matches.find((p) => p.id === selectedId) : undefined;
+    // La elegida siempre se ve (primera), aunque la búsqueda la deje fuera: nunca hay una selección oculta.
+    const selected = selectedId ? projects.find((p) => p.id === selectedId && !p.isDeleted) : undefined;
     return selected && !list.includes(selected) ? [selected, ...list] : list;
-  }, [matches, selectedId]);
+  }, [matches, selectedId, projects]);
   const totals = useMemo(() => new Map(shown.map((p) => [p.id, proposalPriceCents(calculateProjectFinancialSummary(p, mode), 'USD', 1)])), [shown, mode]);
   const selected = selectedId ? projects.find((p) => p.id === selectedId && !p.isDeleted) : undefined;
   // Avisos del borrador que saldría (documentos que no pasan, cliente fuera del directorio…): se muestran discretos.

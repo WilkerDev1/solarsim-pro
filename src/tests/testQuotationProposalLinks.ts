@@ -199,6 +199,13 @@ reset();
   assert.doesNotMatch(html, /En papelera/);
   assert.match(html, /aria-label="Cerrar"/);
   assert.doesNotMatch(html, /disabled=""[^>]*>Crear borrador/, 'con propuesta elegida se puede crear');
+  // Preseleccionada fuera del primer tramo o de la búsqueda: sigue a la vista, nunca hay una selección oculta.
+  store.setState({ projects: [...store.getState().projects, ...Array.from({ length: 60 }, (_, i) => proposal(`bulk-${i}`, (p) => { p.client.name = `Lote ${i}`; p.updatedAt = '2026-11-26T00:00:00Z'; }))] });
+  const many = render(React.createElement(ConvertProposalDialog, { initialProjectId: 'p-4', onClose: () => undefined }));
+  assert.equal((many.match(/type="radio"/g) ?? []).length, 51, '50 a la vez y la elegida');
+  assert.match(many, /checked="" value="p-4"/);
+  assert.match(many, /Se muestran 50 de 63/);
+  store.setState({ projects: store.getState().projects.filter((p) => !p.id.startsWith('bulk-')) });
   const none = render(React.createElement(ConvertProposalDialog, { onClose: () => undefined }));
   assert.match(none, /disabled=""[^>]*>Crear borrador/, 'sin propuesta elegida no');
 }
