@@ -20,6 +20,8 @@ const CompanyProfileHubView = lazy(() => loadCompanyProfileHubView().then((modul
 const ClientsHubView = lazy(() => loadClientsHubView().then((module) => ({ default: module.ClientsHubView })));
 const QuotationsHubView = lazy(() => loadQuotationsHubView().then((module) => ({ default: module.QuotationsHubView })));
 const QuotationEditorView = lazy(() => loadQuotationEditorView().then((module) => ({ default: module.QuotationEditorView })));
+const loadQuotationLibraryView = () => import('./components/quotations/library/QuotationLibraryView');
+const QuotationLibraryView = lazy(() => loadQuotationLibraryView().then((module) => ({ default: module.QuotationLibraryView })));
 import { ConflictResolutionModal } from './components/common/ConflictResolutionModal';
 import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
@@ -133,6 +135,7 @@ export const App: React.FC = () => {
               {activeView === 'clients-hub' && <ClientsHubView />}
               {activeView === 'quotations-hub' && <QuotationsHubView />}
               {activeView === 'quotation-editor' && <QuotationEditorView />}
+              {activeView === 'quotation-library' && <QuotationLibraryView />}
               {activeView === 'simulator' && <SimulatorView />}
               {activeView === 'pdf-preview' && <PDFProposalView />}
             </Suspense>

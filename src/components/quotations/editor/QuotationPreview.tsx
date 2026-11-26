@@ -4,6 +4,9 @@ import { sheetPageLabel } from '../../../../shared/quotations';
 import { SHEET_LAYOUT, paginateQuotation } from '../../../features/quotations/paginate';
 import { exportQuotationPdf, quotationPages } from '../../../features/quotations/exportQuotationPdf';
 import { QuotationSheet, type QuotationSheetData } from '../sheet/QuotationSheet';
+import type { QuotationAttachment } from '../../../types/quotation';
+import { skippedAttachmentsMessage } from '../../../features/quotations/attachments';
+import { quotationAttachmentResolver } from '../../../features/quotations/assetImages';
 
 const DEFAULT_SCALE = 0.62;
 
@@ -11,12 +14,19 @@ const DEFAULT_SCALE = 0.62;
  * Vista previa en vivo: la hoja real escalada, una página a la vez, y la descarga del PDF. Para exportar se montan
  * todas las páginas a tamaño real fuera de la vista y se rasterizan con `exportQuotationPdf`.
  */
-export const QuotationPreview: React.FC<{ quotation: QuotationSheetData; stampImage?: string | null }> = ({ quotation, stampImage }) => {
+export const QuotationPreview: React.FC<{
+  quotation: QuotationSheetData;
+  stampImage?: string | null;
+  quotationId?: string;
+  attachments?: readonly QuotationAttachment[];
+}> = ({ quotation, stampImage, quotationId, attachments = [] }) => {
   const pageCount = useMemo(() => paginateQuotation(quotation).length, [quotation]);
   const [page, setPage] = useState(0);
   const [scale, setScale] = useState(DEFAULT_SCALE);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const included = attachments.filter((a) => a.mode === 'include').length;
   const area = useRef<HTMLDivElement>(null);
   const exportRoot = useRef<HTMLDivElement>(null);
   const current = Math.min(page, pageCount - 1);
@@ -36,7 +46,9 @@ export const QuotationPreview: React.FC<{ quotation: QuotationSheetData; stampIm
   useEffect(() => {
     if (!exporting || !exportRoot.current) return;
     let cancelled = false;
-    void exportQuotationPdf(quotationPages(exportRoot.current), quotation.number)
+    const list = quotationId ? { list: attachments, resolve: quotationAttachmentResolver(quotationId) } : undefined;
+    void exportQuotationPdf(quotationPages(exportRoot.current), quotation.number, list)
+      .then(({ skipped }) => { if (!cancelled) setExportNotice(skippedAttachmentsMessage(skipped)); })
       .catch((error: unknown) => { if (!cancelled) setExportError(error instanceof Error ? error.message : 'No se pudo generar el PDF.'); })
       .finally(() => { if (!cancelled) setExporting(false); });
     return () => { cancelled = true; };
@@ -52,13 +64,14 @@ export const QuotationPreview: React.FC<{ quotation: QuotationSheetData; stampIm
             <span aria-live="polite">{sheetPageLabel(current + 1, pageCount)}</span>
             <button type="button" className="qe-icon-btn" aria-label="Página siguiente" disabled={current >= pageCount - 1} onClick={() => setPage(current + 1)}><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
           </div>
-          <button type="button" className="qe-btn" disabled={exporting} aria-busy={exporting} onClick={() => { setExportError(null); setExporting(true); }}>
+          <button type="button" className="qe-btn" disabled={exporting} aria-busy={exporting} onClick={() => { setExportError(null); setExportNotice(null); setExporting(true); }}>
             <Download className="h-4 w-4" aria-hidden="true" />
             {exporting ? 'Generando PDF…' : 'Descargar PDF'}
           </button>
         </div>
       </div>
       {exportError && <p className="qe-field-error" role="alert">{exportError}</p>}
+      {exportNotice && <p className="qe-field-hint qe-export-notice" role="status">{exportNotice}</p>}
       <div ref={area} className="qe-sheet-area">
         <div className="qe-sheet-frame" style={{ width: SHEET_LAYOUT.width * scale, height: SHEET_LAYOUT.height * scale }}>
           <div style={{ width: SHEET_LAYOUT.width, height: SHEET_LAYOUT.height, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
@@ -66,7 +79,10 @@ export const QuotationPreview: React.FC<{ quotation: QuotationSheetData; stampIm
           </div>
         </div>
       </div>
-      <p className="qe-field-hint qe-preview-hint">El PDF se genera como imagen de cada página.</p>
+      <p className="qe-field-hint qe-preview-hint">
+        El PDF se genera como imagen de cada página.
+        {included ? ` ${included === 1 ? 'Se añade 1 adjunto' : `Se añaden ${included} adjuntos`} al final al exportar.` : ''}
+      </p>
       {exporting && (
         <div ref={exportRoot} aria-hidden="true" className="qe-export-root">
           <QuotationSheet quotation={quotation} stampImage={stampImage} />

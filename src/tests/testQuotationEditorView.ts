@@ -56,7 +56,8 @@ assert.ok(draft.includes('data-quotation-page="1"'), 'vista previa con la hoja r
 assert.ok(draft.includes('Página 1 de 1'));
 assert.ok(draft.includes('Descargar PDF'));
 assert.ok(draft.includes('Guardado en este equipo'), 'estado de guardado honesto en modo local');
-assert.ok(!draft.includes('Plantilla y firmas') && !draft.includes('Adjuntos'), 'las pestañas de fases siguientes no se muestran');
+assert.ok(draft.includes('role="tablist"') && draft.includes('>Plantilla y firmas<') && draft.includes('>Adjuntos<'), 'pestañas Contenido, Plantilla y firmas, Adjuntos');
+assert.ok(/role="tab"[^>]*aria-selected="true"[^>]*>.*?Contenido/.test(draft), 'Contenido abierta al entrar');
 // Emisor de solo lectura con la acción explícita en borrador.
 assert.ok(draft.includes('>Emisor<') && draft.includes('Actualizar desde el membrete'));
 // Orden del tabulador en cada línea: descripción → cantidad → unidad → precio → descuento → ITBIS → acciones.
@@ -109,5 +110,53 @@ assert.equal(quotationSaveStatus({ revision: 'r', baseVersion: 3, serverQuotatio
 assert.match(quotationSaveStatus({ revision: 'r', baseVersion: 3, serverDeleted: true }, online).label, /Conflicto/);
 assert.match(quotationSaveStatus({ revision: 'r', baseVersion: 3, rejected: { revision: 'r', status: 422, error: 'Fecha inválida' } }, online).label, /Rechazad/);
 assert.equal(quotationSaveStatus({ revision: 'r2', baseVersion: 3, rejected: { revision: 'r', status: 422, error: 'x' } }, online).label, 'Pendiente de publicar', 'un rechazo viejo no cuenta tras una edición nueva');
+
+// ── Pestañas «Plantilla y firmas» y «Adjuntos», y el gestor de plantillas, firmas y sellos ──
+const { DesignTab } = await import('../components/quotations/editor/DesignTab');
+const { AttachmentsTab } = await import('../components/quotations/editor/AttachmentsTab');
+const { QuotationLibraryView } = await import('../components/quotations/library/QuotationLibraryView');
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+const meta = { version: 0, baseVersion: 0, createdById: '', createdBy: '', createdAt: '2026-11-23T00:00:00Z', updatedAt: '2026-11-23T00:00:00Z' };
+const templates = [{ ...meta, id: 't1', name: 'Electsun clásica', description: '', design: { layout: 'clasica' as const, accent: '#087b58', typography: 'sans' as const, showSignature: true, showStamp: true }, notes: '', paymentTerms: '', validityDays: 15, isDefault: true }];
+const signatures = [{ ...meta, id: 's1', kind: 'signature' as const, name: 'Idali Candelario', role: 'Ventas', image: PNG, isDefault: true }];
+const content = { ...record(), design: { ...record().design, templateId: 't1' } };
+const designProps = { content, edit: () => null, templates, signatures, saveTemplate: () => null, openLibrary: () => undefined };
+const design = renderToStaticMarkup(React.createElement(DesignTab, { ...designProps, readOnly: false, canSaveTemplate: true }));
+for (const text of ['Gestionar plantillas', 'Electsun clásica', 'Predeterminada', 'Color de acento', 'Tipografía de títulos', 'Idali Candelario', 'Ventas', 'Mostrar la firma en el documento', 'Sello de la empresa', 'Guardar este diseño como plantilla', 'Clásica', 'Banda', 'Minimal']) {
+  assert.ok(design.includes(text), `diseño: ${text}`);
+}
+assert.ok(design.includes('role="switch"') && design.includes('aria-checked="true"'), 'interruptores de firma y sello');
+assert.ok(design.includes('aria-label="Verde Electsun"') && design.includes('type="color"'), 'paleta y color personalizado');
+assert.ok(/aria-pressed="true"[^>]*>.*?Electsun clásica/.test(design), 'la plantilla enlazada se marca');
+const lockedDesign = renderToStaticMarkup(React.createElement(DesignTab, { ...designProps, readOnly: true, canSaveTemplate: false }));
+assert.ok(!lockedDesign.includes('Guardar este diseño como plantilla'), 'LECTOR: sin guardar plantilla');
+assert.ok((lockedDesign.match(/<button\b[^>]*>/g) ?? []).filter((b) => /aria-pressed|role="switch"/.test(b)).every((b) => b.includes('disabled=""')), 'bloqueada: diseño sin cambios');
+const withAttachments = { ...content, attachments: [
+  { id: 'a1', fileName: 'plano.pdf', fileSize: 2_400_000, pageCount: 3, title: 'Plano de la instalación', uploadedAt: '2026-11-23T00:00:00Z', mode: 'include' as const, origin: 'manual' as const },
+  { id: 'a2', fileName: 'ficha.pdf', fileSize: 0, pageCount: 0, title: 'Ficha técnica — Panel', uploadedAt: '2026-11-23T00:00:00Z', mode: 'related' as const, origin: 'catalog' as const, assetId: 'x' },
+] };
+const attachmentsHtml = renderToStaticMarkup(React.createElement(AttachmentsTab, { quotationId: 'q-1', content: withAttachments, readOnly: false, edit: () => null, catalog: [] }));
+for (const text of ['Agregar documentos', 'Desde el equipo', 'Fichas del catálogo', 'Documentos de esta cotización', '2 · 1 se incluyen en el PDF', 'Plano de la instalación', '3 páginas', '2.3 MB', 'Catálogo de equipos', 'Páginas por confirmar', 'Incluir en el PDF', 'Solo relacionado']) {
+  assert.ok(attachmentsHtml.includes(text), `adjuntos: ${text}`);
+}
+assert.ok(attachmentsHtml.includes('aria-label="Subir adjunto 2"') && attachmentsHtml.includes('aria-label="Quitar adjunto 1"'), 'reordenar y quitar con nombre accesible');
+assert.ok(/Fichas del catálogo<\/button>/.test(attachmentsHtml) && /disabled=""[^>]*>[^<]*<svg[^>]*>.*?Fichas del catálogo/.test(attachmentsHtml), 'sin fichas en el catálogo, el botón se desactiva');
+const lockedAttachments = renderToStaticMarkup(React.createElement(AttachmentsTab, { quotationId: 'q-1', content: withAttachments, readOnly: true, edit: () => null, catalog: [] }));
+assert.ok(!lockedAttachments.includes('Agregar documentos') && !lockedAttachments.includes('Quitar adjunto'), 'bloqueada: no se agregan ni se quitan adjuntos');
+assert.ok(editable(lockedAttachments).length === 0, 'bloqueada: títulos de solo lectura');
+
+useSimulationStore.setState({ activeView: 'quotation-library', quotationLibrarySection: 'templates', quotationLibrary: { templates: { items: templates, changes: {}, deletions: [], cursor: null }, signatures: { items: signatures, changes: {}, deletions: [], cursor: null } } });
+Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());
+const library = renderToStaticMarkup(React.createElement(QuotationLibraryView));
+for (const text of ['Plantillas, firmas y sellos', 'Nueva plantilla', 'Electsun clásica', 'Predeterminada', 'Duplicar', 'Editar', 'Guardadas en este equipo']) assert.ok(library.includes(text), `gestor: ${text}`);
+useSimulationStore.setState({ quotationLibrarySection: 'signatures' });
+Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());
+const signaturesHtml = renderToStaticMarkup(React.createElement(QuotationLibraryView));
+for (const text of ['Importar firma', 'Importar sello', 'Firmas', 'Sellos', 'Idali Candelario', 'Reemplazar']) assert.ok(signaturesHtml.includes(text), `firmas: ${text}`);
+setup(record(), reader);
+useSimulationStore.setState({ activeView: 'quotation-library', quotationLibrarySection: 'templates' });
+Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());
+const readerLibrary = renderToStaticMarkup(React.createElement(QuotationLibraryView));
+assert.ok(readerLibrary.includes('Solo lectura') && !readerLibrary.includes('Nueva plantilla') && !readerLibrary.includes('Duplicar'), 'LECTOR: el gestor es de solo lectura');
 
 console.log('Quotation editor view tests passed.');

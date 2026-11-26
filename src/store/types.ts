@@ -82,7 +82,7 @@ export interface DefaultSimulationSettings {
  * `quotation-editor`, el módulo de cotizaciones. `activeView` se persiste y `activeQuotationId` no: al hidratar,
  * `quotation-editor` pasa a `quotations-hub`.
  */
-export type AppView = 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub' | 'clients-hub' | 'quotations-hub' | 'quotation-editor';
+export type AppView = 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub' | 'clients-hub' | 'quotations-hub' | 'quotation-editor' | 'quotation-library';
 /** Pestañas del modal de Ajustes. `agents` agrupa permisos, actividad y conexión MCP. */
 export type SettingsTab = 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features' | 'agents';
 
@@ -246,6 +246,11 @@ export interface UISlice {
   openQuotation: (id: string) => void;
   /** Cierra el editor y vuelve al catálogo de cotizaciones. */
   closeQuotation: () => void;
+  /** Sección del gestor de plantillas, firmas y sellos (`quotation-library`). */
+  quotationLibrarySection: 'templates' | 'signatures';
+  /** Abre el gestor; al cerrarlo se vuelve al editor si había una cotización abierta, si no al catálogo. */
+  openQuotationLibrary: (section?: 'templates' | 'signatures') => void;
+  closeQuotationLibrary: () => void;
   appAssistantEnabled: boolean;
   setAppAssistantEnabled: (enabled: boolean) => void;
   isNewProjectModalOpen: boolean;

@@ -42,4 +42,24 @@ if (created.ok) {
   assert.equal(hub.activeView, 'clients-hub', 'otras vistas se conservan');
 }
 
+// Gestor de plantillas, firmas y sellos: desde el catálogo vuelve al catálogo; desde el editor, a la cotización abierta.
+store.setState({ activeQuotationId: null });
+store.getState().setActiveView('quotations-hub');
+store.getState().openQuotationLibrary('signatures');
+assert.equal(store.getState().activeView, 'quotation-library');
+assert.equal(store.getState().quotationLibrarySection, 'signatures');
+store.getState().openQuotationLibrary();
+assert.equal(store.getState().quotationLibrarySection, 'signatures', 'sin sección, recuerda la última');
+store.getState().closeQuotationLibrary();
+assert.equal(store.getState().activeView, 'quotations-hub');
+const opened = createAndOpenQuotation();
+assert.ok(opened.ok);
+store.getState().openQuotationLibrary('templates');
+store.getState().closeQuotationLibrary();
+assert.equal(store.getState().activeView, 'quotation-editor', 'vuelve a la cotización abierta');
+{
+  const { isQuotationsView } = await import('../features/application/quotationsFeature');
+  assert.ok(isQuotationsView('quotation-library'), 'apagar la función también saca del gestor');
+}
+
 console.log('Quotation navigation tests passed.');
