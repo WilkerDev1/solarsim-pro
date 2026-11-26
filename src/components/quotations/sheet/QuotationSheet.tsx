@@ -4,7 +4,7 @@ import {
   sheetPageLabel, type QuotationTotals,
 } from '../../../../shared/quotations';
 import type { QuotationContent } from '../../../types/quotation';
-import { SHEET_LAYOUT, paginateQuotation, type SheetPage, type SheetRow, type SheetTextChunk } from '../../../features/quotations/paginate';
+import { SHEET_LAYOUT, paginateQuotation, sheetFit, type SheetPage, type SheetRow, type SheetTextChunk } from '../../../features/quotations/paginate';
 import { SANS, SHEET_BODY, SHEET_INK, SHEET_MUTED, SHEET_ROW_RULE, SHEET_RULE, sheetTheme, type SheetTheme } from './sheetTheme';
 
 /**
@@ -78,7 +78,7 @@ const Logo: React.FC<{ quotation: QuotationSheetData; theme: SheetTheme }> = ({ 
   const { issuer } = quotation;
   if (!isImage(issuer.logo)) {
     return issuer.name.trim()
-      ? <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: theme.titleColor, maxWidth: 380, ...WRAP }}>{issuer.name}</div>
+      ? <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: theme.titleColor, maxWidth: 380, ...WRAP }}>{sheetFit.headerName(issuer.name)}</div>
       : <div />;
   }
   const image = <img alt={`Logo de ${issuer.name || 'la empresa'}`} src={issuer.logo} className="block h-auto max-h-[62px] w-auto max-w-[300px]" />;
@@ -105,7 +105,7 @@ const FirstHeader: React.FC<{ quotation: QuotationSheetData; theme: SheetTheme; 
       ].map(([label, value]) => (
         <div key={label} style={{ padding: '14px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={LABEL}>{label}</div>
-          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, ...WRAP }}>{value}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, ...WRAP }}>{sheetFit.meta(value)}</div>
         </div>
       ))}
     </div>
@@ -139,7 +139,7 @@ const Parties: React.FC<{ quotation: QuotationSheetData }> = ({ quotation }) => 
 
 const ContinuationHeader: React.FC<{ quotation: QuotationSheetData; number: string }> = ({ quotation, number }) => (
   <div style={{ margin: '40px 56px 0 56px', paddingBottom: 12, borderBottom: `1px solid ${SHEET_RULE}`, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 24 }}>
-    <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, ...WRAP }}>{quotation.issuer.name}</div>
+    <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, whiteSpace: 'nowrap' }}>{sheetFit.continuation(quotation.issuer.name, `${T.title} ${number} ${T.continued}`)}</div>
     <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, whiteSpace: 'nowrap' }}>{T.title} {number} <span style={{ color: SHEET_MUTED, fontWeight: 500 }}>{T.continued}</span></div>
   </div>
 );
@@ -167,9 +167,9 @@ const LinesTable: React.FC<{ rows: SheetRow[]; quotation: QuotationSheetData; th
               {line.description}
               {line.discountPct > 0 && <div style={{ fontSize: 11.5, fontWeight: 400, color: SHEET_MUTED, lineHeight: 1.4 }}>{T.lineDiscount} {formatQuantity(line.discountPct)}%</div>}
             </div>
-            <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatAmount(line.unitPriceCents)}</div>
+            <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...WRAP }}>{formatAmount(line.unitPriceCents)}</div>
             <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...WRAP }}>{formatQuantity(line.quantity)}{line.unit ? ` ${line.unit}` : ''}</div>
-            <div style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatAmount(netById.get(line.id) ?? 0)}</div>
+            <div style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', ...WRAP }}>{formatAmount(netById.get(line.id) ?? 0)}</div>
           </>
         )}
       </div>
@@ -188,7 +188,7 @@ const TextBlock: React.FC<{ chunk: SheetTextChunk }> = ({ chunk }) => (
 
 const TotalRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, lineHeight: 1.45 }}>
-    <span style={{ color: SHEET_MUTED, ...WRAP }}>{label}</span>
+    <span style={{ color: SHEET_MUTED, whiteSpace: 'nowrap' }}>{sheetFit.discount(label, value)}</span>
     <span style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{value}</span>
   </div>
 );
@@ -228,7 +228,7 @@ const Signatures: React.FC<{ seller: string; stamp: string | null }> = ({ seller
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ height: 64 }} />
       <div style={{ borderTop: `1px solid ${SHEET_INK}`, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, minHeight: 18, ...WRAP }}>{name || ' '}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, minHeight: 18, ...WRAP }}>{sheetFit.signature(name) || ' '}</div>
         <div style={{ fontSize: 11, color: SHEET_MUTED, lineHeight: 1.4 }}>{role}</div>
       </div>
     </div>
@@ -246,7 +246,7 @@ const Signatures: React.FC<{ seller: string; stamp: string | null }> = ({ seller
 
 const Footer: React.FC<{ quotation: QuotationSheetData; label: string }> = ({ quotation, label }) => (
   <div style={{ height: SHEET_LAYOUT.footer, minHeight: SHEET_LAYOUT.footer, maxHeight: SHEET_LAYOUT.footer, boxSizing: 'border-box', padding: '0 56px', borderTop: `1px solid ${SHEET_RULE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, fontSize: 10.5, lineHeight: 1.2, color: SHEET_MUTED, flexShrink: 0 }}>
-    <span style={{ minWidth: 0 }}>{joined(quotation.issuer.name, quotation.issuer.website)}</span>
+    <span style={{ whiteSpace: 'nowrap' }}>{sheetFit.footer(joined(quotation.issuer.name, quotation.issuer.website), label)}</span>
     <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{label}</span>
   </div>
 );

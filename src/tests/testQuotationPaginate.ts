@@ -2,7 +2,7 @@
 // primera página tiene menos capacidad y totales y firmas caben siempre en la última.
 import assert from 'node:assert/strict';
 import { emptyQuotationContent, type QuotationContent, type QuotationLine } from '../../shared/quotations';
-import { SHEET_LAYOUT, estimateLineHeight, paginateQuotation, type SheetPage } from '../features/quotations/paginate';
+import { SHEET_LAYOUT, estimateLineHeight, estimateTotalsHeight, fitToWidth, paginateQuotation, sheetFit, splitParagraph, textWidthEm, type SheetPage } from '../features/quotations/paginate';
 
 const line = (n: number, description = `Ítem ${n}`, extra: Partial<QuotationLine> = {}): QuotationLine => ({
   id: `l-${n}`, kind: 'item', description, quantity: 1, unit: 'UD', unitPriceCents: 1000, discountPct: 0, taxable: true, ...extra,
@@ -78,5 +78,47 @@ assert.ok(short.every((p) => p.texts.every((t) => t.section === 'notes')), 'cond
 const bigClient = paginateQuotation(doc(forty, { client: { name: 'Cliente', attention: '', taxId: '', phone: '', email: '', address: 'Dirección extensa '.repeat(27) } }));
 assert.ok(bigClient[0].capacity < fortyPages[0].capacity);
 check(bigClient, forty, 'cliente con dirección larga');
+
+// Cada fila mide lo que su celda más alta, no solo la descripción (valores fijados a mano: 26 px de relleno + 19 por renglón).
+assert.equal(estimateLineHeight(line(1, 'Cable')), 45, 'un renglón');
+const metrosLine = (n: number) => line(n, 'Cable', { unit: 'METROS', quantity: 1250.5 });
+assert.equal(estimateLineHeight(metrosLine(1)), 64, '«1,250.5 METROS» parte en dos renglones en la columna de 90 px');
+assert.equal(estimateLineHeight(line(1, 'Equipo', { unitPriceCents: 99999999999, quantity: 9 })), 64, 'importes largos parten en dos renglones');
+assert.equal(estimateLineHeight(line(1, 'Cable', { discountPct: 5 })), 45 + 17, 'el «Desc. N%» bajo la descripción suma su renglón');
+const metros = Array.from({ length: 40 }, (_, i) => metrosLine(i + 1));
+const metrosPages = paginateQuotation(doc(metros));
+check(metrosPages, metros, '40 líneas «1,250.5 METROS»');
+assert.equal(metrosPages.length, 4);
+assert.deepEqual(metrosPages.map((p) => p.rows.length), [11, 15, 14, 0]);
+
+// Descuentos globales: cada etiqueta en un renglón junto a su importe (se acorta con «…»), 29 px por fila de totales.
+assert.equal(estimateTotalsHeight(doc([line(1)])), 2 * 29 + 14 + 27);
+const longLabel = 'Descuento por pronto pago y volumen '.repeat(8).slice(0, 255);
+const twentyDiscounts = doc([line(1)], { discounts: Array.from({ length: 20 }, (_, i) => ({ id: `d${i}`, label: longLabel, type: 'fixed' as const, value: 1 })) });
+assert.equal(estimateTotalsHeight(twentyDiscounts), 22 * 29 + 14 + 27);
+const discountPages = paginateQuotation(twentyDiscounts);
+check(discountPages, twentyDiscounts.items, '20 descuentos con etiqueta larga');
+assert.equal(discountPages.length, 2);
+const shortened = sheetFit.discount(longLabel, '-0.01');
+assert.ok(shortened.endsWith('…') && shortened.length < longLabel.length);
+
+// Bloques que el revisor no llegó a romper: vendedor, emisor sin logo, De/Para, notas sin espacios, filas sin espacios.
+const longName = 'Ingeniería y Soluciones Fotovoltaicas Integrales del Caribe '.repeat(5).slice(0, 255);
+for (const [label, content] of [
+  ['vendedor largo', doc(forty, { seller: longName })],
+  ['emisor largo sin logo', doc(forty, { issuer: { name: longName, taxId: '', address: '', phone: '', email: '', website: 'w'.repeat(255), logo: '' } })],
+  ['De/Para enormes', doc(forty, { client: { name: longName, attention: longName, taxId: '', phone: '', email: 'e'.repeat(255), address: 'CALLE PRINCIPAL '.repeat(40).slice(0, 500) } })],
+  ['descripciones sin espacios', doc(Array.from({ length: 12 }, (_, i) => line(i + 1, 'W'.repeat(500))))],
+  ['notas sin espacios', doc([line(1)], { notes: 'W'.repeat(4000), paymentTerms: 'X'.repeat(2000) })],
+] as const) check(paginateQuotation(content), content.items, label);
+assert.equal(sheetFit.meta(longName).endsWith('…'), true, 'el vendedor se acorta a dos renglones en la franja de datos');
+
+// Recortes en JavaScript (sin CSS de recorte).
+assert.equal(fitToWidth('Electsun SRL', 40), 'Electsun SRL');
+const cut = fitToWidth('x'.repeat(300), 20);
+assert.ok(cut.endsWith('…') && textWidthEm(cut) <= 20);
+assert.ok(textWidthEm(sheetFit.footer(`${longName} · ${'w'.repeat(255)}`, 'COT-2026-0001 · Página 1 de 1')) * 10.5 < SHEET_LAYOUT.contentWidth, 'el pie cabe en un renglón');
+const pieces = splitParagraph('palabra '.repeat(3000).trim(), 10, 57);
+assert.ok(pieces.length > 1 && pieces.join(' ') === 'palabra '.repeat(3000).trim());
 
 console.log('Quotation pagination tests passed.');
