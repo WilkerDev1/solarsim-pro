@@ -1,0 +1,54 @@
+# Cotización desde una propuesta
+
+Crear un borrador de cotización a partir de una propuesta, ver las cotizaciones enlazadas y la propuesta de origen. El dominio de la conversión (`quotationFromProposal`) está en [QUOTATIONS.md](QUOTATIONS.md#conversión-desde-propuesta-fromproposalts) y el editor en [QUOTATION_EDITOR.md](QUOTATION_EDITOR.md). Todo depende de la función `quotations` ([Funciones](APPLICATION_FEATURES.md#cotizaciones)): apagada, no aparece ningún punto de entrada ni lista.
+
+**La propuesta no se modifica.** Convertir solo lee la propuesta y crea un borrador nuevo con `sourceProjectId`; lo fija una prueba con igualdad profunda antes y después.
+
+## Origen (`src/features/quotations/proposalSource.ts`)
+
+`buildProposalQuotationSource(project, blocks, context)` arma el `ProposalQuotationSource` y `convertProposalToQuotation(...)` lo pasa por `quotationFromProposal` (contenido ya validado). Puros: la fecha (`today`), los clientes del directorio, el membrete, la tasa de las cotizaciones nuevas y el vendedor por defecto entran en `context` (`proposalConversionContext`, `src/features/quotations/proposalConversion.ts`, los toma del store). `createQuotationFromProposal(projectId, blocks)` crea el borrador con `createAndOpenQuotation` (permisos, validación y enlaces del store) y lo abre en el editor; rechaza una propuesta inexistente o en la papelera.
+
+### Importes: de dónde salen y cómo cuadran
+
+La propuesta no tiene precio unitario por equipo. Los importes salen solo de los resultados del motor (`calculateProjectFinancialSummary`) y de la regla compartida de los ítems extra (`shared/financialRules.ts`), en la moneda y tasa del documento (`toCents(USD × tasa)`; en dólares, la tasa es 1):
+
+| Dato | Origen |
+| --- | --- |
+| Total a cuadrar | `contractPriceUSD` (lo que paga el cliente; el «Precio de la propuesta» del resumen). |
+| ITBIS que cobra la propuesta | `customItemsNonExoneratedITBISUSD` (extras no exonerados) + `contractPriceUSD − grossInvestmentUSD` (el del sistema, solo con la exoneración apagada). |
+| Descuento | `listGrossInvestmentUSD − grossInvestmentUSD`: lo que la propuesta resta de verdad. Con precio manual (`customCostUSD`) es 0 y se avisa que sus descuentos no pasan. |
+| Ítems extra visibles | Una línea por ítem: cantidad, unidad, precio de venta = costo × margen de la propuesta si `appliesItemMargin` (el mismo multiplicador que el motor pasa a `customItemsTaxBreakdown`), ITBIS si no está exonerado (`isItemItbisExonerated`). |
+| Ítems extra ocultos | Se cobran pero no se listan (`hideInQuotation`): van al importe global; los gravados, a la «Parte del sistema con ITBIS». |
+| Parte gravada del sistema | Solo con la exoneración apagada: `(contrato − bruta) / ITBIS_RATE`, línea gravada. |
+| Importe global | Línea «Sistema fotovoltaico N kWp llave en mano…», sin ITBIS: subtotal antes de descuentos que cobra la propuesta (total − ITBIS + descuento) menos las demás líneas. |
+| Equipos | Líneas `detail` sin precio: cada grupo de paneles, inversores y (con baterías) baterías con su cantidad y `catalogItemId`, y la fila de instalación (`cleanInstallationDesc`, la misma que imprime la propuesta). |
+| Descuentos | Los de la propuesta como montos fijos que suman exactamente el descuento aplicado (reparto por el mayor resto, en proporción a lo que vale cada uno); la etiqueta conserva el motivo, el porcentaje y «equipos (Ley 57-07)». |
+
+Se aplica igual en los tres modos de precio del motor: **matriz de costos** (Simple/catálogo), **directo por Wp/kWp** (con el excedente al margen o a la mano de obra) y **precio manual** (`customCostUSD`). En ninguno hay desglose por equipo con precio: por eso una sola línea de importe global y los equipos como `detail`.
+
+**Cuadre.** Sin descuentos el total cuadra al centavo en cualquier modo y moneda: el redondeo de las líneas (precio unitario × cantidad) y del ITBIS (la cotización lo calcula sobre la base gravada del documento) lo absorbe la línea de importe global, que no lleva ITBIS. Con descuentos también cuadra si no hay líneas gravadas.
+
+**Caso que no cuadra al centavo: descuentos y líneas gravadas a la vez.** La propuesta cobra el ITBIS de sus extras antes del descuento (el descuento se resta del total con ITBIS); la cotización, como documento comercial, calcula el ITBIS sobre la base gravada ya descontada (`computeQuotationTotals` prorratea el descuento entre las líneas). Se conservan el subtotal, las líneas y el descuento de la propuesta, así que el total queda por debajo exactamente en `proposalTaxCents − taxCents` (el ITBIS de la parte del descuento asignada a lo gravado, ± redondeo). La prueba fija esa identidad y el diálogo lo avisa.
+
+### Bloques
+
+| Bloque | Encendido | Apagado |
+| --- | --- | --- |
+| Cliente enlazado | `clientId` si el cliente sigue en el directorio (si no, se avisa y no se enlaza: la misma regla que `createQuotationRecord` y el 409 `invalid_client`); datos impresos como los imprime la propuesta (nombre, atención, teléfono sin los de ejemplo, correo; RNC y dirección del cliente). | Sin enlace ni datos impresos. |
+| Equipos y materiales | Líneas y descuentos de la tabla anterior. | Sin líneas ni descuentos. |
+| Documentos | Anexos activos de la propuesta con una referencia reutilizable (`annexAssetId`: `assetId` o la clave de catálogo antigua) como `mode: 'related'`, `origin: 'catalog'` (fichas técnicas, con `catalogItemId`) o `'proposal'`, sin copiar binarios ni subir nada; la miniatura solo si la cotización la admite. Un anexo solo en este equipo (subido a mano, sin referencia) o con una referencia no válida se omite y el diálogo lo dice. El PDF de la propuesta no se adjunta: no hay un archivo guardado, se genera al exportarla. | Sin documentos. |
+| Moneda y tasa | Dólares (la moneda del documento de la propuesta) con la tasa de la propuesta (`resolveAssumptions(...).dopExchangeRate`). | Pesos con la tasa de las cotizaciones nuevas; los importes se convierten con esa tasa (el total cuadra con el precio en pesos). |
+| Condiciones y vigencia | Notas: garantías y servicios incluidos de los textos del documento (`resolveDocumentText`, en texto plano) y, si aplica, la exoneración de ITBIS por la Ley 57-07. Condiciones de pago: la forma de pago del membrete (`defaultPaymentTerms`) y la nota legal (`quotation.validityNote`). Vigencia: fecha de la propuesta (o hoy) + días de validez; vencida, sin vigencia. | Sin notas, condiciones ni vigencia. |
+
+Siempre: `sourceProjectId`, etiqueta del proyecto («Sistema fotovoltaico N kWp», con la capacidad de baterías si las hay), emisor del membrete de la propuesta (si no, el de las propuestas nuevas; un logo que la cotización no admite se omite) y vendedor (el responsable comercial de la propuesta o, sin él, la cuenta o el perfil local).
+
+## Interfaz
+
+- **Diálogo** (`src/components/quotations/convert/ConvertProposalDialog.tsx`): «1 · Propuesta de origen» con buscador (cliente, empresa, código, número de cotización o carpeta, sin acentos; `convertibleProposals`) y lista de radios con nombre, estado · código · carpeta y precio; muestra 50 a la vez y la preseleccionada siempre. «2 · Qué pasa al borrador» con los cinco bloques. Los avisos van plegados en un «N avisos sobre este borrador». Pie con «N de 5 bloques seleccionados», «Cancelar» y «Crear borrador» (deshabilitado sin propuesta). `<dialog>` modal nativo: el resto queda inerte, Tab circula dentro, Escape y «Cerrar» cierran y el foco vuelve a quien lo abrió.
+- **Puntos de entrada**: en el catálogo, «Nueva cotización» abre un menú (`NewQuotationMenu`: «En blanco» y «Desde una propuesta»; flechas, Inicio/Fin y Escape); en el resumen de la propuesta, «Crear cotización» (preselecciona esa propuesta; no aparece en la papelera ni para un LECTOR).
+- **Listas enlazadas** (`LinkedQuotationsList`): en el resumen de la propuesta, las creadas desde ella (`quotationsFromProposal`); en el detalle del cliente, las suyas por `clientId` (`quotationsForClient`). Número resaltado, proyecto o cliente y fecha, total en su moneda y `QuotationStatusChip` al final; clic abre el editor. Ignoran las que tienen un borrado en cola. Sin vista mosaico.
+- **Editor**: «Cliente y origen» muestra la propuesta de origen (`sourceProposalLink`) con «Ver propuesta» (abre su resumen). En borrador se puede «Enlazar propuesta…» (solo el enlace, `setSourceProject`; no importa contenido) o «Quitar enlace». En la papelera o ya no disponible (eliminada, de otra organización o sin acceso) se dice con un texto discreto, sin romper.
+
+## Pruebas
+
+`npm test -- Quotation`: `testQuotationProposalSource` (matriz de costos con el caso de referencia, directo por Wp con excedente al margen y a la mano de obra, precio manual, extras visibles, ocultos, gravados y exentos, descuentos con y sin líneas gravadas y la tolerancia exacta, exoneración apagada, USD y DOP con tasa, cada bloque apagado, sin cliente o con cliente fuera del directorio, documentos con y sin referencia reutilizable, vigencia, y la propuesta sin cambios) y `testQuotationProposalLinks` (crear desde el store con la propuesta sin cambios, papelera, LECTOR, listas por propuesta y por cliente sin las borradas, búsqueda de propuestas, enlazar y quitar el origen, puntos de entrada, diálogo, editor con origen disponible, en papelera o ausente, y la función apagada).
