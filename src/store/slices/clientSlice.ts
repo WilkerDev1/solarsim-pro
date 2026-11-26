@@ -6,6 +6,7 @@ import { ClientSyncService } from '../../services/clientSyncService';
 import { ownsProject } from '../sync/projectReconciliation';
 import { contentEqual } from '../sync/projectDifferences';
 import { reuseArray, reuseIfEqual, reuseRecord } from '../sync/structuralSharing';
+import { dropQuotationLinks } from '../sync/quotationContent';
 
 export interface ClientSlice {
   clients: ClientRecord[];
@@ -38,6 +39,8 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
   };
   // Server deletions unlink proposals locally too; the push would otherwise be rejected as invalid_client.
   // Versions are never inferred: the server's own revision arrives with the project pull, and unsynced work keeps its CAS base.
+  // Quotations are not touched here: the API unlinks them in the deletion transaction and the quotations pull
+  // delivers that revision, so the local copy never diverges from its server version.
   const unlinkDeleted = (deleted: Set<string>) =>
     set((s) => s.projects.some((p) => p.clientId && deleted.has(p.clientId))
       ? { projects: s.projects.map((p) => (p.clientId && deleted.has(p.clientId) ? { ...p, clientId: undefined } : p)) }
@@ -102,6 +105,7 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
         projects: unlinkNow
           ? state.projects.map((p) => (p.clientId === id && !p.isDeleted ? { ...p, clientId: undefined, syncStatus: 'pending', updatedAt: now } : p))
           : state.projects,
+        ...(unlinkNow ? dropQuotationLinks(state, 'clientId', new Set([id]), state.syncSettings.currentUser?.id, { localWorkspace: !state.syncSettings.currentUser }) : {}),
       });
       sync();
       return true;

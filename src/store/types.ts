@@ -350,6 +350,35 @@ export interface NotificationSlice {
 
 import { TariffSlice } from './slices/tariffSlice';
 import { ClientSlice } from './slices/clientSlice';
+import type { QuotationContent, QuotationStatus } from '../../shared/quotations';
+import type {
+  QuotationChange, QuotationDeletionCommand, QuotationMutationResult, QuotationRecord, QuotationSyncCursor,
+} from '../types/quotation';
+
+export type QuotationActionResult = { ok: true } | { ok: false; error: string };
+
+/** Cotizaciones (docs/QUOTATIONS.md): API pura, llamable fuera de React; las reglas viven en `shared/quotations`. */
+export interface QuotationSlice {
+  quotations: QuotationRecord[];
+  quotationChanges: Record<string, QuotationChange>;
+  quotationDeletionQueue: QuotationDeletionCommand[];
+  /** Cursor `since` de la última descarga aplicada entera en este espacio de trabajo. */
+  quotationSyncCursor: QuotationSyncCursor | null;
+  /** Espacio local: última secuencia usada por año (`'2026' → 147`); nunca baja aunque se borre una cotización. */
+  quotationNumberCounters: Record<string, number>;
+  quotationSyncFeedback: string | null;
+  createQuotationRecord: (overrides?: Partial<QuotationContent>) => QuotationMutationResult;
+  /** Edita el contenido de un borrador; nunca cambia `status`. */
+  updateQuotationRecord: (id: string, patch: Partial<QuotationContent>) => QuotationMutationResult;
+  setQuotationStatus: (id: string, status: QuotationStatus) => QuotationMutationResult;
+  duplicateQuotationRecord: (id: string) => QuotationMutationResult;
+  deleteQuotationRecord: (id: string) => QuotationActionResult;
+  /** Enlace opcional; los datos impresos `client` nunca cambian. */
+  linkQuotationToClient: (id: string, clientId: string | null) => QuotationActionResult;
+  moveQuotationToFolder: (id: string, folderId: string | null) => QuotationActionResult;
+  resolveQuotationConflict: (id: string, resolution: 'accept_server' | 'keep_local') => void;
+  syncQuotationsWithServer: () => Promise<{ success: boolean; message: string }>;
+}
 import { FeatureSettingsSlice } from './slices/featureSettingsSlice';
 import { AgentSlice } from './slices/agentSlice';
 import { EquipmentPriceSlice } from './slices/equipmentPriceSlice';
@@ -362,6 +391,7 @@ export type SimulationStore = ProjectSlice &
   UISlice &
   FolderSlice &
   ClientSlice &
+  QuotationSlice &
   TariffSlice &
   CompanyProfileSlice &
   VersionHistorySlice &
