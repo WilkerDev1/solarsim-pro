@@ -9,11 +9,25 @@ export function roundHalfUp(value: number): number {
   return value < 0 && rounded !== 0 ? -rounded : rounded;
 }
 
-/** round(numerator × factor / denominator) en aritmética entera cuando cabe; los enteros seguros no acumulan error. */
+/**
+ * round(numerator × factor / denominator), half-up (la mitad se aleja de cero), exacto para enteros: en `number`
+ * cuando todo cabe en enteros seguros y en BigInt cuando no. Entradas no finitas o denominador ≤ 0 → 0; con
+ * decimales (no ocurre en los totales) cae en `roundHalfUp` de la división.
+ */
 export function mulDivRound(numerator: number, factor: number, denominator: number): number {
-  const product = numerator * factor;
-  if (Number.isSafeInteger(product * 2 + denominator)) return Math.floor((product * 2 + denominator) / (denominator * 2));
-  return roundHalfUp(product / denominator);
+  if (!Number.isFinite(numerator) || !Number.isFinite(factor) || !Number.isFinite(denominator) || denominator <= 0) return 0;
+  if (!Number.isInteger(numerator) || !Number.isInteger(factor) || !Number.isInteger(denominator)) return roundHalfUp((numerator * factor) / denominator);
+  const negative = numerator < 0 !== factor < 0;
+  const product = Math.abs(numerator) * Math.abs(factor);
+  let magnitude: number;
+  if (Number.isSafeInteger(product * 2 + denominator) && Number.isSafeInteger(denominator * 2)) {
+    magnitude = Math.floor((product * 2 + denominator) / (denominator * 2));
+  } else {
+    const big = BigInt(Math.abs(numerator)) * BigInt(Math.abs(factor));
+    const den = BigInt(denominator);
+    magnitude = Number((big * 2n + den) / (den * 2n));
+  }
+  return negative && magnitude !== 0 ? -magnitude : magnitude;
 }
 
 /** Importe en unidades de moneda → centavos enteros. */

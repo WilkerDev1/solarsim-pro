@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { DEFAULT_QUOTATION_DESIGN, computeQuotationTotals, quotationFromProposal, validateQuotationContent } from '../../shared/quotations/index';
-import type { ProposalQuotationSource, QuotationDesign } from '../../shared/quotations/index';
+import type { ProposalQuotationSource, QuotationContent, QuotationDesign } from '../../shared/quotations/index';
 
 const issuer = { name: 'Electsun SRL', taxId: '130000001', address: 'Santo Domingo', phone: '809-000-0000', email: 'info@electsun.do', website: 'electsun.do', logo: 'asset:sha256:' + 'c'.repeat(64) };
 const source = (): ProposalQuotationSource => ({
@@ -32,7 +32,12 @@ const source = (): ProposalQuotationSource => ({
   issuer,
 });
 const counter = () => { let n = 0; return () => `id-${++n}`; };
-const build = (src = source(), design?: QuotationDesign) => quotationFromProposal(src, { today: '2026-03-10', newId: counter(), ...(design ? { design } : {}) });
+const convert = (src = source(), design?: QuotationDesign, today = '2026-03-10') => quotationFromProposal(src, { today, newId: counter(), ...(design ? { design } : {}) });
+const build = (src = source(), design?: QuotationDesign): QuotationContent => {
+  const result = convert(src, design);
+  assert(result.ok, result.ok ? '' : result.error);
+  return result.value;
+};
 
 const quotation = build();
 
@@ -84,11 +89,55 @@ assert.equal(quotation.attachments[0].catalogItemId, 'eq-panel');
 assert.equal(quotation.attachments[0].thumbnailDataUrl, 'data:image/png;base64,AAAA');
 assert.equal('assetId' in quotation.attachments[1], false);
 
-// resultado válido y estable ante la validación
+// resultado válido y estable ante la validación (idempotente)
 {
   const result = validateQuotationContent(quotation);
   assert(result.ok, result.ok ? '' : result.error);
   assert.deepEqual(result.value, quotation);
+}
+
+// vigencia de la propuesta ya vencida: la cotización queda sin vigencia en vez de ser inválida
+{
+  const result = convert({ ...source(), validUntil: '2026-03-01' });
+  assert(result.ok, result.ok ? '' : result.error);
+  assert.equal(result.value.validUntil, null);
+  const again = validateQuotationContent(result.value);
+  assert(again.ok);
+  assert.deepEqual(again.value, result.value, 'la validación no cambia el resultado');
+  const sameDay = convert({ ...source(), validUntil: '2026-03-10' });
+  assert(sameDay.ok && sameDay.value.validUntil === '2026-03-10', 'el mismo día se conserva');
+}
+
+// el resultado sale normalizado (lo que se devuelve es lo que se guardaría)
+{
+  const src = source();
+  src.seller = '  Ana Pérez ';
+  src.pricedLines[0] = { ...src.pricedLines[0], description: ' Equipos ', quantity: 1.23456, unitPriceCents: 100.6 };
+  src.discounts = [{ label: ' Pronto pago ', type: 'percentage', value: 12.345 }];
+  src.issuer = { ...src.issuer, name: ' Electsun ' };
+  const result = convert(src);
+  assert(result.ok, result.ok ? '' : result.error);
+  assert.equal(result.value.seller, 'Ana Pérez');
+  assert.equal(result.value.items[0].description, 'Equipos');
+  assert.equal(result.value.items[0].quantity, 1.235);
+  assert.equal(result.value.items[0].unitPriceCents, 101);
+  assert.deepEqual(result.value.discounts.map(d => [d.label, d.value]), [['Pronto pago', 12.35]]);
+  assert.equal(result.value.issuer.name, 'Electsun');
+  const again = validateQuotationContent(result.value);
+  assert(again.ok);
+  assert.deepEqual(again.value, result.value);
+}
+
+// fuente inválida: error tipado, nunca un contenido que la validación rechazaría
+{
+  const missing = convert({ ...source(), projectId: '' });
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.match(missing.error, /propuesta/i);
+  assert.equal(convert({ ...source(), projectId: '   ' }).ok, false);
+  const tooExpensive = convert({ ...source(), pricedLines: [{ description: 'x', quantity: 1, unit: 'UD', unitPriceCents: 1e306, taxable: true }] });
+  assert.equal(tooExpensive.ok, false);
+  if (!tooExpensive.ok) assert.match(tooExpensive.error, /precio/i);
+  assert.equal(convert(source(), undefined, '0999-01-01').ok, false, 'fecha de emisión fuera de rango');
 }
 
 // totales del borrador = totales de las líneas con precio y los descuentos de la fuente
@@ -145,11 +194,13 @@ assert.equal('assetId' in quotation.attachments[1], false);
 
 // USD y newId determinista
 {
-  const out = quotationFromProposal({ ...source(), currency: 'USD' }, { today: '2026-05-01', newId: counter() });
+  const result = quotationFromProposal({ ...source(), currency: 'USD', validUntil: null }, { today: '2026-05-01', newId: counter() });
+  assert(result.ok, result.ok ? '' : result.error);
+  const out = result.value;
   assert.equal(out.currency, 'USD');
   assert.equal(out.issueDate, '2026-05-01');
-  const again = quotationFromProposal({ ...source(), currency: 'USD' }, { today: '2026-05-01', newId: counter() });
-  assert.deepEqual(again, out, 'misma entrada y mismo generador, mismo resultado');
+  const again = quotationFromProposal({ ...source(), currency: 'USD', validUntil: null }, { today: '2026-05-01', newId: counter() });
+  assert.deepEqual(again, result, 'misma entrada y mismo generador, mismo resultado');
 }
 
 console.log('Quotation from-proposal tests passed.');

@@ -14,6 +14,12 @@ const importSpecifiers = (source: string): string[] => {
   return specifiers;
 };
 
+/**
+ * Relojes y aleatoriedad. `new Date(` solo se rechaza sin argumentos: `new Date(Date.UTC(...))` (que usa `isIsoDate`)
+ * es determinista y está permitido.
+ */
+const CLOCK_OR_RANDOM = /\bDate\.now\s*\(|\bnew\s+Date\s*\(\s*\)|\bcrypto\.|\bMath\.random\s*\(/;
+
 for (const file of files) {
   const source = readFileSync(path.join(dir, file), 'utf8');
   for (const specifier of importSpecifiers(source)) {
@@ -23,10 +29,18 @@ for (const file of files) {
     assert(target.startsWith('shared/'), `${file}: "${specifier}" sale de shared/ (${target})`);
   }
   assert(!source.includes('0.18'), `${file}: el literal 0.18 no va aquí; la tasa sale de ITBIS_RATE (shared/financialRules.ts)`);
-  assert(!/\b(?:Date\.now|new Date\(\)|crypto\.|Math\.random)\b/.test(source), `${file}: shared/quotations no lee relojes ni genera ids`);
+  assert(!CLOCK_OR_RANDOM.test(source), `${file}: shared/quotations no lee relojes ni genera ids`);
 }
 
 // el detector funciona
 assert.deepEqual(importSpecifiers(`import { a } from '../x.js';\nexport * from "./y.js";\nimport type { T } from 'node:fs';\nimport('z')`), ['../x.js', './y.js', 'node:fs', 'z']);
+
+// el patrón de relojes detecta lo prohibido y deja pasar la construcción determinista
+for (const bad of ['const a = new Date();', 'return new Date()', 'x = new Date( );', 'Date.now()', 'const t = Date.now ();', 'Math.random()', 'crypto.randomUUID()']) {
+  assert(CLOCK_OR_RANDOM.test(bad), `debería detectar: ${bad}`);
+}
+for (const allowed of ['const date = new Date(Date.UTC(year, month - 1, day));', 'new Date(value)', 'const randomize = 1;', 'nowDate']) {
+  assert(!CLOCK_OR_RANDOM.test(allowed), `no debería detectar: ${allowed}`);
+}
 
 console.log(`Quotation shared purity tests passed (${files.length} files).`);

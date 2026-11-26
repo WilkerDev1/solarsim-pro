@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { DEFAULT_QUOTATION_DESIGN, QUOTATION_LIMITS, emptyQuotationContent, validateQuotationContent } from '../../shared/quotations/index';
+import { DEFAULT_QUOTATION_DESIGN, QUOTATION_LIMITS, computeQuotationTotals, emptyQuotationContent, validateQuotationContent } from '../../shared/quotations/index';
 import type { QuotationContent } from '../../shared/quotations/index';
 
 const validate = (data: unknown) => validateQuotationContent(data);
-const ok = (data: unknown): QuotationContent => {
+const ok = (data: unknown, label = ''): QuotationContent => {
   const result = validate(data);
-  assert(result.ok, result.ok ? '' : result.error);
+  assert(result.ok, result.ok ? '' : `${label} ${result.error}`.trim());
   return result.value;
 };
 const fail = (data: unknown, pattern: RegExp, label: string) => {
@@ -163,10 +163,15 @@ fail(draft({ discounts: [{ id: 'd', label: 'x', type: 'fixed', value: Number.NaN
 fail(draft({ discounts: [{ id: '', label: 'x', type: 'fixed', value: 1 }] }), /descuento/i, 'id vacío');
 fail(draft({ discounts: [{ id: 'd', label: 'x', type: 'fixed', value: 1 }, { id: 'd', label: 'y', type: 'fixed', value: 2 }] }), /duplicad/i, 'ids de descuento duplicados');
 
-// cliente obligatorio y línea 'item' obligatoria fuera del borrador
+// cliente obligatorio y línea 'item' obligatoria solo en emitida y aceptada
 ok(draft({ client: { name: '' } }));
 ok(draft({ items: [] }));
-for (const status of ['issued', 'accepted', 'rejected', 'void']) {
+for (const status of ['rejected', 'void']) {
+  ok(issued({ status }));
+  ok(draft({ status }), `${status} con borrador vacío (draft → void)`);
+  ok(issued({ status, client: { name: '   ' }, items: [] }));
+}
+for (const status of ['issued', 'accepted']) {
   ok(issued({ status }));
   fail(issued({ status, client: { name: '   ' } }), /cliente/i, `${status} sin nombre de cliente`);
   fail(issued({ status, items: [] }), /l[ií]nea/i, `${status} sin líneas`);
@@ -238,6 +243,88 @@ for (const input of [
 ]) {
   const once = ok(input);
   assert.deepEqual(ok(once), once);
+}
+
+// topes de importes (precio unitario, descuento fijo y bruto del documento)
+{
+  assert.equal(QUOTATION_LIMITS.maxUnitPriceCents, 100_000_000_000);
+  assert.equal(QUOTATION_LIMITS.maxDocumentCents, 1_000_000_000_000);
+  fail(draft({ items: [itemLine({ quantity: 1, unitPriceCents: 1e306 })] }), /precio/i, 'precio 1e306');
+  fail(draft({ items: [itemLine({ quantity: 1, unitPriceCents: 1_234_567_890_123_456 })] }), /precio/i, 'precio que pierde precisión');
+  fail(draft({ items: [itemLine({ quantity: 1, unitPriceCents: QUOTATION_LIMITS.maxUnitPriceCents + 1 })] }), /precio/i, 'precio sobre el tope');
+  assert.equal(ok(draft({ items: [itemLine({ quantity: 1, unitPriceCents: QUOTATION_LIMITS.maxUnitPriceCents })] })).items[0].unitPriceCents, QUOTATION_LIMITS.maxUnitPriceCents);
+  fail(draft({ items: [itemLine({ quantity: 0.001, unitPriceCents: 4_600_000_000_831_495 })] }), /precio/i, 'precio enorme con cantidad mínima');
+  fail(draft({ discounts: [{ id: 'd', label: 'x', type: 'fixed', value: 1e300 }] }), /descuento/i, 'descuento fijo 1e300');
+  fail(draft({ discounts: [{ id: 'd', label: 'x', type: 'fixed', value: QUOTATION_LIMITS.maxDocumentCents + 1 }] }), /descuento/i, 'descuento fijo sobre el tope');
+  ok(draft({ discounts: [{ id: 'd', label: 'x', type: 'fixed', value: QUOTATION_LIMITS.maxDocumentCents }] }));
+  fail(draft({ items: [itemLine({ id: 'a', quantity: 1_000_000, unitPriceCents: 1e10 }), itemLine({ id: 'b', quantity: 1_000_000, unitPriceCents: 1e10 })] }), /documento|importe/i, 'bruto del documento 2e16');
+  fail(draft({ items: Array.from({ length: 11 }, (_, i) => itemLine({ id: `t${i}`, quantity: 1, unitPriceCents: QUOTATION_LIMITS.maxUnitPriceCents })) }), /documento|importe/i, 'once líneas en el tope de precio');
+  ok(draft({ items: Array.from({ length: 10 }, (_, i) => itemLine({ id: `t${i}`, quantity: 1, unitPriceCents: QUOTATION_LIMITS.maxUnitPriceCents })) }));
+  // el bruto que se compara es el redondeado de cada línea: 0.001 × 500 centavos = 0.5 → 1, un centavo sobre el tope
+  fail(draft({ items: [itemLine({ id: 'a', quantity: 10, unitPriceCents: QUOTATION_LIMITS.maxUnitPriceCents }), itemLine({ id: 'b', quantity: 0.001, unitPriceCents: 500 })] }), /documento|importe/i, 'un centavo por encima del tope tras redondear');
+  ok(draft({ items: [itemLine({ id: 'a', quantity: 10, unitPriceCents: QUOTATION_LIMITS.maxUnitPriceCents }), itemLine({ id: 'b', kind: 'detail', quantity: 1_000_000 })] }), 'las filas descriptivas no suman al bruto');
+}
+
+// año de emisión y vigencia entre 2000 y 2199
+fail(draft({ issueDate: '0999-05-01' }), /2000.*2199/, 'año 0999');
+fail(draft({ issueDate: '1999-12-31' }), /2000.*2199/, 'año 1999');
+fail(draft({ issueDate: '2200-01-01' }), /2000.*2199/, 'año 2200');
+ok(draft({ issueDate: '2000-01-01' }));
+ok(draft({ issueDate: '2199-12-31', validUntil: '2199-12-31' }));
+fail(draft({ issueDate: '2199-12-01', validUntil: '2200-01-01' }), /vigencia.*2000.*2199/i, 'vigencia en 2200');
+
+// imágenes: solo '', referencia asset:sha256 o data URL png/jpeg/webp en base64
+{
+  assert.equal(QUOTATION_LIMITS.logoDataUrl, 500_000);
+  assert.equal(QUOTATION_LIMITS.thumbnailDataUrl, 100_000);
+  assert.equal('dataUrl' in QUOTATION_LIMITS, false);
+  const logo = (value: unknown) => draft({ issuer: { name: 'E', logo: value } });
+  for (const good of ['', 'asset:sha256:' + 'a'.repeat(64), 'data:image/png;base64,AAAA', 'data:image/jpeg;base64,/9j/4A==', 'data:image/webp;base64,UklGRg==']) {
+    assert.equal(ok(logo(good)).issuer.logo, good, `logo ${good.slice(0, 30)}`);
+  }
+  assert.equal(ok(logo(undefined)).issuer.logo, '');
+  for (const bad of ['https://example.com/logo.png', 'data:image/svg+xml;base64,PHN2Zz4=', 'data:text/html;base64,AAAA', 'data:image/png,raw', 'data:image/png;base64,', 'data:image/png;base64,AA AA', 'asset:sha256:XYZ', 'asset:sha256:' + 'A'.repeat(64), 'javascript:alert(1)']) {
+    fail(logo(bad), /logo/i, `logo ${bad.slice(0, 30)}`);
+  }
+  const prefix = 'data:image/png;base64,';
+  ok(logo(prefix + 'A'.repeat(QUOTATION_LIMITS.logoDataUrl - prefix.length)));
+  fail(logo(prefix + 'A'.repeat(QUOTATION_LIMITS.logoDataUrl - prefix.length + 4)), /logo/i, 'logo demasiado grande');
+
+  const thumb = (value: unknown) => draft({ attachments: [attachment({ thumbnailDataUrl: value })] });
+  assert.equal(ok(thumb('data:image/jpeg;base64,AAAA')).attachments[0].thumbnailDataUrl, 'data:image/jpeg;base64,AAAA');
+  assert.equal(ok(thumb('asset:sha256:' + 'f'.repeat(64))).attachments[0].thumbnailDataUrl, 'asset:sha256:' + 'f'.repeat(64));
+  assert.equal('thumbnailDataUrl' in ok(thumb('')).attachments[0], false);
+  for (const bad of ['https://example.com/t.png', 'data:image/gif;base64,R0lG', 'hola']) fail(thumb(bad), /miniatura/i, `miniatura ${bad}`);
+  ok(thumb(prefix + 'A'.repeat(QUOTATION_LIMITS.thumbnailDataUrl - prefix.length)));
+  fail(thumb(prefix + 'A'.repeat(QUOTATION_LIMITS.thumbnailDataUrl - prefix.length + 4)), /miniatura/i, 'miniatura demasiado grande');
+
+  const asset = (value: unknown) => draft({ attachments: [attachment({ assetId: value })] });
+  assert.equal(ok(asset('asset:sha256:' + 'a'.repeat(64))).attachments[0].assetId, 'asset:sha256:' + 'a'.repeat(64));
+  assert.equal(ok(asset('file_01-AB')).attachments[0].assetId, 'file_01-AB');
+  for (const bad of ['a b', '../etc/passwd', 'https://x/y', 'id<script>', 'x'.repeat(QUOTATION_LIMITS.assetId + 1)]) fail(asset(bad), /referencia/i, `assetId ${bad.slice(0, 20)}`);
+  ok(asset('x'.repeat(QUOTATION_LIMITS.assetId)));
+}
+
+// porcentajes: se guardan redondeados a 2 decimales (half-up), igual que se calculan
+{
+  const value = ok(draft({
+    items: [itemLine({ id: 'a', discountPct: 12.345 }), itemLine({ id: 'b', discountPct: 12.344 }), itemLine({ id: 'c', discountPct: 0.005 }), itemLine({ id: 'd', discountPct: 99.999 })],
+    discounts: [{ id: 'p', label: 'x', type: 'percentage', value: 12.345 }, { id: 'q', label: 'y', type: 'percentage', value: 1.005 }],
+  }));
+  assert.deepEqual(value.items.map(i => i.discountPct), [12.35, 12.34, 0.01, 100]);
+  assert.deepEqual(value.discounts.map(d => d.value), [12.35, 1.01]);
+  const single = ok(draft({ items: [itemLine({ quantity: 1, unitPriceCents: 100_000, taxable: false })], discounts: [{ id: 'p', label: 'x', type: 'percentage', value: 12.345 }] }));
+  const t = computeQuotationTotals(single);
+  assert.equal(t.discountCents, 12_350);
+  assert.equal(t.discountCents, Math.round(100_000 * single.discounts[0].value / 100), 'lo guardado es exactamente lo que se calcula');
+}
+
+// tasa de cambio entre 1 y el máximo
+{
+  fail(draft({ exchangeRate: 0.5 }), /tasa.*\b1\b.*10[,.]?000/i, 'tasa menor que 1');
+  fail(draft({ exchangeRate: QUOTATION_LIMITS.maxExchangeRate + 1 }), /tasa.*\b1\b.*10[,.]?000/i, 'tasa sobre el máximo');
+  ok(draft({ exchangeRate: 1 }));
+  ok(draft({ exchangeRate: QUOTATION_LIMITS.maxExchangeRate }));
 }
 
 console.log('Quotation validation tests passed.');

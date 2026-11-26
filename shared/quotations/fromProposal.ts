@@ -3,6 +3,7 @@
  * cantidad y da totales agregados), así que quien llama arma `ProposalQuotationSource` con los importes ya calculados.
  */
 import { DEFAULT_QUOTATION_DESIGN } from './types.js';
+import { validateQuotationContent, type QuotationValidation } from './validation.js';
 import type { QuotationAttachment, QuotationContent, QuotationCurrency, QuotationDesign, QuotationIssuer, QuotationLine, QuotationPrintedClient } from './types.js';
 
 export interface ProposalQuotationSource {
@@ -32,8 +33,14 @@ export interface QuotationFromProposalOptions {
   newId: () => string;
 }
 
-/** Borrador ('draft') con las líneas con precio primero y las descriptivas después; no muta `source` ni comparte referencias con él. */
-export function quotationFromProposal(source: ProposalQuotationSource, options: QuotationFromProposalOptions): QuotationContent {
+/**
+ * Borrador ('draft') con las líneas con precio primero y las descriptivas después; no muta `source` ni comparte
+ * referencias con él. Una vigencia anterior a `today` se descarta (`null`). El resultado pasa por
+ * `validateQuotationContent`: `ok` trae el contenido ya normalizado (validarlo otra vez no lo cambia) y `!ok` el
+ * motivo, p. ej. una propuesta sin id o importes fuera de tope.
+ */
+export function quotationFromProposal(source: ProposalQuotationSource, options: QuotationFromProposalOptions): QuotationValidation {
+  if (typeof source.projectId !== 'string' || !source.projectId.trim()) return { ok: false, error: 'La propuesta de origen no tiene id' };
   const priced: QuotationLine[] = source.pricedLines.map(item => ({
     id: options.newId(),
     kind: 'item',
@@ -56,10 +63,12 @@ export function quotationFromProposal(source: ProposalQuotationSource, options: 
     ...(item.catalogItemId ? { catalogItemId: item.catalogItemId } : {}),
   }));
   const design = options.design ?? DEFAULT_QUOTATION_DESIGN;
-  return {
+  // Comparación de cadenas ISO 'YYYY-MM-DD', como `effectiveQuotationStatus`.
+  const validUntil = source.validUntil !== null && source.validUntil < options.today ? null : source.validUntil;
+  const content: QuotationContent = {
     status: 'draft',
     issueDate: options.today,
-    validUntil: source.validUntil,
+    validUntil,
     currency: source.currency,
     exchangeRate: source.exchangeRate,
     ...(source.clientId ? { clientId: source.clientId } : {}),
@@ -80,4 +89,5 @@ export function quotationFromProposal(source: ProposalQuotationSource, options: 
     })),
     issuer: { ...source.issuer },
   };
+  return validateQuotationContent(content);
 }

@@ -1,4 +1,5 @@
 /** Validación y normalización de contenido de cotización no confiable (cuerpo de la API, sincronización, agentes). Mismo patrón que `validateClientInput`. */
+import { isAssetRef } from '../documentAssets.js';
 import { roundHalfUp } from './money.js';
 import { DEFAULT_QUOTATION_DESIGN } from './types.js';
 import type {
@@ -17,13 +18,27 @@ export const QUOTATION_LIMITS = {
   notes: 4000,
   paymentTerms: 2000,
   fileName: 255,
-  dataUrl: 2_000_000,
+  /** Longitud máxima del logo del emisor como data URL. */
+  logoDataUrl: 500_000,
+  /** Longitud máxima de la miniatura de un anexo como data URL. */
+  thumbnailDataUrl: 100_000,
   timestamp: 40,
   maxItems: 200,
   maxDiscounts: 20,
   maxAttachments: 40,
   maxQuantity: 1_000_000,
+  /** Precio unitario máximo en centavos (RD$/US$ 1 000 millones). */
+  maxUnitPriceCents: 100_000_000_000,
+  /**
+   * Tope del documento en centavos: la suma de brutos de línea (cantidad × precio, antes de descuentos) y cada
+   * descuento fijo. Con él todo el cálculo de totales es entero exacto: la base gravada × los puntos básicos del ITBIS
+   * (1e12 × 1800 ≈ 1.8e15) queda por debajo de 2^53.
+   */
+  maxDocumentCents: 1_000_000_000_000,
+  minExchangeRate: 1,
   maxExchangeRate: 10_000,
+  minYear: 2000,
+  maxYear: 2199,
 } as const;
 
 export type QuotationValidation = { ok: true; value: QuotationContent } | { ok: false; error: string };
@@ -40,6 +55,8 @@ const DISCOUNT_TYPES = ['fixed', 'percentage'] as const;
 const ATTACHMENT_MODES = ['include', 'related'] as const;
 const ATTACHMENT_ORIGINS = ['manual', 'catalog', 'proposal'] as const;
 const ACCENT = /^#[0-9a-fA-F]{6}$/;
+const IMAGE_DATA_URL = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+const ASSET_ID = /^[A-Za-z0-9:_-]+$/;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const oneOf = <T extends string>(options: readonly T[], value: unknown): value is T => typeof value === 'string' && (options as readonly string[]).includes(value);
@@ -90,6 +107,25 @@ function finite(raw: unknown, message: string): number {
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : reject(message);
 }
 
+/** Porcentaje redondeado a 2 decimales (half-up): lo guardado es exactamente lo que usan los totales. */
+const pct2 = (value: number): number => roundHalfUp(value * 100) / 100;
+
+/** Fecha 'YYYY-MM-DD' real con año dentro del rango de numeración. */
+function documentDate(raw: unknown, what: string): string {
+  if (!isIsoDate(raw)) return reject(`Fecha de ${what} inválida (use AAAA-MM-DD)`);
+  const year = Number(raw.slice(0, 4));
+  if (year < QUOTATION_LIMITS.minYear || year > QUOTATION_LIMITS.maxYear) {
+    return reject(`Fecha de ${what} fuera de rango: el año debe estar entre ${QUOTATION_LIMITS.minYear} y ${QUOTATION_LIMITS.maxYear}`);
+  }
+  return raw;
+}
+
+/** Imagen: '' o ausente, referencia `asset:sha256:<hex>` o data URL png/jpeg/webp en base64 de hasta `max` caracteres. */
+function image(raw: unknown, max: number, message: string): string {
+  const value = text(raw, max, message);
+  return value === '' || isAssetRef(value) || IMAGE_DATA_URL.test(value) ? value : reject(message);
+}
+
 function line(raw: unknown, seen: Set<string>): QuotationLine {
   if (!isRecord(raw)) return reject('Línea de cotización inválida');
   const id = uniqueId(raw.id, seen, 'línea');
@@ -106,12 +142,13 @@ function line(raw: unknown, seen: Set<string>): QuotationLine {
   if (kind === 'item') {
     const price = finite(raw.unitPriceCents ?? 0, 'El precio de la línea es inválido');
     if (price < 0) return reject('El precio de la línea es inválido');
+    if (price > QUOTATION_LIMITS.maxUnitPriceCents) return reject(`El precio de la línea supera el máximo (${QUOTATION_LIMITS.maxUnitPriceCents} centavos)`);
     const discountPct = finite(raw.discountPct ?? 0, 'El descuento de la línea es inválido');
     if (discountPct < 0 || discountPct > 100) return reject('El descuento de la línea debe estar entre 0 y 100');
     const taxable = raw.taxable ?? true;
     if (typeof taxable !== 'boolean') return reject('La marca de ITBIS de la línea es inválida');
     result.unitPriceCents = roundHalfUp(price);
-    result.discountPct = discountPct;
+    result.discountPct = pct2(discountPct);
     result.taxable = taxable;
   }
   if (catalogItemId) result.catalogItemId = catalogItemId;
@@ -125,7 +162,8 @@ function discount(raw: unknown, seen: Set<string>): QuotationDiscount {
   const label = text(raw.label, QUOTATION_LIMITS.label, 'La etiqueta del descuento es inválida o demasiado larga');
   const value = finite(raw.value, 'El valor del descuento es inválido');
   if (value < 0 || (raw.type === 'percentage' && value > 100)) return reject('El valor del descuento es inválido');
-  return { id, label, type: raw.type, value: raw.type === 'fixed' ? roundHalfUp(value) : value };
+  if (raw.type === 'fixed' && value > QUOTATION_LIMITS.maxDocumentCents) return reject(`El valor del descuento supera el máximo del documento (${QUOTATION_LIMITS.maxDocumentCents} centavos)`);
+  return { id, label, type: raw.type, value: raw.type === 'fixed' ? roundHalfUp(value) : pct2(value) };
 }
 
 function client(raw: unknown): QuotationPrintedClient {
@@ -149,7 +187,7 @@ function issuer(raw: unknown): QuotationIssuer {
     phone: text(data.phone, QUOTATION_LIMITS.phone, 'El teléfono del emisor es inválido'),
     email: text(data.email, QUOTATION_LIMITS.label, 'El correo del emisor es inválido'),
     website: text(data.website, QUOTATION_LIMITS.label, 'El sitio web del emisor es inválido'),
-    logo: text(data.logo, QUOTATION_LIMITS.dataUrl, 'El logo del emisor es inválido o demasiado grande'),
+    logo: image(data.logo, QUOTATION_LIMITS.logoDataUrl, 'El logo del emisor es inválido o demasiado grande (use una imagen PNG, JPEG o WebP)'),
   };
 }
 
@@ -190,9 +228,10 @@ function attachment(raw: unknown, seen: Set<string>): QuotationAttachment {
     origin: raw.origin,
   };
   const assetId = optionalText(raw.assetId, QUOTATION_LIMITS.assetId, 'Anexo inválido: referencia del archivo');
+  if (assetId && !ASSET_ID.test(assetId)) return reject('Anexo inválido: referencia del archivo');
   const catalogItemId = optionalText(raw.catalogItemId, QUOTATION_LIMITS.id, 'Anexo inválido: id del equipo');
   const sourceProjectId = optionalText(raw.sourceProjectId, QUOTATION_LIMITS.id, 'Anexo inválido: id de la propuesta');
-  const thumbnailDataUrl = optionalText(raw.thumbnailDataUrl, QUOTATION_LIMITS.dataUrl, 'Anexo inválido: miniatura');
+  const thumbnailDataUrl = image(raw.thumbnailDataUrl, QUOTATION_LIMITS.thumbnailDataUrl, 'Anexo inválido: miniatura (use una imagen PNG, JPEG o WebP)') || undefined;
   if (assetId) result.assetId = assetId;
   if (catalogItemId) result.catalogItemId = catalogItemId;
   if (sourceProjectId) result.sourceProjectId = sourceProjectId;
@@ -203,12 +242,12 @@ function attachment(raw: unknown, seen: Set<string>): QuotationAttachment {
 function parse(data: Record<string, unknown>): QuotationContent {
   if (!oneOf(STATUSES, data.status)) return reject('Estado de cotización inválido');
   if (!oneOf(CURRENCIES, data.currency)) return reject('Moneda de cotización inválida');
-  if (!isIsoDate(data.issueDate)) return reject('Fecha de emisión inválida (use AAAA-MM-DD)');
-  const validUntil = data.validUntil ?? null;
-  if (validUntil !== null && !isIsoDate(validUntil)) return reject('Fecha de vigencia inválida (use AAAA-MM-DD)');
-  if (validUntil !== null && validUntil < data.issueDate) return reject('La vigencia no puede ser anterior a la fecha de emisión');
-  if (typeof data.exchangeRate !== 'number' || !Number.isFinite(data.exchangeRate) || data.exchangeRate <= 0 || data.exchangeRate > QUOTATION_LIMITS.maxExchangeRate) {
-    return reject('La tasa de cambio debe ser un número mayor que 0');
+  const issueDate = documentDate(data.issueDate, 'emisión');
+  const validUntil = data.validUntil == null ? null : documentDate(data.validUntil, 'vigencia');
+  if (validUntil !== null && validUntil < issueDate) return reject('La vigencia no puede ser anterior a la fecha de emisión');
+  const { minExchangeRate, maxExchangeRate } = QUOTATION_LIMITS;
+  if (typeof data.exchangeRate !== 'number' || !Number.isFinite(data.exchangeRate) || data.exchangeRate < minExchangeRate || data.exchangeRate > maxExchangeRate) {
+    return reject(`La tasa de cambio debe estar entre ${minExchangeRate} y ${maxExchangeRate} DOP por USD`);
   }
 
   const lineIds = new Set<string>();
@@ -218,15 +257,26 @@ function parse(data: Record<string, unknown>): QuotationContent {
   const attachmentIds = new Set<string>();
   const attachments = list(data.attachments, QUOTATION_LIMITS.maxAttachments, `Demasiados anexos (máx. ${QUOTATION_LIMITS.maxAttachments})`, 'Los anexos deben ser una lista').map(raw => attachment(raw, attachmentIds));
 
+  // Suma de brutos redondeados por línea, en BigInt (cantidad en milésimas × centavos no cabe en 2^53).
+  let documentGross = 0n;
+  for (const item of items) {
+    if (item.kind !== 'item') continue;
+    documentGross += (BigInt(Math.round(item.quantity * 1000)) * BigInt(item.unitPriceCents) * 2n + 1000n) / 2000n;
+  }
+  if (documentGross > BigInt(QUOTATION_LIMITS.maxDocumentCents)) {
+    return reject(`El importe del documento (cantidad × precio de las líneas) supera el máximo de ${QUOTATION_LIMITS.maxDocumentCents} centavos`);
+  }
+
   const printedClient = client(data.client);
-  if (data.status !== 'draft') {
+  // Borrador, rechazada y anulada pueden quedar sin cliente ni líneas (p. ej. anular un borrador vacío).
+  if (data.status === 'issued' || data.status === 'accepted') {
     if (!printedClient.name) return reject('El nombre del cliente es obligatorio');
     if (!items.some(item => item.kind === 'item')) return reject('La cotización necesita al menos una línea con precio');
   }
 
   const value: QuotationContent = {
     status: data.status,
-    issueDate: data.issueDate,
+    issueDate,
     validUntil,
     currency: data.currency,
     exchangeRate: data.exchangeRate,

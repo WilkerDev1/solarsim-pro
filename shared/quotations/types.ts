@@ -49,7 +49,7 @@ export interface QuotationIssuer {
   phone: string;
   email: string;
   website: string;
-  /** Data URL o referencia `asset:sha256:`; puede ser ''. */
+  /** Data URL de imagen (png, jpeg o webp) o referencia `asset:sha256:`; puede ser ''. */
   logo: string;
 }
 
@@ -87,7 +87,7 @@ export interface QuotationContent {
   /** 'YYYY-MM-DD' o null. */
   validUntil: string | null;
   currency: QuotationCurrency;
-  /** DOP por 1 USD, > 0. */
+  /** DOP por 1 USD, entre 1 y 10 000. */
   exchangeRate: number;
   clientId?: string;
   client: QuotationPrintedClient;

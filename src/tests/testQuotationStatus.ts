@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   QUOTATION_NUMBER_PREFIX, QUOTATION_STATUS_LABELS, canTransitionQuotation, effectiveQuotationStatus, formatQuotationNumber,
-  isQuotationContentLocked, parseQuotationNumber, quotationNumberYear,
+  isQuotationContentLocked, parseQuotationNumber, quotationNumberYear, validateQuotationContent,
 } from '../../shared/quotations/index';
 import type { QuotationStatus } from '../../shared/quotations/index';
 
@@ -67,5 +67,19 @@ for (const [year, sequence] of [[2026, 1], [2026, 9999], [2031, 10000], [1999, 4
 assert.equal(quotationNumberYear('2026-03-10'), 2026);
 assert.equal(quotationNumberYear('2025-12-31'), 2025);
 assert.throws(() => quotationNumberYear('10/03/2026'), RangeError);
+
+// toda fecha de emisión que la validación acepta produce un número sin lanzar
+{
+  const dates = ['0000-01-01', '0999-05-01', '1000-01-01', '1999-12-31', '2000-01-01', '2026-03-10', '2199-12-31', '2200-01-01', '9999-12-31'];
+  for (let year = 1990; year <= 2210; year += 7) dates.push(`${String(year).padStart(4, '0')}-06-15`);
+  let accepted = 0;
+  for (const issueDate of dates) {
+    const result = validateQuotationContent({ status: 'draft', issueDate, currency: 'DOP', exchangeRate: 60 });
+    if (!result.ok) continue;
+    accepted++;
+    assert.doesNotThrow(() => formatQuotationNumber(quotationNumberYear(result.value.issueDate), 1), `número para ${issueDate}`);
+  }
+  assert(accepted >= 3, 'se aceptan fechas del rango');
+}
 
 console.log('Quotation status and numbering tests passed.');

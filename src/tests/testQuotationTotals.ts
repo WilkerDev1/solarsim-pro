@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { computeQuotationTotals, convertCents, formatAmount, formatMoney, fromCents, toCents } from '../../shared/quotations/index';
-import type { QuotationDiscount, QuotationLine } from '../../shared/quotations/index';
+import { ITBIS_RATE } from '../../shared/financialRules';
+import { QUOTATION_LIMITS, computeQuotationTotals, convertCents, formatAmount, formatMoney, fromCents, toCents, validateQuotationContent } from '../../shared/quotations/index';
+import type { QuotationContent, QuotationDiscount, QuotationLine } from '../../shared/quotations/index';
+import { mulDivRound } from '../../shared/quotations/money';
 
 let line_n = 0;
 const line = (over: Partial<QuotationLine> = {}): QuotationLine => ({
@@ -202,6 +204,124 @@ const reference = [
   const first = computeQuotationTotals({ items, discounts });
   assert.deepEqual({ items, discounts }, before);
   assert.deepEqual(computeQuotationTotals({ items, discounts }), first);
+}
+
+// mulDivRound es exacto aunque el producto no quepa en enteros seguros (BigInt con half-up)
+{
+  assert.equal(mulDivRound(1, 4_600_000_000_831_495, 1000), 4_600_000_000_831, '4600000000831.495 → 4600000000831');
+  assert.equal(mulDivRound(1, 4_600_000_000_831_500, 1000), 4_600_000_000_832, 'mitad exacta → hacia arriba');
+  assert.equal(mulDivRound(1_000_000_000, 100_000_000_000, 1000), 1e17, 'cantidad tope × precio tope');
+  assert.equal(mulDivRound(9_007_199_254_740_991, 3, 7), Number((9_007_199_254_740_991n * 3n * 2n + 7n) / 14n));
+  assert.equal(mulDivRound(5, 1, 2), 3);
+  assert.equal(mulDivRound(-5, 1, 2), -3, 'negativos: la mitad se aleja de cero, como roundHalfUp');
+  assert.equal(mulDivRound(Number.NaN, 1, 2), 0);
+  assert.equal(mulDivRound(1, 1, 0), 0);
+}
+
+// importes fuera de tope: los totales acotan las entradas en vez de perder precisión
+{
+  assert.equal(totals([line({ unitPriceCents: 1e306, taxable: false })]).subtotalCents, QUOTATION_LIMITS.maxUnitPriceCents, 'precio 1e306 se acota al tope');
+  assert.equal(totals([line({ unitPriceCents: 1_234_567_890_123_456, taxable: false })]).subtotalCents, QUOTATION_LIMITS.maxUnitPriceCents);
+  assert.equal(totals([line({ quantity: 5e6, unitPriceCents: 1, taxable: false })]).subtotalCents, QUOTATION_LIMITS.maxQuantity, 'cantidad acotada');
+  const t = totals([line({ id: 'a', quantity: 1_000_000, unitPriceCents: 1e10 }), line({ id: 'b', quantity: 1_000_000, unitPriceCents: 1e10 })], [fixed('d', 3)]);
+  assert.equal(t.discounts.reduce((s, d) => s + d.appliedCents, 0), t.discountCents, 'Σ appliedCents = discountCents');
+  assert.equal(t.discountCents, 3);
+  assert(t.subtotalCents <= QUOTATION_LIMITS.maxDocumentCents, 'el bruto del documento se acota al tope');
+  assert.equal(t.totalCents, t.subtotalCents - t.discountCents + t.taxCents);
+  assert.equal(totals([line({ unitPriceCents: 1000 })], [fixed('f', 1e300)]).discountCents, 1000);
+}
+
+// entradas hostiles: nunca lanza ni devuelve NaN/Infinity
+{
+  const hostile: unknown[] = [
+    ...Array.from({ length: 1100 }, (_, i) => line({ id: `h${i}`, quantity: 0.001, unitPriceCents: 1.7e308 })),
+    line({ quantity: Number.NaN, unitPriceCents: Number.NaN, discountPct: Number.NaN }),
+    line({ quantity: Number.POSITIVE_INFINITY, unitPriceCents: Number.POSITIVE_INFINITY, discountPct: Number.POSITIVE_INFINITY }),
+    line({ quantity: 1e308, unitPriceCents: 1e308, discountPct: -1e308 }),
+    line({ quantity: -1e308, unitPriceCents: -1e308 }),
+    line({ quantity: '5' as any, unitPriceCents: '100' as any, discountPct: '10' as any, taxable: 'yes' as any, id: { x: 1 } as any }),
+    null, undefined, 42, 'x', [], { kind: 'item' }, { kind: 'detail', id: 7 },
+    ...Array.from({ length: 5000 }, (_, i) => line({ id: `m${i}`, quantity: 1e6, unitPriceCents: 1e11, discountPct: i % 101 })),
+  ];
+  const discounts: unknown[] = [
+    pct('p', Number.NaN), pct('q', 1e308), fixed('f', Number.POSITIVE_INFINITY), fixed('g', 1e308), fixed('h', -1e308),
+    { id: 'z', type: 'percentage', value: '50' }, null, 'x', { type: 'fixed' }, fixed('k', 1.7e308),
+  ];
+  for (const input of [
+    { items: hostile, discounts },
+    { items: hostile, discounts: 'x' },
+    { items: 'x', discounts },
+    { items: null, discounts: null },
+    {},
+  ]) {
+    const t = computeQuotationTotals(input as any);
+    const numbers = [t.subtotalCents, t.discountCents, t.taxableBaseCents, t.exemptBaseCents, t.taxCents, t.totalCents,
+      ...t.discounts.map(d => d.appliedCents), ...t.lines.flatMap(l => [l.grossCents, l.lineDiscountCents, l.netCents, l.allocatedDiscountCents, l.taxableBaseCents])];
+    for (const n of numbers) assert(Number.isSafeInteger(n) && n >= 0, `valor no válido ${n}`);
+    assert.equal(t.discounts.reduce((s, d) => s + d.appliedCents, 0), t.discountCents);
+    assert.equal(t.lines.reduce((s, l) => s + l.allocatedDiscountCents, 0), t.discountCents);
+    assert.equal(t.totalCents, t.subtotalCents - t.discountCents + t.taxCents);
+    assert(t.subtotalCents <= QUOTATION_LIMITS.maxDocumentCents);
+    assert(t.lines.every(l => typeof l.id === 'string'));
+  }
+  assert.doesNotThrow(() => computeQuotationTotals(null as any));
+}
+
+// propiedades: documentos válidos aleatorios (generador determinista, semilla fija)
+{
+  let seed = 0x5eed1234;
+  const rand = (): number => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const int = (max: number): number => Math.floor(rand() * (max + 1));
+  /** Magnitud log-uniforme en [0, max]: cubre centavos sueltos y valores cerca del tope. */
+  const logInt = (max: number): number => (rand() < 0.05 ? max : Math.floor(Math.pow(max + 1, rand()) - 1));
+  const ITBIS_BASIS = BigInt(Math.round(ITBIS_RATE * 10000));
+  const halfUpDiv = (num: bigint, den: bigint): bigint => (num * 2n + den) / (den * 2n);
+  let checked = 0;
+  for (let doc = 0; doc < 2000; doc++) {
+    const lineCount = rand() < 0.1 ? int(200) : int(12);
+    const budget = rand() < 0.3 ? QUOTATION_LIMITS.maxDocumentCents : logInt(QUOTATION_LIMITS.maxDocumentCents);
+    let left = BigInt(budget) * 1000n;
+    const items: QuotationLine[] = [];
+    for (let i = 0; i < lineCount; i++) {
+      const kind = rand() < 0.15 ? 'detail' : 'item';
+      const quantityMilli = rand() < 0.5 ? (1 + int(20)) * 1000 : 1 + logInt(QUOTATION_LIMITS.maxQuantity * 1000 - 1);
+      let price = logInt(QUOTATION_LIMITS.maxUnitPriceCents);
+      if (kind === 'item') {
+        // Cada bruto redondeado excede a lo sumo en media unidad (500 milésimas) a cantidad × precio.
+        const room = left > 500n ? (left - 500n) / BigInt(quantityMilli) : 0n;
+        if (BigInt(price) > room) price = Number(room);
+        left -= BigInt(quantityMilli) * BigInt(price) + 500n;
+      }
+      const discountPct = rand() < 0.6 ? 0 : int(10000) / 100;
+      items.push(line({ id: `p${doc}-${i}`, kind, quantity: quantityMilli / 1000, unitPriceCents: price, discountPct, taxable: rand() < 0.7 }));
+    }
+    const discounts: QuotationDiscount[] = Array.from({ length: int(4) }, (_, i) =>
+      rand() < 0.5 ? pct(`d${i}`, int(10000) / 100) : fixed(`d${i}`, logInt(QUOTATION_LIMITS.maxDocumentCents)));
+    const validated = validateQuotationContent({ status: 'draft', issueDate: '2026-03-10', currency: 'DOP', exchangeRate: 60, items, discounts });
+    if (!validated.ok) continue;
+    const content: QuotationContent = validated.value;
+    const t = computeQuotationTotals(content);
+    checked++;
+    const all = [t.subtotalCents, t.discountCents, t.taxableBaseCents, t.exemptBaseCents, t.taxCents, t.totalCents,
+      ...t.discounts.map(d => d.appliedCents), ...t.lines.flatMap(l => [l.grossCents, l.lineDiscountCents, l.netCents, l.allocatedDiscountCents, l.taxableBaseCents])];
+    for (const n of all) assert(Number.isSafeInteger(n) && n >= 0, `doc ${doc}: ${n}`);
+    assert.equal(t.lines.reduce((s, l) => s + l.allocatedDiscountCents, 0), t.discountCents, `doc ${doc}: Σ asignado`);
+    assert.equal(t.discounts.reduce((s, d) => s + d.appliedCents, 0), t.discountCents, `doc ${doc}: Σ aplicado`);
+    assert.equal(t.totalCents, t.subtotalCents - t.discountCents + t.taxCents, `doc ${doc}: total`);
+    assert.equal(t.taxableBaseCents + t.exemptBaseCents, t.subtotalCents - t.discountCents, `doc ${doc}: bases`);
+    assert.equal(BigInt(t.taxCents), halfUpDiv(BigInt(t.taxableBaseCents) * ITBIS_BASIS, 10000n), `doc ${doc}: ITBIS exacto`);
+    content.items.forEach((item, i) => {
+      if (item.kind !== 'item') return;
+      const gross = halfUpDiv(BigInt(Math.round(item.quantity * 1000)) * BigInt(item.unitPriceCents), 1000n);
+      assert.equal(BigInt(t.lines[i].grossCents), gross, `doc ${doc}: bruto exacto de la línea ${i}`);
+    });
+  }
+  assert(checked >= 1500, `se comprobaron ${checked} documentos válidos`);
 }
 
 console.log('Quotation totals tests passed.');
