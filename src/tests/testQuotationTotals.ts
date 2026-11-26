@@ -1,0 +1,207 @@
+import assert from 'node:assert/strict';
+import { computeQuotationTotals, convertCents, formatAmount, formatMoney, fromCents, toCents } from '../../shared/quotations/index';
+import type { QuotationDiscount, QuotationLine } from '../../shared/quotations/index';
+
+let line_n = 0;
+const line = (over: Partial<QuotationLine> = {}): QuotationLine => ({
+  id: over.id ?? `l${++line_n}`, kind: 'item', description: 'x', quantity: 1, unit: 'UD', unitPriceCents: 0, discountPct: 0, taxable: true, ...over,
+});
+const fixed = (id: string, cents: number): QuotationDiscount => ({ id, label: id, type: 'fixed', value: cents });
+const pct = (id: string, value: number): QuotationDiscount => ({ id, label: id, type: 'percentage', value });
+const totals = (items: QuotationLine[], discounts: QuotationDiscount[] = []) => computeQuotationTotals({ items, discounts });
+
+// money: redondeo half-up robusto frente a la coma flotante
+assert.equal(toCents(39.2), 3920);
+assert.equal(toCents(1.005), 101);
+assert.equal(toCents(0.1 + 0.2), 30);
+assert.equal(toCents(0), 0);
+assert.equal(toCents(35966.4), 3596640);
+assert.equal(toCents(Number.NaN), 0);
+assert.equal(fromCents(3596640), 35966.4);
+assert.equal(formatAmount(3596640), '35,966.40');
+assert.equal(formatAmount(5), '0.05');
+assert.equal(formatMoney(3596640, 'DOP'), 'RD$ 35,966.40');
+assert.equal(formatMoney(1845000, 'USD'), 'US$ 18,450.00');
+assert.equal(formatMoney(-1000, 'DOP'), '-RD$ 10.00');
+assert.equal(formatMoney(0, 'USD'), 'US$ 0.00');
+assert.equal(formatMoney(123456789012, 'DOP'), 'RD$ 1,234,567,890.12');
+assert.equal(convertCents(6000, 'DOP', 'DOP', 60), 6000);
+assert.equal(convertCents(6000, 'DOP', 'USD', 60), 100);
+assert.equal(convertCents(100, 'USD', 'DOP', 60), 6000);
+assert.equal(convertCents(100, 'DOP', 'USD', 60), 2, '1.00 DOP = 0.0167 USD → 2 centavos');
+assert.equal(convertCents(1845000, 'USD', 'DOP', 59.75), 110_238_750);
+for (const cents of [0, 1, 99, 12345, 1845000]) {
+  assert.equal(convertCents(convertCents(cents, 'USD', 'DOP', 62.5), 'DOP', 'USD', 62.5), cents, 'ida y vuelta USD→DOP→USD');
+}
+
+// caso real de referencia (plantilla de Electsun): seis líneas gravadas en DOP
+const reference = [
+  line({ id: 'a', quantity: 250, unitPriceCents: toCents(39.2) }),
+  line({ id: 'b', quantity: 1, unitPriceCents: toCents(980) }),
+  line({ id: 'c', quantity: 1, unitPriceCents: toCents(6000) }),
+  line({ id: 'd', quantity: 150, unitPriceCents: toCents(12) }),
+  line({ id: 'e', quantity: 50, unitPriceCents: toCents(68) }),
+  line({ id: 'f', quantity: 1, unitPriceCents: toCents(8500) }),
+];
+{
+  const t = totals(reference);
+  assert.equal(t.subtotalCents, 3048000);
+  assert.equal(t.taxCents, 548640);
+  assert.equal(t.totalCents, 3596640);
+  assert.equal(t.discountCents, 0);
+  assert.equal(t.taxableBaseCents, 3048000);
+  assert.equal(t.exemptBaseCents, 0);
+  assert.deepEqual(t.lines.map(l => l.netCents), [980000, 98000, 600000, 180000, 340000, 850000]);
+  assert.equal(formatMoney(t.totalCents, 'DOP'), 'RD$ 35,966.40');
+}
+
+// descuento de línea
+{
+  const t = totals([line({ quantity: 2, unitPriceCents: 10000, discountPct: 10 })]);
+  assert.deepEqual(t.lines[0], { id: t.lines[0].id, grossCents: 20000, lineDiscountCents: 2000, netCents: 18000, allocatedDiscountCents: 0, taxableBaseCents: 18000 });
+  assert.equal(t.subtotalCents, 18000);
+  assert.equal(t.taxCents, 3240);
+  assert.equal(t.totalCents, 21240);
+}
+
+// descuento de línea con redondeo half-up (33 centavos × 50 % = 16.5 → 17)
+{
+  const t = totals([line({ quantity: 1, unitPriceCents: 33, discountPct: 50 })]);
+  assert.equal(t.lines[0].lineDiscountCents, 17);
+  assert.equal(t.lines[0].netCents, 16);
+}
+
+// descuentos globales: porcentual y fijo combinados, ambos sobre el subtotal (sin cascada)
+{
+  const t = totals([line({ id: 'a', quantity: 1, unitPriceCents: 100000 })], [pct('p', 10), fixed('f', 5000)]);
+  assert.equal(t.subtotalCents, 100000);
+  assert.deepEqual(t.discounts, [{ id: 'p', appliedCents: 10000 }, { id: 'f', appliedCents: 5000 }]);
+  assert.equal(t.discountCents, 15000);
+  assert.equal(t.lines[0].allocatedDiscountCents, 15000);
+  assert.equal(t.taxableBaseCents, 85000);
+  assert.equal(t.taxCents, 15300);
+  assert.equal(t.totalCents, 100000 - 15000 + 15300);
+}
+
+// el orden no cambia el total: dos porcentajes no se encadenan (10 % + 10 % = 20 %, no 19 %)
+{
+  const t = totals([line({ quantity: 1, unitPriceCents: 100000, taxable: false })], [pct('a', 10), pct('b', 10)]);
+  assert.equal(t.discountCents, 20000);
+  assert.equal(t.totalCents, 80000);
+}
+
+// tope: el descuento nunca supera el subtotal y lo aplicado por descuento suma lo descontado
+{
+  const t = totals([line({ quantity: 1, unitPriceCents: 10000 })], [fixed('a', 8000), fixed('b', 8000), pct('c', 50)]);
+  assert.equal(t.discountCents, 10000);
+  assert.deepEqual(t.discounts, [{ id: 'a', appliedCents: 8000 }, { id: 'b', appliedCents: 2000 }, { id: 'c', appliedCents: 0 }]);
+  assert.equal(t.taxableBaseCents, 0);
+  assert.equal(t.taxCents, 0);
+  assert.equal(t.totalCents, 0);
+}
+
+// prorrateo exacto con centavos indivisibles: 3 líneas de 0.01 con descuento fijo de 0.02
+{
+  const t = totals([line({ id: 'a', unitPriceCents: 1 }), line({ id: 'b', unitPriceCents: 1 }), line({ id: 'c', unitPriceCents: 1 })], [fixed('d', 2)]);
+  assert.equal(t.subtotalCents, 3);
+  assert.equal(t.discountCents, 2);
+  assert.deepEqual(t.lines.map(l => l.allocatedDiscountCents), [1, 1, 0], 'empates por orden de línea');
+  assert.equal(t.lines.reduce((s, l) => s + l.allocatedDiscountCents, 0), 2);
+  assert.equal(t.taxableBaseCents, 1);
+}
+
+// prorrateo por mayor resto: la suma asignada siempre es el descuento
+{
+  const items = [line({ id: 'a', unitPriceCents: 3333 }), line({ id: 'b', unitPriceCents: 3333 }), line({ id: 'c', unitPriceCents: 3334 })];
+  for (const d of [1, 2, 7, 99, 100, 1234, 9999, 10000]) {
+    const t = totals(items, [fixed('d', d)]);
+    assert.equal(t.lines.reduce((s, l) => s + l.allocatedDiscountCents, 0), d, `suma exacta con descuento ${d}`);
+    for (const l of t.lines) assert(l.allocatedDiscountCents >= 0 && l.allocatedDiscountCents <= l.netCents);
+    assert.equal(t.taxableBaseCents + t.exemptBaseCents, t.subtotalCents - t.discountCents);
+  }
+  const t = totals(items, [fixed('d', 100)]);
+  assert.deepEqual(t.lines.map(l => l.allocatedDiscountCents), [33, 33, 34]);
+}
+
+// mezcla gravado/exento con descuento: ITBIS sobre la base gravada ya descontada
+{
+  const t = totals([line({ id: 'g', unitPriceCents: 60000, taxable: true }), line({ id: 'e', unitPriceCents: 40000, taxable: false })], [fixed('d', 10000)]);
+  assert.equal(t.subtotalCents, 100000);
+  assert.deepEqual(t.lines.map(l => l.allocatedDiscountCents), [6000, 4000]);
+  assert.equal(t.taxableBaseCents, 54000);
+  assert.equal(t.exemptBaseCents, 36000);
+  assert.equal(t.taxCents, 9720);
+  assert.equal(t.totalCents, 100000 - 10000 + 9720);
+}
+
+// el ITBIS se calcula sobre la base del documento, no línea a línea
+{
+  const items = [line({ unitPriceCents: 5 }), line({ unitPriceCents: 5 }), line({ unitPriceCents: 5 })];
+  const t = totals(items);
+  assert.equal(t.taxableBaseCents, 15);
+  assert.equal(t.taxCents, 3, '15 × 18 % = 2.7 → 3');
+  assert.equal(totals([line({ unitPriceCents: 1 }), line({ unitPriceCents: 1 }), line({ unitPriceCents: 1 }), line({ unitPriceCents: 1 })]).taxCents, 1, '4 × 18 % = 0.72 → 1; por línea sería 0');
+}
+
+// líneas 'detail' no aportan
+{
+  const t = totals([line({ id: 'i', unitPriceCents: 1000 }), line({ id: 'd', kind: 'detail', quantity: 5, unitPriceCents: 999999, discountPct: 50 })]);
+  assert.equal(t.subtotalCents, 1000);
+  assert.deepEqual(t.lines[1], { id: 'd', grossCents: 0, lineDiscountCents: 0, netCents: 0, allocatedDiscountCents: 0, taxableBaseCents: 0 });
+  assert.equal(t.totalCents, 1180);
+  const onlyDetail = totals([line({ kind: 'detail', unitPriceCents: 500 })], [fixed('x', 100)]);
+  assert.equal(onlyDetail.totalCents, 0);
+  assert.equal(onlyDetail.discountCents, 0);
+}
+
+// cantidades decimales (hasta 3 decimales)
+{
+  assert.equal(totals([line({ quantity: 2.5, unitPriceCents: 1000 })]).lines[0].grossCents, 2500);
+  assert.equal(totals([line({ quantity: 0.333, unitPriceCents: 1000 })]).lines[0].grossCents, 333);
+  assert.equal(totals([line({ quantity: 1.005, unitPriceCents: 1000 })]).lines[0].grossCents, 1005);
+  assert.equal(totals([line({ quantity: 0.001, unitPriceCents: 500 })]).lines[0].grossCents, 1, '0.5 centavos → 1');
+  assert.equal(totals([line({ quantity: 1.5, unitPriceCents: 3, discountPct: 12.5 })]).lines[0].lineDiscountCents, 1, '4.5 → 5 bruto; 12.5 % = 0.625 → 1');
+}
+
+// entradas degeneradas: sin NaN y sin excepciones
+{
+  const t = totals([
+    line({ id: 'neg', quantity: -3, unitPriceCents: 1000 }),
+    line({ id: 'nan', quantity: Number.NaN, unitPriceCents: 1000 }),
+    line({ id: 'inf', quantity: 1, unitPriceCents: Number.POSITIVE_INFINITY }),
+    line({ id: 'price', quantity: 1, unitPriceCents: -500 }),
+    line({ id: 'hi', quantity: 1, unitPriceCents: 1000, discountPct: 250 }),
+    line({ id: 'lo', quantity: 1, unitPriceCents: 1000, discountPct: -20 }),
+    line({ id: 'frac', quantity: 1, unitPriceCents: 10.6 }),
+  ], [pct('p', 400), pct('q', -5), fixed('f', Number.NaN), fixed('g', -100)]);
+  const flat = JSON.stringify(t);
+  assert(!flat.includes('null') && !flat.includes('NaN'), 'sin NaN ni null');
+  assert.deepEqual(t.lines.map(l => l.netCents), [0, 0, 0, 0, 0, 1000, 11]);
+  assert.equal(t.lines[4].lineDiscountCents, 1000, 'porcentaje > 100 se acota a 100');
+  assert.equal(t.lines[5].lineDiscountCents, 0, 'porcentaje < 0 se acota a 0');
+  assert.equal(t.subtotalCents, 1011);
+  assert.equal(t.discountCents, 1011, 'porcentaje global > 100 se acota y el tope es el subtotal');
+  assert.equal(t.totalCents, 0);
+  for (const n of [t.subtotalCents, t.discountCents, t.taxCents, t.totalCents, t.taxableBaseCents, t.exemptBaseCents]) assert(Number.isInteger(n) && n >= 0);
+}
+
+// lista vacía
+{
+  const t = totals([]);
+  assert.deepEqual(t, { lines: [], subtotalCents: 0, discounts: [], discountCents: 0, taxableBaseCents: 0, exemptBaseCents: 0, taxCents: 0, totalCents: 0 });
+  const withDiscount = totals([], [fixed('d', 500)]);
+  assert.equal(withDiscount.discountCents, 0);
+  assert.deepEqual(withDiscount.discounts, [{ id: 'd', appliedCents: 0 }]);
+}
+
+// pureza: no muta la entrada y es determinista
+{
+  const items = structuredClone(reference);
+  const discounts = [pct('p', 3), fixed('f', 777)];
+  const before = structuredClone({ items, discounts });
+  const first = computeQuotationTotals({ items, discounts });
+  assert.deepEqual({ items, discounts }, before);
+  assert.deepEqual(computeQuotationTotals({ items, discounts }), first);
+}
+
+console.log('Quotation totals tests passed.');
