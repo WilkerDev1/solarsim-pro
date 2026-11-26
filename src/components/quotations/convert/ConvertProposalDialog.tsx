@@ -1,13 +1,14 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Info, Search, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
-import { formatMoney } from '../../../../shared/quotations';
+import { formatMoney, type QuotationCurrency } from '../../../../shared/quotations';
 import { calculateProjectFinancialSummary } from '../../../engine/financeEngine';
 import { useEnergyCalculationMode } from '../../../features/application/useApplicationFeatures';
 import { convertibleProposals, proposalMeta, proposalName } from '../../../features/quotations/linkedQuotations';
 import { createQuotationFromProposal, proposalConversionContext } from '../../../features/quotations/proposalConversion';
 import {
   ALL_CONVERSION_BLOCKS, CONVERSION_BLOCKS, buildProposalQuotationSource, proposalPriceCents, type ConversionBlock, type ConversionBlocks,
+  type ProposalSourceBuild,
 } from '../../../features/quotations/proposalSource';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 
@@ -20,6 +21,33 @@ export interface ConvertProposalDialogProps {
   /** Propuesta preseleccionada (p. ej. la abierta en el resumen). */
   initialProjectId?: string | null;
   onClose: () => void;
+  /** Dónde vuelve el foco al cerrar (p. ej. el botón «Nueva cotización» cuyo menú ya se cerró); si no, quien tenía el foco. */
+  returnFocus?: React.RefObject<HTMLElement | null>;
+}
+
+/** Elemento que recibe el foco al cerrar: el indicado si sigue en el documento; si no, quien tenía el foco al abrir. */
+export function closeFocusTarget(returnFocus: { current: HTMLElement | null } | undefined, opener: HTMLElement | null): HTMLElement | null {
+  const target = returnFocus?.current;
+  return target && target.isConnected !== false ? target : opener;
+}
+
+/** Bloques y error del diálogo: cambiar un bloque cambia lo que se crearía, así que el error anterior ya no aplica. */
+export interface DialogChoice { blocks: ConversionBlocks; error: string | null }
+export const toggleBlockChoice = (choice: DialogChoice, id: ConversionBlock): DialogChoice => ({ blocks: { ...choice.blocks, [id]: !choice.blocks[id] }, error: null });
+
+/**
+ * Diferencia exacta entre el total del borrador y el de la propuesta, en la moneda del borrador; `null` si cuadra.
+ * Va junto al resumen, visible (no entre los avisos plegados), porque cambia lo que se cobra.
+ */
+export function totalDifferenceText(build: Pick<ProposalSourceBuild, 'totalDifferenceCents' | 'totalDifferenceReason'>, currency: QuotationCurrency): string | null {
+  const diff = build.totalDifferenceCents;
+  if (!diff) return null;
+  const amount = formatMoney(Math.abs(diff), currency);
+  const where = diff < 0 ? 'por debajo' : 'por encima';
+  const why = build.totalDifferenceReason === 'discounted_itbis'
+    ? 'el ITBIS se calcula sobre la base ya descontada'
+    : 'revisa los importes del borrador';
+  return `El total quedará ${amount} ${where} del de la propuesta: ${why}.`;
 }
 
 /**
@@ -27,7 +55,7 @@ export interface ConvertProposalDialogProps {
  * pasan al borrador; «Crear borrador» lo crea enlazado a la propuesta (que no cambia) y lo abre en el editor.
  * Diálogo modal nativo: el resto de la página queda inerte, el foco circula dentro y Escape cierra.
  */
-export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ initialProjectId = null, onClose }) => {
+export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ initialProjectId = null, onClose, returnFocus }) => {
   const { projects, folders, sidebarTheme } = useSimulationStore(useShallow((s) => ({ projects: s.projects, folders: s.folders, sidebarTheme: s.sidebarTheme })));
   const mode = useEnergyCalculationMode();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -39,8 +67,9 @@ export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ in
     const initial = initialProjectId ? projects.find((p) => p.id === initialProjectId && !p.isDeleted) : undefined;
     return initial?.id ?? null;
   });
-  const [blocks, setBlocks] = useState<ConversionBlocks>({ ...ALL_CONVERSION_BLOCKS });
-  const [error, setError] = useState<string | null>(null);
+  const [choice, setChoice] = useState<DialogChoice>({ blocks: { ...ALL_CONVERSION_BLOCKS }, error: null });
+  const { blocks, error } = choice;
+  const setError = (next: string | null) => setChoice((current) => ({ ...current, error: next }));
 
   useEffect(() => {
     const element = dialog.current;
@@ -49,7 +78,7 @@ export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ in
     search.current?.focus();
     return () => {
       if (element?.open) element.close();
-      opener?.focus?.();
+      closeFocusTarget(returnFocus, opener)?.focus?.();
     };
   }, []);
 
@@ -70,7 +99,7 @@ export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ in
   }, [selected, blocks, mode]);
   const count = CONVERSION_BLOCKS.filter((b) => blocks[b.id]).length;
 
-  const toggle = (id: ConversionBlock) => setBlocks((current) => ({ ...current, [id]: !current[id] }));
+  const toggle = (id: ConversionBlock) => setChoice((current) => toggleBlockChoice(current, id));
   const create = () => {
     if (!selected) { setError('Elige la propuesta de origen.'); return; }
     const result = createQuotationFromProposal(selected.id, blocks, mode);
@@ -86,6 +115,7 @@ export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ in
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   };
+  const difference = preview ? totalDifferenceText(preview, preview.source.currency) : null;
   const notes = [
     ...(preview?.notices ?? []),
     ...(blocks.documents && preview?.omittedDocuments.length
@@ -161,9 +191,10 @@ export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ in
       </div>
 
       <div className="qconv-foot">
-        <p className="qconv-summary" aria-live="polite">
-          {error ? <span className="qconv-error" role="alert">{error}</span> : `${count} de ${CONVERSION_BLOCKS.length} bloques seleccionados`}
-        </p>
+        <div className="qconv-summary" aria-live="polite">
+          {error ? <p className="qconv-error" role="alert">{error}</p> : <p>{`${count} de ${CONVERSION_BLOCKS.length} bloques seleccionados`}</p>}
+          {difference && <p className="qconv-difference">{difference}</p>}
+        </div>
         <div className="qconv-actions">
           <button type="button" className="qconv-btn" onClick={onClose}>Cancelar</button>
           <button type="button" className="qconv-btn qconv-btn-primary" disabled={!selected} onClick={create}>Crear borrador</button>

@@ -79,3 +79,15 @@ export function convertibleProposals(projects: readonly ProjectSimulation[], fol
       .some((field) => searchKey(field).includes(key)))
     .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
 }
+
+/**
+ * Propuesta de origen de una cotización, para el selector del editor: devuelve la misma referencia mientras esa
+ * propuesta no cambie, así editar otra propuesta no vuelve a pintar el editor (no se suscribe a toda la lista).
+ */
+export const selectSourceProject = (state: { projects: readonly ProjectSimulation[] }, sourceProjectId: string | undefined): ProjectSimulation | undefined =>
+  sourceProjectId ? state.projects.find((p) => p.id === sourceProjectId) : undefined;
+
+/** Opciones de «Enlazar propuesta…»: se calculan solo al abrir o enfocar el selector. */
+export function sourceProposalOptions(projects: readonly ProjectSimulation[], folders: readonly ProjectFolder[]): { id: string; label: string }[] {
+  return convertibleProposals(projects, folders).map((project) => ({ id: project.id, label: `${proposalName(project)} · ${proposalMeta(project, folders)}` }));
+}

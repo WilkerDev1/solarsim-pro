@@ -7,14 +7,12 @@ import {
 } from '../../../../shared/quotations';
 import type { QuotationContent, QuotationLine } from '../../../types/quotation';
 import type { ClientRecord } from '../../../types/client';
-import type { ProjectFolder } from '../../../types/folder';
-import type { ProjectSimulation } from '../../../types';
 import type { SolarEquipmentItem } from '../../../types/equipment';
 import {
   addDetailLine, addDiscount, addItemLine, appendLine, changeCurrency, currencyChangeSummary, duplicateLine, moveLine, removeDiscount,
   removeLine, setDocumentFields, setExchangeRate, setPrintedClient, setSourceProject, updateDiscount, updateLine,
 } from '../../../domain/quotationEdit';
-import { SOURCE_PROPOSAL_NOTICES, convertibleProposals, proposalMeta, proposalName, sourceProposalLink } from '../../../features/quotations/linkedQuotations';
+import { SOURCE_PROPOSAL_NOTICES, proposalName, type SourceProposalLink } from '../../../features/quotations/linkedQuotations';
 import { catalogQuotationLine, type CatalogLineContext } from '../../../features/quotations/catalogLine';
 import { ClientPicker } from '../../clients/ClientPicker';
 import { CURRENCY_NAMES, CurrencyFlag } from '../common/CurrencyFlag';
@@ -151,28 +149,32 @@ export const IssuerSection: React.FC<{ content: QuotationContent; readOnly: bool
 /**
  * Propuesta de origen: «Ver propuesta» navega a su resumen; en un borrador se puede enlazar a una propuesta o quitar el
  * enlace (solo el enlace, no importa contenido). Una propuesta en la papelera o que ya no está se indica con un texto
- * discreto, sin romper.
+ * discreto, sin romper. La lista de propuestas del selector se carga al abrirlo o enfocarlo, no al pintar el editor.
  */
-const SourceProposalField: React.FC<SectionProps & {
-  projects: readonly ProjectSimulation[];
-  folders: readonly ProjectFolder[];
+export interface SourceProposalProps {
+  link: SourceProposalLink;
+  /** Opciones de «Enlazar propuesta…», pedidas solo al enfocar o abrir el selector. */
+  loadOptions: () => { id: string; label: string }[];
   onOpenProposal: (projectId: string) => void;
-}> = ({ content, readOnly, edit, projects, folders, onOpenProposal }) => {
+}
+
+const SourceProposalField: React.FC<SectionProps & SourceProposalProps> = ({ readOnly, edit, link, loadOptions, onOpenProposal }) => {
   const [error, setError] = useState<string | null>(null);
-  const link = sourceProposalLink(projects, content.sourceProjectId);
-  const options = useMemo(() => (readOnly || link.state !== 'none' ? [] : convertibleProposals(projects, folders)), [readOnly, link.state, projects, folders]);
-  const set = (projectId: string | null) => setError(edit((c) => setSourceProject(c, projectId)));
+  const [options, setOptions] = useState<{ id: string; label: string }[] | null>(null);
+  const load = () => { if (!options) setOptions(loadOptions()); };
+  const set = (projectId: string | null) => { setOptions(null); setError(edit((c) => setSourceProject(c, projectId))); };
   return (
     <div className="qe-field qe-source" role="group" aria-labelledby="qe-source-label">
       <span className="qe-label" id="qe-source-label">Propuesta de origen</span>
       {link.state === 'none' ? (
-        readOnly ? <p className="qe-muted">Sin propuesta de origen.</p> : options.length === 0 ? <p className="qe-muted">No hay propuestas para enlazar.</p> : (
+        readOnly ? <p className="qe-muted">Sin propuesta de origen.</p> : (
           <div className="qe-source-row">
             <FileSymlink className="h-4 w-4" aria-hidden="true" />
             <label htmlFor="qe-source-select" className="sr-only">Enlazar propuesta</label>
-            <select id="qe-source-select" value="" onChange={(e) => { if (e.target.value) set(e.target.value); }}>
+            <select id="qe-source-select" value="" onFocus={load} onPointerDown={load} onChange={(e) => { if (e.target.value) set(e.target.value); }}>
               <option value="">Enlazar propuesta…</option>
-              {options.map((project) => <option key={project.id} value={project.id}>{`${proposalName(project)} · ${proposalMeta(project, folders)}`}</option>)}
+              {options?.length === 0 && <option value="" disabled>No hay propuestas para enlazar</option>}
+              {options?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
             </select>
           </div>
         )
@@ -201,11 +203,9 @@ export const ClientSection: React.FC<SectionProps & {
   clients: readonly ClientRecord[];
   /** Elegir copia los datos del cliente a los impresos; quitar solo desenlaza (`quotationEditorActions`). */
   chooseClient: (client: ClientRecord | null) => string | null;
-  /** Origen: sin `projects` (función de cotizaciones sin propuestas, pruebas antiguas) no se muestra. */
-  projects?: readonly ProjectSimulation[];
-  folders?: readonly ProjectFolder[];
-  onOpenProposal?: (projectId: string) => void;
-}> = ({ content, readOnly, edit, clients, chooseClient, projects, folders = [], onOpenProposal }) => {
+  /** Propuesta de origen; sin ella (pruebas antiguas) no se muestra. */
+  source?: SourceProposalProps;
+}> = ({ content, readOnly, edit, clients, chooseClient, source }) => {
   const [error, setError] = useState<string | null>(null);
   const linked = content.clientId ? clients.find((c) => c.id === content.clientId) : undefined;
   const choose = (client: ClientRecord | null) => setError(chooseClient(client));
@@ -241,9 +241,7 @@ export const ClientSection: React.FC<SectionProps & {
         {printed('email', 'Correo', { type: 'email', className: 'qe-span-2' })}
         {printed('address', 'Dirección', { multiline: true, rows: 2, className: 'qe-span-2' })}
       </div>
-      {projects && onOpenProposal && (
-        <SourceProposalField content={content} readOnly={readOnly} edit={edit} projects={projects} folders={folders} onOpenProposal={onOpenProposal} />
-      )}
+      {source && <SourceProposalField content={content} readOnly={readOnly} edit={edit} {...source} />}
     </Card>
   );
 };

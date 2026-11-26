@@ -72,13 +72,35 @@ export interface ProposalSourceBuild {
   proposalTotalCents: number;
   /** ITBIS que la propuesta cobra al cliente, en centavos de la moneda de la cotización. */
   proposalTaxCents: number;
+  /**
+   * Total del borrador − total de la propuesta, en centavos con signo (0 = cuadra). Solo con «Equipos y materiales»
+   * (sin líneas no hay total que comparar). Se muestra en el diálogo fuera de los avisos plegados.
+   */
+  totalDifferenceCents: number;
+  /** Por qué difiere: `discounted_itbis` (descuento con líneas gravadas) u `other` (p. ej. extras por encima del precio). */
+  totalDifferenceReason: 'discounted_itbis' | 'other' | null;
 }
 
 const DEFAULT_UNIT = 'UD';
 const EMPTY_CLIENT = { name: '', attention: '', taxId: '', phone: '', email: '', address: '' };
 const IMAGE_DATA_URL = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
 const ASSET_ID = /^[A-Za-z0-9:_-]+$/;
-const clip = (value: string | undefined | null, max: number) => (value ?? '').trim().slice(0, max);
+/** Carácter nulo o sustituto UTF-16 suelto: la validación compartida los rechaza, así que se quitan. */
+const INVALID_TEXT = /\u0000|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
+/**
+ * Texto recortado a `max` unidades UTF-16 (el límite que mide la validación) sin partir nunca un par sustituto: se
+ * recorta por puntos de código y el último que no cabe entero se quita.
+ */
+export function clip(value: string | undefined | null, max: number): string {
+  const text = (value ?? '').replace(INVALID_TEXT, '').trim();
+  if (text.length <= max) return text;
+  let out = '';
+  for (const codePoint of text) {
+    if (out.length + codePoint.length > max) break;
+    out += codePoint;
+  }
+  return out.trim();
+}
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
 /** Texto del documento de la propuesta, ya resuelto y en texto plano. */
@@ -154,39 +176,61 @@ export function buildProposalQuotationSource(project: ProjectSimulation, blocks:
   const proposalTotalCents = proposalPriceCents(summary, currency, exchangeRate);
   // ITBIS no exonerado del sistema (solo con la exoneración apagada): contrato − inversión bruta.
   const baseItbisUSD = Math.max(0, round2(summary.contractPriceUSD - summary.grossInvestmentUSD));
-  const proposalTaxCents = cents(baseItbisUSD + summary.customItemsNonExoneratedITBISUSD);
+  // Con precio manual el ITBIS de los extras ya va dentro del precio: solo cuenta el del sistema.
+  const manualPrice = (project.financials.customCostUSD ?? 0) > 0;
+  const proposalTaxCents = cents(baseItbisUSD + (manualPrice ? 0 : summary.customItemsNonExoneratedITBISUSD));
   // Descuento que la propuesta resta: lista − bruta (con precio manual no resta ninguno).
   const discountCents = Math.max(0, cents(summary.listGrossInvestmentUSD - summary.grossInvestmentUSD));
   const customDiscounts = project.financials.customDiscounts ?? [];
-  if (customDiscounts.length && discountCents === 0 && (project.financials.customCostUSD ?? 0) > 0) {
+  if (customDiscounts.length && discountCents === 0 && manualPrice) {
     notices.push('La propuesta tiene un precio manual: sus descuentos no se restan de su total y no pasan a la cotización.');
   }
 
   const pricedLines: ProposalQuotationSource['pricedLines'] = [];
   const detailLines: ProposalQuotationSource['detailLines'] = [];
   const discounts: ProposalQuotationSource['discounts'] = [];
+  let totalDifferenceCents = 0;
+  let totalDifferenceReason: ProposalSourceBuild['totalDifferenceReason'] = null;
 
   if (blocks.items) {
     const multiplier = extrasMarginMultiplier(project);
     const extras = project.financials.customItems ?? [];
     const visible: QuotationLine[] = [];
+    const extraDetails: ProposalQuotationSource['detailLines'] = [];
     let hiddenTaxableCents = 0;
     extras.forEach((item, index) => {
       const taxable = !isItemItbisExonerated(item);
-      if (isItemHiddenInQuotation(item)) {
+      const name = clip(item.description || `Ítem Adicional #${index + 1}`, QUOTATION_LIMITS.lineDescription);
+      // Sin cantidad o sin precio (datos antiguos) cuentan como 0, como en el motor.
+      const quantity = item.quantity ?? 0;
+      const unitPriceUSD = item.unitPriceUSD ?? 0;
+      const unitPriceCents = cents((unitPriceUSD || 0) * (appliesItemMargin(item) ? multiplier : 1));
+      const hidden = isItemHiddenInQuotation(item);
+      // Fuera de rango (cantidad negativa, enorme o no numérica; precio negativo o no numérico): no bloquea, se omite.
+      const outOfRange = !Number.isFinite(quantity) || quantity < 0 || quantity > QUOTATION_LIMITS.maxQuantity
+        || !Number.isFinite(unitPriceUSD) || unitPriceUSD < 0 || !Number.isFinite(unitPriceCents) || unitPriceCents > QUOTATION_LIMITS.maxUnitPriceCents;
+      if (outOfRange) {
+        notices.push(`«${name}» se omite: su cantidad o su precio están fuera de rango. Su importe, si la propuesta lo cobra, queda en la línea global.`);
+        return;
+      }
+      if (manualPrice) {
+        // Precio manual: el precio ya lo incluye todo; los extras visibles se listan sin precio.
+        if (!hidden) extraDetails.push({ description: name, quantity, unit: clip(item.unit || DEFAULT_UNIT, QUOTATION_LIMITS.unit) });
+        return;
+      }
+      if (quantity === 0) {
+        // El motor la cuenta como 1 en la matriz y como 0 en su ITBIS: no hay una línea coherente con ambos.
+        notices.push(`«${name}» tiene cantidad 0: no se lista. Su importe, si la propuesta lo cobra, queda en la línea global sin ITBIS.`);
+        return;
+      }
+      if (hidden) {
         // Se cobra pero no se lista: su venta va al importe global (gravado o no).
         if (taxable) hiddenTaxableCents += cents(customItemsTaxBreakdown([item], multiplier).saleTotalUSD);
         return;
       }
       visible.push({
-        id: `extra-${index}`,
-        kind: 'item',
-        description: clip(item.description || `Ítem Adicional #${index + 1}`, QUOTATION_LIMITS.lineDescription),
-        quantity: item.quantity || 0,
-        unit: clip(item.unit || DEFAULT_UNIT, QUOTATION_LIMITS.unit),
-        unitPriceCents: cents((item.unitPriceUSD || 0) * (appliesItemMargin(item) ? multiplier : 1)),
-        discountPct: 0,
-        taxable,
+        id: `extra-${index}`, kind: 'item', description: name, quantity, unit: clip(item.unit || DEFAULT_UNIT, QUOTATION_LIMITS.unit),
+        unitPriceCents, discountPct: 0, taxable,
       });
     });
     const taxablePartCents = cents(baseItbisUSD / ITBIS_RATE) + hiddenTaxableCents;
@@ -228,15 +272,27 @@ export function buildProposalQuotationSource(project: ProjectSimulation, blocks:
       }
     }
     detailLines.push({ description: clip(cleanInstallationDesc(project.specs.installationServicesDesc), QUOTATION_LIMITS.lineDescription), quantity: 1, unit: DEFAULT_UNIT });
+    detailLines.push(...extraDetails);
 
-    // Descuentos: los de la propuesta, como montos fijos que suman exactamente lo que ella resta.
+    // Descuentos: los de la propuesta, como montos fijos que suman exactamente lo que ella resta. La cotización admite
+    // hasta `maxDiscounts`: los sobrantes se agrupan en un último «Otros descuentos» (la suma sigue siendo exacta).
     if (discountCents > 0 && customDiscounts.length) {
       const weights = customDiscounts.map((d) => (d.type === 'percentage' ? summary.listGrossInvestmentUSD * (Math.max(0, Math.min(100, d.value || 0)) / 100) : Math.max(0, d.value || 0)));
-      apportion(discountCents, weights).forEach((value, i) => {
-        if (value > 0 && discounts.length < QUOTATION_LIMITS.maxDiscounts) discounts.push({ label: discountLabel(customDiscounts[i]), type: 'fixed', value });
-      });
-      if (fixed.some((line) => line.taxable)) notices.push('Con descuentos, el ITBIS de las líneas gravadas se calcula sobre la base descontada: el total puede quedar algo por debajo del de la propuesta.');
+      const amounts = apportion(discountCents, weights)
+        .map((value, i) => ({ label: discountLabel(customDiscounts[i]), value }))
+        .filter((d) => d.value > 0);
+      const max = QUOTATION_LIMITS.maxDiscounts;
+      const kept = amounts.length > max ? amounts.slice(0, max - 1) : amounts;
+      const rest = amounts.slice(kept.length);
+      for (const d of kept) discounts.push({ label: d.label, type: 'fixed', value: d.value });
+      if (rest.length) discounts.push({ label: `Otros descuentos (${rest.length})`, type: 'fixed', value: rest.reduce((sum, d) => sum + d.value, 0) });
     }
+    const quotationTotals = computeQuotationTotals({
+      items: pricedLines.map((line, i) => ({ id: `p-${i}`, kind: 'item' as const, discountPct: 0, ...line })),
+      discounts: discounts.map((d, i) => ({ id: `d-${i}`, ...d })),
+    });
+    totalDifferenceCents = quotationTotals.totalCents - proposalTotalCents;
+    if (totalDifferenceCents !== 0) totalDifferenceReason = discountCents > 0 && fixed.some((line) => line.taxable) ? 'discounted_itbis' : 'other';
   }
 
   // --- Cliente ---
@@ -334,7 +390,7 @@ export function buildProposalQuotationSource(project: ProjectSimulation, blocks:
     attachments,
     issuer,
   };
-  return { source, omittedDocuments, notices, proposalTotalCents, proposalTaxCents };
+  return { source, omittedDocuments, notices, proposalTotalCents, proposalTaxCents, totalDifferenceCents, totalDifferenceReason };
 }
 
 export type ProposalConversion =

@@ -10,6 +10,7 @@ import type { SolarEquipmentItem } from '../../../types/equipment';
 import { newDocumentCompany, stampForIssuer } from '../../../features/quotations/issuer';
 import { quotationCatalogContext } from '../../../features/quotations/catalogLine';
 import { quotationEditorActions } from '../../../features/quotations/editorActions';
+import { selectSourceProject, sourceProposalLink, sourceProposalOptions } from '../../../features/quotations/linkedQuotations';
 import { storeGenericPriceFor } from '../../simulator/params/logic/storeGenericPrice';
 import { localIsoDate } from '../../../utils/localDate';
 import { QuotationStatusChip } from '../common/QuotationStatusChip';
@@ -48,15 +49,15 @@ const LOCK_REASONS: Record<QuotationStatus, string> = {
 
 const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }) => {
   const {
-    change, sidebarTheme, currentUser, online, clients, projects, folders, catalog, defaults, seal, setQuotationStatus, closeQuotation, setActiveProject,
+    change, sidebarTheme, currentUser, online, clients, sourceProject, catalog, defaults, seal, setQuotationStatus, closeQuotation, setActiveProject,
   } = useSimulationStore(useShallow((s) => ({
     change: s.quotationChanges[quotation.id],
     sidebarTheme: s.sidebarTheme,
     currentUser: s.syncSettings.currentUser,
     online: !!s.syncSettings.currentUser && !!s.syncSettings.authToken,
     clients: s.clients,
-    projects: s.projects,
-    folders: s.folders,
+    // Solo la propuesta de origen (misma referencia mientras no cambie), no toda la lista de propuestas.
+    sourceProject: selectSourceProject(s, quotation.sourceProjectId),
     catalog: s.equipmentCatalog,
     defaults: s.defaultSimulationSettings,
     // El sello es el del membrete que emitió la cotización, nunca el de otra empresa (el activo puede ser otro).
@@ -143,9 +144,11 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
             edit={edit}
             clients={clients}
             chooseClient={actions.chooseClient}
-            projects={projects}
-            folders={folders}
-            onOpenProposal={(projectId) => setActiveProject(projectId, 'project-hub')}
+            source={{
+              link: sourceProposalLink(sourceProject ? [sourceProject] : [], quotation.sourceProjectId),
+              loadOptions: () => { const { projects, folders } = useSimulationStore.getState(); return sourceProposalOptions(projects, folders); },
+              onOpenProposal: (projectId) => setActiveProject(projectId, 'project-hub'),
+            }}
           />
           <ItemsSection content={content} readOnly={readOnly} edit={edit} catalog={catalog} catalogContext={catalogContext} />
           <DiscountsSection content={content} readOnly={readOnly} edit={edit} />

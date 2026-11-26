@@ -4,17 +4,20 @@ import { ChevronDown, FilePlus2, FileText, Plus } from 'lucide-react';
 export interface NewQuotationMenuProps {
   onBlank: () => void;
   onFromProposal: () => void;
+  /** Ref del botón «Nueva cotización», para devolverle el foco al cerrar el diálogo que abrió una opción. */
+  triggerRef?: React.MutableRefObject<HTMLButtonElement | null>;
 }
 
 /**
  * «Nueva cotización» del catálogo: menú con «En blanco» y «Desde una propuesta». Botón con `aria-haspopup`/`aria-expanded`;
  * flechas recorren las opciones, Escape cierra y devuelve el foco al botón, y un clic fuera lo cierra.
  */
-export const NewQuotationMenu: React.FC<NewQuotationMenuProps> = ({ onBlank, onFromProposal }) => {
+export const NewQuotationMenu: React.FC<NewQuotationMenuProps> = ({ onBlank, onFromProposal, triggerRef }) => {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const ownTrigger = useRef<HTMLButtonElement | null>(null);
+  const trigger = triggerRef ?? ownTrigger;
   const items = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {

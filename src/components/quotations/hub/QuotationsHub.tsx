@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { canWrite } from '../../../../shared/permissions';
@@ -40,6 +40,7 @@ export function QuotationsHub() {
   const [headerMessage, setHeaderMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [converting, setConverting] = useState(false);
+  const newButton = useRef<HTMLButtonElement | null>(null);
 
   const today = localIsoDate();
   const user = syncSettings.currentUser;
@@ -155,8 +156,8 @@ export function QuotationsHub() {
                 {syncing ? 'Sincronizando…' : 'Sincronizar'}
               </button>
             )}
-            {!readOnly && <NewQuotationMenu onBlank={create} onFromProposal={() => { setHeaderMessage(null); setConverting(true); }} />}
-            {converting && <ConvertProposalDialog onClose={() => setConverting(false)} />}
+            {!readOnly && <NewQuotationMenu triggerRef={newButton} onBlank={create} onFromProposal={() => { setHeaderMessage(null); setConverting(true); }} />}
+            {converting && <ConvertProposalDialog returnFocus={newButton} onClose={() => setConverting(false)} />}
           </div>
         </header>
         {user && quotationSyncFeedback && <p className="qh-notice qh-notice-error" role="alert">{quotationSyncFeedback}</p>}

@@ -15,13 +15,13 @@ const { BENCHMARK_PROJECT } = await import('../engine/referenceCase');
 const { calculateProjectFinancialSummary } = await import('../engine/financeEngine');
 const { ALL_CONVERSION_BLOCKS } = await import('../features/quotations/proposalSource');
 const { createQuotationFromProposal } = await import('../features/quotations/proposalConversion');
-const { convertibleProposals, quotationsForClient, quotationsFromProposal, sourceProposalLink } = await import('../features/quotations/linkedQuotations');
+const { convertibleProposals, quotationsForClient, quotationsFromProposal, selectSourceProject, sourceProposalLink, sourceProposalOptions } = await import('../features/quotations/linkedQuotations');
 const { quotationEditorActions } = await import('../features/quotations/editorActions');
 const { setSourceProject } = await import('../domain/quotationEdit');
 const { ProjectHubView } = await import('../components/hub/ProjectHubView');
 const { ClientDetailPanel } = await import('../components/clients/ClientDetailPanel');
 const { QuotationsHub } = await import('../components/quotations/hub/QuotationsHub');
-const { ConvertProposalDialog } = await import('../components/quotations/convert/ConvertProposalDialog');
+const { ConvertProposalDialog, closeFocusTarget, toggleBlockChoice, totalDifferenceText } = await import('../components/quotations/convert/ConvertProposalDialog');
 const { QuotationEditorView } = await import('../components/quotations/editor/QuotationEditorView');
 
 const store = useSimulationStore;
@@ -229,6 +229,52 @@ reset();
   // Sin enlace, en borrador: «Enlazar propuesta…».
   store.setState({ projects: state.projects, quotations: state.quotations.map((q) => (q.id === quotation.id ? { ...q, sourceProjectId: undefined } : q)) });
   assert.match(render(React.createElement(QuotationEditorView)), /Enlazar propuesta…/);
+}
+
+// --- (8) Editor: lista de propuestas perezosa y selector estrecho de la propuesta de origen ----------------------------
+{
+  const html = render(React.createElement(QuotationEditorView));
+  assert.match(html, /Enlazar propuesta…/);
+  assert.doesNotMatch(html, /<option value="p-3"/, 'las propuestas del selector no se calculan al pintar');
+  const { projects, folders } = store.getState();
+  assert.deepEqual(sourceProposalOptions(projects, folders).map((o) => o.id), ['p-3', 'p-1', 'p-4']);
+  assert.match(sourceProposalOptions(projects, folders)[1].label, /CENTRO MEDICO HISPANICO · Final · SP-2024-089 · carpeta Comercial/);
+  const source = selectSourceProject({ projects }, 'p-1');
+  const edited = projects.map((p) => (p.id === 'p-3' ? { ...p, updatedAt: '2026-11-27T00:00:00Z' } : p));
+  assert.equal(selectSourceProject({ projects: edited }, 'p-1'), source, 'editar otra propuesta no cambia la referencia');
+  assert.equal(selectSourceProject({ projects }, undefined), undefined);
+}
+
+// --- (7) Foco al cerrar y (9) cambiar un bloque limpia el error del diálogo --------------------------------------------
+{
+  const button = { isConnected: true } as unknown as HTMLElement;
+  const opener = { isConnected: true } as unknown as HTMLElement;
+  assert.equal(closeFocusTarget({ current: button }, opener), button, 'vuelve al botón «Nueva cotización»');
+  assert.equal(closeFocusTarget({ current: null }, opener), opener);
+  assert.equal(closeFocusTarget(undefined, opener), opener);
+  assert.equal(closeFocusTarget({ current: { isConnected: false } as unknown as HTMLElement }, opener), opener, 'un botón ya desmontado no');
+  const next = toggleBlockChoice({ blocks: { ...ALL_CONVERSION_BLOCKS }, error: 'La propuesta ya no está disponible.' }, 'items');
+  assert.equal(next.error, null);
+  assert.equal(next.blocks.items, false);
+  assert.equal(next.blocks.client, true);
+}
+
+// --- (1) Diferencia exacta visible junto al resumen, fuera de los avisos plegados -------------------------------------
+{
+  const discounted = proposal('p-disc', (p) => {
+    p.client.name = 'Con descuento';
+    p.financials = { ...p.financials, applyITBISExemption: false, customITBISSavedUSD: undefined, customDiscounts: [{ id: 'd', description: 'Cierre', type: 'percentage', value: 10 }] };
+  });
+  store.setState({ projects: [...store.getState().projects, discounted] });
+  const html = render(React.createElement(ConvertProposalDialog, { initialProjectId: 'p-disc', onClose: () => undefined }));
+  const line = /<p class="qconv-difference">([^<]+)<\/p>/.exec(html);
+  assert(line, 'la diferencia se ve');
+  assert.match(line[1], /^El total quedará US\$ [\d,]+\.\d\d por debajo del de la propuesta: el ITBIS se calcula sobre la base ya descontada\.$/);
+  assert.equal(html.indexOf('qconv-difference') > html.indexOf('qconv-foot'), true, 'en el pie, no en el plegado');
+  assert.doesNotMatch(render(React.createElement(ConvertProposalDialog, { initialProjectId: 'p-3', onClose: () => undefined })), /qconv-difference/, 'si cuadra no se muestra');
+  assert.equal(totalDifferenceText({ totalDifferenceCents: 0, totalDifferenceReason: null }, 'USD'), null);
+  assert.equal(totalDifferenceText({ totalDifferenceCents: -22_444, totalDifferenceReason: 'discounted_itbis' }, 'USD'), 'El total quedará US$ 224.44 por debajo del de la propuesta: el ITBIS se calcula sobre la base ya descontada.');
+  assert.equal(totalDifferenceText({ totalDifferenceCents: 3, totalDifferenceReason: 'discounted_itbis' }, 'DOP'), 'El total quedará RD$ 0.03 por encima del de la propuesta: el ITBIS se calcula sobre la base ya descontada.');
 }
 
 console.log('Quotation proposal links tests passed.');

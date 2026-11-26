@@ -7,6 +7,7 @@ import {
 } from '../features/quotations/proposalSource';
 import type { AttachedPDFDocument, CustomQuotationDiscount, CustomQuotationItem, ProjectSimulation } from '../types';
 import type { CompanyProfile } from '../types/companyProfile';
+import { publishableContent } from '../store/sync/quotationContent';
 
 const TODAY = '2026-11-26';
 const company = { id: 'co-1', name: 'M&A Electsun SRL', rncOrId: '131000001', address: 'Plaza Toledo 307', phone: '809-378-6590', email: 'info@electsun.do', website: 'electsun.do', logoBase64: '' } as unknown as CompanyProfile;
@@ -140,7 +141,94 @@ for (const mode of ['cost_matrix', 'direct_watt'] as const) {
   const taxableShare = t.lines.filter((l, i) => value.items[i].taxable).reduce((sum, l) => sum + l.allocatedDiscountCents, 0);
   assert(taxableShare > 0);
   assert(Math.abs((build.proposalTaxCents - t.taxCents) - Math.round(taxableShare * 0.18)) <= 3, 'la diferencia es el ITBIS del descuento asignado a lo gravado');
-  assert(build.notices.some((n) => /base descontada/.test(n)));
+  // La diferencia exacta (con signo) viaja en el resultado para mostrarla fuera de los avisos plegados.
+  assert.equal(build.totalDifferenceCents, t.totalCents - build.proposalTotalCents);
+  assert(build.totalDifferenceCents < 0);
+  assert.equal(build.notices.some((n) => /base descontada/.test(n)), false, 'no va entre los avisos plegados');
+}
+
+// --- (1) Exención apagada con 10 % de descuento: diferencia exacta en USD y en DOP; DOP con descuentos y extras -------
+for (const [currencyOn, rate] of [[true, 1], [false, 58.5]] as const) {
+  const p = project((x) => {
+    x.financials = { ...x.financials, applyITBISExemption: false, customITBISSavedUSD: undefined, customDiscounts: [{ id: 'd', description: 'Cierre', type: 'percentage', value: 10 }] };
+  });
+  const { value, build } = convert(p, blocks({ currency: currencyOn }));
+  const t = totals(value);
+  assert.equal(build.proposalTotalCents, contractCents(p, rate));
+  assert.equal(build.totalDifferenceCents, t.totalCents - build.proposalTotalCents, `diferencia exacta (${value.currency})`);
+  assert(build.totalDifferenceCents < -1000, `el ITBIS sobre la base descontada deja el total por debajo (${build.totalDifferenceCents})`);
+  assert.equal(build.totalDifferenceReason, 'discounted_itbis');
+  assert.equal(t.discountCents, toCents((calculateProjectFinancialSummary(p).listGrossInvestmentUSD - calculateProjectFinancialSummary(p).grossInvestmentUSD) * rate), 'mismo descuento');
+}
+{
+  const p = project((x) => { x.financials = { ...x.financials, customItems: [taxableExtra, exemptExtra], customDiscounts: discounts }; });
+  const { value, build } = convert(p, blocks({ currency: false }));
+  assert.equal(value.currency, 'DOP');
+  assert.equal(build.totalDifferenceCents, totals(value).totalCents - contractCents(p, 58.5));
+  assert.notEqual(build.totalDifferenceCents, 0);
+}
+{
+  const { build } = convert(project());
+  assert.equal(build.totalDifferenceCents, 0, 'sin descuentos, sin diferencia');
+  assert.equal(build.totalDifferenceReason, null);
+}
+
+// --- (2) Recorte por puntos de código: un emoji en el límite no parte el par sustituto ----------------------------------
+{
+  const longEmoji = { ...exemptExtra, id: 'x-emoji', description: 'a'.repeat(499) + '😀' };
+  const fits = { ...exemptExtra, id: 'x-fits', description: 'b'.repeat(498) + '😀' };
+  const { value } = convert(project((x) => { x.financials = { ...x.financials, customItems: [longEmoji, fits] }; x.client.name = 'c'.repeat(254) + '😀'; }));
+  const descriptions = value.items.map((l) => l.description);
+  assert(descriptions.includes('a'.repeat(499)), 'el emoji que no cabe entero se quita');
+  assert(descriptions.includes('b'.repeat(498) + '😀'), 'el que cabe se conserva');
+  assert.equal(value.client.name, 'c'.repeat(254));
+}
+
+// --- (3) Más de 20 descuentos: los sobrantes se agrupan en «Otros descuentos» y la suma es exacta -----------------------
+{
+  const many: CustomQuotationDiscount[] = Array.from({ length: 21 }, (_, i) => ({ id: `d-${i}`, description: `Desc ${i + 1}`, type: 'fixed', value: 10 + i }));
+  const p = project((x) => { x.financials = { ...x.financials, customDiscounts: many }; });
+  const summary = calculateProjectFinancialSummary(p);
+  const { value } = convert(p);
+  assert.equal(value.discounts.length, 20);
+  assert.equal(value.discounts[19].label, 'Otros descuentos (2)');
+  assert.equal(value.discounts[19].value, (29 + 30) * 100);
+  assert.equal(totals(value).discountCents, toCents(summary.listGrossInvestmentUSD - summary.grossInvestmentUSD));
+  assert.equal(totals(value).totalCents, contractCents(p));
+}
+
+// --- (4) Precio manual con extras que lo superan: extras como filas sin precio, total = precio manual -------------------
+{
+  const pricey: CustomQuotationItem = { id: 'x-big', description: 'Canalización', quantity: 7, unit: 'UD', unitPriceUSD: 1500, exonerateITBIS: false };
+  const p = project((x) => { x.financials = { ...x.financials, customCostUSD: 5000, customItems: [pricey, hiddenExtra] }; });
+  const { value, build } = convert(p);
+  assert.equal(totals(value).totalCents, 500_000);
+  assert.equal(build.totalDifferenceCents, 0);
+  const priced = value.items.filter((l) => l.kind === 'item');
+  assert.equal(priced.length, 1, 'solo la línea global con el precio manual');
+  const extraRow = value.items.find((l) => l.description === 'Canalización');
+  assert(extraRow && extraRow.kind === 'detail' && extraRow.quantity === 7);
+  assert.equal(value.items.some((l) => l.description === 'Flete'), false);
+  assert.equal(build.notices.some((n) => /superan/.test(n)), false);
+}
+
+// --- (5) Extra con cantidad 0 y (6) fuera de rango: no bloquean, se omiten con aviso nombrado --------------------------
+for (const mode of ['cost_matrix', 'direct_watt'] as const) {
+  const zero: CustomQuotationItem = { id: 'x-0', description: 'Pararrayos', quantity: 0, unitPriceUSD: 300, exonerateITBIS: false };
+  const negative: CustomQuotationItem = { id: 'x-neg', description: 'Bonificación', quantity: 1, unitPriceUSD: -50, exonerateITBIS: true };
+  const huge: CustomQuotationItem = { id: 'x-huge', description: 'Cable a granel', quantity: 2_000_000, unitPriceUSD: 0.01, exonerateITBIS: true };
+  const nan: CustomQuotationItem = { id: 'x-nan', description: 'Dato roto', quantity: Number.NaN, unitPriceUSD: Number.NaN, exonerateITBIS: true };
+  const p = project((x) => {
+    x.specs = { ...x.specs, pricingMode: mode, pricePerWattUSD: 1.2 };
+    x.financials = { ...x.financials, customItems: [zero, negative, huge, nan, taxableExtra] };
+  });
+  const { value, build } = convert(p);
+  assert.equal(totals(value).totalCents, contractCents(p), `${mode}: el total sigue cuadrando`);
+  for (const name of ['Pararrayos', 'Bonificación', 'Cable a granel', 'Dato roto']) {
+    assert.equal(value.items.some((l) => l.description === name), false, `${name} no se lista`);
+    assert(build.notices.some((n) => n.includes(`«${name}»`)), `aviso que nombra «${name}»`);
+  }
+  assert(value.items.some((l) => l.description === 'Monitoreo remoto'), 'los extras válidos sí pasan');
 }
 
 // --- ITBIS no exonerado: la parte gravada del sistema lleva el ITBIS de la propuesta -----------------------------------
@@ -239,6 +327,22 @@ for (const mode of ['cost_matrix', 'direct_watt'] as const) {
   assert.equal(expired.validUntil, null);
   const noDate = convert(project((x) => { delete x.client.quoteDate; x.client.quoteValidityDays = 15; })).value;
   assert.equal(noDate.validUntil, '2026-12-11', 'sin fecha, desde hoy');
+}
+
+// --- (10) Ida y vuelta: convertido → contenido publicable → validación compartida (miniatura en línea) -----------------
+{
+  const p = project((x) => {
+    x.customization = { attachedPdfs: [{ id: 'att-1', fileName: 'ficha.pdf', fileSize: 10, pageCount: 1, title: 'Ficha', uploadedAt: '2026-11-01T10:00:00.000Z', enabled: true, addToTableOfContents: true, origin: 'catalog', catalogItemId: 'eq-1', assetId: 'asset-1', thumbnailDataUrl: 'data:image/jpeg;base64,AAAA' }] };
+    x.financials = { ...x.financials, customItems: [taxableExtra], customDiscounts: discounts };
+  });
+  const { value } = convert(p);
+  assert.equal(value.attachments[0].thumbnailDataUrl, 'data:image/jpeg;base64,AAAA');
+  const published = publishableContent(value);
+  assert.equal('thumbnailDataUrl' in published.attachments[0], false, 'la miniatura en línea no viaja');
+  assert.equal(published.attachments[0].assetId, 'asset-1');
+  const again = validateQuotationContent(published);
+  assert(again.ok, again.ok ? '' : again.error);
+  assert.deepEqual(computeQuotationTotals(again.value), computeQuotationTotals(value), 'mismos totales tras publicar');
 }
 
 // --- La propuesta de origen no cambia -----------------------------------------------------------------------------------

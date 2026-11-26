@@ -270,8 +270,17 @@
   flex-wrap: wrap;
 }
 .qconv-summary {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   font-size: 12.5px;
   color: var(--qc-muted);
+}
+.qconv-difference {
+  color: var(--qc-text);
+  line-height: 1.45;
 }
 .qconv-error {
   color: var(--qc-error);
