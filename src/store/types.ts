@@ -77,7 +77,11 @@ export interface DefaultSimulationSettings {
   annualEnergyTariffEscalationPct: number;
 }
 
-/** Vistas principales de la aplicación. `clients-hub` lo implementa el directorio de clientes; `quotations-hub` y `quotation-editor`, el módulo de cotizaciones. */
+/**
+ * Vistas principales de la aplicación. `clients-hub` lo implementa el directorio de clientes; `quotations-hub` y
+ * `quotation-editor`, el módulo de cotizaciones. `activeView` se persiste y `activeQuotationId` no: al hidratar,
+ * `quotation-editor` pasa a `quotations-hub`.
+ */
 export type AppView = 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub' | 'clients-hub' | 'quotations-hub' | 'quotation-editor';
 /** Pestañas del modal de Ajustes. `agents` agrupa permisos, actividad y conexión MCP. */
 export type SettingsTab = 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features' | 'agents';

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { canTransitionQuotation, emptyQuotationContent, type QuotationStatus } from '../../shared/quotations';
 import type { QuotationChange, QuotationDeletionCommand, QuotationRecord } from '../types/quotation';
 import {
-  QUOTATION_VIEWS, countQuotationsByView, filterQuotations, formatQuotationDate, quotationStatusActions, quotationSyncIssue,
-  quotationTotalDopCents, quotationValidityLabel, summarizeQuotations,
+  QUOTATION_VIEWS, countQuotationsByView, filterQuotations, formatQuotationDate, pendingPublishCount, quotationStatusActions, quotationSyncIssue,
+  quotationTotalDopCents, quotationValidityLabel, summarizeQuotations, viewShowing,
 } from '../utils/quotationSummary';
 
 const TODAY = '2026-11-26';
@@ -116,6 +116,13 @@ const all = [draft, issued, issuedToday, expired, accepted, rejected, voided];
   assert.equal(quotationValidityLabel({ status: 'issued', validUntil: TODAY }, TODAY), 'Vence 26 nov 2026');
   assert.equal(quotationValidityLabel({ status: 'issued', validUntil: '2026-11-14' }, TODAY), 'Venció 14 nov 2026');
   assert.equal(quotationValidityLabel({ status: 'draft', validUntil: '2026-11-14' }, TODAY), 'Venció 14 nov 2026');
+  assert.equal(quotationValidityLabel({ status: 'draft', validUntil: '2026-12-01' }, TODAY), 'Vence 1 dic 2026');
+  // Aceptadas, rechazadas y anuladas: la fecha sin el verbo (ya no «vencen»).
+  for (const status of ['accepted', 'rejected', 'void'] as const) {
+    assert.equal(quotationValidityLabel({ status, validUntil: '2026-11-14' }, TODAY), 'Vigencia 14 nov 2026', status);
+    assert.equal(quotationValidityLabel({ status, validUntil: '2026-12-21' }, TODAY), 'Vigencia 21 dic 2026', status);
+    assert.equal(quotationValidityLabel({ status, validUntil: null }, TODAY), 'Sin vigencia', status);
+  }
 }
 
 // --- Transiciones ofrecidas = canTransitionQuotation -----------------------------------------------------------------
@@ -149,6 +156,41 @@ const all = [draft, issued, issuedToday, expired, accepted, rejected, voided];
   const foreign = quotationSyncIssue('x', ctx({ x: { revision: 'r', baseVersion: 1, ownerId: 'u-2', serverQuotation: server } }));
   assert.equal(foreign?.kind, 'version_conflict');
   assert.equal(foreign?.own, false, 'el cambio de otra cuenta no se resuelve desde aquí');
+  // Un rechazo de una revisión anterior ya está superado por una edición nueva: es un cambio pendiente, no un rechazo.
+  const superseded = quotationSyncIssue('x', ctx({ x: { revision: 'r2', baseVersion: 1, rejected: { revision: 'r1', status: 400, error: 'Viejo' } } }));
+  assert.equal(superseded?.kind, 'pending');
+  assert.equal(superseded?.error, undefined);
+}
+
+// --- Cambios pendientes de publicar: solo los propios, con los borrados en cola y sin conflictos ni rechazos ---------
+{
+  const server = quotation({ id: 'srv2' });
+  const changes: Record<string, QuotationChange> = {
+    a: { revision: 'r', baseVersion: 1, ownerId: 'u-1' },
+    b: { revision: 'r', baseVersion: 0 }, // sin dueño (espacio local o creación anterior a la sesión): propio
+    c: { revision: 'r', baseVersion: 1, ownerId: 'u-2' }, // de otra cuenta
+    d: { revision: 'r', baseVersion: 1, ownerId: 'u-1', serverQuotation: server }, // conflicto
+    e: { revision: 'r', baseVersion: 1, ownerId: 'u-1', serverDeleted: true }, // conflicto de borrado
+    f: { revision: 'r', baseVersion: 1, ownerId: 'u-1', rejected: { revision: 'r', status: 400, error: 'x' } }, // rechazo activo
+    g: { revision: 'r2', baseVersion: 1, ownerId: 'u-1', rejected: { revision: 'r1', status: 400, error: 'x' } }, // rechazo superado
+  };
+  const deletions: QuotationDeletionCommand[] = [
+    { id: 'h', ownerId: 'u-1', baseVersion: 2 },
+    { id: 'i', ownerId: 'u-2', baseVersion: 2 },
+    { id: 'j', ownerId: 'u-1', baseVersion: 2, rejected: { status: 403, error: 'no' } },
+  ];
+  assert.equal(pendingPublishCount(changes, deletions, 'u-1'), 4, 'a, b, g y el borrado h');
+  assert.equal(pendingPublishCount({}, [], 'u-1'), 0);
+}
+
+// --- Vista que muestra una copia recién duplicada -------------------------------------------------------------------
+{
+  const copy = quotation({ status: 'draft', number: null });
+  const base = { view: 'all' as const, folderId: null, hiddenFolderIds: new Set<string>(), query: '', currency: 'all' as const, today: TODAY };
+  assert.equal(viewShowing(copy, base), 'all', 'si ya se ve, la vista no cambia');
+  assert.equal(viewShowing(copy, { ...base, view: 'draft' }), 'draft');
+  assert.equal(viewShowing(copy, { ...base, view: 'accepted' }), 'draft', 'desde una vista que no la contiene, a Borradores');
+  assert.equal(viewShowing(copy, { ...base, view: 'expired' }), 'draft');
 }
 
 console.log('Quotation summary tests passed.');

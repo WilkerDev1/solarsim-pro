@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { createAndOpenQuotation } from '../features/quotations/newQuotation';
+import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
+import { hydrateSimulationStore } from '../store/persistence/hydrateSimulationStore';
+import type { SimulationStore } from '../store/types';
 
 const store = useSimulationStore;
 
@@ -24,6 +27,19 @@ if (created.ok) {
   const quotation = store.getState().quotations.find((q) => q.id === created.id);
   assert.equal(quotation?.status, 'draft');
   assert.equal(quotation?.projectLabel, 'Alimentación de planta');
+}
+
+// Reabrir la app: `activeView` se guarda y `activeQuotationId` no, así que el editor sin cotización vuelve al catálogo.
+{
+  store.getState().openQuotation('q-persisted');
+  const saved = JSON.parse(JSON.stringify(serializeSimulationStore(store.getState()))) as SimulationStore;
+  assert.equal(saved.activeView, 'quotation-editor');
+  assert.equal('activeQuotationId' in saved, false);
+  hydrateSimulationStore(saved);
+  assert.equal(saved.activeView, 'quotations-hub');
+  const hub = JSON.parse(JSON.stringify({ ...serializeSimulationStore(store.getState()), activeView: 'clients-hub' })) as SimulationStore;
+  hydrateSimulationStore(hub);
+  assert.equal(hub.activeView, 'clients-hub', 'otras vistas se conservan');
 }
 
 console.log('Quotation navigation tests passed.');

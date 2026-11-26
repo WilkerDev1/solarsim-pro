@@ -13,20 +13,24 @@ const withPeriod = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() :
 const quantityText = (quantity: number, unit: string) => `${Number(quantity.toFixed(3)).toLocaleString('en-US', { maximumFractionDigits: 3 })}${unit ? ` ${unit}` : ''}`;
 const quotationName = (quotation: QuotationRecord) => quotation.number ?? 'la cotización sin número';
 
-/** Una frase por tipo de conflicto o rechazo; las dos resoluciones dicen qué hacen en cada caso. */
+/**
+ * Una frase por tipo de conflicto o rechazo y, para quien puede resolverlo, qué hace cada resolución. Con un cambio de
+ * otra cuenta no se nombran botones que no se muestran.
+ */
 function issueMessage(issue: QuotationSyncIssue): string | null {
   const version = issue.serverVersion ? ` (versión ${issue.serverVersion})` : '';
+  const text = (what: string, hint: string) => (issue.own ? `${what} ${hint}` : what);
   switch (issue.kind) {
     case 'version_conflict':
-      return `Otro miembro cambió esta cotización${version} mientras tenías cambios sin publicar. «Usar la del servidor» descarta tus cambios; «Conservar la mía» publica los tuyos sobre esa versión.`;
+      return text(`Otro miembro cambió esta cotización${version} mientras tenías cambios sin publicar.`, '«Usar la del servidor» descarta tus cambios; «Conservar la mía» publica los tuyos sobre esa versión.');
     case 'server_deleted':
-      return 'Otro miembro eliminó esta cotización mientras tenías cambios sin publicar. «Usar la del servidor» descarta tu copia; «Conservar la mía» la guarda como un borrador nuevo, sin número.';
+      return text('Otro miembro eliminó esta cotización mientras tenías cambios sin publicar.', '«Usar la del servidor» descarta tu copia; «Conservar la mía» la guarda como un borrador nuevo, sin número.');
     case 'stale_deletion':
-      return `La eliminaste, pero otro miembro la cambió antes${version}. «Usar la del servidor» la conserva; «Conservar la mía» vuelve a eliminarla.`;
+      return text(`La eliminaste, pero otro miembro la cambió antes${version}.`, '«Usar la del servidor» la conserva; «Conservar la mía» vuelve a eliminarla.');
     case 'rejected':
-      return `El servidor rechazó el último cambio: ${withPeriod(issue.error ?? 'sin motivo')} «Usar la del servidor» descarta tus cambios locales; «Conservar la mía» lo reintenta.`;
+      return text(`El servidor rechazó el último cambio: ${withPeriod(issue.error ?? 'sin motivo')}`, '«Usar la del servidor» descarta tus cambios locales; «Conservar la mía» lo reintenta.');
     case 'deletion_rejected':
-      return `El servidor rechazó eliminarla: ${withPeriod(issue.error ?? 'sin motivo')} «Usar la del servidor» la conserva; «Conservar la mía» reintenta eliminarla.`;
+      return text(`El servidor rechazó eliminarla: ${withPeriod(issue.error ?? 'sin motivo')}`, '«Usar la del servidor» la conserva; «Conservar la mía» reintenta eliminarla.');
     default:
       return null;
   }
@@ -36,8 +40,8 @@ interface QuotationDetailDockProps {
   quotation: QuotationRecord;
   today: string;
   readOnly: boolean;
-  /** Tras duplicar, el catálogo selecciona la copia. */
-  onDuplicated?: (id: string) => void;
+  /** Tras duplicar, el catálogo selecciona la copia y la pone a la vista. */
+  onDuplicated?: (copy: QuotationRecord) => void;
 }
 
 /** Vista previa de la cotización seleccionada con sus acciones. Mirarla nunca escribe en el store. */
@@ -74,7 +78,7 @@ export function QuotationDetailDock({ quotation, today, readOnly, onDuplicated }
   const duplicate = () => {
     setError(null);
     const result = duplicateQuotationRecord(quotation.id);
-    if (result.ok) onDuplicated?.(result.quotation.id);
+    if (result.ok) onDuplicated?.(result.quotation);
     else setError({ text: `Duplicar: ${result.error}`, near: 'head' });
   };
   const remove = async () => {

@@ -34,6 +34,8 @@ function isLegacyServerUrl(url: string | undefined): boolean {
 }
 
 export function hydrateSimulationStore(state: SimulationStore | undefined): void {
+  // `activeView` se guarda pero `activeQuotationId` no: reabrir en el editor dejaría una vista sin cotización.
+  if (state?.activeView === 'quotation-editor') state.activeView = 'quotations-hub';
   if (state && state.projects && Array.isArray(state.projects)) {
     // Remove legacy hardcoded mock projects and purge expired trash projects (>30 days)
     const mockProjectIds = new Set(['benchmark-centro-medico', 'proj-logistics-hub', 'proj-residential-42']);

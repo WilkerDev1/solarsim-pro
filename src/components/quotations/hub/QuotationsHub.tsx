@@ -8,8 +8,9 @@ import { useSimulationStore } from '../../../store/useSimulationStore';
 import { hiddenFolderIdSet } from '../../../utils/folderVisibility';
 import { localIsoDate } from '../../../utils/localDate';
 import {
-  QUOTATION_VIEWS, countQuotationsByView, filterQuotations, quotationSyncIssue, summarizeQuotations, type QuotationView,
+  QUOTATION_VIEWS, countQuotationsByView, filterQuotations, pendingPublishCount, quotationSyncIssue, summarizeQuotations, viewShowing, type QuotationView,
 } from '../../../utils/quotationSummary';
+import type { QuotationRecord } from '../../../types/quotation';
 import { confirmAction } from '../../common/confirmAction';
 import { QuotationDetailDock } from './QuotationDetailDock';
 import { QuotationsKpis } from './QuotationsKpis';
@@ -59,9 +60,22 @@ export function QuotationsHub() {
   const selected = visible.find((q) => q.id === selectedId) ?? visible[0] ?? null;
   const visibleChecked = useMemo(() => new Set(visible.filter((q) => checked.has(q.id)).map((q) => q.id)), [visible, checked]);
   const issueFor = (id: string) => quotationSyncIssue(id, { changes: quotationChanges, deletionQueue: quotationDeletionQueue, userId: user?.id, signedIn: !!user });
-  const pendingCount = Object.keys(quotationChanges).length;
+  const pendingCount = pendingPublishCount(quotationChanges, quotationDeletionQueue, user?.id);
   const title = QUOTATION_VIEWS.find((v) => v.id === view)?.title ?? 'Cotizaciones';
 
+  /** La copia recién duplicada (un borrador) queda seleccionada y a la vista: si la vista activa no la contiene, Borradores. */
+  const showDuplicate = (copy: QuotationRecord) => {
+    const filter = { ...scope, view, query, currency, today };
+    const nextView = viewShowing(copy, filter);
+    setView(nextView);
+    if (!filterQuotations([copy], { ...filter, view: nextView }).length) {
+      // La búsqueda, la moneda o una carpeta oculta también la esconderían: se quitan para que se vea.
+      setQuery('');
+      setCurrency('all');
+      if (!filterQuotations([copy], { ...filter, view: nextView, query: '', currency: 'all' }).length) setFolderId(copy.folderId ?? null);
+    }
+    setSelectedId(copy.id);
+  };
   const create = () => {
     setHeaderMessage(null);
     const result = createAndOpenQuotation();
@@ -178,7 +192,7 @@ export function QuotationsHub() {
             onClearFilters={() => { setQuery(''); setCurrency('all'); setView('all'); setFolderId(null); }}
           />
           {selected ? (
-            <QuotationDetailDock key={selected.id} quotation={selected} today={today} readOnly={readOnly} onDuplicated={setSelectedId} />
+            <QuotationDetailDock key={selected.id} quotation={selected} today={today} readOnly={readOnly} onDuplicated={showDuplicate} />
           ) : (
             <aside className="qh-panel qh-dock" aria-label="Detalle de la cotización seleccionada">
               <p className="qh-dock-empty">{quotations.length ? 'Selecciona una cotización para ver su detalle.' : 'Aquí verás el detalle de la cotización seleccionada.'}</p>

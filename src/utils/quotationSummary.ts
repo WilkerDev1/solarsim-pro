@@ -120,10 +120,20 @@ export function formatQuotationDate(iso: string | null | undefined): string {
   return `${Number(match[3])} ${MONTHS[month - 1]} ${match[1]}`;
 }
 
-/** «Sin vigencia», «Vence 21 dic 2026» (también hoy, que aún es válida) o «Venció 14 nov 2026». */
+/**
+ * Vigencia en la lista. Borradores y emitidas dicen si vencen o vencieron (decidido con `effectiveQuotationStatus`; el
+ * mismo día aún es válida): «Vence 21 dic 2026», «Venció 14 nov 2026». Aceptadas, rechazadas y anuladas ya no vencen:
+ * «Vigencia 14 nov 2026». Sin fecha, «Sin vigencia».
+ */
 export function quotationValidityLabel(quotation: { status: QuotationStatus; validUntil: string | null }, today: string): string {
   if (!quotation.validUntil) return 'Sin vigencia';
-  return `${quotation.validUntil < today ? 'Venció' : 'Vence'} ${formatQuotationDate(quotation.validUntil)}`;
+  const date = formatQuotationDate(quotation.validUntil);
+  const status = effectiveQuotationStatus(quotation, today);
+  if (status === 'expired') return `Venció ${date}`;
+  if (status === 'issued') return `Vence ${date}`;
+  // Un borrador aún no está emitido (no es «Vencida»), pero su fecha ya puede haber pasado.
+  if (status === 'draft') return `${quotation.validUntil < today ? 'Venció' : 'Vence'} ${date}`;
+  return `Vigencia ${date}`;
 }
 
 const STATUS_ACTIONS: readonly { to: QuotationStatus; label: string }[] = [
@@ -171,10 +181,31 @@ export function quotationSyncIssue(
     if (change.serverQuotation) {
       return { kind: change.deletionConflict ? 'stale_deletion' : 'version_conflict', own: mine, serverVersion: change.serverQuotation.version };
     }
-    if (change.rejected) return { kind: 'rejected', own: mine, error: change.rejected.error };
+    // Un rechazo de una revisión anterior ya lo superó una edición nueva, que se reintentará: es un cambio pendiente.
+    if (change.rejected && change.rejected.revision === change.revision) return { kind: 'rejected', own: mine, error: change.rejected.error };
     return { kind: 'pending', own: mine };
   }
   const refused = context.deletionQueue.find((command) => command.id === id && command.rejected);
   if (refused?.rejected) return { kind: 'deletion_rejected', own: own(refused.ownerId), error: refused.rejected.error };
   return null;
+}
+
+/**
+ * Cambios de la cuenta actual (o del espacio local) pendientes de publicar: escrituras sin conflicto ni rechazo activo y
+ * borrados en cola no rechazados. Los conflictos y rechazos tienen su propia marca y aviso.
+ */
+export function pendingPublishCount(
+  changes: Record<string, QuotationChange>,
+  deletionQueue: readonly QuotationDeletionCommand[],
+  userId: string | null | undefined,
+): number {
+  const own = (ownerId?: string) => !ownerId || ownerId === userId;
+  const writes = Object.values(changes).filter((change) =>
+    own(change.ownerId) && !change.serverQuotation && !change.serverDeleted && !(change.rejected && change.rejected.revision === change.revision)).length;
+  return writes + deletionQueue.filter((command) => own(command.ownerId) && !command.rejected).length;
+}
+
+/** Vista en la que se ve `quotation` (p. ej. la copia recién duplicada): la activa si la contiene; si no, Borradores. */
+export function viewShowing(quotation: QuotationRecord, filter: QuotationFilter): QuotationView {
+  return filterQuotations([quotation], filter).length ? filter.view : 'draft';
 }

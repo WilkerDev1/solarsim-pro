@@ -90,8 +90,14 @@ try {
   assert.match(html, />Duplicar</);
   assert.match(html, />Eliminar</);
   // Un indicador por grupo con su importe en RD$ (la emitida vencida se convierte con su tasa: 18,450 × 60).
-  assert.match(html, /Emitidas por responder/);
-  assert.match(html, /RD\$ 1,107,000\.00/);
+  const kpi = (id: string) => new RegExp(`<li class="qh-kpi" data-kpi="${id}">(.*?)</li>`).exec(html)?.[1] ?? '';
+  assert.match(kpi('expired'), /Vencidas/);
+  assert.match(kpi('expired'), /RD\$ 1,107,000\.00/, 'la emitida vencida suma en Vencidas');
+  assert.match(kpi('expired'), /1 cotización/);
+  assert.match(kpi('issued'), /Emitidas por responder/);
+  assert.match(kpi('issued'), /RD\$ 0\.00/, 'y no en Emitidas por responder');
+  assert.match(kpi('draft'), /RD\$ 35,966\.40/);
+  assert.match(kpi('accepted'), /RD\$ 0\.00/);
 
   // --- LECTOR: ve todo y no tiene acciones de escritura ---------------------------------------------------------------
   useSimulationStore.setState({ syncSettings: { ...initial.syncSettings, serverUrl: 'https://qa.example.invalid', authToken: 'synthetic', currentUser: { id: 'u-r', name: 'Lectora', email: 'r@example.invalid', role: 'LECTOR', organizationId: 'org' } } });
@@ -126,6 +132,15 @@ try {
   assert.match(version, /Usar la del servidor/);
   assert.match(version, /Conservar la mía/);
   assert.match(dockWith({ serverDeleted: true }), /Otro miembro eliminó esta cotización/);
+  // Conflicto de otra cuenta de este equipo: se explica, sin acciones.
+  const foreign = dockWith({ ownerId: 'u-otra', serverQuotation: { ...reference, version: 6 } });
+  assert.match(foreign, /Otro miembro cambió esta cotización/);
+  assert.match(foreign, /solo esa cuenta puede resolverlo/);
+  assert.doesNotMatch(foreign, /Usar la del servidor|Conservar la mía/);
+  // Rechazo de una revisión anterior (superado por una edición): no se muestra como rechazo activo.
+  const stale = dockWith({ revision: 'r2', rejected: { revision: 'r1', status: 400, error: 'Error viejo.' } });
+  assert.doesNotMatch(stale, /El servidor rechazó|Error viejo/);
+  assert.match(stale, /Cambios pendientes de publicar/);
   assert.match(dockWith({ serverQuotation: { ...reference, version: 5 }, deletionConflict: true }), /La eliminaste/);
   assert.match(dockWith({ rejected: { revision: 'r', status: 409, code: 'quotation_locked', error: 'La cotización está bloqueada.' } }), /El servidor rechazó[^<]*La cotización está bloqueada\./);
   useSimulationStore.setState({ quotationChanges: {} });
