@@ -365,6 +365,10 @@ import type {
   QuotationChange, QuotationDeletionCommand, QuotationMutationResult, QuotationRecord, QuotationSyncCursor,
 } from '../types/quotation';
 
+import type {
+  LibraryKind, LibraryMutationResult, QuotationLibraryState, QuotationSignature, QuotationSignatureContent, QuotationTemplate, QuotationTemplateContent,
+} from '../types/quotationLibrary';
+
 export type QuotationActionResult = { ok: true } | { ok: false; error: string };
 
 /** Cotizaciones (docs/QUOTATIONS.md): API pura, llamable fuera de React; las reglas viven en `shared/quotations`. */
@@ -389,6 +393,28 @@ export interface QuotationSlice {
   resolveQuotationConflict: (id: string, resolution: 'accept_server' | 'keep_local') => void;
   syncQuotationsWithServer: () => Promise<{ success: boolean; message: string }>;
 }
+
+/**
+ * Plantillas, firmas y sellos de cotización (docs/QUOTATIONS.md#plantillas-firmas-y-sellos): recursos del espacio de
+ * trabajo; sin cuenta todo funciona en este equipo, con sesión se sincronizan con CAS como las cotizaciones.
+ */
+export interface QuotationLibrarySlice {
+  quotationLibrary: QuotationLibraryState;
+  quotationLibrarySyncFeedback: string | null;
+  createQuotationTemplate: (content: Partial<QuotationTemplateContent>) => LibraryMutationResult<QuotationTemplate>;
+  updateQuotationTemplate: (id: string, changes: Partial<QuotationTemplateContent>) => LibraryMutationResult<QuotationTemplate>;
+  duplicateQuotationTemplate: (id: string) => LibraryMutationResult<QuotationTemplate>;
+  /** Marca la predeterminada (desmarca las demás); `null` deja ninguna. */
+  setDefaultQuotationTemplate: (id: string | null) => QuotationActionResult;
+  deleteQuotationTemplate: (id: string) => QuotationActionResult;
+  createQuotationSignature: (content: Partial<QuotationSignatureContent>) => LibraryMutationResult<QuotationSignature>;
+  updateQuotationSignature: (id: string, changes: Partial<QuotationSignatureContent>) => LibraryMutationResult<QuotationSignature>;
+  /** Una predeterminada por tipo: firma y sello. */
+  setDefaultQuotationSignature: (id: string) => QuotationActionResult;
+  deleteQuotationSignature: (id: string) => QuotationActionResult;
+  resolveQuotationLibraryConflict: (kind: LibraryKind, id: string, resolution: 'accept_server' | 'keep_local') => void;
+  syncQuotationLibraryWithServer: () => Promise<{ success: boolean; message: string }>;
+}
 import { FeatureSettingsSlice } from './slices/featureSettingsSlice';
 import { AgentSlice } from './slices/agentSlice';
 import { EquipmentPriceSlice } from './slices/equipmentPriceSlice';
@@ -402,6 +428,7 @@ export type SimulationStore = ProjectSlice &
   FolderSlice &
   ClientSlice &
   QuotationSlice &
+  QuotationLibrarySlice &
   TariffSlice &
   CompanyProfileSlice &
   VersionHistorySlice &

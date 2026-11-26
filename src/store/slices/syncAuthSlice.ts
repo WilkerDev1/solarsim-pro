@@ -235,6 +235,9 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       // Quotations are independent records too: their errors never block proposals either.
       const quotations = await get().syncQuotationsWithServer().catch((error: unknown) => ({ success: false, message: error instanceof Error ? error.message : 'No se pudieron sincronizar las cotizaciones.' }));
       ensureCurrent();
+      // Templates and signatures: their state is shown in their own view (quotationLibrarySyncFeedback), never here.
+      await get().syncQuotationLibraryWithServer().catch(() => undefined);
+      ensureCurrent();
       // Folder errors must not prevent downloading independent project updates.
       // Incremental: only what changed since this scope's last applied pull; tombstones always arrive in full.
       const cursor = get().projectSyncCursor;

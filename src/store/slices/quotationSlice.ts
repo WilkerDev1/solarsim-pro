@@ -12,6 +12,9 @@ import {
   canonicalQuotationContent, keepLocalImages, nextLocalQuotationNumber, planQuotationPush, quotationContent, sameQuotationContent,
 } from '../sync/quotationContent';
 import { localIsoDate } from '../../utils/localDate';
+import { DocumentAssetService } from '../../services/documentAssetService';
+import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
+import { publishQuotationAssets } from '../sync/quotationAssets';
 
 const SESSION_CHANGED = { success: false, message: 'La sesión cambió.' };
 const fail = (error: string) => ({ ok: false as const, error });
@@ -316,6 +319,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
         workspaceScope(get().syncSettings) === scope;
       const own = (ownerId?: string) => !ownerId || ownerId === user.id;
       const transport = QuotationSyncService.transport(initial.syncSettings.serverUrl, () => get().syncSettings.authToken || '');
+      const assets = DocumentAssetService.transport(initial.syncSettings.serverUrl, () => get().syncSettings.authToken || '');
       const promise = (async () => {
         try {
           const cursor = get().quotationSyncCursor;
@@ -430,6 +434,12 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               failures++;
               continue;
             }
+            // Logo, thumbnails and attachments travel as `asset:sha256:` references: upload what this device has.
+            await publishQuotationAssets(local, {
+              upload: (dataUrl) => DocumentAssetService.ensureUploaded(assets, scope, dataUrl),
+              attachmentBytes: (attachmentId) => PDFAttachmentStorage.getAttachment(attachmentId),
+            });
+            if (!current()) return SESSION_CHANGED;
             const serverCopy = remote.get(id);
             if (serverCopy && sameQuotationContent(serverCopy, local)) {
               // Recover a lost PUT receipt only from identical authoritative content.

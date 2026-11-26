@@ -10,6 +10,7 @@ import {
   DEFAULT_LOCAL_USER,
 } from "../../types/companyProfile";
 import { DEFAULT_SIMULATION_SETTINGS } from "../defaultSimulationSettings";
+import { emptyQuotationLibrary } from "../../types/quotationLibrary";
 
 const keys = [
   "projects",
@@ -25,6 +26,7 @@ const keys = [
   "quotationDeletionQueue",
   "quotationSyncCursor",
   "quotationNumberCounters",
+  "quotationLibrary",
   "equipmentCatalog",
   "deletedEquipmentIds",
   "equipmentChanges",
@@ -57,7 +59,8 @@ type OptionalWorkspaceKey =
   | "quotationChanges"
   | "quotationDeletionQueue"
   | "quotationSyncCursor"
-  | "quotationNumberCounters";
+  | "quotationNumberCounters"
+  | "quotationLibrary";
 export type OrganizationWorkspace = Pick<
   SimulationStore,
   Exclude<(typeof keys)[number], OptionalWorkspaceKey>
@@ -92,6 +95,8 @@ export function emptyWorkspace(): OrganizationWorkspace {
     quotationDeletionQueue: [],
     quotationSyncCursor: null,
     quotationNumberCounters: {},
+    // Templates, signatures and stamps follow the workspace too (docs/QUOTATIONS.md#plantillas-firmas-y-sellos).
+    quotationLibrary: emptyQuotationLibrary(),
     equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
     deletedEquipmentIds: [],
     equipmentChanges: {},
@@ -373,6 +378,7 @@ export function changeWorkspace(
     quotationDeletionQueue: workspace.quotationDeletionQueue || [],
     quotationSyncCursor: workspace.quotationSyncCursor ?? null,
     quotationNumberCounters: workspace.quotationNumberCounters || {},
+    quotationLibrary: workspace.quotationLibrary || emptyQuotationLibrary(),
     folders: workspace.folders.filter(
       (f) =>
         f.visibility !== "private" ||
@@ -396,6 +402,7 @@ export function changeWorkspace(
       folderSyncFeedback: null,
       clientSyncFeedback: null,
       quotationSyncFeedback: null,
+      quotationLibrarySyncFeedback: null,
       workspaceScope: initialized.workspaceScope,
       organizationWorkspaces: hidden.length
         ? { ...others, [nextScope]: captured }
@@ -422,6 +429,7 @@ export function changeWorkspace(
     activeClientId: null,
     clientSyncFeedback: null,
     quotationSyncFeedback: null,
+    quotationLibrarySyncFeedback: null,
     activeConflict: null,
     pendingImportConflict: null,
     pendingAgentActions: [],

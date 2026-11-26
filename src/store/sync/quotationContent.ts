@@ -20,16 +20,31 @@ export function quotationContent(record: QuotationContent): QuotationContent {
 
 const inline = (image: string | undefined): boolean => !!image && !isAssetRef(image);
 
-/** What the API accepts: images that are not `asset:sha256:` references are sent empty. */
+/**
+ * Inline images already uploaded to `/api/document-assets` (data URL → `asset:sha256:` reference). The reference is the
+ * sha256 of the exact text, so once known it stands for that image in every comparison and publication.
+ */
+const uploadedRefs = new Map<string, string>();
+const MAX_KNOWN_REFS = 200;
+export function registerUploadedImage(dataUrl: string, ref: string): void {
+  if (!isAssetRef(ref)) return;
+  if (uploadedRefs.size >= MAX_KNOWN_REFS) uploadedRefs.delete(uploadedRefs.keys().next().value!);
+  uploadedRefs.set(dataUrl, ref);
+}
+/** What travels for an image slot: references as they are, uploaded inline images as their reference, the rest empty. */
+const published = (image: string | undefined): string => (inline(image) ? uploadedRefs.get(image!) ?? '' : image ?? '');
+
+/** What the API accepts: images that are not `asset:sha256:` references (nor uploaded already) are sent empty. */
 export function publishableContent(record: QuotationContent): QuotationContent {
   const content = quotationContent(record);
   return {
     ...content,
-    issuer: { ...content.issuer, logo: inline(content.issuer?.logo) ? '' : content.issuer?.logo ?? '' },
+    issuer: { ...content.issuer, logo: published(content.issuer?.logo) },
     attachments: (content.attachments ?? []).map((attachment) => {
       if (!inline(attachment.thumbnailDataUrl)) return attachment;
-      const { thumbnailDataUrl: _inline, ...rest } = attachment;
-      return rest;
+      const { thumbnailDataUrl: local, ...rest } = attachment;
+      const ref = published(local);
+      return ref ? { ...rest, thumbnailDataUrl: ref } : rest;
     }),
   };
 }
@@ -44,16 +59,34 @@ export function canonicalQuotationContent(record: QuotationContent): QuotationCo
 export const sameQuotationContent = (left: QuotationContent, right: QuotationContent): boolean =>
   contentEqual(canonicalQuotationContent(left), canonicalQuotationContent(right));
 
-/** The server never stores inline images: its empty value keeps the local inline image of the same slot. */
+/**
+ * The server never stores inline images: its empty value, or the reference of the same uploaded image, keeps the local
+ * inline image of the same slot.
+ */
 export function keepLocalImages(server: QuotationRecord, local: QuotationRecord | undefined): QuotationRecord {
   if (!local) return server;
-  const logo = !server.issuer?.logo && inline(local.issuer?.logo) ? local.issuer.logo : undefined;
+  const same = (remote: string | undefined, mine: string | undefined) => inline(mine) && (!remote || remote === uploadedRefs.get(mine!));
+  const logo = same(server.issuer?.logo, local.issuer?.logo) ? local.issuer.logo : undefined;
   const thumbnails = new Map((local.attachments ?? []).filter((a) => inline(a.thumbnailDataUrl)).map((a) => [a.id, a.thumbnailDataUrl!]));
-  const attachments = (server.attachments ?? []).map((a) => (!a.thumbnailDataUrl && thumbnails.has(a.id) ? { ...a, thumbnailDataUrl: thumbnails.get(a.id) } : a));
+  const attachments = (server.attachments ?? []).map((a) => (thumbnails.has(a.id) && same(a.thumbnailDataUrl, thumbnails.get(a.id)) ? { ...a, thumbnailDataUrl: thumbnails.get(a.id) } : a));
   const changedAttachments = attachments.some((a, index) => a !== server.attachments[index]);
   if (!logo && !changedAttachments) return server;
   return { ...server, ...(logo ? { issuer: { ...server.issuer, logo } } : {}), ...(changedAttachments ? { attachments } : {}) };
 }
+
+/** `target` with the image slots of `base` (logo and thumbnails of the same attachments). */
+const withImagesOf = (target: QuotationContent, base: QuotationContent): QuotationContent => {
+  const thumbnails = new Map(base.attachments.map((a) => [a.id, a.thumbnailDataUrl]));
+  return {
+    ...target,
+    issuer: { ...target.issuer, logo: base.issuer.logo },
+    attachments: target.attachments.map((a) => {
+      const { thumbnailDataUrl: _mine, ...rest } = a;
+      const theirs = thumbnails.has(a.id) ? thumbnails.get(a.id) : a.thumbnailDataUrl;
+      return theirs ? { ...rest, thumbnailDataUrl: theirs } : rest;
+    }),
+  };
+};
 
 /**
  * PUTs needed to move the server copy (`base`, confirmed at the change's base version) to `local`. The API only lets
@@ -61,11 +94,16 @@ export function keepLocalImages(server: QuotationRecord, local: QuotationRecord 
  * and a status that is not reachable in one step goes through `issued`. Empty = nothing to publish.
  */
 export function planQuotationPush(base: QuotationContent | undefined, local: QuotationContent): QuotationContent[] {
-  const target = canonicalQuotationContent(local);
+  let target = canonicalQuotationContent(local);
   // A creation is only accepted as `draft` or `issued`: an accepted/rejected one that was never published is created
   // as issued first. (A never-published `void` is discarded by the store without any request.)
   if (!base) return target.status === 'accepted' || target.status === 'rejected' ? [{ ...target, status: 'issued' }, target] : [target];
   let current = canonicalQuotationContent(base);
+  // While it stays locked, an image uploaded later never reopens it: a status change keeps the confirmed images.
+  if (isQuotationContentLocked(current.status) && isQuotationContentLocked(target.status)) {
+    const kept = withImagesOf(target, current);
+    if (contentEqual({ ...kept, status: current.status }, current)) target = kept;
+  }
   if (contentEqual(current, target)) return [];
   const plan: QuotationContent[] = [];
   const { status: _currentStatus, ...currentRest } = current;
