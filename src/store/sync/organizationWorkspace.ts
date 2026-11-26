@@ -20,6 +20,11 @@ const keys = [
   "clients",
   "clientChanges",
   "clientDeletionQueue",
+  "quotations",
+  "quotationChanges",
+  "quotationDeletionQueue",
+  "quotationSyncCursor",
+  "quotationNumberCounters",
   "equipmentCatalog",
   "deletedEquipmentIds",
   "equipmentChanges",
@@ -42,7 +47,17 @@ const keys = [
   "proposalPriceLive",
 ] as const;
 // Keys added after 2.6 are optional: archives written by older versions lack them and fall back to emptyWorkspace().
-type OptionalWorkspaceKey = "agentActivity" | "projectSyncCursor" | "genericPrices" | "pricePending" | "proposalPriceLive";
+type OptionalWorkspaceKey =
+  | "agentActivity"
+  | "projectSyncCursor"
+  | "genericPrices"
+  | "pricePending"
+  | "proposalPriceLive"
+  | "quotations"
+  | "quotationChanges"
+  | "quotationDeletionQueue"
+  | "quotationSyncCursor"
+  | "quotationNumberCounters";
 export type OrganizationWorkspace = Pick<
   SimulationStore,
   Exclude<(typeof keys)[number], OptionalWorkspaceKey>
@@ -71,6 +86,12 @@ export function emptyWorkspace(): OrganizationWorkspace {
     clients: [],
     clientChanges: {},
     clientDeletionQueue: [],
+    // Quotations, their queues, pull cursor and local numbering belong to the workspace (docs/QUOTATIONS.md).
+    quotations: [],
+    quotationChanges: {},
+    quotationDeletionQueue: [],
+    quotationSyncCursor: null,
+    quotationNumberCounters: {},
     equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
     deletedEquipmentIds: [],
     equipmentChanges: {},
@@ -347,6 +368,11 @@ export function changeWorkspace(
     clients: workspace.clients || [],
     clientChanges: workspace.clientChanges || {},
     clientDeletionQueue: workspace.clientDeletionQueue || [],
+    quotations: workspace.quotations || [],
+    quotationChanges: workspace.quotationChanges || {},
+    quotationDeletionQueue: workspace.quotationDeletionQueue || [],
+    quotationSyncCursor: workspace.quotationSyncCursor ?? null,
+    quotationNumberCounters: workspace.quotationNumberCounters || {},
     folders: workspace.folders.filter(
       (f) =>
         f.visibility !== "private" ||
@@ -369,6 +395,7 @@ export function changeWorkspace(
       activeTeamMemberFilter: null,
       folderSyncFeedback: null,
       clientSyncFeedback: null,
+      quotationSyncFeedback: null,
       workspaceScope: initialized.workspaceScope,
       organizationWorkspaces: hidden.length
         ? { ...others, [nextScope]: captured }
@@ -394,6 +421,7 @@ export function changeWorkspace(
     activeFolderId: null,
     activeClientId: null,
     clientSyncFeedback: null,
+    quotationSyncFeedback: null,
     activeConflict: null,
     pendingImportConflict: null,
     pendingAgentActions: [],

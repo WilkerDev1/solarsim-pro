@@ -1,6 +1,6 @@
 # Cotizaciones
 
-Documento comercial simple (líneas, descuentos, ITBIS y total). **No es una factura fiscal ni una propuesta**: es una entidad propia, distinta de `ProjectSimulation` ([ADR 0007](adr/0007-cotizaciones-entidad-propia.md)). Este documento describe el contrato del dominio puro compartido en `shared/quotations/`; la API, el store y la interfaz llegan en fases siguientes.
+Documento comercial simple (líneas, descuentos, ITBIS y total). **No es una factura fiscal ni una propuesta**: es una entidad propia, distinta de `ProjectSimulation` ([ADR 0007](adr/0007-cotizaciones-entidad-propia.md)). Este documento describe el contrato del dominio puro compartido en `shared/quotations/`; la sección «Store y sincronización» describe el almacén del cliente; la API y la interfaz llegan en fases siguientes.
 
 Reglas del módulo: TypeScript puro (sin `src/`, `server/`, `electron/`, Node ni terceros), imports relativos con extensión `.js`, sin relojes ni generación de ids (la fecha y `newId` entran como argumento), importes en **centavos enteros** y la tasa de ITBIS solo desde `ITBIS_RATE` (`shared/financialRules.ts`). Lo verifica `testQuotationSharedPurity`.
 
@@ -87,6 +87,57 @@ La propuesta no tiene precio unitario por equipo, así que `quotationFromProposa
 
 El contenido es un `draft` con `sourceProjectId`; primero las `pricedLines` como `item`, después las `detailLines` como `detail`; todos los anexos con `mode: 'related'`, `origin: 'proposal'` y `sourceProjectId`; ids de línea y de descuento de `newId()`. Si `source.validUntil` es anterior a `today`, la vigencia queda en `null`. El contenido se pasa por `validateQuotationContent` y se devuelve su resultado: con `ok` el valor ya está normalizado (validarlo otra vez no lo cambia); con `!ok`, el motivo (importes fuera de tope, fecha fuera de rango…). Un `projectId` vacío devuelve `{ ok: false }`. No muta la entrada ni comparte referencias con ella.
 
+## Store y sincronización
+
+`src/store/slices/quotationSlice.ts` (tipos en `src/store/types.ts`, registro local `QuotationRecord` en `src/types/quotation.ts`) es una API pura, llamable fuera de React. No reimplementa reglas: valida con `validateQuotationContent`, decide estados con `canTransitionQuotation`/`isQuotationContentLocked` y numera con `formatQuotationNumber`. Permisos con `canWrite` (`shared/permissions.ts`): sin cuenta se puede todo; un LECTOR no escribe.
+
+| Acción | Resultado y reglas |
+| --- | --- |
+| `createQuotationRecord(overrides?)` | `{ok, quotation}`. Borrador desde `emptyQuotationContent` con la fecha local de hoy (`src/utils/localDate.ts`), la tasa de cambio de las propuestas nuevas (`assumptionFields(undefined, defaultSimulationSettings).specs.dopExchangeRate`) y como vendedor el nombre de la cuenta o, sin cuenta, el del perfil local. El estado siempre es `draft`; id `quotation-<uuid>`. Rechaza un `clientId`/`folderId` inexistente. |
+| `updateQuotationRecord(id, patch)` | Solo en `draft`; ignora `patch.status`. |
+| `setQuotationStatus(id, status)` | Transición de `canTransitionQuotation`; el contenido debe validar con el estado nuevo (emitir exige cliente y una línea con precio). |
+| `duplicateQuotationRecord(id)` | Borrador nuevo: id nuevo, número nuevo (local) o `null` (con sesión), fecha de hoy, `validUntil` solo si no ha vencido; no copia enlaces a clientes o carpetas que ya no existen. |
+| `deleteQuotationRecord(id)` | `{ok}`. Encola el borrado con la versión confirmada. |
+| `linkQuotationToClient(id, clientId \| null)`, `moveQuotationToFolder(id, folderId \| null)` | `{ok}`. Enlaces opcionales que nunca reescriben `client` (datos impresos); rechazan destinos inexistentes. Como `clientId` y `folderId` son contenido y la API solo admite cambiar el estado de una cotización no borrador, exigen `draft` (salvo que el enlace ya sea el pedido). |
+| `resolveQuotationConflict(id, 'accept_server' \| 'keep_local')` | Ver conflictos. Aceptar el servidor lo puede hacer el dueño del cambio aunque haya perdido el permiso de escritura; conservar lo local exige ese permiso. |
+| `syncQuotationsWithServer()` | `{success, message}`. |
+
+### Numeración
+
+- **Espacio local (sin cuenta):** el número se asigna al crear (y al duplicar) con `quotationNumberCounters` (`año → última secuencia`, año de la fecha de emisión), que pertenece al espacio de trabajo. Nunca baja: borrar una cotización no libera su número, y la secuencia tampoco queda por debajo de un número ya en uso.
+- **Con sesión (espacio de una organización):** `number` es `null` hasta el primer PUT; el número de la respuesta se guarda y ya no cambia (al aplicar una copia del servidor se conserva el número local si ya existe).
+
+### Colas y descarga
+
+- Las escrituras van a `quotationChanges[id]` (`revision`, `ownerId`, `baseVersion` y `base`: el contenido publicable confirmado en `baseVersion`; ausente en una creación) y los borrados a `quotationDeletionQueue`. `version`/`baseVersion` valen 0 hasta la primera confirmación.
+- `GET /api/quotations` usa `?since=` con `quotationSyncCursor` (`{scope, serverTimestamp}`) si es del espacio activo; si no, descarga completa. Una descarga completa es la lista entera (lo que no está y no tiene cambios pendientes se quita); una parcial aplica solo lo cambiado y `deletedIds`. El cursor se guarda solo al final de una pasada que aplicó la descarga entera; si la sesión, el servidor o el espacio de trabajo cambian mientras tanto, la respuesta se descarta sin tocar nada.
+- Con la cotización emitida en el servidor, una secuencia local reabrir → editar → emitir se publica como varios PUT (`planQuotationPush`, `src/store/sync/quotationContent.ts`): primero reabrir con el contenido confirmado y después la edición (que desde `draft` puede emitir en el mismo PUT); un estado que no se alcanza en un paso pasa por `issued`. Si lo local vuelve a ser igual a lo confirmado (reabrir y emitir sin cambios) no se envía nada. Cada PUT confirmado se instala enseguida con su versión.
+- Borradores nunca publicados (`baseVersion` 0 y ausentes del servidor) se eliminan sin petición; un `DELETE` con 404 se da por hecho.
+- La API solo crea cotizaciones `draft` o `issued`. Una nunca publicada que se anuló sin conexión (`void`) se descarta sin petición, como un borrador nunca publicado; una aceptada o rechazada sin conexión se crea primero emitida y luego cambia de estado.
+- Un fallo de transporte detiene la pasada sin guardar el cursor; los cambios siguen en cola.
+- Si la API responde 404 a la lista (aún sin cotizaciones), la pasada solo falla si hay trabajo propio pendiente.
+
+### Conflictos y rechazos
+
+- **Recibo perdido:** si la copia del servidor es idéntica a la local (comparación del contenido publicable normalizado), se da por confirmada sin reenviar; si difiere y la local era una creación, queda como conflicto.
+- **409 de versión:** `serverQuotation` se conserva y la copia local no cambia hasta que el usuario elija. `accept_server` instala la del servidor; `keep_local` toma su versión como base y vuelve a publicar.
+- **Borrada en el servidor** (`deletedIds` o 409 con `quotation: null`) con edición local pendiente: conflicto de borrado (`serverDeleted`), nunca se publica sobre ese id. `accept_server` descarta la copia; `keep_local` la convierte en un borrador nuevo con id nuevo, sin número y versión 0.
+- **Borrado obsoleto** (409 al borrar): la cotización del servidor vuelve a la lista como conflicto.
+- **409 `invalid_client` / `invalid_folder`:** el cliente o la carpeta enlazados ya no son válidos (borrados, de otra organización o, la carpeta, privada de otro usuario). Se quita solo `clientId` o `folderId` de la copia local y el cambio sigue pendiente para la siguiente pasada; no es un conflicto que resolver.
+- **Otros 4xx** (`quotation_locked`, `invalid_transition`, `inline_image_not_allowed`, validación, 403): `rejected = {revision, status, code?, error}` queda como error visible de esa cotización y no se reintenta mientras la revisión sea la misma. Una edición nueva, o `keep_local`, la reintenta; `accept_server` descarta lo local: si nunca se publicó se elimina y, si no, la siguiente descarga es completa y trae la copia del servidor.
+- `quotationSyncFeedback` resume las pendientes; `5xx` se reintenta en la siguiente pasada.
+
+### Imágenes
+
+Antes de cada PUT, `issuer.logo` y `attachments[].thumbnailDataUrl` que no sean `asset:sha256:` se envían vacíos (`publishableContent`); las referencias sí viajan. La copia local conserva sus imágenes: al aplicar una respuesta o una descarga, un hueco vacío del servidor recupera la imagen en línea local del mismo hueco (logo, o miniatura del anexo con el mismo id). La comparación de recibos ignora esas imágenes.
+
+### Espacios de trabajo y enganches
+
+- `quotations`, `quotationChanges`, `quotationDeletionQueue`, `quotationSyncCursor` y `quotationNumberCounters` forman parte del espacio de trabajo (`organizationWorkspace`): se guardan, se archivan y se restauran al cambiar de servidor u organización como los clientes (los archivos antiguos sin ellos empiezan vacíos). Las creadas sin cuenta **nunca se asignan automáticamente** a una organización al iniciar sesión.
+- `syncProjectsWithServer` sincroniza las cotizaciones justo después de los clientes; su fallo no bloquea las propuestas y el mensaje final indica «cotizaciones pendientes».
+- Cuando llegan `deletedIds` de clientes o de carpetas, las cotizaciones pierden solo `clientId`/`folderId` (sin marcarse como cambio: la revisión autoritativa llega con la descarga de cotizaciones). Al borrar un cliente o una carpeta en local (el cliente, solo cuando su desenlace es inmediato), además los borradores afectados quedan como cambio pendiente para publicar el desenlace.
+- El transporte (`src/services/quotationSyncService.ts`) es inyectable (`QuotationSyncService.setTransportFactory`) y envía `PUT {baseVersion, content}`; las pruebas no tocan la red.
+
 ## Pruebas
 
-`npm test -- Quotation`: `testQuotationTotals` (dinero, totales, entradas hostiles y propiedades sobre 2000 documentos aleatorios con semilla fija), `testQuotationStatus` (estados y numeración), `testQuotationValidation`, `testQuotationFromProposal` y `testQuotationSharedPurity`.
+`npm test -- Quotation`: `testQuotationTotals` (dinero, totales, entradas hostiles y propiedades sobre 2000 documentos aleatorios con semilla fija), `testQuotationStatus` (estados y numeración), `testQuotationValidation`, `testQuotationFromProposal`, `testQuotationSharedPurity`, `testQuotationStore` (local: numeración, bloqueo, transiciones, duplicado, enlaces, persistencia y espacios de trabajo) y `testQuotationSync` (API sintética con el contrato HTTP: número del servidor, `since`, recibos perdidos, conflictos, borrados, rechazos sin bucle, `invalid_client`/`invalid_folder`, creaciones anuladas o rechazadas sin conexión, imágenes, aislamiento y enganche con `syncProjectsWithServer`).

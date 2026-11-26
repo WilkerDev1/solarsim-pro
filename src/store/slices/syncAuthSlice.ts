@@ -232,6 +232,9 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       // Clients are independent records: unknown ids are accepted by the push, so their errors never block proposals.
       const clients = await get().syncClientsWithServer();
       ensureCurrent();
+      // Quotations are independent records too: their errors never block proposals either.
+      const quotations = await get().syncQuotationsWithServer().catch((error: unknown) => ({ success: false, message: error instanceof Error ? error.message : 'No se pudieron sincronizar las cotizaciones.' }));
+      ensureCurrent();
       // Folder errors must not prevent downloading independent project updates.
       // Incremental: only what changed since this scope's last applied pull; tombstones always arrive in full.
       const cursor = get().projectSyncCursor;
@@ -369,7 +372,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       const pendingConfirmations = get().projects.filter(project => project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)).length;
       const unresolvedConflicts = get().projects.filter(project => project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId)).length;
       conflicts = Math.max(conflicts, unresolvedConflicts);
-      const message = pullError ? `No se pudieron descargar los proyectos: ${pullError}${sent.length ? ' Los cambios locales se enviaron igualmente.' : ''}` : !folders.success ? `Proyectos descargados; carpetas pendientes: ${folders.message}` : pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : !clients.success ? `Proyectos sincronizados; clientes pendientes: ${clients.message}` : 'Sincronización completada.';
+      const message = pullError ? `No se pudieron descargar los proyectos: ${pullError}${sent.length ? ' Los cambios locales se enviaron igualmente.' : ''}` : !folders.success ? `Proyectos descargados; carpetas pendientes: ${folders.message}` : pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : !clients.success ? `Proyectos sincronizados; clientes pendientes: ${clients.message}` : !quotations.success ? `Proyectos sincronizados; cotizaciones pendientes: ${quotations.message}` : 'Sincronización completada.';
       set((state) => {
         const lastSyncTimestamp = deletionErrors || pullError ? state.syncSettings.lastSyncTimestamp : nextCursor?.serverTimestamp ?? state.syncSettings.lastSyncTimestamp;
         return {

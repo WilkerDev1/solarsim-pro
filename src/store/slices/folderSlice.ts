@@ -5,6 +5,7 @@ import { fetchWithSessionRetry } from "../../services/syncService";
 import { ownsProject } from "../sync/projectReconciliation";
 import { contentEqual } from "../sync/projectDifferences";
 import { reuseArray, reuseIfEqual, reuseRecord } from "../sync/structuralSharing";
+import { dropQuotationLinks } from "../sync/quotationContent";
 
 // Compare the editable definition, excluding server attribution and receipt metadata.
 const folderContent = (folder: ProjectFolder) => ({
@@ -197,6 +198,10 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
             : p,
         ),
         saveFeedbackMessage: "Carpeta eliminada; los proyectos se conservan.",
+        // Quotations keep their content and lose only the link.
+        ...dropQuotationLinks(state, "folderId", new Set([id]), {
+          markDirty: { ownerId: state.syncSettings.currentUser?.id },
+        }),
       });
       sync();
     },
@@ -460,6 +465,8 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
                   : null,
             };
           });
+          // Server tombstones drop quotation links locally; the quotations pull brings the authoritative revision.
+          set((s) => dropQuotationLinks(s, "folderId", deleted));
           return {
             success: failures === 0,
             message: failures
