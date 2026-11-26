@@ -74,10 +74,15 @@ export const QuotationSyncService = {
       quotation,
     };
   },
-  async remove(transport: QuotationTransport, id: string, baseVersion: number): Promise<{ ok: boolean; status: number; quotation: QuotationRecord | null }> {
+  /** 409 with `quotation: null` means the id is already deleted (with another version); 404, that it never existed. */
+  async remove(
+    transport: QuotationTransport,
+    id: string,
+    baseVersion: number,
+  ): Promise<{ ok: boolean; status: number; error: string; quotation: QuotationRecord | null }> {
     const response = await transport(`/${encodeURIComponent(id)}?baseVersion=${baseVersion}`, { method: 'DELETE' });
-    if (response.ok) return { ok: true, status: response.status, quotation: null };
+    if (response.ok) return { ok: true, status: response.status, error: '', quotation: null };
     const data = await body(response);
-    return { ok: false, status: response.status, quotation: record(data.quotation) };
+    return { ok: false, status: response.status, error: data.error || 'No se pudo eliminar la cotización.', quotation: record(data.quotation) };
   },
 };

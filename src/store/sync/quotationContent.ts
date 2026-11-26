@@ -106,29 +106,29 @@ export function nextLocalQuotationNumber(
 type LinkState = { quotations: QuotationRecord[]; quotationChanges: Record<string, QuotationChange> };
 
 /**
- * Drops `clientId`/`folderId` links to deleted records without touching the printed data. Server tombstones only
- * change the local copy (the authoritative revision arrives with the quotations pull); a local deletion
- * (`markDirty`) also queues editable drafts so the next PUT carries the unlink.
+ * Local deletion of a client or folder: editable drafts lose the `clientId`/`folderId` link (printed data untouched)
+ * and stay pending so the next PUT carries the unlink. Quotations that are not drafts are never edited here: the API
+ * accepts unknown ids and, when the deletion is published, unlinks them itself (the change arrives with the pull).
+ * Server tombstones (`deletedIds`) never call this: the API already unlinked its quotations in the same transaction.
  */
 export function dropQuotationLinks(
   state: LinkState,
   field: 'clientId' | 'folderId',
   ids: ReadonlySet<string>,
-  options: { markDirty?: { ownerId?: string } } = {},
+  ownerId: string | undefined,
 ): Partial<LinkState> {
-  if (!state.quotations.some((q) => q[field] && ids.has(q[field]!))) return {};
+  const affected = (q: QuotationRecord) => q.status === 'draft' && !!q[field] && ids.has(q[field]!);
+  if (!state.quotations.some(affected)) return {};
   let changes = state.quotationChanges;
   const quotations = state.quotations.map((q) => {
-    if (!q[field] || !ids.has(q[field]!)) return q;
+    if (!affected(q)) return q;
     const { [field]: _dropped, ...rest } = q;
-    if (options.markDirty && q.status === 'draft') {
-      const { rejected: _retry, ...kept } = changes[q.id] ?? {
-        revision: '', ownerId: options.markDirty.ownerId, baseVersion: q.baseVersion ?? q.version ?? 0,
-        ...(q.version ? { base: canonicalQuotationContent(q) } : {}),
-      };
-      changes = { ...changes, [q.id]: { ...kept, revision: crypto.randomUUID() } };
-    }
+    const { rejected: _retry, ...kept } = changes[q.id] ?? {
+      revision: '', ownerId, baseVersion: q.baseVersion ?? q.version ?? 0,
+      ...(q.version ? { base: canonicalQuotationContent(q) } : {}),
+    };
+    changes = { ...changes, [q.id]: { ...kept, revision: crypto.randomUUID() } };
     return rest as QuotationRecord;
   });
-  return changes === state.quotationChanges ? { quotations } : { quotations, quotationChanges: changes };
+  return { quotations, quotationChanges: changes };
 }

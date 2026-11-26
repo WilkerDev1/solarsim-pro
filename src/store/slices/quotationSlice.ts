@@ -184,7 +184,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
         quotationChanges: changes,
         quotationDeletionQueue: [
           ...state.quotationDeletionQueue.filter((c) => c.id !== id),
-          { id, ownerId: account()?.id, baseVersion: existing.version ?? 0 },
+          { id, ownerId: account()?.id, baseVersion: existing.version ?? 0, quotation: existing },
         ],
       });
       sync();
@@ -212,6 +212,28 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
     },
     resolveQuotationConflict: (id, resolution) => {
       const state = get(), change = state.quotationChanges[id], user = account();
+      const refused = state.quotationDeletionQueue.find((c) => c.id === id && c.rejected);
+      if (!change && refused) {
+        // Deletion rejected by the API (4xx): retry it, or discard it and keep the quotation.
+        if ((refused.ownerId && refused.ownerId !== user?.id) || (resolution === 'keep_local' && !writable())) return;
+        if (resolution === 'keep_local') {
+          const { rejected: _retry, ...command } = refused;
+          set({
+            quotations: state.quotations.filter((q) => q.id !== id),
+            quotationDeletionQueue: state.quotationDeletionQueue.map((c) => (c.id === id ? command : c)),
+            quotationSyncFeedback: null,
+          });
+        } else {
+          // The copy shown may be older than the server's: the next pull is a full one and brings it.
+          set({
+            quotationDeletionQueue: state.quotationDeletionQueue.filter((c) => c.id !== id),
+            quotationSyncCursor: null,
+            quotationSyncFeedback: null,
+          });
+        }
+        sync();
+        return;
+      }
       if (!(change?.serverQuotation || change?.serverDeleted || change?.rejected) || (change.ownerId && change.ownerId !== user?.id)) return;
       // Discarding local work is always allowed to its owner; keeping it requires write access.
       if (resolution === 'keep_local' && !writable()) return;
@@ -227,6 +249,21 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
       }
       if (change.serverQuotation) {
         const server = change.serverQuotation;
+        if (change.deletionConflict && resolution === 'keep_local') {
+          // A stale deletion kept: deleted again against the newest server version known.
+          delete changes[id];
+          set({
+            quotations: state.quotations.filter((q) => q.id !== id),
+            quotationChanges: changes,
+            quotationDeletionQueue: [
+              ...state.quotationDeletionQueue.filter((c) => c.id !== id),
+              { id, ownerId: user?.id, baseVersion: server.version, quotation: serverRecord(server, local) },
+            ],
+            quotationSyncFeedback: null,
+          });
+          sync();
+          return;
+        }
         if (resolution === 'accept_server') {
           delete changes[id];
           set({
@@ -297,7 +334,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
           let failures = 0;
           const patchChange = (id: string, patch: Partial<QuotationChange>, baseVersion = 0) =>
             set((s) => {
-              const { serverQuotation: _s, serverDeleted: _d, rejected: _r, ...kept } =
+              const { serverQuotation: _s, serverDeleted: _d, rejected: _r, deletionConflict: _c, ...kept } =
                 s.quotationChanges[id] ?? { revision: crypto.randomUUID(), ownerId: user.id, baseVersion };
               return { quotationChanges: { ...s.quotationChanges, [id]: { ...kept, ...patch } } };
             });
@@ -309,6 +346,11 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
           for (const command of [...get().quotationDeletionQueue]) {
             if (!current()) return SESSION_CHANGED;
             if (!own(command.ownerId)) continue;
+            if (command.rejected) {
+              // Rejected deletions wait for the user to retry or discard them: no retry loop.
+              failures++;
+              continue;
+            }
             const release = () => set((s) => ({ quotationDeletionQueue: s.quotationDeletionQueue.filter((c) => c.id !== command.id) }));
             // Never-published drafts are dropped without a request.
             if (deleted.has(command.id) || (!remote.has(command.id) && command.baseVersion === 0)) {
@@ -317,7 +359,8 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
             }
             const result = await QuotationSyncService.remove(transport, command.id, command.baseVersion);
             if (!current()) return SESSION_CHANGED;
-            if (result.ok || result.status === 404) {
+            // 404: it never existed; 409 without a record: it is already deleted (with another version).
+            if (result.ok || result.status === 404 || (result.status === 409 && !result.quotation)) {
               remote.delete(command.id);
               deleted.add(command.id);
               release();
@@ -325,13 +368,23 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
             }
             failures++;
             if (result.status === 409 && result.quotation) {
-              // A stale deletion is never applied blindly: the server record returns for review.
+              // A stale deletion is never applied blindly: the server record returns for review as a deletion conflict.
               const server = result.quotation;
               set((s) => ({
-                quotations: [...s.quotations.filter((q) => q.id !== command.id), serverRecord(server, undefined)],
+                quotations: [...s.quotations.filter((q) => q.id !== command.id), serverRecord(server, command.quotation)],
                 quotationDeletionQueue: s.quotationDeletionQueue.filter((c) => c.id !== command.id),
               }));
-              conflict(command.id, server, command.baseVersion);
+              patchChange(command.id, { serverQuotation: server, deletionConflict: true }, command.baseVersion);
+            } else if (result.status >= 400 && result.status < 500) {
+              // Not retried by itself (e.g. 403 after losing the role): the quotation is shown again with the error.
+              const shown = remote.get(command.id) ?? command.quotation;
+              set((s) => ({
+                quotations: shown && !s.quotations.some((q) => q.id === command.id)
+                  ? [...s.quotations, serverRecord(shown, command.quotation)]
+                  : s.quotations,
+                quotationDeletionQueue: s.quotationDeletionQueue.map((c) =>
+                  c.id === command.id ? { ...c, rejected: { status: result.status, error: result.error } } : c),
+              }));
             }
           }
 
@@ -339,6 +392,13 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
             if (!current()) return SESSION_CHANGED;
             const local = get().quotations.find((q) => q.id === id);
             if (!local) continue;
+            const newer = remote.get(id);
+            const waiting = !own(change.ownerId) || change.serverQuotation || change.rejected?.revision === change.revision;
+            if (waiting && !change.serverDeleted && newer && newer.version > (change.serverQuotation?.version ?? change.baseVersion)) {
+              // A newer server copy of a quotation that is not pushed in this pass is kept in its conflict, so the
+              // cursor can advance without losing it: `accept_server` always installs the newest copy known.
+              patchChange(id, { serverQuotation: newer, ...(change.deletionConflict ? { deletionConflict: true } : {}) }, change.baseVersion);
+            }
             if (!own(change.ownerId)) {
               // A teammate's retained change is never uploaded here, but a tombstone still protects it for its owner.
               if (deleted.has(id) && !change.serverDeleted) tombstone(id);
@@ -350,7 +410,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               failures++;
               continue;
             }
-            if (change.serverQuotation || change.serverDeleted || change.rejected?.revision === change.revision) {
+            if (waiting || change.serverDeleted) {
               // Unresolved conflicts and 4xx rejections wait for the user (or a new edit): no retry loop.
               failures++;
               continue;
@@ -424,7 +484,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
             const changes = reuseRecord(s.quotationChanges, Object.fromEntries(
               Object.entries(s.quotationChanges).filter(([id, c]) => !deleted.has(id) || (c.serverDeleted && s.quotations.some((q) => q.id === id))),
             ));
-            const hidden = new Set(s.quotationDeletionQueue.map((c) => c.id));
+            const hidden = new Set(s.quotationDeletionQueue.filter((c) => !c.rejected).map((c) => c.id));
             const known = new Map(s.quotations.map((q) => [q.id, q]));
             const install = (server: QuotationRecord) => reuseIfEqual(known.get(server.id), serverRecord(server, known.get(server.id)));
             // A full pull is the whole list; a partial one (`since`) only brings changes and tombstones.
@@ -434,12 +494,13 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
             const added = [...remote.values()].filter((q) => !known.has(q.id) && !changes[q.id] && !hidden.has(q.id)).map(install);
             const quotations = reuseArray(s.quotations, [...kept, ...added]);
             const unresolved = Object.values(changes).some((c) => (c.serverQuotation || c.serverDeleted || c.rejected?.revision === c.revision) && own(c.ownerId));
+            const refusedDeletions = s.quotationDeletionQueue.some((c) => c.rejected && own(c.ownerId));
             return {
               quotations,
               quotationChanges: changes,
               // The cursor is stored only with the download it describes, fully applied.
               ...(listed.serverTimestamp ? { quotationSyncCursor: { scope, serverTimestamp: listed.serverTimestamp } } : {}),
-              quotationSyncFeedback: failures || unresolved
+              quotationSyncFeedback: failures || unresolved || refusedDeletions
                 ? `${failures} cotización(es) pendientes: hay conflictos, rechazos del servidor o permisos distintos. Revisa y sincroniza.`
                 : null,
             };

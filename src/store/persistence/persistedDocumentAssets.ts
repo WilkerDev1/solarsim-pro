@@ -1,4 +1,4 @@
-import { SHA256_HEX, assetRef, isAssetCandidate, mapDocumentAssetFields, replaceAssetRefs } from '../../../shared/documentAssets';
+import { SHA256_HEX, assetRef, assetRefHash, isAssetCandidate, isAssetRef, mapDocumentAssetFields, replaceAssetRefs } from '../../../shared/documentAssets';
 import type { PersistCodec, TextStorage } from './deferredStorage';
 
 /**
@@ -18,6 +18,16 @@ export type DocumentAssetHasher = (text: string) => Promise<string | null>;
 
 const COMPANY_IMAGE_FIELDS = ['logoBase64', 'watermarkLogoBase64', 'signatureSealBase64'] as const;
 export const persistedAssetsKey = (name: string) => `${name}-assets`;
+
+/**
+ * Cotizaciones: `issuer.logo` y `attachments[].thumbnailDataUrl`. Una imagen en línea se guarda con su propio prefijo
+ * (`quotation-asset:sha256:`), no con `asset:sha256:`, porque en una cotización una referencia `asset:sha256:` es un
+ * dato del servidor que debe volver a publicarse tal cual: expandirla al hidratar la convertiría en una imagen en
+ * línea que la sincronización enviaría vacía. Por eso las claves de cotizaciones quedan fuera de la expansión general
+ * y solo se expande su prefijo propio.
+ */
+const QUOTATION_IMAGE_PREFIX = 'quotation-asset:sha256:';
+const QUOTATION_KEYS = ['quotations', 'quotationChanges', 'quotationDeletionQueue'] as const;
 
 const subtleSha256: DocumentAssetHasher = async (text) => {
   const subtle = globalThis.crypto?.subtle;
@@ -50,6 +60,15 @@ const withField = (value: unknown, field: string, map: (item: any) => any) => {
   const out = map(value[field]);
   return out === value[field] ? value : { ...value, [field]: out };
 };
+/** Copy of a quotation with each non-empty image passed through `map`; unchanged → same object. */
+const mapQuotationImages = (value: unknown, map: (text: string) => string): unknown => {
+  if (!isRecord(value)) return value;
+  const text = (item: unknown) => (typeof item === 'string' && item ? map(item) : item);
+  const issuer = withField(value.issuer, 'logo', text);
+  const attachments = mapArray(value.attachments, (attachment) => withField(attachment, 'thumbnailDataUrl', text));
+  if (issuer === value.issuer && attachments === value.attachments) return value;
+  return { ...value, ...(issuer !== value.issuer ? { issuer } : {}), ...(attachments !== value.attachments ? { attachments } : {}) };
+};
 
 export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHasher; onLearned?: () => void } = {}): PersistCodec & {
   settled: () => Promise<void>;
@@ -67,7 +86,7 @@ export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHas
   /** Hashes present in each name's side key, and those the value being written references. */
   const stored = new Map<string, Set<string>>();
   const writing = new Map<string, Set<string>>();
-  const caches = { project: new WeakMap<object, { out: unknown; hashes: string[] }>(), customization: new WeakMap<object, { out: unknown; hashes: string[] }>(), company: new WeakMap<object, { out: unknown; hashes: string[] }>() };
+  const caches = { project: new WeakMap<object, { out: unknown; hashes: string[] }>(), customization: new WeakMap<object, { out: unknown; hashes: string[] }>(), company: new WeakMap<object, { out: unknown; hashes: string[] }>(), quotation: new WeakMap<object, { out: unknown; hashes: string[] }>() };
 
   const runBatch = async () => {
     const texts = queue;
@@ -115,6 +134,12 @@ export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHas
     return out;
   };
   const project = (value: unknown, pass: Pass) => cached(caches.project, value, pass, (inner) => mapDocumentAssetFields(value, (text) => image(text, inner)));
+  /** Inline images of a quotation get the quotation prefix; server references (`asset:sha256:`) stay as they are. */
+  const quotation = (value: unknown, pass: Pass) => cached(caches.quotation, value, pass, (inner) => mapQuotationImages(value, (text) => {
+    if (isAssetRef(text)) return text;
+    const out = image(text, inner);
+    return isAssetRef(out) ? QUOTATION_IMAGE_PREFIX + assetRefHash(out) : out;
+  }));
   const customization = (value: unknown, pass: Pass) =>
     cached(caches.customization, value, pass, (inner) => mapDocumentAssetFields({ customization: value }, (text) => image(text, inner)).customization);
   const company = (value: unknown, pass: Pass) => cached(caches.company, value, pass, (inner) => {
@@ -137,6 +162,8 @@ export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHas
       defaultDocumentCustomization: (value) => customization(value, pass),
       documentTemplatesByCompany: (value) => mapRecord(value, (item) => customization(item, pass)),
       companies: (value) => mapArray(value, (item) => company(item, pass)),
+      quotations: (value) => mapArray(value, (item) => quotation(item, pass)),
+      quotationDeletionQueue: (value) => mapArray(value, (command) => withField(command, 'quotation', (data) => quotation(data, pass))),
     };
     let next: Rec | null = null;
     for (const [key, collapse] of Object.entries(fields)) {
@@ -150,6 +177,29 @@ export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHas
     const top = workspace(state, pass);
     const archives = mapRecord(state.organizationWorkspaces, (archive) => isRecord(archive) ? workspace(archive, pass) : archive);
     return archives === state.organizationWorkspaces ? top : { ...top, organizationWorkspaces: archives };
+  };
+
+  /** Expands one workspace: proposals and company images through every `asset:sha256:`, quotations only by their prefix. */
+  const expandWorkspace = (workspace: Rec): Rec => {
+    const held: Rec = {};
+    const rest: Rec = { ...workspace };
+    for (const key of QUOTATION_KEYS) if (key in rest) { held[key] = rest[key]; delete rest[key]; }
+    const expanded = replaceAssetRefs(rest, (sha) => contentOf.get(sha));
+    if (!Object.keys(held).length) return expanded === rest ? workspace : expanded;
+    // A missing side-key entry (never written by this codec) reads as no image, never as an invalid value.
+    const restore = (value: unknown) => mapQuotationImages(value, (text) =>
+      text.startsWith(QUOTATION_IMAGE_PREFIX) ? contentOf.get(text.slice(QUOTATION_IMAGE_PREFIX.length)) ?? '' : text);
+    if (held.quotations !== undefined) held.quotations = mapArray(held.quotations, restore);
+    if (held.quotationDeletionQueue !== undefined)
+      held.quotationDeletionQueue = mapArray(held.quotationDeletionQueue, (command) => withField(command, 'quotation', restore));
+    return { ...expanded, ...held };
+  };
+  const expandState = (state: Rec): Rec => {
+    const { organizationWorkspaces, ...top } = state;
+    const expanded = expandWorkspace(top);
+    if (organizationWorkspaces === undefined) return expanded;
+    const archives = mapRecord(organizationWorkspaces, (archive) => (isRecord(archive) ? expandWorkspace(archive) : archive));
+    return { ...expanded, organizationWorkspaces: archives };
   };
 
   /** Valid entries of the side key; a corrupt or missing key reads as empty. */
@@ -223,7 +273,7 @@ export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHas
         hashOf.set(content, sha);
       }
       stored.set(name, new Set(Object.keys(entries)));
-      const expanded = replaceAssetRefs(state, (sha) => contentOf.get(sha));
+      const expanded = isRecord(state) ? expandState(state) : replaceAssetRefs(state, (sha) => contentOf.get(sha));
       // Warms the collapsed cache and starts hashing images still inline (data saved before this format).
       if (isRecord(expanded)) collapseState(expanded, { used: new Set(), pending: false });
       return expanded;

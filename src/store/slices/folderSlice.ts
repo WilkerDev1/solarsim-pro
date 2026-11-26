@@ -198,10 +198,13 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
             : p,
         ),
         saveFeedbackMessage: "Carpeta eliminada; los proyectos se conservan.",
-        // Quotations keep their content and lose only the link.
-        ...dropQuotationLinks(state, "folderId", new Set([id]), {
-          markDirty: { ownerId: state.syncSettings.currentUser?.id },
-        }),
+        // Draft quotations lose only the link; the others keep it (see dropQuotationLinks).
+        ...dropQuotationLinks(
+          state,
+          "folderId",
+          new Set([id]),
+          state.syncSettings.currentUser?.id,
+        ),
       });
       sync();
     },
@@ -465,8 +468,6 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
                   : null,
             };
           });
-          // Server tombstones drop quotation links locally; the quotations pull brings the authoritative revision.
-          set((s) => dropQuotationLinks(s, "folderId", deleted));
           return {
             success: failures === 0,
             message: failures

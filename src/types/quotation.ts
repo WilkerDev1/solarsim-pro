@@ -31,6 +31,8 @@ export interface QuotationChange {
   serverQuotation?: QuotationRecord;
   /** Otro miembro la borró mientras este equipo tenía cambios sin publicar; la copia local se conserva para revisarla. */
   serverDeleted?: boolean;
+  /** The conflict comes from a stale deletion (409 with a newer record): `keep_local` deletes it again. */
+  deletionConflict?: boolean;
   rejected?: QuotationRejection;
 }
 
@@ -38,6 +40,10 @@ export interface QuotationDeletionCommand {
   id: string;
   ownerId?: string;
   baseVersion: number;
+  /** Local copy at deletion time, shown again if the API rejects the deletion. */
+  quotation?: QuotationRecord;
+  /** 4xx other than 404/409: not retried until the user retries (`keep_local`) or discards it (`accept_server`). */
+  rejected?: { status: number; error: string };
 }
 
 /** Cursor de la descarga incremental (`GET /api/quotations?since=`) del espacio de trabajo `scope`. */

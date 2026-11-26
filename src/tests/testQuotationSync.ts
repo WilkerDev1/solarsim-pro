@@ -7,18 +7,20 @@ import { isAssetRef } from '../../shared/documentAssets';
 import { contentEqual } from '../store/sync/projectDifferences';
 import type { QuotationContent, QuotationLine, QuotationRecord } from '../types/quotation';
 
-// ── Synthetic API that follows the quotations HTTP contract (no network) ──
+// ── Synthetic API aligned with server/src/modules/quotations.ts (no network) ──
 const serverUrl = 'https://quotations-sync.invalid';
 const user = { id: 'owner', name: 'QA', email: 'qa@example.invalid', role: 'EDITOR' as const, organizationId: 'qa-org' };
 let clock = Date.parse('2026-11-01T00:00:00.000Z');
 const tick = () => new Date(++clock).toISOString();
 type Row = { record: QuotationRecord; changedAt: string };
+/** Live rows; deleted ones keep their row (`deleted_at`) with the version bumped by the deletion. */
 let rows = new Map<string, Row>();
-let tombstones = new Map<string, string>();
+let tombstones = new Map<string, { changedAt: string; version: number }>();
 let sequences = new Map<number, number>();
 let online = true;
 let dropResponseFor: string | null = null;
 let holdList: Promise<void> | null = null;
+let forbidDelete = false;
 const invalidClients = new Set<string>();
 const invalidFolders = new Set<string>();
 const calls: string[] = [];
@@ -28,24 +30,27 @@ const hasInlineImage = (c: QuotationContent) =>
   (!!c.issuer?.logo && !isAssetRef(c.issuer.logo)) || (c.attachments ?? []).some((a) => !!a.thumbnailDataUrl && !isAssetRef(a.thumbnailDataUrl));
 
 const reset = () => {
-  rows = new Map(); tombstones = new Map(); sequences = new Map(); calls.length = 0; dropResponseFor = null; holdList = null; online = true;
+  rows = new Map(); tombstones = new Map(); sequences = new Map(); calls.length = 0; dropResponseFor = null; holdList = null; online = true; forbidDelete = false;
+  invalidClients.clear(); invalidFolders.clear();
 };
 const serverPut = (id: string, baseVersion: number, raw: QuotationContent): Response => {
   const current = rows.get(id)?.record;
-  // Same order of checks as the API: validation → inline images → version/tombstone → transition → lock → client.
+  // Same order of checks as the API: validation 400 → inline images → version/deleted id 409 → initial status and
+  // transition → lock → client → folder.
   const validated = validateQuotationContent(raw);
   if (!validated.ok) return json({ error: validated.error }, 400);
-  if (!current && !['draft', 'issued'].includes(validated.value.status))
-    return json({ error: 'Una cotización nueva es borrador o emitida', code: 'invalid_transition' }, 400);
-  if (hasInlineImage(raw)) return json({ error: 'Imágenes en línea no admitidas', code: 'inline_image_not_allowed' }, 400);
-  if (tombstones.has(id)) return json({ error: 'Cotización eliminada', quotation: null }, 409);
-  if ((current?.version ?? 0) !== baseVersion) return json({ error: 'Conflicto de versión', quotation: current ?? null }, 409);
   const content = validated.value;
+  if (hasInlineImage(content)) return json({ error: 'Imágenes en línea no admitidas', code: 'inline_image_not_allowed' }, 400);
+  if (tombstones.has(id) || (current?.version ?? 0) !== baseVersion)
+    return json({ error: 'La cotización cambió', quotation: tombstones.has(id) ? null : current ?? null }, 409);
+  if (!current && content.status !== 'draft' && content.status !== 'issued')
+    return json({ error: 'Una cotización nueva es borrador o emitida', code: 'invalid_transition' }, 400);
   if (current && content.status !== current.status && !canTransitionQuotation(current.status, content.status))
     return json({ error: 'Transición no permitida', code: 'invalid_transition' }, 400);
   if (current && current.status !== 'draft') {
+    // Locked content is compared without the status: the same status with identical content is accepted.
     const stored = validateQuotationContent(current);
-    if (content.status === current.status || !stored.ok || !contentEqual(strip(content), strip(stored.value)))
+    if (!stored.ok || !contentEqual(strip(content), strip(stored.value)))
       return json({ error: 'La cotización está bloqueada', code: 'quotation_locked' }, 400);
   }
   if (content.clientId && invalidClients.has(content.clientId))
@@ -75,7 +80,16 @@ const teammateWrite = (id: string, edit: (q: QuotationRecord) => Partial<Quotati
   const record = { ...row.record, ...edit(row.record), version: row.record.version + 1, baseVersion: row.record.version + 1, updatedAt: changedAt };
   rows.set(id, { record, changedAt });
 };
-const teammateDelete = (id: string) => { rows.delete(id); tombstones.set(id, tick()); };
+/** Soft delete: the row stays deleted with its version bumped. */
+const teammateDelete = (id: string) => {
+  const version = rows.get(id)!.record.version + 1;
+  rows.delete(id);
+  tombstones.set(id, { changedAt: tick(), version });
+};
+/** Cascade of a client/folder deletion (`unlinkQuotations`): drops the link and bumps the version of live quotations. */
+const serverUnlink = (field: 'clientId' | 'folderId', linked: string) => {
+  for (const [id, row] of rows) if (row.record[field] === linked) teammateWrite(id, (q) => { const { [field]: _gone, ...rest } = q; return { ...rest, [field]: undefined }; });
+};
 
 QuotationSyncService.setTransportFactory((url, token) => async (path, init = {}) => {
   assert.equal(url, serverUrl, 'Only the session server');
@@ -87,17 +101,18 @@ QuotationSyncService.setTransportFactory((url, token) => async (path, init = {})
     const since = new URLSearchParams(path.replace(/^\?/, '')).get('since');
     const serverTimestamp = tick();
     const quotations = [...rows.values()].filter((r) => !since || r.changedAt > since).map((r) => structuredClone(r.record));
-    const deletedIds = [...tombstones.entries()].filter(([, at]) => !since || at > since).map(([id]) => id);
+    const deletedIds = [...tombstones.entries()].filter(([, t]) => !since || t.changedAt > since).map(([id]) => id);
     if (holdList) await holdList;
     return json({ success: true, quotations, deletedIds, serverTimestamp });
   }
   const id = decodeURIComponent(path.slice(1).split('?')[0]);
   if (method === 'DELETE') {
+    if (forbidDelete) return json({ error: 'Permisos insuficientes' }, 403);
     const baseVersion = Number(new URLSearchParams(path.split('?')[1]).get('baseVersion'));
-    const current = rows.get(id)?.record;
-    if (!current) return json({ error: 'No encontrada' }, 404);
-    if (current.version !== baseVersion) return json({ error: 'Conflicto', quotation: current }, 409);
-    teammateDelete(id);
+    const current = rows.get(id)?.record, tombstone = tombstones.get(id);
+    if (!current && !tombstone) return json({ error: 'Cotización no encontrada' }, 404);
+    if ((current?.version ?? tombstone!.version) !== baseVersion) return json({ error: 'La cotización cambió', quotation: current ?? null }, 409);
+    if (current) teammateDelete(id);
     return json({ success: true });
   }
   const body = JSON.parse(String(init.body));
@@ -415,21 +430,25 @@ try {
   assert.equal((await sync()).success, true);
   assert.equal(find(mine.quotation.id).notes, 'Llega tarde');
 
-  // 11. Client and folder tombstones drop only the links (printed client data stays).
+  // 11. Client and folder tombstones from the server: the API already unlinked its quotations (cascade, version
+  // bumped), so the local copy is not touched and the quotations pull installs the server revision.
   begin();
-  const linked = api().createQuotationRecord({ client: printed });
-  assert.ok(linked.ok);
+  const issuedLinked = api().createQuotationRecord({ client: printed, items: [line('l1')] });
+  assert.ok(issuedLinked.ok);
   store.setState((s) => ({
     clients: [{ id: 'client-gone', name: 'Se borra', kind: 'persona', taxId: '', phone: '', email: '', address: '', province: '', notes: '', createdAt: '2026-11-01', version: 1, baseVersion: 1 }],
     clientChanges: {}, clientDeletionQueue: [],
     folders: [{ id: 'folder-gone', name: 'Se borra', color: '#10b981', createdAt: '2026-11-01', version: 1, baseVersion: 1 } as never],
     folderChanges: {}, folderDeletionQueue: [],
-    quotations: s.quotations.map((q) => (q.id === linked.quotation.id ? { ...q, clientId: 'client-gone', folderId: 'folder-gone' } : q)),
+    quotations: s.quotations.map((q) => (q.id === issuedLinked.quotation.id ? { ...q, clientId: 'client-gone', folderId: 'folder-gone' } : q)),
   }));
+  assert.ok(api().setQuotationStatus(issuedLinked.quotation.id, 'issued').ok);
+  assert.equal((await sync()).success, true);
+  serverUnlink('clientId', 'client-gone');
+  serverUnlink('folderId', 'folder-gone');
+  const beforeTombstones = find(issuedLinked.quotation.id);
   ClientSyncService.setTransportFactory(() => async () => json({ success: true, clients: [], deletedIds: ['client-gone'] }));
   assert.equal((await api().syncClientsWithServer()).success, true);
-  assert.equal(find(linked.quotation.id).clientId, undefined);
-  assert.deepEqual(find(linked.quotation.id).client, printed);
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input) => {
     assert.ok(new URL(String(input)).pathname.endsWith('/api/folders'));
@@ -440,7 +459,127 @@ try {
   } finally {
     globalThis.fetch = originalFetch;
   }
-  assert.equal(find(linked.quotation.id).folderId, undefined);
+  assert.equal(find(issuedLinked.quotation.id), beforeTombstones, 'Tombstones never leave a local copy diverging from its server revision');
+  assert.equal((await sync()).success, true);
+  assert.equal(find(issuedLinked.quotation.id).clientId, undefined);
+  assert.equal(find(issuedLinked.quotation.id).folderId, undefined);
+  assert.deepEqual(find(issuedLinked.quotation.id).client, printed, 'The printed client stays');
+  assert.equal(find(issuedLinked.quotation.id).version, rows.get(issuedLinked.quotation.id)!.record.version);
+  assert.ok(api().setQuotationStatus(issuedLinked.quotation.id, 'accepted').ok);
+  assert.equal((await sync()).success, true, 'A later status change is published without quotation_locked');
+  assert.equal(rows.get(issuedLinked.quotation.id)!.record.status, 'accepted');
+
+  // C. A local deletion of an unpublished folder or client never edits a locked quotation; drafts lose the link and stay pending.
+  const localFolder = api().createFolder('Carpeta sin publicar')!;
+  const localClient = api().createClientRecord({ name: 'Cliente sin publicar' });
+  assert.ok(localClient.ok);
+  const issuedInFolder = api().createQuotationRecord({ client: printed, items: [line('l1')], folderId: localFolder.id, clientId: localClient.client.id });
+  const draftInFolder = api().createQuotationRecord({ client: printed, folderId: localFolder.id, clientId: localClient.client.id });
+  assert.ok(issuedInFolder.ok && draftInFolder.ok);
+  assert.ok(api().setQuotationStatus(issuedInFolder.quotation.id, 'issued').ok);
+  assert.equal((await sync()).success, true, 'Unknown folder and client ids are accepted by the API');
+  api().deleteFolder(localFolder.id);
+  assert.equal(api().deleteClientRecord(localClient.client.id), true);
+  assert.equal(find(issuedInFolder.quotation.id).folderId, localFolder.id, 'The issued quotation keeps its link');
+  assert.equal(find(issuedInFolder.quotation.id).clientId, localClient.client.id);
+  assert.equal(api().quotationChanges[issuedInFolder.quotation.id], undefined);
+  assert.equal(find(draftInFolder.quotation.id).folderId, undefined, 'Drafts lose the link');
+  assert.equal(find(draftInFolder.quotation.id).clientId, undefined);
+  assert.ok(api().quotationChanges[draftInFolder.quotation.id], 'and stay pending');
+  assert.ok(api().setQuotationStatus(issuedInFolder.quotation.id, 'accepted').ok);
+  assert.equal((await sync()).success, true);
+  assert.equal(api().quotationChanges[issuedInFolder.quotation.id], undefined);
+  assert.equal(rows.get(issuedInFolder.quotation.id)!.record.status, 'accepted');
+  assert.equal(rows.get(draftInFolder.quotation.id)!.record.folderId, undefined);
+
+  // A. accept_server installs the newest server copy known, also when it arrives with `since` during the conflict.
+  const raced = api().createQuotationRecord({ client: printed, notes: 'v1' });
+  assert.ok(raced.ok);
+  await sync();
+  teammateWrite(raced.quotation.id, () => ({ notes: 'v2 del compañero' }));
+  assert.ok(api().updateQuotationRecord(raced.quotation.id, { notes: 'Edición local' }).ok);
+  assert.equal((await sync()).success, false);
+  assert.equal(api().quotationChanges[raced.quotation.id].serverQuotation?.notes, 'v2 del compañero');
+  teammateWrite(raced.quotation.id, () => ({ notes: 'v3 del compañero' }));
+  const cursorBefore = api().quotationSyncCursor!.serverTimestamp;
+  assert.equal((await sync()).success, false);
+  assert.notEqual(api().quotationSyncCursor!.serverTimestamp, cursorBefore, 'The cursor advances');
+  assert.equal(api().quotationChanges[raced.quotation.id].serverQuotation?.notes, 'v3 del compañero', 'The conflict keeps the newest server copy');
+  api().resolveQuotationConflict(raced.quotation.id, 'accept_server');
+  assert.equal(find(raced.quotation.id).notes, 'v3 del compañero');
+  assert.equal(find(raced.quotation.id).version, rows.get(raced.quotation.id)!.record.version);
+  assert.equal((await sync()).success, true);
+  assert.equal(find(raced.quotation.id).notes, 'v3 del compañero');
+  // A tombstone that arrives during a version conflict turns it into a deletion conflict.
+  teammateWrite(raced.quotation.id, () => ({ notes: 'v4' }));
+  api().updateQuotationRecord(raced.quotation.id, { notes: 'Otra edición' });
+  await sync();
+  assert.ok(api().quotationChanges[raced.quotation.id].serverQuotation);
+  teammateDelete(raced.quotation.id);
+  await sync();
+  assert.equal(api().quotationChanges[raced.quotation.id].serverDeleted, true);
+  assert.equal(api().quotationChanges[raced.quotation.id].serverQuotation, undefined);
+
+  // B. Deleting a quotation already deleted on the server (409 quotation: null) releases the command.
+  api().deleteQuotationRecord(raced.quotation.id);
+  assert.equal(api().quotationChanges[raced.quotation.id], undefined);
+  calls.length = 0;
+  assert.equal((await sync()).success, true);
+  assert.ok(calls.some((c) => c.startsWith(`DELETE /${encodeURIComponent(raced.quotation.id)}?`)), JSON.stringify(calls));
+  assert.deepEqual(api().quotationDeletionQueue, []);
+  assert.equal(api().quotationSyncFeedback, null);
+  assert.ok(!api().quotations.some((q) => q.id === raced.quotation.id));
+
+  // D. A stale deletion (409 with a newer record) is a deletion conflict: keep_local deletes with the server version.
+  const stale = api().createQuotationRecord({ client: printed });
+  const stale2 = api().createQuotationRecord({ client: printed });
+  assert.ok(stale.ok && stale2.ok);
+  await sync();
+  teammateWrite(stale.quotation.id, () => ({ notes: 'Más nueva' }));
+  teammateWrite(stale2.quotation.id, () => ({ notes: 'Más nueva 2' }));
+  api().deleteQuotationRecord(stale.quotation.id);
+  api().deleteQuotationRecord(stale2.quotation.id);
+  assert.equal((await sync()).success, false);
+  assert.equal(api().quotationChanges[stale.quotation.id].deletionConflict, true);
+  assert.equal(find(stale.quotation.id).notes, 'Más nueva');
+  api().resolveQuotationConflict(stale.quotation.id, 'keep_local');
+  assert.ok(!api().quotations.some((q) => q.id === stale.quotation.id));
+  assert.equal(api().quotationDeletionQueue.find((c) => c.id === stale.quotation.id)?.baseVersion, 2);
+  api().resolveQuotationConflict(stale2.quotation.id, 'accept_server');
+  assert.equal(find(stale2.quotation.id).notes, 'Más nueva 2');
+  assert.equal(api().quotationChanges[stale2.quotation.id], undefined);
+  assert.equal((await sync()).success, true);
+  assert.ok(tombstones.has(stale.quotation.id) && !rows.has(stale.quotation.id));
+  assert.ok(rows.has(stale2.quotation.id));
+  assert.deepEqual(api().quotationDeletionQueue, []);
+
+  // F. Another 4xx on DELETE (403 after losing the role) is a rejected command: not retried, the quotation is visible again.
+  forbidDelete = true;
+  api().deleteQuotationRecord(stale2.quotation.id);
+  const forbidden = api().createQuotationRecord({ client: printed });
+  assert.ok(forbidden.ok);
+  await sync();
+  api().deleteQuotationRecord(forbidden.quotation.id);
+  assert.equal((await sync()).success, false);
+  const rejectedDeletion = api().quotationDeletionQueue.find((c) => c.id === stale2.quotation.id);
+  assert.equal(rejectedDeletion?.rejected?.status, 403);
+  assert.ok(api().quotations.some((q) => q.id === stale2.quotation.id), 'The quotation is visible again');
+  assert.ok(api().quotations.some((q) => q.id === forbidden.quotation.id));
+  calls.length = 0;
+  assert.equal((await sync()).success, false);
+  assert.deepEqual(calls.filter((c) => c.startsWith('DELETE')), [], 'Not retried by itself');
+  assert.match(api().quotationSyncFeedback!, /cotizaci/i);
+  forbidDelete = false;
+  api().resolveQuotationConflict(stale2.quotation.id, 'keep_local');
+  assert.ok(!api().quotations.some((q) => q.id === stale2.quotation.id), 'Retrying hides it again');
+  api().resolveQuotationConflict(forbidden.quotation.id, 'accept_server');
+  assert.ok(api().quotations.some((q) => q.id === forbidden.quotation.id), 'Discarding the deletion keeps the quotation');
+  assert.equal((await sync()).success, true);
+  assert.ok(tombstones.has(stale2.quotation.id));
+  assert.ok(rows.has(forbidden.quotation.id));
+  assert.ok(api().quotations.some((q) => q.id === forbidden.quotation.id));
+  assert.deepEqual(api().quotationDeletionQueue, []);
+  assert.equal(api().quotationSyncFeedback, null);
 
   // 12. Project sync runs quotations right after clients; a quotation failure does not block proposals.
   const order: string[] = [];
