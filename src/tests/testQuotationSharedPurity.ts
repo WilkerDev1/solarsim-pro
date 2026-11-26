@@ -32,6 +32,12 @@ for (const file of files) {
   assert(!CLOCK_OR_RANDOM.test(source), `${file}: shared/quotations no lee relojes ni genera ids`);
 }
 
+// Las etiquetas de la hoja derivan el porcentaje de ITBIS de ITBIS_RATE: ni 18 ni 0.18 escritos a mano.
+assert(files.includes('sheetTexts.ts'), 'falta shared/quotations/sheetTexts.ts');
+const sheetTexts = readFileSync(path.join(dir, 'sheetTexts.ts'), 'utf8');
+assert(!/(?<![\d.])18(?![\d])/.test(sheetTexts), 'sheetTexts.ts: el porcentaje de ITBIS sale de ITBIS_RATE, no de un 18 escrito a mano');
+assert(sheetTexts.includes('ITBIS_RATE'), 'sheetTexts.ts deriva el porcentaje de ITBIS_RATE');
+
 // el detector funciona
 assert.deepEqual(importSpecifiers(`import { a } from '../x.js';\nexport * from "./y.js";\nimport type { T } from 'node:fs';\nimport('z')`), ['../x.js', './y.js', 'node:fs', 'z']);
 

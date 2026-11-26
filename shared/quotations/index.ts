@@ -9,4 +9,7 @@ export { computeQuotationTotals, type QuotationLineTotals, type QuotationTotals 
 export { QUOTATION_STATUS_LABELS, canTransitionQuotation, effectiveQuotationStatus, isQuotationContentLocked } from './status.js';
 export { QUOTATION_NUMBER_PREFIX, formatQuotationNumber, parseQuotationNumber, quotationNumberYear } from './numbering.js';
 export { QUOTATION_LIMITS, isIsoDate, validateQuotationContent, type QuotationValidation } from './validation.js';
+export {
+  QUOTATION_SHEET_TEXTS, currencySymbol, formatExchangeRate, formatQuantity, formatSheetDate, itbisPercentLabel, sheetCurrencyLabel, sheetPageLabel,
+} from './sheetTexts.js';
 export { quotationFromProposal, type ProposalQuotationSource, type QuotationFromProposalOptions } from './fromProposal.js';
