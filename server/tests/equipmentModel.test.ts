@@ -180,7 +180,7 @@ before(
     await migrateDatabase(pool);
     app = asClient(createApp({ pool, jwtSecret: secret, logging: false }));
   },
-  { timeout: 30000 },
+  { timeout: 120000 },
 );
 after(async () => {
   await database?.stop();

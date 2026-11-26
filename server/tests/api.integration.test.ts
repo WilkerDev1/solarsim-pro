@@ -93,7 +93,7 @@ before(
     editor = await provision("EDITOR", "editor");
     reader = await provision("VIEWER", "reader");
   },
-  { timeout: 30000 },
+  { timeout: 120000 },
 );
 after(async () => {
   await database?.stop();

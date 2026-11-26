@@ -9,6 +9,7 @@ import { projectCreatedAtBackfill } from "./007_project_created_at.js";
 import { agentAccess } from "./008_agent_access.js";
 import { documentAssets } from "./009_document_assets.js";
 import { equipmentPriceObservations } from "./010_equipment_price_observations.js";
+import { quotations } from "./011_quotations.js";
 /** Additive, recorded migrations, guarded by a cross-process transaction lock. */
 export async function migrateDatabase(pool: Pool): Promise<void> {
   const client = await pool.connect();
@@ -50,6 +51,7 @@ export async function migrateDatabase(pool: Pool): Promise<void> {
         name: "equipment_price_observations",
         run: equipmentPriceObservations,
       },
+      { version: 11, name: "quotations", run: quotations },
     ]) {
       if (applied.has(migration.version)) continue;
       await migration.run(client);
