@@ -18,6 +18,7 @@ import { QuotationPreview } from './QuotationPreview';
 import { quotationSaveStatus } from './saveStatus';
 import '../../clients/client-link.css';
 import './quotation-editor.css';
+import './source-proposal.css';
 
 /**
  * Editor de una cotización (docs/QUOTATION_EDITOR.md): formulario a la izquierda y la hoja real a la derecha. No hay
@@ -47,19 +48,22 @@ const LOCK_REASONS: Record<QuotationStatus, string> = {
 
 const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }) => {
   const {
-    change, sidebarTheme, currentUser, online, clients, catalog, defaults, seal, setQuotationStatus, closeQuotation,
+    change, sidebarTheme, currentUser, online, clients, projects, folders, catalog, defaults, seal, setQuotationStatus, closeQuotation, setActiveProject,
   } = useSimulationStore(useShallow((s) => ({
     change: s.quotationChanges[quotation.id],
     sidebarTheme: s.sidebarTheme,
     currentUser: s.syncSettings.currentUser,
     online: !!s.syncSettings.currentUser && !!s.syncSettings.authToken,
     clients: s.clients,
+    projects: s.projects,
+    folders: s.folders,
     catalog: s.equipmentCatalog,
     defaults: s.defaultSimulationSettings,
     // El sello es el del membrete que emitió la cotización, nunca el de otra empresa (el activo puede ser otro).
     seal: stampForIssuer(s.companies, quotation.issuer),
     setQuotationStatus: s.setQuotationStatus,
     closeQuotation: s.closeQuotation,
+    setActiveProject: s.setActiveProject,
   })));
   const [statusError, setStatusError] = useState<string | null>(null);
   const [pane, setPane] = useState<'form' | 'preview'>('form');
@@ -133,7 +137,16 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
           )}
           <DocumentSection content={content} readOnly={readOnly} edit={edit} number={quotation.number} />
           <IssuerSection content={content} readOnly={readOnly} refresh={() => actions.refreshIssuer(newDocumentCompany(useSimulationStore.getState()))} />
-          <ClientSection content={content} readOnly={readOnly} edit={edit} clients={clients} chooseClient={actions.chooseClient} />
+          <ClientSection
+            content={content}
+            readOnly={readOnly}
+            edit={edit}
+            clients={clients}
+            chooseClient={actions.chooseClient}
+            projects={projects}
+            folders={folders}
+            onOpenProposal={(projectId) => setActiveProject(projectId, 'project-hub')}
+          />
           <ItemsSection content={content} readOnly={readOnly} edit={edit} catalog={catalog} catalogContext={catalogContext} />
           <DiscountsSection content={content} readOnly={readOnly} edit={edit} />
           <NotesSection content={content} readOnly={readOnly} edit={edit} />

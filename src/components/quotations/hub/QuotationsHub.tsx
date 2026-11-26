@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { canWrite } from '../../../../shared/permissions';
 import type { QuotationCurrency } from '../../../../shared/quotations';
@@ -12,6 +12,8 @@ import {
 } from '../../../utils/quotationSummary';
 import type { QuotationRecord } from '../../../types/quotation';
 import { confirmAction } from '../../common/confirmAction';
+import { ConvertProposalDialog } from '../convert/ConvertProposalDialog';
+import { NewQuotationMenu } from './NewQuotationMenu';
 import { QuotationDetailDock } from './QuotationDetailDock';
 import { QuotationsKpis } from './QuotationsKpis';
 import { QuotationsList } from './QuotationsList';
@@ -37,6 +39,7 @@ export function QuotationsHub() {
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
   const [headerMessage, setHeaderMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   const today = localIsoDate();
   const user = syncSettings.currentUser;
@@ -152,11 +155,8 @@ export function QuotationsHub() {
                 {syncing ? 'Sincronizando…' : 'Sincronizar'}
               </button>
             )}
-            {!readOnly && (
-              <button type="button" className="qh-btn qh-btn-primary qh-btn-lg" onClick={create}>
-                <Plus className="h-4 w-4" aria-hidden="true" />Nueva cotización
-              </button>
-            )}
+            {!readOnly && <NewQuotationMenu onBlank={create} onFromProposal={() => { setHeaderMessage(null); setConverting(true); }} />}
+            {converting && <ConvertProposalDialog onClose={() => setConverting(false)} />}
           </div>
         </header>
         {user && quotationSyncFeedback && <p className="qh-notice qh-notice-error" role="alert">{quotationSyncFeedback}</p>}

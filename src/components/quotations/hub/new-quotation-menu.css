@@ -1,0 +1,54 @@
+/* Menú «Nueva cotización» del catálogo (tokens --qh-* de quotations-hub.css). */
+.qh-new {
+  position: relative;
+}
+.qh-new-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  width: 300px;
+  padding: 6px;
+  border: 1px solid var(--qh-border);
+  border-radius: 10px;
+  background: var(--qh-panel);
+  box-shadow: 0 12px 32px rgb(15 23 42 / 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qh-new-menu button {
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--qh-text);
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.qh-new-menu button:hover,
+.qh-new-menu button:focus-visible {
+  background: var(--qh-selected);
+}
+.qh-new-menu button > svg {
+  margin-top: 2px;
+  flex-shrink: 0;
+  color: var(--qh-green);
+}
+.qh-new-menu span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qh-new-menu strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.qh-new-menu small {
+  font-size: 12px;
+  color: var(--qh-muted);
+}

@@ -1,0 +1,310 @@
+/* «Crear cotización desde una propuesta»: mismo mundo Operate que el catálogo de cotizaciones (roles --qh-*). */
+.qconv {
+  --qc-panel: #fff;
+  --qc-border: #dce2e8;
+  --qc-divider: #eef1f4;
+  --qc-text: #182230;
+  --qc-muted: #536174;
+  --qc-radio: #8e99a8;
+  --qc-selected: #f3faf7;
+  --qc-green: #067451;
+  --qc-action: #087b58;
+  --qc-action-hover: #066344;
+  --qc-error: #ad2435;
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--qc-panel);
+  color: var(--qc-text);
+  font-family: Inter, sans-serif;
+  font-size: 14px;
+  box-shadow: 0 24px 64px rgb(15 23 42 / 0.28);
+  flex-direction: column;
+  overflow: hidden;
+}
+.qconv[open] {
+  display: flex;
+}
+.qconv[data-theme="dark"] {
+  --qc-panel: #1c1f23;
+  --qc-border: #363b43;
+  --qc-divider: #2b3036;
+  --qc-text: #f1f3f5;
+  --qc-muted: #abb4c0;
+  --qc-radio: #7d8794;
+  --qc-selected: #123d30;
+  --qc-green: #6be0b5;
+  --qc-error: #ffc0c9;
+  color-scheme: dark;
+}
+.qconv::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+.qconv * {
+  box-sizing: border-box;
+}
+.qconv :is(button, input) {
+  font: inherit;
+}
+.qconv :focus-visible {
+  outline: 2px solid var(--qc-green);
+  outline-offset: 2px;
+}
+.qconv .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.qconv :is(h2, p) {
+  margin: 0;
+}
+
+.qconv-head {
+  padding: 20px 24px 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--qc-border);
+}
+.qconv-head h2 {
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.qconv-head p {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--qc-muted);
+}
+.qconv-close {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--qc-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.qconv-close:hover {
+  background: var(--qc-selected);
+  color: var(--qc-text);
+}
+
+.qconv-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.qconv-step {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.qconv-step-title {
+  padding: 0;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--qc-muted);
+}
+.qconv-search {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--qc-border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--qc-muted);
+}
+.qconv-search:focus-within {
+  border-color: var(--qc-green);
+}
+.qconv-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--qc-text);
+  font-size: 13.5px;
+}
+.qconv-list {
+  max-height: 248px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px;
+}
+.qconv-option {
+  padding: 10px 12px;
+  border: 1.5px solid var(--qc-border);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.qconv-option[data-selected] {
+  border-color: var(--qc-action);
+  background: var(--qc-selected);
+}
+.qconv-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--qc-action);
+}
+.qconv-option-text {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qconv-option-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.qconv-option-meta {
+  font-size: 12px;
+  color: var(--qc-muted);
+  overflow-wrap: anywhere;
+}
+.qconv-option-total {
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.qconv-empty,
+.qconv-hint {
+  font-size: 12.5px;
+  color: var(--qc-muted);
+}
+.qconv-block {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--qc-divider);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+.qconv-block input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--qc-action);
+}
+.qconv-block > span {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qconv-block-label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.qconv-block-desc {
+  font-size: 12.5px;
+  color: var(--qc-muted);
+}
+.qconv-notes {
+  font-size: 12.5px;
+  color: var(--qc-muted);
+}
+.qconv-notes summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+}
+.qconv-notes summary::-webkit-details-marker {
+  display: none;
+}
+.qconv-notes ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: 1.5;
+}
+
+.qconv-foot {
+  padding: 16px 24px;
+  border-top: 1px solid var(--qc-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.qconv-summary {
+  font-size: 12.5px;
+  color: var(--qc-muted);
+}
+.qconv-error {
+  color: var(--qc-error);
+}
+.qconv-actions {
+  display: flex;
+  gap: 8px;
+}
+.qconv-btn {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--qc-border);
+  border-radius: 8px;
+  background: var(--qc-panel);
+  color: var(--qc-text);
+  font-size: 13.5px;
+  font-weight: 550;
+  cursor: pointer;
+}
+.qconv-btn:hover {
+  background: var(--qc-selected);
+}
+.qconv-btn-primary {
+  padding: 0 16px;
+  border-color: transparent;
+  background: var(--qc-action);
+  color: #fff;
+  font-weight: 600;
+}
+.qconv-btn-primary:hover {
+  background: var(--qc-action-hover);
+}
+.qconv-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

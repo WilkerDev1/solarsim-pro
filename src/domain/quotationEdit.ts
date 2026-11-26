@@ -170,6 +170,16 @@ export function setExchangeRate(content: QuotationContent, exchangeRate: number)
   return content.exchangeRate === exchangeRate ? content : { ...content, exchangeRate };
 }
 
+/**
+ * Enlaza la cotización con una propuesta de origen (`sourceProjectId`) o, con `null`, quita el enlace. Solo el enlace:
+ * no importa ni reescribe líneas, cliente ni importes (eso es «Crear cotización desde una propuesta»).
+ */
+export function setSourceProject(content: QuotationContent, projectId: string | null): QuotationContent {
+  if ((content.sourceProjectId ?? null) === (projectId || null)) return content;
+  const { sourceProjectId: _previous, ...rest } = content;
+  return projectId ? { ...rest, sourceProjectId: projectId } : rest;
+}
+
 /** Claves de nivel superior que cambiaron (por referencia): el parche que se envía a `updateQuotationRecord`. */
 export function contentPatch(previous: QuotationContent, next: QuotationContent): Partial<QuotationContent> {
   const patch: Partial<QuotationContent> = {};

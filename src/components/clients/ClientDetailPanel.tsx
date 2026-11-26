@@ -12,6 +12,7 @@ import { projectDateStamps, type ProjectDateKind } from '../dashboard/projectPre
 import { confirmAction } from '../common/confirmAction';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { ClientForm } from './ClientForm';
+import { ClientQuotationsSection } from '../quotations/linked/LinkedQuotationSections';
 
 const money = (value: number) =>
   value.toLocaleString('es-DO', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -140,6 +141,8 @@ export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; 
           </div>
         )}
       </section>
+
+      <ClientQuotationsSection clientId={client.id} />
 
       <ClientForm
         key={client.id}
