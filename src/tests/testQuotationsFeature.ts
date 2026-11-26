@@ -2,14 +2,15 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  APPLICATION_FEATURES, DEFAULT_FEATURE_SETTINGS, featureScope, featureSettingsForClient, isCompatibleFeatureSettings, isFeatureSettings,
-  normalizeFeatureSettings, quotationsFeatureEnabled,
+  APPLICATION_FEATURES, DEFAULT_FEATURE_SETTINGS, featureKeysForClient, featureScope, featureSettingsForClient, isCompatibleFeatureSettings,
+  isFeatureSettings, isFeatureSettingsForClient, managedFeatureKeys, normalizeFeatureSettings, quotationsFeatureEnabled,
 } from '../../shared/applicationFeatures';
 import { FEATURE_POLICY_V2_CLIENT_VERSION, FEATURE_POLICY_V3_CLIENT_VERSION, compareSemver } from '../../shared/clientVersion';
 import { effectiveFeatureSettings } from '../features/application/featurePolicy';
 import { enforceQuotationsFeature, isQuotationsView } from '../features/application/quotationsFeature';
 import { requestFeaturePolicy } from '../services/featurePolicyService';
 import { PrimaryIconDock } from '../components/layout/PrimaryIconDock';
+import { ApplicationFeaturesSection } from '../components/settings/sections/ApplicationFeaturesSection';
 import { useSimulationStore } from '../store/useSimulationStore';
 
 // --- Registro ---------------------------------------------------------------------------------------------------------
@@ -109,6 +110,74 @@ try {
   globalThis.fetch = originalFetch;
   useSimulationStore.setState(initial, true);
   syncServerSnapshot();
+}
+
+// --- Claves que gestiona el servidor para la versión de cada cliente ---------------------------------------------------
+const V2 = `desktop/${FEATURE_POLICY_V2_CLIENT_VERSION}`;
+const V3 = `desktop/${FEATURE_POLICY_V3_CLIENT_VERSION}`;
+assert.deepEqual(featureKeysForClient(null), ['selfConsumptionProjection']);
+assert.deepEqual(featureKeysForClient('desktop/2.9.4'), ['selfConsumptionProjection', 'netMeteringRegimeSelector']);
+assert.deepEqual(featureKeysForClient(`desktop/${FEATURE_POLICY_V3_CLIENT_VERSION}-beta.1`), ['selfConsumptionProjection', 'netMeteringRegimeSelector'], 'una prerrelease es anterior');
+assert.deepEqual(featureKeysForClient(V3), ['selfConsumptionProjection', 'netMeteringRegimeSelector', 'quotations']);
+// Guardar: cada versión envía exactamente sus claves; un cliente anterior a V3 nunca puede tocar `quotations`.
+const three = { selfConsumptionProjection: true, netMeteringRegimeSelector: false, quotations: false };
+const two = { selfConsumptionProjection: true, netMeteringRegimeSelector: false };
+assert.equal(isFeatureSettingsForClient(three, 'desktop/2.9.4'), false, 'tres claves desde 2.9.4: rechazado');
+assert.equal(isFeatureSettingsForClient(three, V2), false);
+assert.equal(isFeatureSettingsForClient(two, 'desktop/2.9.4'), true);
+assert.equal(isFeatureSettingsForClient(two, V3), false);
+assert.equal(isFeatureSettingsForClient(three, V3), true);
+assert.equal(isFeatureSettingsForClient({ selfConsumptionProjection: true }, 'desktop/2.7.4'), false, 'anteriores a V2 no guardan');
+assert.equal(isFeatureSettingsForClient({ selfConsumptionProjection: true }, null), false);
+assert.deepEqual(managedFeatureKeys(two), ['selfConsumptionProjection', 'netMeteringRegimeSelector']);
+assert.deepEqual(managedFeatureKeys({ ...three, extra: true, quotations: 'no' }), ['selfConsumptionProjection', 'netMeteringRegimeSelector']);
+
+{
+  const snapshot = { ...useSimulationStore.getState() };
+  const syncServerSnapshot = () => Object.assign(useSimulationStore.getInitialState(), useSimulationStore.getState());
+  const scope = featureScope(serverUrl, user.organizationId);
+  try {
+    // Respuesta de dos claves (cliente que se identifica anterior a V3): `quotations` no la gestiona el servidor.
+    globalThis.fetch = (async () => Response.json({ organizationId: user.organizationId, version: 7, settings: two })) as typeof fetch;
+    const policy = await requestFeaturePolicy(serverUrl, 'synthetic', user.organizationId);
+    assert.deepEqual(policy.managedFeatures, ['selfConsumptionProjection', 'netMeteringRegimeSelector']);
+    assert.equal(policy.settings.quotations, true, 'para mostrarla vale su defecto');
+
+    // Guardar otra función con esa política no inventa ni envía `quotations` (no pisa el valor de otro ADMIN).
+    const bodies: unknown[] = [];
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') bodies.push(JSON.parse(String(init.body)));
+      return Response.json({ organizationId: user.organizationId, version: 8, settings: { ...two, selfConsumptionProjection: false } });
+    }) as typeof fetch;
+    useSimulationStore.setState({
+      syncSettings: { ...initial.syncSettings, serverUrl, authToken: 'synthetic', currentUser: user },
+      organizationFeaturePolicies: { [scope]: policy },
+      featurePolicyRequest: { scope, status: 'ready' },
+    });
+    await useSimulationStore.getState().saveOrganizationFeaturePolicy({ selfConsumptionProjection: false, netMeteringRegimeSelector: false, quotations: false });
+    assert.deepEqual(bodies, [{ settings: { selfConsumptionProjection: false, netMeteringRegimeSelector: false }, baseVersion: 7 }]);
+    assert.deepEqual(useSimulationStore.getState().organizationFeaturePolicies[scope].managedFeatures, ['selfConsumptionProjection', 'netMeteringRegimeSelector']);
+
+    // Ajustes: el interruptor de una función que el servidor no gestiona para esta versión está deshabilitado y lo explica.
+    const html = () => { syncServerSnapshot(); return renderToStaticMarkup(React.createElement(ApplicationFeaturesSection)); };
+    const quotationsSwitch = (markup: string) => /<button[^>]*aria-labelledby="feature-title-quotations"[^>]*>/.exec(markup)?.[0] ?? '';
+    let markup = html();
+    assert.match(quotationsSwitch(markup), /disabled=""/);
+    assert.match(markup, new RegExp(`Disponible para la organización a partir de la versión ${FEATURE_POLICY_V3_CLIENT_VERSION.replace(/\./g, '\\.')} del cliente`));
+    assert.doesNotMatch(/<button[^>]*aria-labelledby="feature-title-selfConsumptionProjection"[^>]*>/.exec(markup)?.[0] ?? '', /disabled=""/);
+    // Con la política de tres claves, el interruptor se puede usar y la nota desaparece.
+    useSimulationStore.setState({ organizationFeaturePolicies: { [scope]: { organizationId: user.organizationId, version: 9, settings: normalizeFeatureSettings(three), managedFeatures: ['selfConsumptionProjection', 'netMeteringRegimeSelector', 'quotations'] } } });
+    markup = html();
+    assert.doesNotMatch(quotationsSwitch(markup), /disabled=""/);
+    assert.doesNotMatch(markup, /Disponible para la organización a partir/);
+    // Sin sesión (preferencia local) todas se pueden cambiar.
+    useSimulationStore.setState({ syncSettings: { ...initial.syncSettings, currentUser: null, authToken: null } });
+    assert.doesNotMatch(quotationsSwitch(html()), /disabled=""/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    useSimulationStore.setState(snapshot, true);
+    syncServerSnapshot();
+  }
 }
 
 console.log('Quotations feature tests passed.');

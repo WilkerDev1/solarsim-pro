@@ -12,7 +12,13 @@ export interface ApplicationFeatureSettings { selfConsumptionProjection: boolean
 export interface OrganizationFeaturePolicy {
   organizationId: string;
   version: number;
+  /** Política efectiva: las claves que el servidor no envió valen su defecto (`normalizeFeatureSettings`). */
   settings: ApplicationFeatureSettings;
+  /**
+   * Claves que el servidor envió para la versión con la que se identifica este cliente (`featureKeysForClient`): solo
+   * esas se pueden cambiar y solo esas se envían al guardar. Ausente en políticas guardadas por versiones anteriores.
+   */
+  managedFeatures?: ApplicationFeatureId[];
 }
 export const APPLICATION_FEATURES = [{
   id: 'selfConsumptionProjection',
@@ -72,22 +78,42 @@ export function isCompatibleFeatureSettings(value: unknown): boolean {
   return typeof record.selfConsumptionProjection === 'boolean' && keys.every((key) => (FEATURE_KEYS as string[]).includes(key) && typeof record[key] === 'boolean');
 }
 /**
- * Política tal como la lee un cliente según su versión (`X-SolarSim-Client`), porque cada versión valida exactamente
- * las claves que conoce: anterior a `FEATURE_POLICY_V2_CLIENT_VERSION`, o sin encabezado válido, recibe solo
- * `selfConsumptionProjection`; desde esa versión y antes de `FEATURE_POLICY_V3_CLIENT_VERSION`, también
- * `netMeteringRegimeSelector`; desde esta última, la forma completa. Sin encabezado se elige la forma más antigua: es
- * la que entiende cualquier cliente que no se identifica.
+ * Claves de la política que gestiona un cliente según su versión (`X-SolarSim-Client`), porque cada versión valida
+ * exactamente las claves que conoce: anterior a `FEATURE_POLICY_V2_CLIENT_VERSION`, o sin encabezado válido, solo
+ * `selfConsumptionProjection`; desde esa versión y antes de `FEATURE_POLICY_V3_CLIENT_VERSION` (prerreleases de esta
+ * incluidas), también `netMeteringRegimeSelector`; desde esta última, todas. Sin encabezado se elige la forma más
+ * antigua: es la que entiende cualquier cliente que no se identifica.
  */
-export function featureSettingsForClient(
-  stored: unknown,
-  clientHeader: string | null | undefined,
-): ApplicationFeatureSettings | Pick<ApplicationFeatureSettings, 'selfConsumptionProjection' | 'netMeteringRegimeSelector'> | Pick<ApplicationFeatureSettings, 'selfConsumptionProjection'> {
+export function featureKeysForClient(clientHeader: string | null | undefined): ApplicationFeatureId[] {
+  if (isClientOutdated(clientHeader, FEATURE_POLICY_V2_CLIENT_VERSION)) return ['selfConsumptionProjection'];
+  if (isClientOutdated(clientHeader, FEATURE_POLICY_V3_CLIENT_VERSION)) return ['selfConsumptionProjection', 'netMeteringRegimeSelector'];
+  return [...FEATURE_KEYS];
+}
+/** Política tal como la lee un cliente según su versión: solo sus claves (`featureKeysForClient`), completadas con el defecto. */
+export function featureSettingsForClient(stored: unknown, clientHeader: string | null | undefined): Partial<ApplicationFeatureSettings> {
   const settings = normalizeFeatureSettings(stored);
-  if (isClientOutdated(clientHeader, FEATURE_POLICY_V2_CLIENT_VERSION)) return { selfConsumptionProjection: settings.selfConsumptionProjection };
-  if (isClientOutdated(clientHeader, FEATURE_POLICY_V3_CLIENT_VERSION)) {
-    return { selfConsumptionProjection: settings.selfConsumptionProjection, netMeteringRegimeSelector: settings.netMeteringRegimeSelector };
-  }
-  return settings;
+  return Object.fromEntries(featureKeysForClient(clientHeader).map((key) => [key, settings[key]]));
+}
+/**
+ * Forma que la API acepta al guardar desde un cliente: exactamente sus claves (`featureKeysForClient`), booleanas. Las
+ * claves que esa versión no conoce se conservan tal como están guardadas, así un cliente anterior a V3 nunca cambia ni
+ * reinicia `quotations`. Los anteriores a `FEATURE_POLICY_V2_CLIENT_VERSION` (o sin encabezado válido) no guardan.
+ */
+export function isFeatureSettingsForClient(value: unknown, clientHeader: string | null | undefined): value is Partial<ApplicationFeatureSettings> {
+  if (isClientOutdated(clientHeader, FEATURE_POLICY_V2_CLIENT_VERSION)) return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const keys = featureKeysForClient(clientHeader);
+  return Object.keys(record).length === keys.length && keys.every((key) => typeof record[key] === 'boolean');
+}
+/** Claves conocidas y booleanas de una política recibida: las que el servidor gestiona para este cliente. */
+export function managedFeatureKeys(value: unknown): ApplicationFeatureId[] {
+  const record = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return FEATURE_KEYS.filter((key) => typeof record[key] === 'boolean');
+}
+/** Solo las claves `keys` de `settings`: lo que un cliente envía al guardar, sin inventar valores para las demás. */
+export function pickFeatureSettings(settings: ApplicationFeatureSettings, keys: readonly ApplicationFeatureId[]): Partial<ApplicationFeatureSettings> {
+  return Object.fromEntries(FEATURE_KEYS.filter((key) => keys.includes(key)).map((key) => [key, settings[key]]));
 }
 /** ¿Se muestra el selector de régimen de medición neta? Función disponible y activada en la política efectiva. */
 export function netMeteringRegimeSelectorVisible(settings: ApplicationFeatureSettings): boolean {

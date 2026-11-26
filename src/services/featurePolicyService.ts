@@ -1,7 +1,7 @@
 import { fetchWithSessionRetry } from './syncService';
-import { isCompatibleFeatureSettings, normalizeFeatureSettings, OrganizationFeaturePolicy } from '../../shared/applicationFeatures';
+import { isCompatibleFeatureSettings, managedFeatureKeys, normalizeFeatureSettings, type ApplicationFeatureSettings, type OrganizationFeaturePolicy } from '../../shared/applicationFeatures';
 
-export async function requestFeaturePolicy(serverUrl: string, authToken: string, organizationId: string, change?: { settings: OrganizationFeaturePolicy['settings']; baseVersion: number }): Promise<OrganizationFeaturePolicy> {
+export async function requestFeaturePolicy(serverUrl: string, authToken: string, organizationId: string, change?: { settings: Partial<ApplicationFeatureSettings>; baseVersion: number }): Promise<OrganizationFeaturePolicy> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
@@ -19,7 +19,8 @@ export async function requestFeaturePolicy(serverUrl: string, authToken: string,
     }
     const policy = await response.json() as OrganizationFeaturePolicy;
     if (policy.organizationId !== organizationId || !Number.isSafeInteger(policy.version) || policy.version < 1 || !isCompatibleFeatureSettings(policy.settings)) throw new Error('El servidor devolvió una configuración de funciones inválida.');
-    // Una API anterior devuelve una sola clave: las demás toman su valor por defecto.
-    return { ...policy, settings: normalizeFeatureSettings(policy.settings) };
+    // El servidor envía las claves que gestiona para la versión de este cliente: solo esas se pueden cambiar
+    // (`managedFeatures`); las demás toman su valor por defecto para mostrarse.
+    return { organizationId: policy.organizationId, version: policy.version, settings: normalizeFeatureSettings(policy.settings), managedFeatures: managedFeatureKeys(policy.settings) };
   } finally { clearTimeout(timeout); }
 }

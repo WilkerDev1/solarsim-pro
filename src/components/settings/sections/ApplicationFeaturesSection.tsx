@@ -1,10 +1,14 @@
 import { isAdminRole } from '../../../../shared/permissions';
 import React, { useEffect } from 'react';
 import { LockKeyhole, RefreshCw } from 'lucide-react';
-import { BUILT_IN_APPLICATION_FEATURES, APPLICATION_FEATURES, featureScope } from '../../../../shared/applicationFeatures';
+import { BUILT_IN_APPLICATION_FEATURES, APPLICATION_FEATURES, featureScope, type ApplicationFeatureId } from '../../../../shared/applicationFeatures';
+import { FEATURE_POLICY_V2_CLIENT_VERSION, FEATURE_POLICY_V3_CLIENT_VERSION } from '../../../../shared/clientVersion';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
-import { effectiveFeatureSettings } from '../../../features/application/featurePolicy';
+import { effectiveFeatureSettings, organizationManagedFeatures } from '../../../features/application/featurePolicy';
+
+/** Primera versión del cliente con la que la organización gestiona cada clave de la política. */
+const MANAGED_SINCE: Record<ApplicationFeatureId, string | null> = { selfConsumptionProjection: null, netMeteringRegimeSelector: FEATURE_POLICY_V2_CLIENT_VERSION, quotations: FEATURE_POLICY_V3_CLIENT_VERSION };
 
 export function ApplicationFeaturesSection() {
   const state = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, organizationFeaturePolicies: s.organizationFeaturePolicies, featurePolicyRequest: s.featurePolicyRequest, localFeatureSettings: s.localFeatureSettings, loadOrganizationFeaturePolicy: s.loadOrganizationFeaturePolicy, appAssistantEnabled: s.appAssistantEnabled, setAppAssistantEnabled: s.setAppAssistantEnabled, saveOrganizationFeaturePolicy: s.saveOrganizationFeaturePolicy, setLocalFeatureSettings: s.setLocalFeatureSettings })));
@@ -15,6 +19,9 @@ export function ApplicationFeaturesSection() {
   const settings = effectiveFeatureSettings(state);
   const busy = request?.status === 'loading' || request?.status === 'saving';
   const canEdit = !user || (isAdminRole(user.role) && !!policy && !busy && request?.status === 'ready');
+  // Con sesión, solo las claves que el servidor gestiona para esta versión del cliente se pueden cambiar.
+  const managed = user && policy ? organizationManagedFeatures(policy) : null;
+  const unmanaged = (id: ApplicationFeatureId) => !!managed && !managed.includes(id);
   useEffect(() => {
     if (user) void state.loadOrganizationFeaturePolicy();
   }, [user?.id, user?.organizationId, state.syncSettings.serverUrl]);
@@ -47,8 +54,9 @@ export function ApplicationFeaturesSection() {
           <div className="flex flex-wrap items-center gap-2"><h4 id={`feature-title-${feature.id}`} className="text-sm font-semibold text-slate-900 dark:text-white">{feature.title}</h4><span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">{({ stable: 'Estable', beta: 'Beta', experimental: 'Experimental' })[feature.stage]}</span></div>
           <p id={`feature-description-${feature.id}`} className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-zinc-400">{feature.description}</p>
           <p className="mt-3 text-xs text-slate-500 dark:text-zinc-400">{feature.disabledNote}{feature.available ? '' : ' No disponible en esta versión.'}</p>
+          {unmanaged(feature.id) && <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-slate-600 dark:text-zinc-300"><LockKeyhole className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />{`Disponible para la organización a partir de la versión ${MANAGED_SINCE[feature.id] ?? FEATURE_POLICY_V3_CLIENT_VERSION} del cliente.`}</p>}
         </div>
-        <button type="button" role="switch" aria-checked={settings[feature.id]} aria-labelledby={`feature-title-${feature.id}`} aria-describedby={`feature-description-${feature.id}`} disabled={!canEdit || !feature.available}
+        <button type="button" role="switch" aria-checked={settings[feature.id]} aria-labelledby={`feature-title-${feature.id}`} aria-describedby={`feature-description-${feature.id}`} disabled={!canEdit || !feature.available || unmanaged(feature.id)}
           onClick={() => {
             const next = { ...settings, [feature.id]: !settings[feature.id] };
             if (user) void state.saveOrganizationFeaturePolicy(next); else state.setLocalFeatureSettings(next);
