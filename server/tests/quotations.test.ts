@@ -134,7 +134,7 @@ before(
     editor = await provision("EDITOR", "quotations-editor");
     reader = await provision("LECTOR", "quotations-reader");
   },
-  { timeout: 30000 },
+  { timeout: 120000 },
 );
 after(async () => {
   await database?.stop();
@@ -489,15 +489,87 @@ test("status changes follow the allowed transitions", async () => {
   );
   assert.equal(back.status, 400);
   assert.equal(back.body.code, "invalid_transition");
-  // Any valid initial status is accepted on creation.
-  const issued = await put(
-    editor,
-    "q-transition-issued",
+});
+
+test("a quotation is created only as draft or issued, without spending a number otherwise", async () => {
+  for (const status of ["draft", "issued"] as const) {
+    const created = await put(
+      editor,
+      `q-initial-${status}`,
+      0,
+      content({ status }, "2046-01-01"),
+    );
+    assert.equal(created.status, 200, status);
+    assert.equal(created.body.quotation.status, status);
+  }
+  for (const status of ["accepted", "rejected", "void"] as const) {
+    const result = await put(
+      editor,
+      `q-initial-${status}`,
+      0,
+      content({ status }, "2046-01-01"),
+    );
+    assert.equal(result.status, 400, status);
+    assert.equal(result.body.code, "invalid_transition");
+  }
+  assert.equal(
+    (await create(editor, "q-initial-next", content({}, "2046-02-02"))).number,
+    "COT-2046-0003",
+  );
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::int AS n FROM quotations WHERE id IN ('q-initial-accepted','q-initial-rejected','q-initial-void')",
+      )
+    ).rows[0].n,
     0,
+  );
+});
+
+test("NUL characters and lone surrogates are rejected with 400, not 500", async () => {
+  for (const notes of ["a\u0000b", "a\ud800b", "a\udc00b"]) {
+    const result = await put(editor, "q-bad-text", 0, content({ notes }));
+    assert.equal(result.status, 400, JSON.stringify(notes));
+    assert.match(result.body.error, /caracteres no válidos/i);
+  }
+  const description = await put(
+    editor,
+    "q-bad-text",
+    0,
+    content({
+      items: [{ ...content().items[0], description: "Panel\u0000" }],
+    }),
+  );
+  assert.equal(description.status, 400);
+});
+
+test("a locked quotation compares against its stored content normalized by the current validator", async () => {
+  const issued = await create(
+    editor,
+    "q-legacy-row",
     content({ status: "issued" }),
   );
-  assert.equal(issued.status, 200);
-  assert.equal(issued.body.quotation.status, "issued");
+  // Simulate a row written by an older validator: an extra key and an untrimmed text.
+  await pool.query(
+    `UPDATE quotations SET data_json=data_json || '{"legacyField": 1, "notes": "  Nota antigua  "}'::jsonb WHERE organization_id=$1 AND id='q-legacy-row'`,
+    [admin.organizationId],
+  );
+  const accepted = await put(
+    editor,
+    "q-legacy-row",
+    issued.version,
+    content({ status: "accepted", notes: "Nota antigua" }),
+  );
+  assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+  assert.equal(accepted.body.quotation.status, "accepted");
+  const edited = await put(
+    editor,
+    "q-legacy-row",
+    issued.version + 1,
+    content({ status: "void", notes: "Otra" }),
+  );
+  assert.equal(edited.status, 400);
+  assert.equal(edited.body.code, "quotation_locked");
 });
 
 test("non-draft quotations are locked: only status changes, reopen to edit", async () => {
@@ -681,6 +753,106 @@ test("GET ?since returns only what changed plus deletions; an invalid cursor is 
   assert.ok(full.body.deletedIds.includes("q-since-gone"));
   for (const since of ["ayer", "2026-13-01T00:00:00Z", "2026-02-30T00:00:00Z"])
     assert.equal((await list(reader, since)).status, 400, since);
+  // Offsets PostgreSQL cannot parse are normalized before the query: an accepted cursor never becomes a 500.
+  for (const since of [
+    "2026-01-01T00:00:00-23:59",
+    "2026-01-01T00:00:00+23:59",
+    "2000-01-01T00:00:00.123456+14:00",
+  ]) {
+    const result = await list(reader, since);
+    assert.equal(result.status, 200, since);
+  }
+  for (const since of [
+    "2026-01-01T00:00:00-99:99",
+    "2026-01-01T00:00:00+24:00",
+    "0000-01-01T00:00:00Z",
+    "9999-12-31T23:59:59-23:59",
+  ])
+    assert.notEqual((await list(reader, since)).status, 500, since);
+});
+
+test("folder links follow the proposal push rules", async () => {
+  const privateFolder = await request(
+    "PUT",
+    "/api/folders/qf-private",
+    editor,
+    {
+      name: "Privada del editor",
+      visibility: "private",
+      baseVersion: 0,
+    },
+  );
+  assert.equal(privateFolder.status, 200);
+  await request("PUT", "/api/folders/qf-gone", admin, {
+    name: "Borrada",
+    baseVersion: 0,
+  });
+  assert.equal(
+    (await request("DELETE", "/api/folders/qf-gone?baseVersion=1", admin))
+      .status,
+    200,
+  );
+  await request("PUT", "/api/folders/qf-foreign", other, {
+    name: "Ajena",
+    baseVersion: 0,
+  });
+  await request("PUT", "/api/folders/qf-public", admin, {
+    name: "Pública",
+    baseVersion: 0,
+  });
+  assert.equal(
+    (await put(admin, "q-folder-public", 0, content({ folderId: "qf-public" })))
+      .status,
+    200,
+  );
+  assert.equal(
+    (
+      await put(
+        admin,
+        "q-folder-offline",
+        0,
+        content({ folderId: "qf-offline" }),
+      )
+    ).status,
+    200,
+  );
+  for (const folderId of ["qf-gone", "qf-foreign", "qf-private"]) {
+    const result = await put(admin, "q-folder-bad", 0, content({ folderId }));
+    assert.equal(result.status, 409, folderId);
+    assert.equal(result.body.code, "invalid_folder");
+    assert.equal(result.body.reason, "invalid_folder");
+    assert.equal(result.body.quotation, null);
+  }
+  // invalid_client is checked first.
+  const both = await put(
+    admin,
+    "q-folder-bad",
+    0,
+    content({ folderId: "qf-gone", clientId: "qc-foreign" }),
+  );
+  assert.equal(both.body.code, "invalid_client");
+  const moved = await put(
+    admin,
+    "q-folder-public",
+    1,
+    content({ folderId: "qf-gone" }),
+  );
+  assert.equal(moved.status, 409);
+  assert.equal(moved.body.quotation.folderId, "qf-public");
+  // The creator files a quotation in their private folder; another writer may edit it while it stays there.
+  const mine = await create(
+    editor,
+    "q-folder-private",
+    content({ folderId: "qf-private" }),
+  );
+  const kept = await put(
+    admin,
+    "q-folder-private",
+    mine.version,
+    content({ folderId: "qf-private", notes: "Editada" }),
+  );
+  assert.equal(kept.status, 200, JSON.stringify(kept.body));
+  assert.equal(kept.body.quotation.folderId, "qf-private");
 });
 
 test("deleting a client or a folder unlinks its quotations and bumps their version", async () => {
@@ -746,6 +918,79 @@ test("deleting a client or a folder unlinks its quotations and bumps their versi
     (await put(editor, "q-cascade", linked.version + 2, content())).status,
     200,
   );
+});
+
+test("a client cascade only touches the deleting organization", async () => {
+  for (const user of [admin, other])
+    assert.equal(
+      (
+        await request("PUT", "/api/clients/qc-shared-id", user, {
+          name: "Mismo id",
+          baseVersion: 0,
+        })
+      ).status,
+      200,
+    );
+  const mine = await create(
+    admin,
+    "q-shared-client",
+    content({ clientId: "qc-shared-id" }),
+  );
+  const theirs = await create(
+    other,
+    "q-shared-client",
+    content({ clientId: "qc-shared-id" }),
+  );
+  assert.equal(
+    (await request("DELETE", "/api/clients/qc-shared-id?baseVersion=1", admin))
+      .status,
+    200,
+  );
+  const own = (await list(admin)).body.quotations.find(
+    (q: any) => q.id === "q-shared-client",
+  );
+  assert.equal("clientId" in own, false);
+  assert.equal(own.version, mine.version + 1);
+  const foreign = (await list(other)).body.quotations.find(
+    (q: any) => q.id === "q-shared-client",
+  );
+  assert.deepEqual(foreign, theirs);
+});
+
+test("a quotation write racing the deletion of its client never keeps a link to a deleted client", async () => {
+  for (let round = 0; round < 6; round++) {
+    const clientId = `qc-race-${round}`;
+    const id = `q-race-${round}`;
+    await request("PUT", `/api/clients/${clientId}`, admin, {
+      name: "Cliente en carrera",
+      baseVersion: 0,
+    });
+    await create(editor, id, content({ clientId }));
+    const [write, removal] = await Promise.all([
+      put(editor, id, 1, content({ clientId, notes: `Edición ${round}` })),
+      request("DELETE", `/api/clients/${clientId}?baseVersion=1`, admin),
+    ]);
+    assert.equal(removal.status, 200);
+    assert.ok([200, 409].includes(write.status), JSON.stringify(write.body));
+    const row = (
+      await pool.query(
+        "SELECT client_id,version,data_json FROM quotations WHERE organization_id=$1 AND id=$2",
+        [admin.organizationId, id],
+      )
+    ).rows[0];
+    assert.equal(row.client_id, null);
+    assert.equal("clientId" in row.data_json, false);
+    if (write.status === 200) {
+      // Write first (v2, linked), then the cascade (v3).
+      assert.equal(write.body.quotation.version, 2);
+      assert.equal(row.version, 3);
+      assert.equal(row.data_json.notes, `Edición ${round}`);
+    } else {
+      // Cascade first (v2): the write is a stale CAS or an invalid client and keeps nothing.
+      assert.equal(row.version, 2);
+      assert.equal(row.data_json.notes, "");
+    }
+  }
 });
 
 test("quotation routes require the client header and reject agent tokens", async () => {

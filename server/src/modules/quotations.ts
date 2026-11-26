@@ -66,23 +66,34 @@ const quotationRecord = (r: Record<string, any>) => ({
 const current = (row: Record<string, any> | undefined) =>
   row && !row.deleted_at ? quotationRecord(row) : null;
 
-/** The cursor format returned as `serverTimestamp` (microseconds, UTC) or any ISO instant with a real date. */
+/**
+ * Parses `since`: the `serverTimestamp` format (microseconds, UTC) or any ISO instant with a real date from 1970 on.
+ * Returns the instant in UTC keeping its microseconds (offsets are whole minutes), so PostgreSQL never sees an offset
+ * or a year it cannot parse; `null` when it cannot be interpreted.
+ */
 const ISO_INSTANT =
-  /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
-function isIsoInstant(value: string): boolean {
+  /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/;
+const MAX_INSTANT = Date.UTC(9999, 11, 31, 23, 59, 59, 999);
+function normalizeSince(value: string): string | null {
   const match = ISO_INSTANT.exec(value);
-  if (!match || !Number.isFinite(Date.parse(value))) return false;
+  if (!match) return null;
   const [year, month, day] = [
     Number(match[1]),
     Number(match[2]),
     Number(match[3]),
   ];
   const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
+  if (
+    year < 1970 ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  )
+    return null;
+  const instant = Date.parse(value);
+  if (!Number.isFinite(instant) || instant > MAX_INSTANT) return null;
+  const fraction = (match[5] ?? "").padEnd(6, "0");
+  return `${new Date(instant).toISOString().slice(0, 19)}.${fraction}Z`;
 }
 
 /** Images travel as `asset:sha256:` references only; the API never stores inline data URLs for quotations. */
@@ -91,12 +102,18 @@ const hasInlineImage = (value: QuotationContent) =>
     (image) => !!image && !isAssetRef(image),
   );
 
+/** Saved content normalized by the current validator, so a validator change never locks an issued quotation. */
+const storedContent = (row: Record<string, any>): Record<string, any> => {
+  const stored = validateQuotationContent(row.data_json);
+  return stored.ok ? stored.value : row.data_json;
+};
+
 const withoutStatus = (value: Record<string, any>) => {
   const { status: _status, ...rest } = value;
   return rest;
 };
 
-/** Organization quotations (docs/QUOTATIONS.md): numbered by the API, CAS writes, soft delete, delta reads. */
+/** Organization quotations (docs/DATABASE_AND_API_SPECIFICATION.md#cotizaciones-migración-011): numbered by the API, CAS writes, soft delete, delta reads. */
 export function registerQuotationRoutes(
   app: Hono,
   { pool, authenticate }: Dependencies,
@@ -105,9 +122,9 @@ export function registerQuotationRoutes(
     const user = await authenticate(c);
     if (!user) return c.json({ error: "No autorizado" }, 401);
     const raw = c.req.query("since");
-    if (raw !== undefined && !isIsoInstant(raw))
-      return c.json({ error: "Cursor inválido" }, 400);
-    const since = raw ?? "1970-01-01T00:00:00.000Z";
+    const since =
+      raw === undefined ? "1970-01-01T00:00:00.000000Z" : normalizeSince(raw);
+    if (since === null) return c.json({ error: "Cursor inválido" }, 400);
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -207,6 +224,13 @@ export function registerQuotationRoutes(
           error: "La cotización cambió. Sincroniza antes de editar.",
           quotation: current(existing),
         });
+      // A new quotation starts as a draft or already issued; nothing else spends a number.
+      if (!existing && value.status !== "draft" && value.status !== "issued")
+        return fail(400, {
+          error:
+            "Una cotización nueva solo puede crearse como borrador o emitida",
+          code: "invalid_transition",
+        });
       if (existing) {
         const saved = existing.status as QuotationContent["status"];
         if (
@@ -220,7 +244,7 @@ export function registerQuotationRoutes(
         if (
           isQuotationContentLocked(saved) &&
           !isDeepStrictEqual(
-            withoutStatus(existing.data_json),
+            withoutStatus(storedContent(existing)),
             withoutStatus(value),
           )
         )
@@ -251,6 +275,33 @@ export function registerQuotationRoutes(
           reason: "invalid_client",
           quotation: current(existing),
         });
+      // Same rule as the proposal push: unknown folders were created offline; deleted, foreign or someone else's
+      // private folders are rejected unless the quotation already sits in that folder.
+      if (value.folderId) {
+        const folders = (
+          await client.query(
+            "SELECT organization_id,visibility,created_by_id,deleted_at FROM project_folders WHERE id=$1",
+            [value.folderId],
+          )
+        ).rows;
+        const own = folders.find(
+          (row) => row.organization_id === user.organizationId,
+        );
+        const unchanged = existing?.folder_id === value.folderId;
+        if (
+          (folders.length > 0 && !own) ||
+          own?.deleted_at ||
+          (own?.visibility === "private" &&
+            own.created_by_id !== user.id &&
+            !unchanged)
+        )
+          return fail(409, {
+            error: "La carpeta no existe o no está disponible.",
+            code: "invalid_folder",
+            reason: "invalid_folder",
+            quotation: current(existing),
+          });
+      }
       const links = [
         value.clientId ?? null,
         value.sourceProjectId ?? null,

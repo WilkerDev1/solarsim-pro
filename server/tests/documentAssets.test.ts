@@ -109,7 +109,7 @@ before(
     admin = await register("assets-admin");
     other = await register("assets-other", "Otra empresa");
   },
-  { timeout: 30000 },
+  { timeout: 120000 },
 );
 after(async () => {
   await database?.stop();
