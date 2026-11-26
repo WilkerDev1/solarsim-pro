@@ -105,7 +105,7 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
         projects: unlinkNow
           ? state.projects.map((p) => (p.clientId === id && !p.isDeleted ? { ...p, clientId: undefined, syncStatus: 'pending', updatedAt: now } : p))
           : state.projects,
-        ...(unlinkNow ? dropQuotationLinks(state, 'clientId', new Set([id]), state.syncSettings.currentUser?.id) : {}),
+        ...(unlinkNow ? dropQuotationLinks(state, 'clientId', new Set([id]), state.syncSettings.currentUser?.id, { localWorkspace: !state.syncSettings.currentUser }) : {}),
       });
       sync();
       return true;

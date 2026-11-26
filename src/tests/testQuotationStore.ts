@@ -121,6 +121,25 @@ assert.equal(api().quotations.find((q) => q.id === draftId)!.folderId, folder.id
 assert.equal(api().moveQuotationToFolder(draftId, 'folder-unknown').ok, false);
 assert.equal(api().linkQuotationToClient(first.id, client.client.id).ok, false, 'A locked quotation keeps its content, links included');
 
+// Local workspace (no API cascade): deleting a client or folder drops the link from every quotation, also locked ones.
+const issuedLinked = api().createQuotationRecord({
+  client: { name: 'Cliente impreso', attention: '', taxId: '', phone: '', email: '', address: '' }, items: [line('l9')],
+});
+assert.ok(issuedLinked.ok);
+const tempClient = api().createClientRecord({ name: 'Temporal' });
+const tempFolder = api().createFolder('Temporal')!;
+assert.ok(tempClient.ok);
+assert.ok(api().linkQuotationToClient(issuedLinked.quotation.id, tempClient.client.id).ok);
+assert.ok(api().moveQuotationToFolder(issuedLinked.quotation.id, tempFolder.id).ok);
+assert.ok(api().setQuotationStatus(issuedLinked.quotation.id, 'issued').ok);
+assert.equal(api().deleteClientRecord(tempClient.client.id), true);
+api().deleteFolder(tempFolder.id);
+const issuedAfter = api().quotations.find((q) => q.id === issuedLinked.quotation.id)!;
+assert.equal(issuedAfter.clientId, undefined);
+assert.equal(issuedAfter.folderId, undefined);
+assert.equal(issuedAfter.status, 'issued');
+assert.equal(issuedAfter.client.name, 'Cliente impreso', 'Printed data untouched');
+
 // Deleting the client or the folder drops only the link.
 assert.equal(api().deleteClientRecord(client.client.id), true);
 let draft = api().quotations.find((q) => q.id === draftId)!;
@@ -138,7 +157,7 @@ assert.equal(serialized.quotations.length, api().quotations.length);
 assert.ok(serialized.quotationChanges[draftId]);
 assert.equal(serialized.quotationDeletionQueue.length, 1);
 assert.deepEqual(serialized.quotationSyncCursor, { scope: 'local', serverTimestamp: '2026-11-01T00:00:00.000Z' });
-assert.deepEqual(serialized.quotationNumberCounters, { [String(year)]: 5 });
+assert.deepEqual(serialized.quotationNumberCounters, { [String(year)]: 6 });
 const before = structuredClone({
   quotations: api().quotations, quotationChanges: api().quotationChanges, quotationDeletionQueue: api().quotationDeletionQueue,
   quotationSyncCursor: api().quotationSyncCursor, quotationNumberCounters: api().quotationNumberCounters,
@@ -150,7 +169,7 @@ assert.deepEqual({
   quotations: restored.quotations, quotationChanges: restored.quotationChanges, quotationDeletionQueue: restored.quotationDeletionQueue,
   quotationSyncCursor: restored.quotationSyncCursor, quotationNumberCounters: restored.quotationNumberCounters,
 }, JSON.parse(JSON.stringify(before)));
-assert.equal(restored.quotationNumberCounters[String(year)], 5);
+assert.equal(restored.quotationNumberCounters[String(year)], 6);
 
 // ── Workspaces: local quotations are never assigned to an organization; logging out restores them ──
 assert.equal(captureWorkspace(api()).quotations?.length, before.quotations.length);

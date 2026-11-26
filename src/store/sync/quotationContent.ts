@@ -106,7 +106,8 @@ export function nextLocalQuotationNumber(
 type LinkState = { quotations: QuotationRecord[]; quotationChanges: Record<string, QuotationChange> };
 
 /**
- * Local deletion of a client or folder: editable drafts lose the `clientId`/`folderId` link (printed data untouched)
+ * Local deletion of a client or folder. In the local workspace (no account, `localWorkspace`) every linked quotation
+ * loses the link, since no API will unlink them. With an account, editable drafts lose the `clientId`/`folderId` link (printed data untouched)
  * and stay pending so the next PUT carries the unlink. Quotations that are not drafts are never edited here: the API
  * accepts unknown ids and, when the deletion is published, unlinks them itself (the change arrives with the pull).
  * Server tombstones (`deletedIds`) never call this: the API already unlinked its quotations in the same transaction.
@@ -116,13 +117,17 @@ export function dropQuotationLinks(
   field: 'clientId' | 'folderId',
   ids: ReadonlySet<string>,
   ownerId: string | undefined,
+  options: { localWorkspace?: boolean } = {},
 ): Partial<LinkState> {
-  const affected = (q: QuotationRecord) => q.status === 'draft' && !!q[field] && ids.has(q[field]!);
+  const linked = (q: QuotationRecord) => !!q[field] && ids.has(q[field]!);
+  // Without an account there is no API cascade: every quotation loses the dead link (nothing is published).
+  const affected = (q: QuotationRecord) => linked(q) && (q.status === 'draft' || !!options.localWorkspace);
   if (!state.quotations.some(affected)) return {};
   let changes = state.quotationChanges;
   const quotations = state.quotations.map((q) => {
     if (!affected(q)) return q;
     const { [field]: _dropped, ...rest } = q;
+    if (q.status !== 'draft') return rest as QuotationRecord;
     const { rejected: _retry, ...kept } = changes[q.id] ?? {
       revision: '', ownerId, baseVersion: q.baseVersion ?? q.version ?? 0,
       ...(q.version ? { base: canonicalQuotationContent(q) } : {}),

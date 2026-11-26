@@ -21,6 +21,7 @@ let online = true;
 let dropResponseFor: string | null = null;
 let holdList: Promise<void> | null = null;
 let forbidDelete = false;
+let onPut: ((id: string) => void) | null = null;
 const invalidClients = new Set<string>();
 const invalidFolders = new Set<string>();
 const calls: string[] = [];
@@ -118,6 +119,7 @@ QuotationSyncService.setTransportFactory((url, token) => async (path, init = {})
   const body = JSON.parse(String(init.body));
   assert.deepEqual(Object.keys(body).sort(), ['baseVersion', 'content']);
   const response = serverPut(id, body.baseVersion, body.content);
+  onPut?.(id);
   if (id === dropResponseFor) {
     dropResponseFor = null;
     throw new Error('Conexión interrumpida tras enviar');
@@ -579,6 +581,60 @@ try {
   assert.ok(rows.has(forbidden.quotation.id));
   assert.ok(api().quotations.some((q) => q.id === forbidden.quotation.id));
   assert.deepEqual(api().quotationDeletionQueue, []);
+  assert.equal(api().quotationSyncFeedback, null);
+
+  // 1. A rejected deletion of a quotation that a teammate then deletes leaves the queue (no orphan command).
+  forbidDelete = true;
+  api().deleteQuotationRecord(forbidden.quotation.id);
+  await sync();
+  assert.ok(api().quotationDeletionQueue.find((c) => c.id === forbidden.quotation.id)?.rejected);
+  forbidDelete = false;
+  teammateDelete(forbidden.quotation.id);
+  assert.equal((await sync()).success, true);
+  assert.deepEqual(api().quotationDeletionQueue, [], 'Released by the tombstone');
+  assert.equal(api().quotationSyncFeedback, null);
+  assert.ok(!api().quotations.some((q) => q.id === forbidden.quotation.id));
+
+  // 2. Editing a quotation in a deletion conflict keeps it: the edit survives as a normal version conflict.
+  const keptQ = api().createQuotationRecord({ client: printed });
+  assert.ok(keptQ.ok);
+  await sync();
+  teammateWrite(keptQ.quotation.id, () => ({ notes: 'Del compañero' }));
+  api().deleteQuotationRecord(keptQ.quotation.id);
+  await sync();
+  assert.equal(api().quotationChanges[keptQ.quotation.id].deletionConflict, true);
+  assert.ok(api().updateQuotationRecord(keptQ.quotation.id, { notes: 'Me la quedo y la edito' }).ok);
+  assert.equal(api().quotationChanges[keptQ.quotation.id].deletionConflict, undefined, 'Editing drops the deletion intent');
+  assert.ok(api().quotationChanges[keptQ.quotation.id].serverQuotation, 'It is still a version conflict to resolve');
+  api().resolveQuotationConflict(keptQ.quotation.id, 'keep_local');
+  assert.equal((await sync()).success, true);
+  assert.equal(rows.get(keptQ.quotation.id)!.record.notes, 'Me la quedo y la edito', 'The edit is published, not deleted');
+  assert.equal(find(keptQ.quotation.id).notes, 'Me la quedo y la edito');
+
+  // 4. A conflict resolved while a pass is still running is not revived by that pass.
+  const pusher = api().createQuotationRecord({ client: printed, notes: 'Empuja' });
+  const racing = api().createQuotationRecord({ client: printed, notes: 'v1' });
+  assert.ok(pusher.ok && racing.ok);
+  await sync();
+  teammateWrite(racing.quotation.id, () => ({ notes: 'v2' }));
+  api().updateQuotationRecord(racing.quotation.id, { notes: 'Local' });
+  await sync();
+  const racingConflict = api().quotationChanges[racing.quotation.id];
+  assert.ok(racingConflict.serverQuotation);
+  api().updateQuotationRecord(pusher.quotation.id, { notes: 'Empuja otra vez' });
+  // The pusher's change goes first, so its PUT runs before the racing conflict is examined in the same pass.
+  store.setState((s) => {
+    const { [pusher.quotation.id]: first, [racing.quotation.id]: second, ...rest } = s.quotationChanges;
+    return { quotationChanges: { [pusher.quotation.id]: first, [racing.quotation.id]: second, ...rest } };
+  });
+  teammateWrite(racing.quotation.id, () => ({ notes: 'v3' }));
+  onPut = (putId) => {
+    if (putId === pusher.quotation.id) api().resolveQuotationConflict(racing.quotation.id, 'accept_server');
+  };
+  await sync();
+  onPut = null;
+  assert.equal(api().quotationChanges[racing.quotation.id], undefined, 'The resolved conflict stays resolved');
+  assert.equal(find(racing.quotation.id).notes, 'v3', 'and the newest copy is installed by the same pass');
   assert.equal(api().quotationSyncFeedback, null);
 
   // 12. Project sync runs quotations right after clients; a quotation failure does not block proposals.

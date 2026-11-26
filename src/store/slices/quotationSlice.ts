@@ -66,7 +66,8 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
   /** New revision of `previous` (the record before the edit): its confirmed content becomes the base of a new change. */
   const dirty = (previous: QuotationRecord): Record<string, QuotationChange> => {
     const changes = get().quotationChanges, existing = changes[previous.id];
-    const { rejected: _retry, ...kept } = existing ?? {
+    // Editing keeps the quotation: a pending deletion conflict becomes an ordinary (version) conflict.
+    const { rejected: _retry, deletionConflict: _keep, ...kept } = existing ?? {
       revision: '', baseVersion: previous.baseVersion ?? previous.version ?? 0,
       ...(previous.version ? { base: canonicalQuotationContent(previous) } : {}),
     };
@@ -346,14 +347,19 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
           for (const command of [...get().quotationDeletionQueue]) {
             if (!current()) return SESSION_CHANGED;
             if (!own(command.ownerId)) continue;
+            const release = () => set((s) => ({ quotationDeletionQueue: s.quotationDeletionQueue.filter((c) => c.id !== command.id) }));
+            // Already deleted on the server (also after a rejected attempt): nothing left to do.
+            if (deleted.has(command.id)) {
+              release();
+              continue;
+            }
             if (command.rejected) {
               // Rejected deletions wait for the user to retry or discard them: no retry loop.
               failures++;
               continue;
             }
-            const release = () => set((s) => ({ quotationDeletionQueue: s.quotationDeletionQueue.filter((c) => c.id !== command.id) }));
             // Never-published drafts are dropped without a request.
-            if (deleted.has(command.id) || (!remote.has(command.id) && command.baseVersion === 0)) {
+            if (!remote.has(command.id) && command.baseVersion === 0) {
               release();
               continue;
             }
@@ -388,16 +394,25 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
             }
           }
 
-          for (const [id, change] of Object.entries(get().quotationChanges)) {
+          for (const id of Object.keys(get().quotationChanges)) {
             if (!current()) return SESSION_CHANGED;
+            // Read now, not from a copy taken when the loop started: earlier PUTs await, and the user may resolve
+            // or edit this change meanwhile.
+            const change = get().quotationChanges[id];
             const local = get().quotations.find((q) => q.id === id);
-            if (!local) continue;
+            if (!change || !local) continue;
             const newer = remote.get(id);
-            const waiting = !own(change.ownerId) || change.serverQuotation || change.rejected?.revision === change.revision;
+            const waits = (c: QuotationChange) => !own(c.ownerId) || !!c.serverQuotation || c.rejected?.revision === c.revision;
+            const waiting = waits(change);
             if (waiting && !change.serverDeleted && newer && newer.version > (change.serverQuotation?.version ?? change.baseVersion)) {
               // A newer server copy of a quotation that is not pushed in this pass is kept in its conflict, so the
               // cursor can advance without losing it: `accept_server` always installs the newest copy known.
-              patchChange(id, { serverQuotation: newer, ...(change.deletionConflict ? { deletionConflict: true } : {}) }, change.baseVersion);
+              set((s) => {
+                const latest = s.quotationChanges[id];
+                if (!latest || !waits(latest) || latest.serverDeleted) return {};
+                const { rejected: _r, ...kept } = latest;
+                return { quotationChanges: { ...s.quotationChanges, [id]: { ...kept, serverQuotation: newer } } };
+              });
             }
             if (!own(change.ownerId)) {
               // A teammate's retained change is never uploaded here, but a tombstone still protects it for its owner.

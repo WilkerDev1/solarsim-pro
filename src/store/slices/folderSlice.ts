@@ -204,6 +204,7 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
           "folderId",
           new Set([id]),
           state.syncSettings.currentUser?.id,
+          { localWorkspace: !state.syncSettings.currentUser },
         ),
       });
       sync();
