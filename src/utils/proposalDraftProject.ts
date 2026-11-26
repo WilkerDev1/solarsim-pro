@@ -8,7 +8,7 @@ import { getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTar
 import { tariffMatrixKey } from '../../shared/tariffRules';
 import { resolveSystemLossesPct, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
 import { assumptionFields, resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
-import { DEFAULT_TARGET_MARGIN_PCT } from '../store/defaultSimulationSettings';
+import { automatedSaleMarginMultiplier } from './saleMargin';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
 import { NEW_PROPOSAL_NET_METERING_REGIME, reconcileGridUseCharge } from '../../shared/netMetering';
 import { editEquipment, readEquipment, type EquipmentKind } from '../../shared/equipment';
@@ -134,7 +134,7 @@ export function createAIProposalBase(template:ProjectSimulation,defaults:Default
 
       // ADR 0003 (d): los ajustes del usuario primero, luego las constantes compartidas (la misma fábrica que el proyecto nuevo).
       const seeded=assumptionFields(undefined,defaults);
-      base.specs={...base.specs,pricePerWattUSD:seeded.specs.pricePerWattUSD,systemLosses:seeded.specs.systemLosses,annualDegradation:seeded.specs.annualDegradation,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? DEFAULT_TARGET_MARGIN_PCT)/100,installationUnitPriceUSD:0};
+      base.specs={...base.specs,pricePerWattUSD:seeded.specs.pricePerWattUSD,systemLosses:seeded.specs.systemLosses,annualDegradation:seeded.specs.annualDegradation,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:automatedSaleMarginMultiplier(defaults),installationUnitPriceUSD:0};
       // Grupos explícitos; el DOD por defecto vive en el grupo de batería.
       const withGroups=withoutInheritedPanelDegradation(migrateLegacySpecs(base.specs)); // la degradación configurada manda sobre el 0.5 % de la referencia
       base.specs={...withGroups,batteries:withGroups.batteries?.map((group,index)=>index===0?{...group,dodPct:defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT}:group)};

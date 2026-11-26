@@ -2,18 +2,18 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ArrowLeft, Eye, FileText, Lock, RotateCcw, Send } from 'lucide-react';
 import { canWrite } from '../../../../shared/permissions';
-import { assumptionFields } from '../../../../shared/assumptions';
 import { canTransitionQuotation, effectiveQuotationStatus, isQuotationContentLocked, type QuotationStatus } from '../../../../shared/quotations';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { quotationContent } from '../../../store/sync/quotationContent';
 import type { QuotationRecord } from '../../../types/quotation';
 import type { SolarEquipmentItem } from '../../../types/equipment';
-import { contentPatch } from '../../../domain/quotationEdit';
-import { newDocumentCompany } from '../../../features/quotations/issuer';
+import { newDocumentCompany, stampForIssuer } from '../../../features/quotations/issuer';
+import { quotationCatalogContext } from '../../../features/quotations/catalogLine';
+import { quotationEditorActions } from '../../../features/quotations/editorActions';
 import { storeGenericPriceFor } from '../../simulator/params/logic/storeGenericPrice';
 import { localIsoDate } from '../../../utils/localDate';
 import { QuotationStatusChip } from '../common/QuotationStatusChip';
-import { ClientSection, DiscountsSection, DocumentSection, ItemsSection, NotesSection, SummarySection, type Edit } from './ContentSections';
+import { ClientSection, DiscountsSection, DocumentSection, IssuerSection, ItemsSection, NotesSection, SummarySection, type Edit } from './ContentSections';
 import { QuotationPreview } from './QuotationPreview';
 import { quotationSaveStatus } from './saveStatus';
 import '../../clients/client-link.css';
@@ -47,8 +47,7 @@ const LOCK_REASONS: Record<QuotationStatus, string> = {
 
 const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }) => {
   const {
-    change, sidebarTheme, currentUser, online, clients, catalog, defaults, seal,
-    updateQuotationRecord, setQuotationStatus, linkQuotationToClient, closeQuotation,
+    change, sidebarTheme, currentUser, online, clients, catalog, defaults, seal, setQuotationStatus, closeQuotation,
   } = useSimulationStore(useShallow((s) => ({
     change: s.quotationChanges[quotation.id],
     sidebarTheme: s.sidebarTheme,
@@ -57,10 +56,9 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
     clients: s.clients,
     catalog: s.equipmentCatalog,
     defaults: s.defaultSimulationSettings,
-    seal: newDocumentCompany(s)?.signatureSealBase64 ?? null,
-    updateQuotationRecord: s.updateQuotationRecord,
+    // El sello es el del membrete que emitió la cotización, nunca el de otra empresa (el activo puede ser otro).
+    seal: stampForIssuer(s.companies, quotation.issuer),
     setQuotationStatus: s.setQuotationStatus,
-    linkQuotationToClient: s.linkQuotationToClient,
     closeQuotation: s.closeQuotation,
   })));
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -74,31 +72,17 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
   const save = quotationSaveStatus(change, { online, version: quotation.version });
   const canReopen = writable && locked && canTransitionQuotation(quotation.status, 'draft');
 
-  const edit: Edit = useCallback((update) => {
-    const latest = useSimulationStore.getState().quotations.find((q) => q.id === id);
-    if (!latest) return 'Cotización no encontrada.';
-    const base = quotationContent(latest);
-    const patch = contentPatch(base, update(base));
-    if (!Object.keys(patch).length) return null;
-    const result = updateQuotationRecord(id, patch);
-    return result.ok ? null : result.error;
-  }, [id, updateQuotationRecord]);
-  const link = useCallback((clientId: string | null) => {
-    const result = linkQuotationToClient(id, clientId);
-    return result.ok ? null : result.error;
-  }, [id, linkQuotationToClient]);
+  const actions = useMemo(() => quotationEditorActions(useSimulationStore.getState, id), [id]);
+  const edit: Edit = actions.edit;
   const transition = (status: QuotationStatus) => {
     const result = setQuotationStatus(id, status);
     setStatusError(result.ok ? null : result.error);
   };
-  // Margen de venta de los ajustes (fábrica de supuestos, ADR 0003) y genérico vigente al abrir el selector (ADR 0006).
-  const saleMarginMultiplier = assumptionFields(undefined, defaults).specs.saleMarginMultiplier;
-  const catalogContext = useCallback((item: SolarEquipmentItem) => ({
-    currency: content.currency,
-    exchangeRate: content.exchangeRate,
-    saleMarginMultiplier,
-    genericPrice: storeGenericPriceFor(item.id),
-  }), [content.currency, content.exchangeRate, saleMarginMultiplier]);
+  // Margen de las propuestas automáticas con los ajustes del usuario y genérico vigente al abrir el selector (ADR 0006).
+  const catalogContext = useCallback(
+    (item: SolarEquipmentItem) => quotationCatalogContext(content, defaults, storeGenericPriceFor(item.id)),
+    [content, defaults],
+  );
   const sheet = useMemo(() => ({ ...content, number: quotation.number }), [content, quotation.number]);
   const readOnlyReason = !writable ? 'Solo lectura: tu rol no permite editar cotizaciones.' : LOCK_REASONS[quotation.status];
 
@@ -148,7 +132,8 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
             </p>
           )}
           <DocumentSection content={content} readOnly={readOnly} edit={edit} number={quotation.number} />
-          <ClientSection content={content} readOnly={readOnly} edit={edit} clients={clients} link={link} />
+          <IssuerSection content={content} readOnly={readOnly} refresh={() => actions.refreshIssuer(newDocumentCompany(useSimulationStore.getState()))} />
+          <ClientSection content={content} readOnly={readOnly} edit={edit} clients={clients} chooseClient={actions.chooseClient} />
           <ItemsSection content={content} readOnly={readOnly} edit={edit} catalog={catalog} catalogContext={catalogContext} />
           <DiscountsSection content={content} readOnly={readOnly} edit={edit} />
           <NotesSection content={content} readOnly={readOnly} edit={edit} />

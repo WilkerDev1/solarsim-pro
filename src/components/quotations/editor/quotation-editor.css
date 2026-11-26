@@ -420,7 +420,7 @@
   text-align: left;
   cursor: pointer;
 }
-.qe-segmented button[aria-checked="true"] {
+.qe-segmented button[aria-pressed="true"] {
   background: var(--qe-panel);
   border-color: var(--qe-border);
   color: var(--qe-text);
@@ -459,16 +459,30 @@
   border: 1px solid var(--qe-border);
   border-radius: 10px;
   padding: 10px 12px 12px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "top actions" "values values" "error error";
   gap: 8px;
+}
+/* Orden del tabulador: descripción, valores y después las acciones (que se ven arriba a la derecha). */
+.qe-line > .qe-line-top {
+  grid-area: top;
+}
+.qe-line > .qe-line-actions {
+  grid-area: actions;
+}
+.qe-line > .qe-line-values {
+  grid-area: values;
+}
+.qe-line > .qe-field-error {
+  grid-area: error;
 }
 .qe-line-detail {
   border-style: dashed;
 }
 .qe-line-top {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
 }
@@ -542,6 +556,39 @@
 .qe-detail-note {
   align-self: end;
   padding-bottom: 10px;
+}
+
+/* Emisor */
+.qe-issuer {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--qe-muted);
+}
+.qe-issuer svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.qe-issuer dl {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  font-size: 13px;
+  min-width: 0;
+}
+.qe-issuer dl > div {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.qe-issuer dt {
+  color: var(--qe-muted);
+}
+.qe-issuer dd {
+  margin: 0;
+  color: var(--qe-text);
+  overflow-wrap: anywhere;
 }
 
 /* Catálogo */

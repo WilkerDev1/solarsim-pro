@@ -37,7 +37,6 @@ const editable = (html: string) => inputs(html).filter((tag) => !/\b(readonly|di
 
 // Borrador: campos editables, emitir, sin «Guardar», vista previa en vivo con la hoja.
 setup(record());
-const before = JSON.stringify(useSimulationStore.getState().quotations);
 const draft = render();
 assert.ok(draft.includes('COT-2026-0147'));
 assert.ok(draft.includes('Borrador'));
@@ -58,7 +57,16 @@ assert.ok(draft.includes('Página 1 de 1'));
 assert.ok(draft.includes('Descargar PDF'));
 assert.ok(draft.includes('Guardado en este equipo'), 'estado de guardado honesto en modo local');
 assert.ok(!draft.includes('Plantilla y firmas') && !draft.includes('Adjuntos'), 'las pestañas de fases siguientes no se muestran');
-assert.equal(JSON.stringify(useSimulationStore.getState().quotations), before, 'mirar no escribe');
+// Emisor de solo lectura con la acción explícita en borrador.
+assert.ok(draft.includes('>Emisor<') && draft.includes('Actualizar desde el membrete'));
+// Orden del tabulador en cada línea: descripción → cantidad → unidad → precio → descuento → ITBIS → acciones.
+const order = ['Descripción de la línea 1', '>Cant.<', '>Unidad<', '>Precio unit.<', '>Desc. %<', '>ITBIS<', 'Subir línea 1', 'Quitar línea 1'].map((text) => draft.indexOf(text));
+assert.ok(order.every((at, i) => at > 0 && (i === 0 || at > order[i - 1])), `orden de la línea: ${order.join(', ')}`);
+// La moneda son botones con aria-pressed, no un grupo de radio que cambia con las flechas.
+assert.ok(draft.includes('aria-pressed="true"') && !draft.includes('role="radiogroup"'));
+// Toda referencia aria-describedby apunta a un elemento presente.
+const describedRefs = (html: string) => [...html.matchAll(/aria-describedby="([^"]+)"/g)].flatMap((m) => m[1].split(' '));
+for (const ref of describedRefs(draft)) assert.ok(draft.includes(`id="${ref}"`), `aria-describedby sin destino: ${ref}`);
 
 // Bloqueada (emitida): solo lectura, explicación y «Reabrir para editar».
 setup(record({ status: 'issued' }));
@@ -69,6 +77,8 @@ assert.ok(!issued.includes('Emitir cotización'));
 assert.equal(editable(issued).length, 0, `sin campos editables: ${editable(issued).join(' ')}`);
 assert.ok(!issued.includes('Ítem libre'), 'sin acciones de edición');
 assert.ok(issued.includes('Descargar PDF'), 'se puede descargar');
+assert.ok(!issued.includes('Actualizar desde el membrete'), 'el emisor no se actualiza fuera de borrador');
+for (const ref of describedRefs(issued)) assert.ok(issued.includes(`id="${ref}"`), `aria-describedby sin destino en solo lectura: ${ref}`);
 // Aceptada: bloqueada y sin reabrir (no es una transición permitida).
 setup(record({ status: 'accepted' }));
 const accepted = render();

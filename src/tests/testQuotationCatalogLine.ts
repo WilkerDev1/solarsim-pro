@@ -2,7 +2,9 @@
 // único (oferta utilizable → genérico → nada) y el margen de venta, moneda del documento y exención de ITBIS.
 import assert from 'node:assert/strict';
 import { validateQuotationContent, emptyQuotationContent } from '../../shared/quotations';
-import { CATALOG_PRICE_NOTICES, catalogItemDescription, catalogQuotationLine } from '../features/quotations/catalogLine';
+import { CATALOG_PRICE_NOTICES, catalogItemDescription, catalogQuotationLine, catalogSalePrice, quotationCatalogContext } from '../features/quotations/catalogLine';
+import { automatedSaleMarginMultiplier } from '../utils/saleMargin';
+import { DEFAULT_TARGET_MARGIN_PCT } from '../store/defaultSimulationSettings';
 import type { SolarEquipmentItem } from '../types/equipment';
 
 const item = (extra: Partial<SolarEquipmentItem>): SolarEquipmentItem => ({
@@ -56,5 +58,18 @@ assert.equal(catalogItemDescription(item({ displayName: 'x'.repeat(600) })).leng
 // El resultado es contenido válido.
 const content = emptyQuotationContent('2026-11-26', { exchangeRate: 60, items: [supplied.line, { ...none.line, id: 'line-2' }] });
 assert.ok(validateQuotationContent(content).ok);
+
+// Un solo redondeo desde el precio de origen (no USD a centavos y luego a pesos).
+const precise = item({ supplierPrices: [offer('a', 1234.567)] });
+assert.equal(catalogSalePrice(precise, { currency: 'DOP', exchangeRate: 62.35, saleMarginMultiplier: 1.25 }).cents, Math.round(1234.567 * 1.25 * 62.35 * 100));
+
+// El margen es el de las propuestas automáticas con los ajustes del usuario: cambiar el ajuste cambia el precio.
+const doc = { currency: 'DOP' as const, exchangeRate: 60 };
+assert.equal(automatedSaleMarginMultiplier({ defaultTargetMarginPct: 40 }), 1.4);
+assert.equal(automatedSaleMarginMultiplier(undefined), 1 + DEFAULT_TARGET_MARGIN_PCT / 100);
+const hundred = item({ supplierPrices: [offer('a', 100)] });
+assert.equal(catalogQuotationLine(hundred, quotationCatalogContext(doc, { defaultTargetMarginPct: 40 }), newId).line.unitPriceCents, 840000, '100 × 1.40 × 60');
+assert.equal(catalogQuotationLine(hundred, quotationCatalogContext(doc, { defaultTargetMarginPct: 10 }), newId).line.unitPriceCents, 660000, '100 × 1.10 × 60');
+assert.equal(quotationCatalogContext(doc, { defaultTargetMarginPct: 40 }, generic).genericPrice, generic);
 
 console.log('Quotation catalog line tests passed.');

@@ -4,9 +4,9 @@
  * ni valida: el store valida con `validateQuotationContent` al guardar (`updateQuotationRecord`). Los ids nuevos
  * salen del generador inyectado (`newId`) para que las pruebas sean deterministas.
  */
-import { convertCents } from '../../shared/quotations';
+import { convertCents, formatExchangeRate } from '../../shared/quotations';
 import type {
-  QuotationContent, QuotationCurrency, QuotationDiscount, QuotationLine, QuotationPrintedClient,
+  QuotationContent, QuotationCurrency, QuotationDiscount, QuotationIssuer, QuotationLine, QuotationPrintedClient,
 } from '../../shared/quotations';
 
 export type IdFactory = () => string;
@@ -142,6 +142,27 @@ export function changeCurrency(content: QuotationContent, currency: QuotationCur
     items: content.items.map((line) => (line.kind === 'item' ? { ...line, unitPriceCents: convert(line.unitPriceCents) } : line)),
     discounts: content.discounts.map((discount) => (discount.type === 'fixed' ? { ...discount, value: convert(discount.value) } : discount)),
   };
+}
+
+const CURRENCY_LABELS: Record<QuotationCurrency, string> = { DOP: 'pesos dominicanos (RD$)', USD: 'dólares (US$)' };
+
+/**
+ * Qué supone cambiar a `currency`: hay que confirmarlo si hay importes que convertir (líneas con precio o descuentos
+ * fijos); el mensaje dice a qué moneda, con qué tasa y que los importes se convierten y redondean a centavos.
+ */
+export function currencyChangeSummary(content: QuotationContent, currency: QuotationCurrency): { needsConfirmation: boolean; message: string } {
+  const priced = content.items.filter((line) => line.kind === 'item' && line.unitPriceCents > 0).length;
+  const fixed = content.discounts.filter((discount) => discount.type === 'fixed' && discount.value > 0).length;
+  const parts = [priced ? `${priced} ${priced === 1 ? 'precio' : 'precios'}` : '', fixed ? `${fixed} ${fixed === 1 ? 'descuento fijo' : 'descuentos fijos'}` : ''].filter(Boolean);
+  return {
+    needsConfirmation: parts.length > 0,
+    message: `La cotización pasará a ${CURRENCY_LABELS[currency]}. Se convertirán ${parts.join(' y ') || 'los importes'} con la tasa del documento (US$ 1 = RD$ ${formatExchangeRate(content.exchangeRate)}) y se redondearán a centavos; volver a la moneda anterior puede no dar los mismos importes.`,
+  };
+}
+
+/** Reemplaza los datos impresos del emisor (p. ej. «Actualizar desde el membrete»). */
+export function setIssuer(content: QuotationContent, issuer: QuotationIssuer): QuotationContent {
+  return { ...content, issuer: { ...issuer } };
 }
 
 /** Cambia la tasa (DOP por USD) sin tocar importes. */

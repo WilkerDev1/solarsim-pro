@@ -1,5 +1,6 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { AlignLeft, ArrowDown, ArrowUp, Copy, Package, Plus, Trash2 } from 'lucide-react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { AlignLeft, ArrowDown, ArrowUp, Building2, Copy, Package, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { confirmAction } from '../../common/confirmAction';
 import {
   QUOTATION_LIMITS, QUOTATION_SHEET_TEXTS, computeQuotationTotals, formatAmount, formatExchangeRate, formatMoney, formatQuantity, toCents,
   type QuotationCurrency,
@@ -8,7 +9,7 @@ import type { QuotationContent, QuotationLine } from '../../../types/quotation';
 import type { ClientRecord } from '../../../types/client';
 import type { SolarEquipmentItem } from '../../../types/equipment';
 import {
-  addDetailLine, addDiscount, addItemLine, appendLine, changeCurrency, duplicateLine, moveLine, printedClientFromDirectory, removeDiscount,
+  addDetailLine, addDiscount, addItemLine, appendLine, changeCurrency, currencyChangeSummary, duplicateLine, moveLine, removeDiscount,
   removeLine, setDocumentFields, setExchangeRate, setPrintedClient, updateDiscount, updateLine,
 } from '../../../domain/quotationEdit';
 import { catalogQuotationLine, type CatalogLineContext } from '../../../features/quotations/catalogLine';
@@ -43,8 +44,12 @@ const Card: React.FC<{ title: string; titleId: string; actions?: React.ReactNode
 export const DocumentSection: React.FC<SectionProps & { number: string | null }> = ({ content, readOnly, edit, number }) => {
   const currencies: QuotationCurrency[] = ['DOP', 'USD'];
   const [currencyError, setCurrencyError] = useState<string | null>(null);
-  const pickCurrency = (currency: QuotationCurrency) => {
+  const currencyButtons = useRef<(HTMLButtonElement | null)[]>([]);
+  // Cambiar de moneda es una acción explícita: con importes que convertir, se confirma primero.
+  const pickCurrency = async (currency: QuotationCurrency) => {
     if (readOnly || currency === content.currency) return;
+    const summary = currencyChangeSummary(content, currency);
+    if (summary.needsConfirmation && !(await confirmAction({ title: `Cambiar la moneda a ${currency === 'DOP' ? 'RD$' : 'US$'}`, message: summary.message, confirmLabel: 'Convertir importes' }))) return;
     setCurrencyError(edit((c) => changeCurrency(c, currency)));
   };
   return (
@@ -64,24 +69,25 @@ export const DocumentSection: React.FC<SectionProps & { number: string | null }>
           <span className="qe-label" id="qe-currency-label">Moneda</span>
           <div
             className="qe-segmented"
-            role="radiogroup"
+            role="group"
             aria-labelledby="qe-currency-label"
-            aria-describedby="qe-currency-hint"
+            aria-describedby={currencyError ? 'qe-currency-error' : !readOnly ? 'qe-currency-hint' : undefined}
             onKeyDown={(event) => {
-              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+              // Las flechas solo mueven el foco; cambiar de moneda exige pulsar el botón.
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
               event.preventDefault();
-              pickCurrency(content.currency === 'DOP' ? 'USD' : 'DOP');
+              const index = currencyButtons.current.findIndex((button) => button === document.activeElement);
+              currencyButtons.current[(index + 1) % currencies.length]?.focus();
             }}
           >
-            {currencies.map((currency) => (
+            {currencies.map((currency, index) => (
               <button
                 key={currency}
+                ref={(button) => { currencyButtons.current[index] = button; }}
                 type="button"
-                role="radio"
-                aria-checked={content.currency === currency}
-                tabIndex={content.currency === currency ? 0 : -1}
+                aria-pressed={content.currency === currency}
                 disabled={readOnly && content.currency !== currency}
-                onClick={() => pickCurrency(currency)}
+                onClick={() => void pickCurrency(currency)}
               >
                 <CurrencyFlag currency={currency} width={20} />
                 <span>{CURRENCY_NAMES[currency]}</span>
@@ -89,8 +95,8 @@ export const DocumentSection: React.FC<SectionProps & { number: string | null }>
             ))}
           </div>
           {currencyError
-            ? <p className="qe-field-error" role="alert">{currencyError}</p>
-            : !readOnly && <p id="qe-currency-hint" className="qe-field-hint">Al cambiar de moneda, los precios se convierten con la tasa del documento.</p>}
+            ? <p id="qe-currency-error" className="qe-field-error" role="alert">{currencyError}</p>
+            : !readOnly && <p id="qe-currency-hint" className="qe-field-hint">Cambiar de moneda convierte los precios con la tasa del documento; se pide confirmación.</p>}
         </div>
         <NumberField
           label="Tasa del dólar"
@@ -106,22 +112,47 @@ export const DocumentSection: React.FC<SectionProps & { number: string | null }>
   );
 };
 
+/** Emisor impreso: solo lectura, con «Actualizar desde el membrete» (borrador y permiso de escritura, con confirmación). */
+export const IssuerSection: React.FC<{ content: QuotationContent; readOnly: boolean; refresh: () => string | null }> = ({ content, readOnly, refresh }) => {
+  const [error, setError] = useState<string | null>(null);
+  const { issuer } = content;
+  const update = async () => {
+    const accepted = await confirmAction({
+      title: 'Actualizar el emisor',
+      message: 'Se reemplazarán los datos impresos del emisor de esta cotización (nombre, RNC, contacto y logo) por los del membrete actual.',
+      confirmLabel: 'Actualizar',
+    });
+    if (accepted) setError(refresh());
+  };
+  return (
+    <Card
+      title="Emisor"
+      titleId="qe-issuer-title"
+      actions={!readOnly && <button type="button" className="qe-btn qe-btn-sm" onClick={() => void update()}><RefreshCw className="h-4 w-4" aria-hidden="true" />Actualizar desde el membrete</button>}
+    >
+      <div className="qe-issuer">
+        <Building2 className="h-4 w-4" aria-hidden="true" />
+        {issuer.name.trim() ? (
+          <dl>
+            <div><dt>Nombre</dt><dd>{issuer.name}</dd></div>
+            {issuer.taxId && <div><dt>RNC</dt><dd>{issuer.taxId}</dd></div>}
+            {issuer.phone && <div><dt>Teléfono</dt><dd>{issuer.phone}</dd></div>}
+          </dl>
+        ) : <p className="qe-muted">Sin datos del emisor.</p>}
+      </div>
+      {error && <p className="qe-field-error" role="alert">{error}</p>}
+    </Card>
+  );
+};
+
 export const ClientSection: React.FC<SectionProps & {
   clients: readonly ClientRecord[];
-  link: (clientId: string | null) => string | null;
-}> = ({ content, readOnly, edit, clients, link }) => {
+  /** Elegir copia los datos del cliente a los impresos; quitar solo desenlaza (`quotationEditorActions`). */
+  chooseClient: (client: ClientRecord | null) => string | null;
+}> = ({ content, readOnly, edit, clients, chooseClient }) => {
   const [error, setError] = useState<string | null>(null);
   const linked = content.clientId ? clients.find((c) => c.id === content.clientId) : undefined;
-  const choose = (client: ClientRecord | null) => {
-    if (!client) {
-      // Quitar el enlace nunca cambia los datos impresos.
-      setError(link(null));
-      return;
-    }
-    const failure = link(client.id);
-    // Elegir un cliente es la acción explícita que copia sus datos a los impresos.
-    setError(failure ?? edit((c) => setPrintedClient(c, printedClientFromDirectory(client))));
-  };
+  const choose = (client: ClientRecord | null) => setError(chooseClient(client));
   const printed = (key: keyof QuotationContent['client'], label: string, extra: Partial<React.ComponentProps<typeof TextField>> = {}) => (
     <TextField
       label={label}
@@ -187,14 +218,6 @@ const LineRow: React.FC<{
           placeholder={detail ? 'Texto descriptivo (sin precio)' : 'Descripción del ítem'}
           onCommit={(description) => change({ description })}
         />
-        {!readOnly && (
-          <div className="qe-line-actions">
-            <button type="button" className="qe-icon-btn" aria-label={`Subir línea ${position}`} disabled={index === 0} onClick={() => act((c) => moveLine(c, line.id, -1))}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
-            <button type="button" className="qe-icon-btn" aria-label={`Bajar línea ${position}`} disabled={index === count - 1} onClick={() => act((c) => moveLine(c, line.id, 1))}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
-            <button type="button" className="qe-icon-btn" aria-label={`Duplicar línea ${position}`} onClick={() => act((c) => duplicateLine(c, line.id, newLineId))}><Copy className="h-4 w-4" aria-hidden="true" /></button>
-            <button type="button" className="qe-icon-btn qe-danger" aria-label={`Quitar línea ${position}`} onClick={() => act((c) => removeLine(c, line.id))}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
-          </div>
-        )}
       </div>
       <div className="qe-line-values">
         <NumberField className="qe-w-qty" label="Cant." value={line.quantity} readOnly={readOnly} format={formatQuantity} onCommit={(quantity) => change({ quantity })} />
@@ -216,6 +239,14 @@ const LineRow: React.FC<{
           </>
         )}
       </div>
+      {!readOnly && (
+        <div className="qe-line-actions">
+          <button type="button" className="qe-icon-btn" aria-label={`Subir línea ${position}`} disabled={index === 0} onClick={() => act((c) => moveLine(c, line.id, -1))}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
+          <button type="button" className="qe-icon-btn" aria-label={`Bajar línea ${position}`} disabled={index === count - 1} onClick={() => act((c) => moveLine(c, line.id, 1))}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
+          <button type="button" className="qe-icon-btn" aria-label={`Duplicar línea ${position}`} onClick={() => act((c) => duplicateLine(c, line.id, newLineId))}><Copy className="h-4 w-4" aria-hidden="true" /></button>
+          <button type="button" className="qe-icon-btn qe-danger" aria-label={`Quitar línea ${position}`} onClick={() => act((c) => removeLine(c, line.id))}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+        </div>
+      )}
       {actionError && <p className="qe-field-error" role="alert">{actionError}</p>}
     </li>
   );
