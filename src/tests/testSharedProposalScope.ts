@@ -92,7 +92,7 @@ try {
   const project = { ...structuredClone(BENCHMARK_PROJECT), id: 'synthetic-project', organizationId: 'org-a', syncServerUrl: serverA };
   const scope = featureScope(serverA, 'org-a');
   useSimulationStore.setState({ projects: [project], loadOrganizationFeaturePolicy: async () => {}, organizationFeaturePolicies: {
-    [scope]: { organizationId: 'org-a', version: 1, settings: { selfConsumptionProjection: false, netMeteringRegimeSelector: true } },
+    [scope]: { organizationId: 'org-a', version: 1, settings: { selfConsumptionProjection: false, netMeteringRegimeSelector: true, quotations: true } },
   } });
   const publishResponse = deferred<Response>();
   const started = deferred<void>();

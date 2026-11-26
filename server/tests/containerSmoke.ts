@@ -129,6 +129,7 @@ try {
       settings: {
         selfConsumptionProjection: true,
         netMeteringRegimeSelector: true,
+        quotations: true,
       },
     }),
   });

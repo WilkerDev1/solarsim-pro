@@ -8,7 +8,10 @@ import { asClient } from "./helpers/clientHeader.js";
 import { migrateDatabase } from "../src/database/migrations.js";
 import { projectCreatedAtBackfill } from "../src/database/007_project_created_at.js";
 import { readConfig } from "../src/config.js";
-import { FEATURE_POLICY_V2_CLIENT_VERSION } from "../../shared/clientVersion.js";
+import {
+  FEATURE_POLICY_V2_CLIENT_VERSION,
+  FEATURE_POLICY_V3_CLIENT_VERSION,
+} from "../../shared/clientVersion.js";
 import {
   startEphemeralPostgres,
   type EphemeralPostgres,
@@ -19,8 +22,12 @@ let database: EphemeralPostgres;
 let pool: pg.Pool;
 let app: ReturnType<typeof createApp>;
 let admin: any, other: any, editor: any, reader: any;
-/** Cliente que ya entiende la política de dos claves. */
+/** Cliente que ya entiende la política de tres claves (`quotations`). */
 const NEW = {
+  "X-SolarSim-Client": `desktop/${FEATURE_POLICY_V3_CLIENT_VERSION}`,
+};
+/** Cliente que entiende solo la política de dos claves (2.8.0 … 2.9.x). */
+const V2 = {
   "X-SolarSim-Client": `desktop/${FEATURE_POLICY_V2_CLIENT_VERSION}`,
 };
 async function request(
@@ -196,7 +203,8 @@ test("expired access never authorizes mutation; explicit refresh has a bounded 3
 });
 test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and tenant isolation", async () => {
   // Lectura según la versión del cliente: los anteriores a la política de dos claves (aquí el 2.7.1 de las suites)
-  // reciben solo `selfConsumptionProjection`; los nuevos, las dos (la fila de una clave se completa con el default).
+  // reciben solo `selfConsumptionProjection`; 2.8.0 … 2.9.x, las dos que conocen; los nuevos, las tres (la fila
+  // guardada con menos claves se completa con el default).
   const initial = await request("GET", "/api/organization/features", reader);
   assert.deepEqual(initial.body.settings, { selfConsumptionProjection: false });
   assert.deepEqual(
@@ -211,7 +219,17 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
   assert.deepEqual(
     (await request("GET", "/api/organization/features", reader, undefined, NEW))
       .body.settings,
+    {
+      selfConsumptionProjection: false,
+      netMeteringRegimeSelector: true,
+      quotations: true,
+    },
+  );
+  assert.deepEqual(
+    (await request("GET", "/api/organization/features", reader, undefined, V2))
+      .body.settings,
     { selfConsumptionProjection: false, netMeteringRegimeSelector: true },
+    "2.8.0 … 2.9.x validan exactamente dos claves",
   );
   // Un rol falso en el JWT no basta: el PATCH comprueba el rol actual en la base de datos.
   for (const role of ["ADMIN", "VIEWER"]) {
@@ -232,6 +250,7 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
             settings: {
               selfConsumptionProjection: true,
               netMeteringRegimeSelector: false,
+              quotations: true,
             },
             baseVersion: 1,
           },
@@ -248,6 +267,7 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
         settings: {
           selfConsumptionProjection: true,
           netMeteringRegimeSelector: false,
+          quotations: true,
         },
         baseVersion: 1,
       })
@@ -260,15 +280,17 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
         settings: {
           selfConsumptionProjection: "yes",
           netMeteringRegimeSelector: true,
+          quotations: true,
         },
         baseVersion: 1,
       })
     ).status,
     400,
   );
-  // Un cliente anterior (una sola clave) o una clave desconocida no puede sobrescribir la política: 400 y sin cambios.
+  // Un cliente anterior (una o dos claves) o una clave desconocida no puede sobrescribir la política: 400 y sin cambios.
   for (const settings of [
     { selfConsumptionProjection: true },
+    { selfConsumptionProjection: true, netMeteringRegimeSelector: false },
     {
       selfConsumptionProjection: true,
       netMeteringRegimeSelector: true,
@@ -295,6 +317,7 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
         settings: {
           selfConsumptionProjection: true,
           netMeteringRegimeSelector: false,
+          quotations: false,
         },
         baseVersion: 1,
       })
@@ -304,9 +327,19 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
   assert.deepEqual(
     (await request("GET", "/api/organization/features", reader, undefined, NEW))
       .body.settings,
+    {
+      selfConsumptionProjection: true,
+      netMeteringRegimeSelector: false,
+      quotations: false,
+    },
+  );
+  // Un cliente 2.9.x sigue viendo sus dos claves aunque la fila ya tenga tres.
+  assert.deepEqual(
+    (await request("GET", "/api/organization/features", reader, undefined, V2))
+      .body.settings,
     { selfConsumptionProjection: true, netMeteringRegimeSelector: false },
   );
-  // Un cliente anterior sigue viendo una sola clave aunque la fila ya tenga dos.
+  // Un cliente anterior sigue viendo una sola clave aunque la fila ya tenga tres.
   assert.deepEqual(
     (await request("GET", "/api/organization/features", reader)).body.settings,
     { selfConsumptionProjection: true },
@@ -317,6 +350,7 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
         settings: {
           selfConsumptionProjection: false,
           netMeteringRegimeSelector: true,
+          quotations: true,
         },
         baseVersion: 1,
       })

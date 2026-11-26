@@ -1,14 +1,14 @@
 /** Pure capability contract shared by the desktop app and the organization API. */
-import { FEATURE_POLICY_V2_CLIENT_VERSION, isClientOutdated } from './clientVersion.js';
+import { FEATURE_POLICY_V2_CLIENT_VERSION, FEATURE_POLICY_V3_CLIENT_VERSION, isClientOutdated } from './clientVersion.js';
 export type FeatureStage = 'stable' | 'beta' | 'experimental';
 export type EnergyCalculationMode = 'legacy' | 'self_consumption';
 /**
- * Política de funciones de la organización. Desde la versión que introduce el régimen de medición neta tiene dos
- * claves; la API solo guarda la forma completa (`isFeatureSettings`), así que un cliente anterior (una sola clave)
- * no puede sobrescribirla. Una respuesta o una política guardada de una sola clave se sigue leyendo
- * (`isCompatibleFeatureSettings`) y la clave que falta toma su valor por defecto.
+ * Política de funciones de la organización. Tiene tres claves desde la versión que introduce las cotizaciones (dos
+ * desde el régimen de medición neta); la API solo guarda la forma completa (`isFeatureSettings`), así que un cliente
+ * anterior (una o dos claves) no puede sobrescribirla. Una respuesta o una política guardada con menos claves se sigue
+ * leyendo (`isCompatibleFeatureSettings`) y la clave que falta toma su valor por defecto.
  */
-export interface ApplicationFeatureSettings { selfConsumptionProjection: boolean; netMeteringRegimeSelector: boolean }
+export interface ApplicationFeatureSettings { selfConsumptionProjection: boolean; netMeteringRegimeSelector: boolean; quotations: boolean }
 export interface OrganizationFeaturePolicy {
   organizationId: string;
   version: number;
@@ -28,6 +28,15 @@ export const APPLICATION_FEATURES = [{
   title: 'Selector de régimen de medición neta',
   description: 'Selector temporal en los parámetros de tarifa para calcular una propuesta con la retención % anterior o con el cargo por kWh inyectado del Reglamento SIE-007-2026, para pruebas y casos especiales.',
   disabledNote: 'Desactivada: el selector no se muestra. No cambia el régimen de ninguna propuesta: las nuevas nacen en SIE-007-2026 y las guardadas conservan el suyo.',
+  stage: 'beta' as FeatureStage,
+  available: true,
+  visibilityWhenDisabled: 'hidden' as 'hidden' | 'labelled',
+  defaultEnabled: true,
+}, {
+  id: 'quotations',
+  title: 'Cotizaciones',
+  description: 'Catálogo y editor de cotizaciones: documentos comerciales simples con líneas, descuentos, ITBIS y total, independientes de las propuestas.',
+  disabledNote: 'Desactivada: el botón y las vistas de cotizaciones no se muestran. Las cotizaciones guardadas se conservan y se siguen sincronizando.',
   stage: 'beta' as FeatureStage,
   available: true,
   visibilityWhenDisabled: 'hidden' as 'hidden' | 'labelled',
@@ -52,8 +61,9 @@ export function isFeatureSettings(value: unknown): value is ApplicationFeatureSe
   return Object.keys(record).length === FEATURE_KEYS.length && FEATURE_KEYS.every((key) => typeof record[key] === 'boolean');
 }
 /**
- * Forma que el cliente acepta al leer (respuesta de la API o política guardada): la completa o la de una sola clave
- * de las API y clientes anteriores (`selfConsumptionProjection`). Claves desconocidas o no booleanas: no válida.
+ * Forma que el cliente acepta al leer (respuesta de la API o política guardada): la completa o la de una o dos claves
+ * de las API y clientes anteriores (siempre con `selfConsumptionProjection`). Claves desconocidas o no booleanas: no
+ * válida.
  */
 export function isCompatibleFeatureSettings(value: unknown): boolean {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -62,18 +72,30 @@ export function isCompatibleFeatureSettings(value: unknown): boolean {
   return typeof record.selfConsumptionProjection === 'boolean' && keys.every((key) => (FEATURE_KEYS as string[]).includes(key) && typeof record[key] === 'boolean');
 }
 /**
- * Política tal como la lee un cliente según su versión (`X-SolarSim-Client`): anterior a
- * `FEATURE_POLICY_V2_CLIENT_VERSION`, o sin encabezado válido, recibe solo `selfConsumptionProjection` (la forma que
- * valida con «exactamente una clave»); desde esa versión, la forma completa. Sin encabezado se elige la forma antigua:
- * es la que entiende cualquier cliente que no se identifica.
+ * Política tal como la lee un cliente según su versión (`X-SolarSim-Client`), porque cada versión valida exactamente
+ * las claves que conoce: anterior a `FEATURE_POLICY_V2_CLIENT_VERSION`, o sin encabezado válido, recibe solo
+ * `selfConsumptionProjection`; desde esa versión y antes de `FEATURE_POLICY_V3_CLIENT_VERSION`, también
+ * `netMeteringRegimeSelector`; desde esta última, la forma completa. Sin encabezado se elige la forma más antigua: es
+ * la que entiende cualquier cliente que no se identifica.
  */
-export function featureSettingsForClient(stored: unknown, clientHeader: string | null | undefined): ApplicationFeatureSettings | Pick<ApplicationFeatureSettings, 'selfConsumptionProjection'> {
+export function featureSettingsForClient(
+  stored: unknown,
+  clientHeader: string | null | undefined,
+): ApplicationFeatureSettings | Pick<ApplicationFeatureSettings, 'selfConsumptionProjection' | 'netMeteringRegimeSelector'> | Pick<ApplicationFeatureSettings, 'selfConsumptionProjection'> {
   const settings = normalizeFeatureSettings(stored);
-  return isClientOutdated(clientHeader, FEATURE_POLICY_V2_CLIENT_VERSION) ? { selfConsumptionProjection: settings.selfConsumptionProjection } : settings;
+  if (isClientOutdated(clientHeader, FEATURE_POLICY_V2_CLIENT_VERSION)) return { selfConsumptionProjection: settings.selfConsumptionProjection };
+  if (isClientOutdated(clientHeader, FEATURE_POLICY_V3_CLIENT_VERSION)) {
+    return { selfConsumptionProjection: settings.selfConsumptionProjection, netMeteringRegimeSelector: settings.netMeteringRegimeSelector };
+  }
+  return settings;
 }
 /** ¿Se muestra el selector de régimen de medición neta? Función disponible y activada en la política efectiva. */
 export function netMeteringRegimeSelectorVisible(settings: ApplicationFeatureSettings): boolean {
   return isApplicationFeatureAvailable('netMeteringRegimeSelector') && settings.netMeteringRegimeSelector;
+}
+/** ¿Se muestran el botón y las vistas de cotizaciones? Función disponible y activada en la política efectiva. */
+export function quotationsFeatureEnabled(settings: ApplicationFeatureSettings): boolean {
+  return isApplicationFeatureAvailable('quotations') && settings.quotations;
 }
 export function featureScope(serverUrl: string, organizationId: string): string {
   return `${serverUrl.trim().replace(/\/+$/, '')}|${organizationId}`;
@@ -100,8 +122,8 @@ export type BuiltInFeatureId = (typeof BUILT_IN_APPLICATION_FEATURES)[number]['i
 export const isBuiltInFeatureAvailable = (id: BuiltInFeatureId): boolean => BUILT_IN_APPLICATION_FEATURES.some((f) => f.id === id && f.available && f.defaultEnabled);
 
 /**
- * Capabilities decided per device. They are not part of `ApplicationFeatureSettings`: 2.6.x clients and the API validate exactly one
- * organization key, and an organization must not be able to open a local port on a member's computer.
+ * Capabilities decided per device. They are not part of `ApplicationFeatureSettings`: every client version and the API validate exactly
+ * the organization keys they know, and an organization must not be able to open a local port on a member's computer.
  */
 export const DEVICE_APPLICATION_FEATURES = [{
   id: 'localMcpServer', title: 'Servidor MCP local',

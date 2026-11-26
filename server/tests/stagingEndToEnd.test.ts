@@ -259,6 +259,7 @@ test("Staging E2E: completo ciclo de confirmación de política, publicación we
         settings: {
           selfConsumptionProjection: true,
           netMeteringRegimeSelector: true,
+          quotations: true,
         },
       }),
     });
