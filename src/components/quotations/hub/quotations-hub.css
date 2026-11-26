@@ -439,7 +439,8 @@
 }
 .qh-table {
   width: 100%;
-  min-width: 660px;
+  /* 546 px de columnas fijas: deja al cliente al menos ~150 px antes de desplazar la tabla. */
+  min-width: 680px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -467,10 +468,10 @@
 .qh-table :is(th, td):last-child {
   padding-right: 18px;
 }
-.qh-col-number { width: 168px; }
-.qh-col-dates { width: 132px; }
-.qh-col-total { width: 150px; text-align: right !important; }
-.qh-col-status { width: 108px; }
+.qh-col-number { width: 158px; }
+.qh-col-dates { width: 108px; }
+.qh-col-total { width: 140px; text-align: right !important; }
+.qh-col-status { width: 96px; }
 .qh-table tbody tr {
   cursor: pointer;
   background: var(--qh-panel);
@@ -505,6 +506,7 @@
   gap: 6px;
   cursor: pointer;
   text-align: left;
+  white-space: nowrap;
   border-radius: 4px;
 }
 .qh-number:hover {
@@ -836,7 +838,7 @@
 /* Anchos: dock a la derecha desde 1400px; debajo de la lista en ventanas más estrechas. */
 @media (min-width: 1400px) {
   .qh-workspace {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
   }
 }
 @media (max-width: 1280px) {
