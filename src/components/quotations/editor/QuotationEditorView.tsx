@@ -128,6 +128,20 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
     { id: 'design' as const, label: 'Plantilla y firmas', icon: Palette },
     { id: 'attachments' as const, label: content.attachments.length ? `Adjuntos · ${content.attachments.length}` : 'Adjuntos', icon: Paperclip },
   ];
+  // «Agregar correo del cliente» en la vista de correo: abre Contenido, despliega los datos impresos y enfoca «Correo».
+  // Solo cambia la vista (estado local); no escribe nada.
+  const goToClientEmail = () => {
+    setTab('content');
+    setPane('form');
+    requestAnimationFrame(() => {
+      const details = document.getElementById('qe-client-printed') as HTMLDetailsElement | null;
+      if (!details) return;
+      details.open = true;
+      const input = details.querySelector<HTMLInputElement>('input[type="email"]');
+      input?.scrollIntoView({ block: 'center' });
+      input?.focus();
+    });
+  };
   const readOnlyReason = !writable ? 'Solo lectura: tu rol no permite editar cotizaciones.' : LOCK_REASONS[quotation.status];
 
   return (
@@ -221,7 +235,7 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
           </div>
         </div>
         <div className="qe-preview">
-          <QuotationPreview quotation={sheet} stampImage={stamp} quotationId={id} attachments={content.attachments} imageSources={imageSources} />
+          <QuotationPreview quotation={sheet} stampImage={stamp} quotationId={id} attachments={content.attachments} imageSources={imageSources} onGoToClientEmail={readOnly ? undefined : goToClientEmail} />
         </div>
       </div>
     </div>

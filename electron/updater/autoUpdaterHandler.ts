@@ -6,6 +6,7 @@ import { assertNewerReleaseVersion, compareReleaseVersions } from './releaseVers
 import { selectEligibleRelease } from './releaseChannel';
 import { autoUpdater } from 'electron-updater';
 import { getMainWindow } from '../window/windowManager';
+import { isOpenableExternalUrl } from '../../shared/externalUrl';
 
 // Configure autoUpdater
 autoUpdater.autoDownload = false;
@@ -135,7 +136,8 @@ export function registerAutoUpdater() {
   });
 
   ipcMain.handle('open-external-url', async (_event, url: string) => {
-    if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+    // http(s) y mailto: (correo de la cotización), sin caracteres de control (shared/externalUrl.ts).
+    if (isOpenableExternalUrl(url)) {
       await shell.openExternal(url);
     }
   });

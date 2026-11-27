@@ -19,6 +19,8 @@
   --qe-error-text: #ad2435;
   --qe-pending: #7a4b00;
   --qe-preview-bg: #eceff3;
+  --qe-divider: #e8ecf0;
+  --qe-dashed: #b9c3ce;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -47,6 +49,8 @@
   --qe-error-text: #ffc0c9;
   --qe-pending: #ffd88a;
   --qe-preview-bg: #0f1114;
+  --qe-divider: #2b3036;
+  --qe-dashed: #5a636e;
   color-scheme: dark;
 }
 .quotation-editor * {
@@ -1078,6 +1082,308 @@
 }
 .qe-preview-hint {
   text-align: center;
+}
+/* Conmutador «PDF | Correo» de la barra de la vista previa (maqueta EditorCorreo) */
+.qe-format-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--qe-panel);
+  border: 1px solid var(--qe-border);
+  border-radius: 9px;
+}
+.qe-format-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--qe-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qe-format-switch button[aria-selected="true"] {
+  background: var(--qe-selected);
+  color: var(--qe-green);
+}
+.qe-format-switch button:hover:not([aria-selected="true"]) {
+  color: var(--qe-text);
+  background: var(--qe-quiet);
+}
+.qe-view-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Vista previa del correo */
+.qe-mail-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.qe-mail {
+  width: 600px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--qe-panel);
+  color: var(--qe-text);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(24, 34, 48, 0.08), 0 12px 32px rgba(24, 34, 48, 0.1);
+}
+.qe-mail-head {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--qe-divider);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.qe-mail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.qe-mail-label {
+  flex: 0 0 56px;
+  width: 56px;
+  color: var(--qe-muted);
+}
+.qe-mail-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.qe-mail-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 10px;
+  border: 1px solid var(--qe-border);
+  border-radius: 999px;
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.quotation-editor .qe-mail-chip-missing {
+  border-style: dashed;
+  border-color: var(--qe-dashed);
+  color: var(--qe-muted);
+  background: transparent;
+}
+.quotation-editor .qe-mail-chip-button {
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.quotation-editor .qe-mail-chip-button:hover {
+  color: var(--qe-green);
+  border-color: var(--qe-green);
+}
+.qe-mail-note {
+  font-size: 12px;
+  color: var(--qe-muted);
+}
+.qe-mail-row-subject {
+  gap: 10px;
+}
+.quotation-editor .qe-mail-subject,
+.quotation-editor .qe-mail-text {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--qe-text);
+}
+.quotation-editor .qe-mail-subject {
+  flex: 1;
+  min-height: 28px;
+  padding: 2px 6px;
+  margin-left: -7px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.quotation-editor .qe-mail-text {
+  display: block;
+  width: calc(100% + 14px);
+  margin: -5px -7px;
+  padding: 4px 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: none;
+  field-sizing: content;
+  overflow-wrap: anywhere;
+}
+.quotation-editor :is(.qe-mail-subject, .qe-mail-text):hover {
+  border-color: var(--qe-border);
+}
+.quotation-editor :is(.qe-mail-subject, .qe-mail-text):focus {
+  border-color: var(--qe-field-border);
+  background: var(--qe-input);
+}
+.qe-mail-row-subject .qe-icon-btn {
+  width: 28px;
+  height: 28px;
+}
+.qe-mail-body {
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.qe-mail-logo {
+  height: 40px;
+  width: auto;
+  max-width: 240px;
+  object-fit: contain;
+  align-self: flex-start;
+}
+.qe-mail-issuer {
+  font-size: 16px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.qe-mail-card {
+  border: 1px solid var(--qe-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.qe-mail-card-head {
+  padding: 16px 20px;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.qe-mail-card-ref {
+  font-size: 13px;
+  font-weight: 600;
+}
+.qe-mail-card-total {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.qe-mail-card-rows {
+  margin: 0;
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.qe-mail-card-rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.qe-mail-card-rows dt {
+  flex-shrink: 0;
+  color: var(--qe-muted);
+}
+.qe-mail-card-rows dd {
+  margin: 0;
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.qe-mail-closing {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.qe-mail-signature {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.qe-mail-signature strong {
+  font-weight: 600;
+}
+.qe-mail-signature .qe-muted {
+  font-size: 13px;
+}
+.qe-mail-files {
+  margin: 0;
+  padding: 14px 22px;
+  list-style: none;
+  border-top: 1px solid var(--qe-divider);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.qe-mail-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--qe-border);
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 550;
+}
+.qe-mail-file-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.qe-mail-file-kind {
+  flex-shrink: 0;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: var(--qe-error-bg);
+  color: var(--qe-error-text);
+  font-size: 9px;
+  font-weight: 700;
+}
+.qe-mail-file-tag {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--qe-quiet);
+  color: var(--qe-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.qe-mail-actions {
+  justify-content: center;
+}
+.qe-mail-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.qe-mail-view .qe-preview-hint {
+  max-width: 600px;
+}
+@media (max-width: 1100px) {
+  .qe-mail-body {
+    padding: 22px 20px;
+  }
+  .qe-mail-head,
+  .qe-mail-files {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
 }
 .qe-export-root {
   position: fixed;
