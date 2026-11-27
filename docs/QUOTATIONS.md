@@ -10,7 +10,7 @@ Reglas del módulo: TypeScript puro (sin `src/`, `server/`, `electron/`, Node ni
 
 | Tipo | Contenido |
 | --- | --- |
-| `QuotationContent` | Lo editable y validado: `status`, `issueDate`, `validUntil` (`YYYY-MM-DD` o `null`), `currency` (`DOP`/`USD`), `exchangeRate` (DOP por 1 USD, entre 1 y 10 000), `clientId?`, `client` (datos impresos), `sourceProjectId?`, `folderId?`, `seller`, `projectLabel`, `items`, `discounts`, `notes`, `paymentTerms`, `design`, `attachments`, `issuer`. |
+| `QuotationContent` | Lo editable y validado: `status`, `issueDate`, `validUntil` (`YYYY-MM-DD` o `null`), `currency` (`DOP`/`USD`), `exchangeRate` (DOP por 1 USD, entre 1 y 10 000), `clientId?`, `client` (datos impresos), `sourceProjectId?`, `dismissedSourceDocuments?` (ids de documentos de la propuesta que el usuario quitó; solo con `sourceProjectId`, [detalle](QUOTATION_FROM_PROPOSAL.md#documentos-de-la-propuesta-enlazada)), `folderId?`, `seller`, `projectLabel`, `items`, `discounts`, `notes`, `paymentTerms`, `design`, `attachments`, `issuer`. |
 | `Quotation` | `QuotationContent` + `id`, `number` (`null` hasta que lo asigne la API), `version`, `baseVersion`, `createdById`, `createdBy`, `createdAt`, `updatedAt`. |
 | `QuotationLine` | `kind` `item` (con precio) o `detail` (fila descriptiva: descripción y cantidad, precio 0, aporta 0 al total), `quantity` (hasta 3 decimales), `unit`, `unitPriceCents`, `discountPct` (0–100, 2 decimales), `taxable`, `catalogItemId?`. |
 | `QuotationDiscount` | Global: `fixed` (centavos) o `percentage` (0–100 con 2 decimales, sobre el subtotal). |
