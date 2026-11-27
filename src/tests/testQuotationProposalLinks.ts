@@ -259,22 +259,36 @@ reset();
   assert.equal(next.blocks.client, true);
 }
 
-// --- (1) Diferencia exacta visible junto al resumen, fuera de los avisos plegados -------------------------------------
+// --- (1) Con descuentos y líneas gravadas el borrador cuadra: no hay aviso de diferencia. Solo el resto de un descuento
+// mayor que la parte sin ITBIS deja una diferencia exacta, visible junto al resumen, fuera de los avisos plegados -------
 {
   const discounted = proposal('p-disc', (p) => {
     p.client.name = 'Con descuento';
     p.financials = { ...p.financials, applyITBISExemption: false, customITBISSavedUSD: undefined, customDiscounts: [{ id: 'd', description: 'Cierre', type: 'percentage', value: 10 }] };
   });
-  store.setState({ projects: [...store.getState().projects, discounted] });
-  const html = render(React.createElement(ConvertProposalDialog, { initialProjectId: 'p-disc', onClose: () => undefined }));
+  const residual = proposal('p-resto', (p) => {
+    p.client.name = 'Descuento mayor';
+    p.specs = { ...p.specs, pricingMode: 'direct_watt', pricePerWattUSD: 0.2 };
+    p.financials = {
+      ...p.financials,
+      customItems: [
+        { id: 'x-big', description: 'Obra civil', quantity: 1, unit: 'UD', unitPriceUSD: 10_000, exonerateITBIS: true, applyMargin: false },
+        { id: 'x-tax', description: 'Transformador', quantity: 2, unit: 'UD', unitPriceUSD: 1_500, exonerateITBIS: false, applyMargin: false },
+      ],
+      customDiscounts: [{ id: 'd', description: 'Liquidación', type: 'percentage', value: 60 }],
+    };
+  });
+  store.setState({ projects: [...store.getState().projects, discounted, residual] });
+  assert.doesNotMatch(render(React.createElement(ConvertProposalDialog, { initialProjectId: 'p-disc', onClose: () => undefined })), /qconv-difference/, 'exención apagada con 10 %: cuadra, sin aviso');
+  const html = render(React.createElement(ConvertProposalDialog, { initialProjectId: 'p-resto', onClose: () => undefined }));
   const line = /<p class="qconv-difference">([^<]+)<\/p>/.exec(html);
-  assert(line, 'la diferencia se ve');
-  assert.match(line[1], /^El total quedará US\$ [\d,]+\.\d\d por debajo del de la propuesta: el ITBIS se calcula sobre la base ya descontada\.$/);
+  assert(line, 'la diferencia del resto se ve');
+  assert.match(line[1], /^El total quedará US\$ [\d,]+\.\d\d por debajo del de la propuesta: US\$ [\d,]+\.\d\d del descuento superan la parte sin ITBIS y se descuentan de todo el documento, ITBIS incluido\.$/);
   assert.equal(html.indexOf('qconv-difference') > html.indexOf('qconv-foot'), true, 'en el pie, no en el plegado');
   assert.doesNotMatch(render(React.createElement(ConvertProposalDialog, { initialProjectId: 'p-3', onClose: () => undefined })), /qconv-difference/, 'si cuadra no se muestra');
-  assert.equal(totalDifferenceText({ totalDifferenceCents: 0, totalDifferenceReason: null }, 'USD'), null);
-  assert.equal(totalDifferenceText({ totalDifferenceCents: -22_444, totalDifferenceReason: 'discounted_itbis' }, 'USD'), 'El total quedará US$ 224.44 por debajo del de la propuesta: el ITBIS se calcula sobre la base ya descontada.');
-  assert.equal(totalDifferenceText({ totalDifferenceCents: 3, totalDifferenceReason: 'discounted_itbis' }, 'DOP'), 'El total quedará RD$ 0.03 por encima del de la propuesta: el ITBIS se calcula sobre la base ya descontada.');
+  assert.equal(totalDifferenceText({ totalDifferenceCents: 0, totalDifferenceReason: null, residualDiscountCents: 0 }, 'USD'), null);
+  assert.equal(totalDifferenceText({ totalDifferenceCents: -22_444, totalDifferenceReason: 'residual_discount', residualDiscountCents: 411_500 }, 'USD'), 'El total quedará US$ 224.44 por debajo del de la propuesta: US$ 4,115.00 del descuento superan la parte sin ITBIS y se descuentan de todo el documento, ITBIS incluido.');
+  assert.equal(totalDifferenceText({ totalDifferenceCents: 3, totalDifferenceReason: 'other', residualDiscountCents: 0 }, 'DOP'), 'El total quedará RD$ 0.03 por encima del de la propuesta: revisa los importes del borrador.');
 }
 
 console.log('Quotation proposal links tests passed.');

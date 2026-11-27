@@ -3,11 +3,13 @@
  * unitario por equipo: los importes salen de los resultados del motor (`calculateProjectFinancialSummary`) y de la regla
  * compartida de los ítems extra (`shared/financialRules.ts`), nunca de fórmulas propias de precio.
  *
- * Cuadre: la cotización suma el precio que la propuesta cobra al cliente (`contractPriceUSD`, en la moneda y tasa del
- * documento). Sin descuentos el total cuadra al centavo: el redondeo de las líneas y del ITBIS lo absorbe la línea de
- * importe global, que no lleva ITBIS. Con descuentos y líneas gravadas a la vez no puede cuadrar al centavo: la propuesta
- * cobra el ITBIS de sus extras antes del descuento y la cotización lo calcula sobre la base gravada ya descontada
- * (`computeQuotationTotals`); la diferencia es exactamente `proposalTaxCents − taxCents` de la cotización.
+ * Cuadre: la cotización reproduce al centavo el precio que la propuesta cobra al cliente (`contractPriceUSD`, en la
+ * moneda y tasa del documento), su ITBIS y su base gravada. En el motor el ITBIS (el del sistema con la exoneración
+ * apagada y el de los extras gravados) no depende del descuento: el descuento rebaja solo la parte sin ITBIS. Por eso la
+ * conversión imputa los descuentos a la línea de importe global (sin ITBIS), con una fila descriptiva debajo que los
+ * nombra, en vez de pasarlos como descuentos del documento (que la cotización prorratearía también sobre lo gravado).
+ * Solo si el descuento supera lo que vale la línea global, el resto va como descuento del documento y el total difiere
+ * en `totalDifferenceCents`.
  *
  * Puro: no lee el store ni relojes (la fecha y el contexto entran como argumento) y no muta la propuesta.
  */
@@ -19,7 +21,7 @@ import { ITBIS_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExon
 import { resolveSaleMarginMultiplier } from '../../../shared/projectDefaults';
 import { isItemHiddenInQuotation } from '../../../shared/quotationItems';
 import {
-  QUOTATION_LIMITS, computeQuotationTotals, quotationFromProposal, toCents,
+  QUOTATION_LIMITS, computeQuotationTotals, formatMoney, quotationFromProposal, toCents,
   type ProposalQuotationSource, type QuotationContent, type QuotationCurrency, type QuotationLine,
 } from '../../../shared/quotations';
 import { calculateProjectFinancialSummary } from '../../engine/financeEngine';
@@ -77,8 +79,13 @@ export interface ProposalSourceBuild {
    * (sin líneas no hay total que comparar). Se muestra en el diálogo fuera de los avisos plegados.
    */
   totalDifferenceCents: number;
-  /** Por qué difiere: `discounted_itbis` (descuento con líneas gravadas) u `other` (p. ej. extras por encima del precio). */
-  totalDifferenceReason: 'discounted_itbis' | 'other' | null;
+  /**
+   * Por qué difiere: `residual_discount` (parte del descuento no cabe en la línea global y, como descuento del
+   * documento, rebaja también lo gravado) u `other` (p. ej. extras por encima del precio).
+   */
+  totalDifferenceReason: 'residual_discount' | 'other' | null;
+  /** Descuento que no cabe en la línea global sin ITBIS y pasa como descuento del documento (0 casi siempre). */
+  residualDiscountCents: number;
 }
 
 const DEFAULT_UNIT = 'UD';
@@ -102,6 +109,10 @@ export function clip(value: string | undefined | null, max: number): string {
   return out.trim();
 }
 const round2 = (value: number) => Math.round(value * 100) / 100;
+/** Base gravada en centavos cuyo ITBIS (redondeado como en `computeQuotationTotals`) es exactamente `taxCents`. */
+function taxableBaseForTax(taxCents: number): number {
+  return taxCents > 0 ? Math.round(taxCents / ITBIS_RATE) : 0;
+}
 
 /** Texto del documento de la propuesta, ya resuelto y en texto plano. */
 function documentText(project: ProjectSimulation, ctx: ReturnType<typeof buildDocumentTextContext>, key: string): string {
@@ -140,6 +151,40 @@ function discountLabel(discount: CustomQuotationDiscount): string {
   const pct = discount.type === 'percentage' ? ` (${Math.max(0, Math.min(100, discount.value || 0))} %)` : '';
   const target = discount.target === 'equipment' ? ' · equipos (Ley 57-07)' : '';
   return clip(`${base}${pct}${target}`, QUOTATION_LIMITS.label);
+}
+
+interface DiscountShare { label: string; value: number }
+
+/**
+ * `total` repartido entre los descuentos de la propuesta por el mayor resto, en proporción a lo que vale cada uno (la
+ * suma es exacta); sin pesos (datos raros), un único «Descuento».
+ */
+function discountShares(total: number, customDiscounts: readonly CustomQuotationDiscount[], listGrossUSD: number): DiscountShare[] {
+  if (total <= 0) return [];
+  const weights = customDiscounts.map((d) => (d.type === 'percentage' ? listGrossUSD * (Math.max(0, Math.min(100, d.value || 0)) / 100) : Math.max(0, d.value || 0)));
+  const shares = apportion(total, weights).map((value, i) => ({ label: discountLabel(customDiscounts[i]), value })).filter((d) => d.value > 0);
+  return shares.length ? shares : [{ label: 'Descuento', value: total }];
+}
+
+/**
+ * Fila descriptiva bajo la línea global con el descuento que ya lleva: «Incluye descuento: Cierre (10 %) −US$ 2,507.84»;
+ * con varios, el total y el desglose. Si el desglose no cabe en la descripción, los últimos van juntos («otros N»).
+ */
+function includedDiscountNote(shares: readonly DiscountShare[], currency: QuotationCurrency): string {
+  const max = QUOTATION_LIMITS.lineDescription;
+  const minus = (value: number) => `−${formatMoney(value, currency)}`;
+  const item = (share: DiscountShare) => `${share.label} ${minus(share.value)}`;
+  if (shares.length === 1) return clip(`Incluye descuento: ${item(shares[0])}`, max);
+  const total = shares.reduce((sum, d) => sum + d.value, 0);
+  const head = `Incluye descuentos por ${minus(total)}`;
+  for (let kept = shares.length; kept > 0; kept--) {
+    const rest = shares.slice(kept);
+    const parts = shares.slice(0, kept).map(item);
+    if (rest.length) parts.push(`otros ${rest.length} ${minus(rest.reduce((sum, d) => sum + d.value, 0))}`);
+    const text = `${head}: ${parts.join('; ')}`;
+    if (text.length <= max) return text;
+  }
+  return clip(`Incluye ${shares.length} descuentos por ${minus(total)}`, max);
 }
 
 /** Etiqueta del proyecto: potencia y, si la hay, capacidad de baterías. */
@@ -191,6 +236,7 @@ export function buildProposalQuotationSource(project: ProjectSimulation, blocks:
   const discounts: ProposalQuotationSource['discounts'] = [];
   let totalDifferenceCents = 0;
   let totalDifferenceReason: ProposalSourceBuild['totalDifferenceReason'] = null;
+  let residualDiscountCents = 0;
 
   if (blocks.items) {
     const multiplier = extrasMarginMultiplier(project);
@@ -233,25 +279,37 @@ export function buildProposalQuotationSource(project: ProjectSimulation, blocks:
         unitPriceCents, discountPct: 0, taxable,
       });
     });
-    const taxablePartCents = cents(baseItbisUSD / ITBIS_RATE) + hiddenTaxableCents;
+    // Parte gravada del sistema (ITBIS no exonerado y extras gravados ocultos). Con ella la base gravada del borrador es
+    // exactamente la de la propuesta: la base en centavos cuyo 18 % es su ITBIS (`taxableBaseForTax`); esta línea
+    // absorbe el redondeo de los extras gravados visibles. Sin ella (todo exonerado salvo extras visibles) la base es la
+    // suma de esas líneas, y el ITBIS, el de su precio unitario redondeado al centavo.
+    const visibleTaxableCents = computeQuotationTotals({ items: visible.filter((line) => line.taxable), discounts: [] }).subtotalCents;
+    const approxTaxablePartCents = cents(baseItbisUSD / ITBIS_RATE) + hiddenTaxableCents;
+    const exactTaxablePartCents = taxableBaseForTax(proposalTaxCents) - visibleTaxableCents;
+    const taxablePartCents = approxTaxablePartCents > 0 && exactTaxablePartCents > 0 ? exactTaxablePartCents : approxTaxablePartCents;
     const taxablePart: QuotationLine[] = taxablePartCents > 0
       ? [{ id: 'taxable-part', kind: 'item', description: 'Parte del sistema con ITBIS (no exonerada)', quantity: 1, unit: DEFAULT_UNIT, unitPriceCents: taxablePartCents, discountPct: 0, taxable: true }]
       : [];
     const fixed = [...taxablePart, ...visible];
     const fixedTotals = computeQuotationTotals({ items: fixed, discounts: [] });
-    // Subtotal antes de descuentos que la propuesta cobra sin ITBIS; el resto, en la línea de importe global sin ITBIS.
-    const subtotalCents = proposalTotalCents - proposalTaxCents + discountCents;
-    let globalCents = subtotalCents - fixedTotals.subtotalCents;
-    // Sin descuentos el ITBIS no depende de la línea global: su redondeo se absorbe ahí y el total cuadra al centavo.
-    if (discountCents === 0) globalCents += proposalTaxCents - fixedTotals.taxCents;
-    if (globalCents < 0) {
-      notices.push('Los ítems extra superan el precio de la propuesta: revisa los importes del borrador.');
-      globalCents = 0;
-    }
+    // Línea de importe global, sin ITBIS: lo que la propuesta cobra menos las demás líneas y su ITBIS (así el total
+    // cuadra al centavo). Antes del descuento vale eso más el descuento, que la propuesta resta de esta parte sin ITBIS.
+    const netGlobalCents = proposalTotalCents - fixedTotals.taxCents - fixedTotals.subtotalCents;
+    const listGlobalCents = netGlobalCents + discountCents;
+    if (listGlobalCents < 0) notices.push('Los ítems extra superan el precio de la propuesta: revisa los importes del borrador.');
+    // Lo que cabe en la línea global va incluido en ella (visible en la fila de debajo); el resto, raro (precio por Wp
+    // bajo con extras caros), como descuento del documento.
+    const includedDiscountCents = Math.min(discountCents, Math.max(0, listGlobalCents));
+    residualDiscountCents = discountCents - includedDiscountCents;
+    const globalCents = Math.max(0, listGlobalCents) - includedDiscountCents;
     const kWp = summary.systemCapacityKWp.toFixed(2);
     const storage = project.specs.hasBattery && getProjectBatteries(project.specs).some((b) => (b.count || 0) > 0) ? ', almacenamiento' : '';
-    if (globalCents > 0) {
-      pricedLines.push({ description: `Sistema fotovoltaico ${kWp} kWp llave en mano (equipos${storage}, instalación y puesta en marcha)`, quantity: 1, unit: DEFAULT_UNIT, unitPriceCents: globalCents, taxable: false });
+    if (globalCents > 0 || includedDiscountCents > 0) {
+      const note = includedDiscountCents > 0 ? includedDiscountNote(discountShares(includedDiscountCents, customDiscounts, summary.listGrossInvestmentUSD), currency) : '';
+      pricedLines.push({
+        description: `Sistema fotovoltaico ${kWp} kWp llave en mano (equipos${storage}, instalación y puesta en marcha)`, quantity: 1, unit: DEFAULT_UNIT, unitPriceCents: globalCents, taxable: false,
+        ...(note ? { note } : {}),
+      });
     }
     for (const line of fixed) pricedLines.push({ description: line.description, quantity: line.quantity, unit: line.unit, unitPriceCents: line.unitPriceCents, taxable: line.taxable });
 
@@ -274,13 +332,10 @@ export function buildProposalQuotationSource(project: ProjectSimulation, blocks:
     detailLines.push({ description: clip(cleanInstallationDesc(project.specs.installationServicesDesc), QUOTATION_LIMITS.lineDescription), quantity: 1, unit: DEFAULT_UNIT });
     detailLines.push(...extraDetails);
 
-    // Descuentos: los de la propuesta, como montos fijos que suman exactamente lo que ella resta. La cotización admite
-    // hasta `maxDiscounts`: los sobrantes se agrupan en un último «Otros descuentos» (la suma sigue siendo exacta).
-    if (discountCents > 0 && customDiscounts.length) {
-      const weights = customDiscounts.map((d) => (d.type === 'percentage' ? summary.listGrossInvestmentUSD * (Math.max(0, Math.min(100, d.value || 0)) / 100) : Math.max(0, d.value || 0)));
-      const amounts = apportion(discountCents, weights)
-        .map((value, i) => ({ label: discountLabel(customDiscounts[i]), value }))
-        .filter((d) => d.value > 0);
+    // Resto del descuento que no cabe en la línea global: descuentos del documento, montos fijos que suman exactamente ese
+    // resto. La cotización admite hasta `maxDiscounts`: los sobrantes se agrupan en un último «Otros descuentos».
+    if (residualDiscountCents > 0) {
+      const amounts = discountShares(residualDiscountCents, customDiscounts, summary.listGrossInvestmentUSD);
       const max = QUOTATION_LIMITS.maxDiscounts;
       const kept = amounts.length > max ? amounts.slice(0, max - 1) : amounts;
       const rest = amounts.slice(kept.length);
@@ -292,7 +347,7 @@ export function buildProposalQuotationSource(project: ProjectSimulation, blocks:
       discounts: discounts.map((d, i) => ({ id: `d-${i}`, ...d })),
     });
     totalDifferenceCents = quotationTotals.totalCents - proposalTotalCents;
-    if (totalDifferenceCents !== 0) totalDifferenceReason = discountCents > 0 && fixed.some((line) => line.taxable) ? 'discounted_itbis' : 'other';
+    if (totalDifferenceCents !== 0) totalDifferenceReason = residualDiscountCents > 0 && listGlobalCents >= 0 && fixed.some((line) => line.taxable) ? 'residual_discount' : 'other';
   }
 
   // --- Cliente ---
@@ -390,7 +445,7 @@ export function buildProposalQuotationSource(project: ProjectSimulation, blocks:
     attachments,
     issuer,
   };
-  return { source, omittedDocuments, notices, proposalTotalCents, proposalTaxCents, totalDifferenceCents, totalDifferenceReason };
+  return { source, omittedDocuments, notices, proposalTotalCents, proposalTaxCents, totalDifferenceCents, totalDifferenceReason, residualDiscountCents };
 }
 
 export type ProposalConversion =
