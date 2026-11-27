@@ -14,7 +14,7 @@ import { selectSourceProject, sourceProposalLink, sourceProposalOptions } from '
 import { storeGenericPriceFor } from '../../simulator/params/logic/storeGenericPrice';
 import { localIsoDate } from '../../../utils/localDate';
 import { QuotationStatusChip } from '../common/QuotationStatusChip';
-import { ClientSection, DiscountsSection, DocumentSection, IssuerSection, ItemsSection, NotesSection, SummarySection, type Edit } from './ContentSections';
+import { ClientSection, DiscountsSection, DocumentSection, IssuerSection, ItemsSection, NotesSection, type Edit } from './ContentSections';
 import { QuotationPreview } from './QuotationPreview';
 import { DesignTab } from './DesignTab';
 import { AttachmentsTab } from './AttachmentsTab';
@@ -212,7 +212,6 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
                 <ItemsSection content={content} readOnly={readOnly} edit={edit} catalog={catalog} catalogContext={catalogContext} />
                 <DiscountsSection content={content} readOnly={readOnly} edit={edit} />
                 <NotesSection content={content} readOnly={readOnly} edit={edit} />
-                <SummarySection content={content} />
               </>
             )}
             {tab === 'design' && (

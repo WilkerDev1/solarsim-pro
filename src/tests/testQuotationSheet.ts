@@ -108,4 +108,17 @@ for (const bad of ['className="truncate"', 'className="overflow-hidden"', 'line-
   assert.ok(FORBIDDEN.some((p) => p.test(bad)), `debería detectar: ${bad}`);
 }
 
+// Sello generado: con «Sello de la empresa», sin sello importado ni del membrete, la hoja dibuja uno con RNC, logo o
+// nombre y teléfono del emisor. Un emisor sin RNC ni logo no sella; con sello importado o el interruptor apagado, tampoco.
+{
+  const stamped = { ...reference, issuer: { ...reference.issuer, taxId: '1-32-04088-2', phone: '809-378-6590', logo: '' } };
+  const generated = render(stamped);
+  assert.ok(generated.includes('data-quotation-stamp="generated"'), 'sin sello importado se genera uno');
+  assert.ok(generated.split('1-32-04088-2').length >= 3 && generated.split('809-378-6590').length >= 3, 'el sello repite RNC y teléfono del emisor');
+  assert.ok(!render(stamped, 'COT-2026-0147', SEAL).includes('data-quotation-stamp'), 'con sello importado no se genera');
+  assert.ok(!render({ ...stamped, design: { ...stamped.design, showStamp: false } }).includes('data-quotation-stamp'), 'interruptor apagado: sin sello');
+  assert.ok(!render({ ...stamped, issuer: { ...stamped.issuer, taxId: '', logo: '' } }).includes('data-quotation-stamp'), 'sin RNC ni logo no se sella');
+  assert.ok(render({ ...stamped, issuer: { ...stamped.issuer, taxId: '', logo: PNG } }).includes('data-quotation-stamp'), 'con logo y sin RNC sí se sella');
+}
+
 console.log('Quotation sheet tests passed.');

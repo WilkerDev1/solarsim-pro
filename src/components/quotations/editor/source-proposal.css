@@ -19,7 +19,7 @@
   width: auto;
 }
 .qe-source-name {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: 13.5px;
   font-weight: 600;

@@ -1,4 +1,5 @@
 import React, { useId, useReducer } from 'react';
+import { InfoTip } from '../../simulator/params/ui/InfoTip';
 import { parseDecimalInput } from '../../../domain/quotationEdit';
 import { fieldDraftReducer, initialFieldDraft, pendingCommit } from './fieldState';
 
@@ -56,11 +57,15 @@ interface FieldShell {
   readOnly?: boolean;
   className?: string;
   hint?: string;
+  /** Explicación que no cabe en la etiqueta: va en un ⓘ junto a ella, no en un párrafo. */
+  info?: string;
 }
 
-const Shell: React.FC<FieldShell & { id: string; error: string | null; children: React.ReactNode }> = ({ id, label, hideLabel, className = '', error, hint, children }) => (
+const Shell: React.FC<FieldShell & { id: string; error: string | null; children: React.ReactNode }> = ({ id, label, hideLabel, className = '', error, hint, info, children }) => (
   <div className={`qe-field ${className}`}>
-    <label htmlFor={id} className={hideLabel ? 'sr-only' : undefined}>{label}</label>
+    {info && !hideLabel ? (
+      <span className="qe-label-row"><label htmlFor={id}>{label}</label><InfoTip text={info} label={`Más información: ${label}`} /></span>
+    ) : <label htmlFor={id} className={hideLabel ? 'sr-only' : undefined}>{label}</label>}
     {children}
     {hint && !error && <p id={`${id}-hint`} className="qe-field-hint">{hint}</p>}
     {error && <p id={`${id}-error`} className="qe-field-error" role="alert">{error}</p>}
@@ -114,9 +119,10 @@ export interface NumberFieldProps extends FieldShell {
   /** Valor tecleado (unidades) → valor guardado (p. ej. a centavos). */
   toValue?: (typed: number) => number;
   suffix?: string;
+  prefix?: string;
 }
 
-export const NumberField: React.FC<NumberFieldProps> = ({ value, onCommit, format, toValue = (n) => n, suffix, readOnly, ...shell }) => {
+export const NumberField: React.FC<NumberFieldProps> = ({ value, onCommit, format, toValue = (n) => n, suffix, prefix, readOnly, ...shell }) => {
   const id = useId();
   const field = useDraft<number>({
     display: format(value),
@@ -131,7 +137,8 @@ export const NumberField: React.FC<NumberFieldProps> = ({ value, onCommit, forma
   });
   return (
     <Shell {...shell} id={id} error={field.error}>
-      <span className={suffix ? 'qe-input-affix' : undefined}>
+      <span className={suffix || prefix ? 'qe-input-affix' : undefined}>
+        {prefix && <span aria-hidden="true">{prefix}</span>}
         <input
           id={id}
           type="text"
