@@ -178,6 +178,17 @@ export const createQuotationLibrarySlice: SimulationSlice<QuotationLibrarySlice>
       patch(kind, (s) => ({ items: s.items.some((item) => item.id === server.id) ? s.items.map((item) => (item.id === server.id ? kept : item)) : [...s.items, kept] }));
     };
 
+    const cursor = collection(kind).cursor;
+    const since = cursor?.scope === context.scope && Number.isFinite(Date.parse(cursor.serverTimestamp)) ? cursor.serverTimestamp : null;
+    const ownPending = () => Object.values(collection(kind).changes).some((c) => context.own(c.ownerId)) || collection(kind).deletions.some((d) => context.own(d.ownerId));
+    // Una API sin plantillas ni firmas (anterior a 2.10.0, o durante un rollback) responde 404 a todo: antes de subir se
+    // comprueba que las admite, para no marcar como rechazados los cambios ni dar por hechos los borrados.
+    if (ownPending()) {
+      const probe = await QuotationLibrarySyncService.list<AnyRecord>(transport, kind, since);
+      if (!context.current()) return 'changed';
+      if (!probe.supported) return failures + 1;
+    }
+
     for (const command of [...collection(kind).deletions]) {
       if (!context.current()) return 'changed';
       if (!context.own(command.ownerId)) continue;
@@ -256,14 +267,9 @@ export const createQuotationLibrarySlice: SimulationSlice<QuotationLibrarySlice>
         setChange(id, { rejected: { revision: change.revision, status: saved.status, ...(saved.code ? { code: saved.code } : {}), error: saved.error } });
     }
 
-    const cursor = collection(kind).cursor;
-    const since = cursor?.scope === context.scope && Number.isFinite(Date.parse(cursor.serverTimestamp)) ? cursor.serverTimestamp : null;
     const listed = await QuotationLibrarySyncService.list<AnyRecord>(transport, kind, since);
     if (!context.current()) return 'changed';
-    if (!listed.supported) {
-      const pending = Object.values(collection(kind).changes).some((c) => context.own(c.ownerId)) || collection(kind).deletions.some((d) => context.own(d.ownerId));
-      return pending ? failures + 1 : failures;
-    }
+    if (!listed.supported) return ownPending() ? failures + 1 : failures;
     const remote = new Map(listed.items.map((item) => [item.id, item]));
     const deleted = new Set(listed.deletedIds);
     const images = new Map<string, AnyRecord>();

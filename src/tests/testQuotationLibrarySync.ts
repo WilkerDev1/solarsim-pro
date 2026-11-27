@@ -28,9 +28,11 @@ const tables: Record<LibraryKind, Map<string, Row>> = { templates: new Map(), si
 const assets = new Map<string, string>();
 const calls: string[] = [];
 let online = true;
+/** API anterior a 2.10.0 (o durante un rollback): las rutas de plantillas y firmas no existen. */
+let legacyApi = false;
 const json = (value: unknown, status = 200) => Response.json(value, { status });
 const ITEM = { templates: 'template', signatures: 'signature' } as const;
-const reset = () => { tables.templates.clear(); tables.signatures.clear(); assets.clear(); calls.length = 0; online = true; DocumentAssetService.setTransportFactory(assetFactory); };
+const reset = () => { tables.templates.clear(); tables.signatures.clear(); assets.clear(); calls.length = 0; online = true; legacyApi = false; DocumentAssetService.setTransportFactory(assetFactory); };
 
 QuotationLibrarySyncService.setTransportFactory((url, token) => async (kind, path, init = {}) => {
   assert.equal(url, serverUrl);
@@ -38,6 +40,7 @@ QuotationLibrarySyncService.setTransportFactory((url, token) => async (kind, pat
   const method = init.method || 'GET';
   calls.push(`${method} ${kind}${path}`);
   if (!online) throw new Error('Sin conexión');
+  if (legacyApi) return json({ error: 'Not Found' }, 404);
   const table = tables[kind];
   if (method === 'GET') {
     const since = new URLSearchParams(path.replace(/^\?/, '')).get('since');
@@ -319,5 +322,31 @@ assert.equal(tables.templates.get(second.ok ? second.record.id : '')!.record.isD
 store.setState({ quotationLibrarySyncFeedback: 'pendiente' });
 api().resolveQuotationLibraryConflict('templates', 'no-existe', 'accept_server');
 assert.equal(api().quotationLibrarySyncFeedback, null);
+
+// API sin plantillas ni firmas (anterior a 2.10.0 o en un rollback): nada se marca rechazado ni se da por borrado;
+// al volver la API nueva, los cambios y borrados pendientes se publican solos.
+{
+  begin(session);
+  const kept = api().createQuotationTemplate(template('Pendiente'));
+  assert.ok(kept.ok);
+  tables.templates.set('qtemplate-server', { record: { ...template('Del servidor'), id: 'qtemplate-server', organizationId: user.organizationId, version: 1, baseVersion: 1, createdById: user.id, createdBy: user.name, createdAt: tick(), updatedAt: tick(), isDefault: false, description: '', notes: '', paymentTerms: '', validityDays: 30 }, changedAt: tick() });
+  await sync();
+  assert.ok(templates().some((t) => t.id === 'qtemplate-server'));
+  assert.ok(api().deleteQuotationTemplate('qtemplate-server').ok);
+  const edited = api().createQuotationTemplate(template('Otra pendiente'));
+  assert.ok(edited.ok);
+  legacyApi = true;
+  calls.length = 0;
+  await sync();
+  assert.ok(calls.every((c) => c.startsWith('GET ')), `sin escrituras contra una API sin plantillas: ${calls.join(', ')}`);
+  assert.ok(Object.values(lib().templates.changes).every((c) => !c.rejected), 'ningún cambio queda rechazado');
+  assert.ok(lib().templates.deletions.some((d) => d.id === 'qtemplate-server' && !d.rejected), 'el borrado sigue pendiente');
+  legacyApi = false;
+  await sync();
+  assert.equal(Object.keys(lib().templates.changes).length, 0, 'al volver la API, los cambios se publican');
+  assert.equal(lib().templates.deletions.length, 0, 'y el borrado se aplica');
+  assert.ok(tables.templates.get('qtemplate-server')?.deleted);
+  assert.ok([...tables.templates.values()].some((r) => r.record.name === 'Otra pendiente'));
+}
 
 console.log('Quotation library sync tests passed.');
