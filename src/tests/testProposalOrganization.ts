@@ -5,6 +5,11 @@ import {
   orderProposalFamilies,
   proposalFamily,
   unlinkableDrag,
+  unlinkOnQuickDrop,
+  startProposalDrag,
+  stopProposalDrag,
+  currentProposalDrag,
+  onProposalDragStop,
 } from "../features/proposals/proposalGroups";
 import { projectDifferences } from "../store/sync/projectDifferences";
 import { serializeSimulationStore } from "../store/persistence/serializeSimulationStore";
@@ -294,3 +299,53 @@ assert.deepEqual(orderProposalFamilies([descendant,ancestor],[ancestor,hidden,de
   assert.equal(unlinkableDrag(null,all),null);
   assert.equal(unlinkableDrag('missing',all),null);
 }
+
+// Soltar sin esperar sobre una propuesta de OTRO grupo la saca de su grupo; la lista suele no dejar huecos vacíos.
+{
+  const root=make('q-root'),child={...make('q-child'),proposalLink:{parentId:'q-root'}},grandchild={...make('q-grand'),proposalLink:{parentId:'q-child'}},
+    sibling={...make('q-sibling'),proposalLink:{parentId:'q-root'}},loose=make('q-loose'),otherRoot=make('q-other'),otherChild={...make('q-other-child'),proposalLink:{parentId:'q-other'}};
+  const all=[root,child,grandchild,sibling,loose,otherRoot,otherChild];
+  assert.equal(unlinkOnQuickDrop('q-child','q-loose',all)?.id,'q-child','quick drop on an ungrouped proposal unlinks');
+  assert.equal(unlinkOnQuickDrop('q-child','q-other-child',all)?.id,'q-child','quick drop on another family unlinks');
+  assert.equal(unlinkOnQuickDrop('q-child','q-root',all),null,'its own principal is not "outside"');
+  assert.equal(unlinkOnQuickDrop('q-child','q-sibling',all),null,'a sibling is not "outside"');
+  assert.equal(unlinkOnQuickDrop('q-child','q-grand',all),null,'its own linked proposals are not "outside"');
+  assert.equal(unlinkOnQuickDrop('q-root','q-loose',all),null,'a principal has nothing to unlink from');
+  assert.equal(unlinkOnQuickDrop('q-child','q-child',all),null);
+  assert.equal(unlinkOnQuickDrop(null,'q-loose',all),null);
+}
+
+// Si el arrastre termina sin dragend (Wayland, ventana que pierde el foco), el siguiente puntero suelto lo libera.
+{
+  const listeners=new Map<string,Set<(event:any)=>void>>();
+  const fakeWindow={
+    addEventListener:(type:string,fn:(event:any)=>void)=>{if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type)!.add(fn);},
+    removeEventListener:(type:string,fn:(event:any)=>void)=>{listeners.get(type)?.delete(fn);},
+    dispatchEvent:(event:{type:string})=>{listeners.get(event.type)?.forEach(fn=>fn(event));return true;},
+  };
+  const previousWindow=(globalThis as any).window;
+  (globalThis as any).window=fakeWindow;
+  try{
+    const fire=(type:string,event:any={})=>[...(listeners.get(type)||[])].forEach(fn=>fn({type,...event}));
+    const data:Record<string,string>={};
+    const dragEvent=()=>({dataTransfer:{setData:(k:string,v:string)=>{data[k]=v;},effectAllowed:''}}) as any;
+    let stops=0;const unsubscribe=onProposalDragStop(()=>stops++);
+    startProposalDrag(dragEvent(),'p-1');
+    assert.equal(currentProposalDrag(),'p-1');
+    assert.equal(data['text/plain'],'p-1');
+    await new Promise(r=>setTimeout(r,0));
+    fire('pointermove',{buttons:1});
+    assert.equal(currentProposalDrag(),'p-1','a held button means the drag is still going');
+    fire('pointermove',{buttons:0});
+    assert.equal(currentProposalDrag(),null,'a free pointer means the drag ended without dragend');
+    assert.equal(stops,1,'drop targets are told to clear their highlight');
+    assert.equal(listeners.get('pointermove')?.size||0,0,'the fallback listeners are released');
+    startProposalDrag(dragEvent(),'p-2');
+    stopProposalDrag();stopProposalDrag();
+    assert.equal(stops,2,'a normal dragend notifies once');
+    await new Promise(r=>setTimeout(r,0));
+    assert.equal(listeners.get('pointerdown')?.size||0,0,'a stopped drag never arms the fallback');
+    unsubscribe();
+  }finally{(globalThis as any).window=previousWindow;}
+}
+console.log("✓ Quick drop outside the family unlinks; a drag that never gets dragend is released.");

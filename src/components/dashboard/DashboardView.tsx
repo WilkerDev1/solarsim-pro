@@ -461,7 +461,7 @@ export const DashboardView: React.FC<{ initialStatusFilter?: string }> = ({ init
           </div>
         </div>
 
-        <p className="-mt-2 text-xs leading-relaxed text-slate-500 dark:text-zinc-400">Para enlazar, mantén una propuesta sobre otra y suéltala al resaltarse. Clic derecho para organizar el grupo.</p>
+        <p className="-mt-2 text-xs leading-relaxed text-slate-500 dark:text-zinc-400">Para enlazar, mantén una propuesta sobre otra y suéltala al resaltarse. Para sacarla de su grupo, suéltala sin esperar sobre otra propuesta o en un hueco. Clic derecho para organizar el grupo.</p>
 
         {/* 📌 Banner de Filtro Activo (si se seleccionó una carpeta, distribuidora, autor o estado) */}
         {(activeFolderName ||

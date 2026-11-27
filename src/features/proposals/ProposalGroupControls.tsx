@@ -5,17 +5,24 @@ import type { ProjectSimulation } from "../../types";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { useShallow } from 'zustand/react/shallow';
 import { canEditCommercial } from "./commercial";
-import { proposalFamily, currentProposalDrag, unlinkableDrag, PROPOSAL_DROP_TARGET } from "./proposalGroups";
+import { proposalFamily, currentProposalDrag, unlinkableDrag, unlinkOnQuickDrop, onProposalDragStop, PROPOSAL_DROP_TARGET } from "./proposalGroups";
 import { PROPOSAL_GROUP_COLORS } from "../../../shared/proposalLinks";
 import "./proposal-groups.css";
 export function requestProposalGroupMenu(id:string,x:number,y:number) {
   window.dispatchEvent(new CustomEvent('solarsim-proposal-group-menu',{detail:{id,x,y}}));
 }
+type DropHover = "waiting" | "unlink" | "ready";
+/** Texto bajo la propuesta destino mientras otra pasa por encima. */
+export function proposalDropMessage(hover: DropHover) {
+  if (hover === "ready") return "Soltar para enlazar debajo";
+  if (hover === "unlink") return "Suelta ya para sacarla de su grupo · mantén para enlazarla aquí";
+  return "Mantén aquí para enlazar…";
+}
 export function useProposalLinkDrop(project: ProjectSimulation) {
   const { syncSettings, linkProposals } = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, linkProposals: s.linkProposals })));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null),
     ready = useRef(false);
-  const [hover, setHover] = useState<"waiting" | "ready" | null>(null);
+  const [hover, setHover] = useState<DropHover | null>(null);
   const clear = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
@@ -26,9 +33,15 @@ export function useProposalLinkDrop(project: ProjectSimulation) {
     const cancel=()=>clear();
     const key=(event:KeyboardEvent)=>{if(event.key==='Escape')cancel();};
     document.addEventListener('dragend',cancel,true);window.addEventListener('blur',cancel);document.addEventListener('keydown',key);
-    return()=>{if(timer.current)clearTimeout(timer.current);document.removeEventListener('dragend',cancel,true);window.removeEventListener('blur',cancel);document.removeEventListener('keydown',key);};
+    const unsubscribe=onProposalDragStop(cancel);
+    return()=>{if(timer.current)clearTimeout(timer.current);document.removeEventListener('dragend',cancel,true);window.removeEventListener('blur',cancel);document.removeEventListener('keydown',key);unsubscribe();};
   },[]);
   const [feedback, setFeedback] = useState("");
+  useEffect(() => {
+    if (!feedback) return;
+    const done = setTimeout(() => setFeedback(""), 4000);
+    return () => clearTimeout(done);
+  }, [feedback]);
   return {
     hover,
     feedback,
@@ -50,7 +63,7 @@ export function useProposalLinkDrop(project: ProjectSimulation) {
         event.stopPropagation();
         event.dataTransfer.dropEffect = "move";
         if (!timer.current) {
-          setHover("waiting");
+          setHover(unlinkOnQuickDrop(source, project.id, useSimulationStore.getState().projects) ? "unlink" : "waiting");
           timer.current = setTimeout(() => {
             ready.current = true;
             setHover("ready");
@@ -70,12 +83,20 @@ export function useProposalLinkDrop(project: ProjectSimulation) {
         if (!source) return;
         event.preventDefault();
         event.stopPropagation();
+        const outside = ready.current ? null : unlinkOnQuickDrop(source, project.id, useSimulationStore.getState().projects);
         if (ready.current) {
           const result = linkProposals(source, project.id);
           setFeedback(
             result.success
               ? "Propuesta enlazada."
               : result.error || "No se pudo enlazar.",
+          );
+        } else if (outside) {
+          const result = linkProposals(outside.id, null);
+          setFeedback(
+            result.success
+              ? `«${outside.client.name || "Sin nombre"}» ya no está enlazada.`
+              : result.error || "No se pudo desenlazar.",
           );
         } else
           setFeedback(
@@ -98,7 +119,8 @@ export function useProposalUnlinkZone() {
     const clear = () => setActive(null);
     document.addEventListener("dragend", clear, true);
     window.addEventListener("blur", clear);
-    return () => { document.removeEventListener("dragend", clear, true); window.removeEventListener("blur", clear); };
+    const unsubscribe = onProposalDragStop(clear);
+    return () => { document.removeEventListener("dragend", clear, true); window.removeEventListener("blur", clear); unsubscribe(); };
   }, []);
   useEffect(() => {
     if (!feedback) return;
