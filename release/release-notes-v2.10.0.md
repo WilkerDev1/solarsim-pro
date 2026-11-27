@@ -24,7 +24,7 @@ Versión de cotizaciones. SolarSim incorpora un módulo de **cotizaciones**: doc
 ## Despliegue
 
 - **API primero, antes de publicar el escritorio:** migraciones 011 (`quotations`, `quotation_counters`) y 012 (`quotation_templates`, `quotation_signatures`), ambas aditivas, con checkpoint y ensayo de restauración que debe terminar en `[1..12]`. Rutas nuevas sin migración: `POST /api/document-assets` y `GET /api/document-assets/:sha256/file`. Un cliente 2.10.0 contra la API anterior no sincroniza cotizaciones.
-- **Rollback de la API:** la API anterior reemplaza la política de funciones entera al guardar y solo conoce dos claves. Antes de volver atrás, anotar las organizaciones con Cotizaciones apagada y no guardar la política mientras dure el rollback; al volver, comprobar y restaurar.
+- **Rollback de la API:** la API anterior solo conoce dos claves de la política de funciones. Mientras dure, los clientes 2.10.0 ven Cotizaciones activada aunque nadie guarde, y cualquier guardado de la política borra `quotations: false`. Antes de volver atrás, anotar las organizaciones con Cotizaciones apagada y no guardar la política; al volver, comprobar y restaurar. La API anterior tampoco desenlaza las cotizaciones al borrar un cliente o una carpeta: tras volver a la 2.10.0, revisar las cotizaciones que apunten a clientes o carpetas borrados durante el rollback.
 - **`MIN_CLIENT_VERSION`** no cambia y sigue en 2.9.0.
 - **Visor web (Worker)** y **MCP remoto:** solo cambia el número de versión; redesplegarlos es opcional.
 - **Cliente:** publicar el instalador 2.10.0 con el flujo habitual, después de la API.
