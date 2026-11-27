@@ -6,6 +6,7 @@ import { assertNewerReleaseVersion, compareReleaseVersions } from './releaseVers
 import { selectEligibleRelease } from './releaseChannel';
 import { autoUpdater } from 'electron-updater';
 import { getMainWindow } from '../window/windowManager';
+import { isOpenableExternalUrl } from '../../shared/externalUrl';
 
 // Configure autoUpdater
 autoUpdater.autoDownload = false;
@@ -134,9 +135,14 @@ export function registerAutoUpdater() {
     };
   });
 
-  ipcMain.handle('open-external-url', async (_event, url: string) => {
-    if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+  // Frontera real de los enlaces externos: lista blanca estricta (shared/externalUrl.ts). Devuelve si se abrió.
+  ipcMain.handle('open-external-url', async (_event, url: unknown): Promise<boolean> => {
+    if (!isOpenableExternalUrl(url)) return false;
+    try {
       await shell.openExternal(url);
+      return true;
+    } catch {
+      return false;
     }
   });
 

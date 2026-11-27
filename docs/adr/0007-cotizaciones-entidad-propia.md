@@ -17,9 +17,10 @@ SolarSim necesita emitir **cotizaciones**: un documento comercial simple (línea
 3. **Importes en centavos enteros.** Ninguna suma de decimales en coma flotante; el redondeo es half-up y se hace en aritmética entera (`shared/quotations/money.ts`, con BigInt cuando un producto no cabe en enteros seguros). Los topes de `QUOTATION_LIMITS` (precio unitario ≤ 1e11 centavos, bruto del documento y descuento fijo ≤ 1e12) mantienen todo el cálculo en enteros exactos. La tasa de cambio es DOP por 1 USD (entre 1 y 10 000).
 4. **ITBIS sobre la base gravada del documento.** Los descuentos globales se prorratean entre las líneas por el método del mayor resto (la suma asignada es exacta) y el ITBIS se calcula una sola vez sobre la base gravada ya descontada, no línea a línea. La tasa sale de `ITBIS_RATE` (`shared/financialRules.ts`), la única regla de ITBIS.
 5. **«Vencida» es un estado derivado.** No se guarda: es una emitida cuya vigencia es anterior a hoy (`effectiveQuotationStatus`). Así no hay tareas que cambien estados ni estados desfasados.
-6. **El número lo asigna la API.** `number` es `null` hasta que el servidor lo asigna (`COT-AAAA-NNNN`, secuencia por organización y año de la fecha de emisión); este ADR solo fija el formato y su lectura estricta. La asignación llega con la API en una fase posterior.
+6. **El número lo asigna la API.** `number` es `null` hasta que el servidor lo asigna (`COT-AAAA-NNNN`, secuencia por organización y año de la fecha de emisión); este ADR fija el formato y su lectura estricta. La API (migración 011) lo asigna al crear, en la misma transacción que la inserción, y nunca lo cambia ni lo reutiliza ([API](../DATABASE_AND_API_SPECIFICATION.md#cotizaciones-migración-011)).
 7. **La conversión desde propuesta recibe datos ya calculados.** Como la propuesta no tiene precio unitario por equipo, `quotationFromProposal` recibe una estructura armada por quien llama (líneas con precio, filas descriptivas sin precio, descuentos, anexos), la ordena, descarta una vigencia ya vencida y la pasa por `validateQuotationContent`, cuyo resultado (`ok`/`error`) devuelve. Armarla corresponde al código de `src/`, donde vive el motor.
 8. **Validación en el borde.** `validateQuotationContent` (patrón de `validateClientInput`) normaliza y rechaza con mensajes en español; descarta claves desconocidas. La API y el cliente usan la misma función.
+9. **Sin envío de correo desde la app.** La cotización se envía con la aplicación de correo del usuario: el editor genera asunto y cuerpo (función pura), los deja copiar y abre un `mailto:`; el PDF se descarga y se adjunta a mano. Ni el cliente ni la API envían correos ni guardan credenciales SMTP, y el texto editado para un envío no se guarda en la cotización ([editor](../QUOTATION_EDITOR.md#correo)).
 
 ## Alternativas descartadas
 
@@ -29,6 +30,7 @@ SolarSim necesita emitir **cotizaciones**: un documento comercial simple (línea
 ## Consecuencias
 
 - Cliente, API y PDF comparten una sola implementación de totales, estados, numeración y validación; las pruebas de `src/tests/testQuotation*.ts` fijan el contrato.
-- Esta fase no añade API, migraciones, almacén ni interfaz: son fases siguientes y deberán consumir `shared/quotations` sin reimplementar sus reglas.
+- La API (migraciones 011 y 012), el store y la sincronización, el catálogo, el editor, el PDF y el correo consumen `shared/quotations` sin reimplementar sus reglas ([QUOTATIONS.md](../QUOTATIONS.md)).
+- Sin envío desde la app no hay registro de «enviada» ni seguimiento de apertura: «Emitida» la marca el usuario. Enviar desde el servidor exigiría un ADR nuevo (credenciales, reputación del remitente, adjuntos grandes).
 - Los importes ya guardados no cambian si se ajusta una regla de presentación; sí cambiarían si se tocara el algoritmo de totales (cambio de contrato, requiere nuevo ADR).
 - Si la tasa de ITBIS cambia, solo cambia `ITBIS_RATE`.

@@ -15,7 +15,7 @@ import { storeGenericPriceFor } from '../../simulator/params/logic/storeGenericP
 import { localIsoDate } from '../../../utils/localDate';
 import { QuotationStatusChip } from '../common/QuotationStatusChip';
 import { ClientSection, DiscountsSection, DocumentSection, IssuerSection, ItemsSection, NotesSection, type Edit } from './ContentSections';
-import { QuotationPreview } from './QuotationPreview';
+import { QuotationPreview, type PreviewView } from './QuotationPreview';
 import { DesignTab } from './DesignTab';
 import { AttachmentsTab } from './AttachmentsTab';
 import { templateFromQuotation } from '../../../../shared/quotations';
@@ -30,7 +30,7 @@ import './source-proposal.css';
  * Editor de una cotización (docs/QUOTATION_EDITOR.md): formulario a la izquierda y la hoja real a la derecha. No hay
  * «Guardar»: cada cambio confirmado se guarda con `updateQuotationRecord`. Mirar nunca escribe.
  */
-export const QuotationEditorView: React.FC = () => {
+export const QuotationEditorView: React.FC<{ initialPreview?: PreviewView }> = ({ initialPreview }) => {
   const { activeQuotationId, quotation, closeQuotation } = useSimulationStore(useShallow((s) => ({
     activeQuotationId: s.activeQuotationId,
     quotation: s.quotations.find((q) => q.id === s.activeQuotationId),
@@ -41,7 +41,7 @@ export const QuotationEditorView: React.FC = () => {
     if (!activeQuotationId || !quotation) closeQuotation();
   }, [activeQuotationId, quotation, closeQuotation]);
   if (!quotation) return null;
-  return <QuotationEditor key={quotation.id} quotation={quotation} />;
+  return <QuotationEditor key={quotation.id} quotation={quotation} initialPreview={initialPreview} />;
 };
 
 const LOCK_REASONS: Record<QuotationStatus, string> = {
@@ -52,7 +52,7 @@ const LOCK_REASONS: Record<QuotationStatus, string> = {
   void: 'Anulada: solo se puede consultar.',
 };
 
-const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }) => {
+const QuotationEditor: React.FC<{ quotation: QuotationRecord; initialPreview?: PreviewView }> = ({ quotation, initialPreview }) => {
   const {
     change, sidebarTheme, currentUser, online, clients, sourceProject, catalog, defaults, seal, setQuotationStatus, closeQuotation, setActiveProject, templates, signatures, openQuotationLibrary, imageIssues,
   } = useSimulationStore(useShallow((s) => ({
@@ -128,6 +128,20 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
     { id: 'design' as const, label: 'Plantilla y firmas', icon: Palette },
     { id: 'attachments' as const, label: content.attachments.length ? `Adjuntos · ${content.attachments.length}` : 'Adjuntos', icon: Paperclip },
   ];
+  // «Agregar correo del cliente» en la vista de correo: abre Contenido, despliega los datos impresos y enfoca «Correo».
+  // Solo cambia la vista (estado local); no escribe nada.
+  const goToClientEmail = () => {
+    setTab('content');
+    setPane('form');
+    requestAnimationFrame(() => {
+      const details = document.getElementById('qe-client-printed') as HTMLDetailsElement | null;
+      if (!details) return;
+      details.open = true;
+      const input = details.querySelector<HTMLInputElement>('input[type="email"]');
+      input?.scrollIntoView({ block: 'center' });
+      input?.focus();
+    });
+  };
   const readOnlyReason = !writable ? 'Solo lectura: tu rol no permite editar cotizaciones.' : LOCK_REASONS[quotation.status];
 
   return (
@@ -221,7 +235,7 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
           </div>
         </div>
         <div className="qe-preview">
-          <QuotationPreview quotation={sheet} stampImage={stamp} quotationId={id} attachments={content.attachments} imageSources={imageSources} />
+          <QuotationPreview quotation={sheet} stampImage={stamp} quotationId={id} attachments={content.attachments} imageSources={imageSources} initialView={initialPreview} onGoToClientEmail={readOnly ? undefined : goToClientEmail} />
         </div>
       </div>
     </div>

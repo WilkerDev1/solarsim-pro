@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
+import { openExternalUrl } from '../../../utils/openExternalUrl';
 import {
   ShareProposalService,
   SharedProposalRecord,
@@ -174,11 +175,7 @@ export const CloudflareProposalsSection: React.FC = () => {
 
   // Abrir enlace en el navegador
   const handleOpenBrowser = (url: string) => {
-    if (window.electronAPI?.openExternalUrl) {
-      window.electronAPI.openExternalUrl(url);
-    } else {
-      window.open(url, '_blank');
-    }
+    void openExternalUrl(url);
   };
 
   // Compartir por WhatsApp

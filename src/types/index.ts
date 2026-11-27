@@ -580,7 +580,8 @@ declare global {
       onUpdateStatus: (callback: (info: UpdateInfo) => void) => () => void;
       getAppVersion: () => Promise<string>;
       getPlatformInfo: () => Promise<PlatformInfo>;
-      openExternalUrl: (url: string) => Promise<void>;
+      /** Abre http(s) o mailto: permitido (shared/externalUrl.ts); `false` si el proceso principal lo rechaza. */
+      openExternalUrl: (url: string) => Promise<boolean>;
       installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) => Promise<{ success: boolean; error?: string }>;
       parseInvoiceWithAI?: (payload: import('../../shared/aiProposal').AIProposalPayload) => Promise<{ success: boolean; data?: ExtractedInvoiceData; error?: string }>;
       cancelAIRequest?: (requestId: string) => Promise<void>;

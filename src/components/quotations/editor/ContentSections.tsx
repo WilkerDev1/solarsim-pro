@@ -243,7 +243,7 @@ export const ClientSection: React.FC<SectionProps & {
       )}
       {readOnly && !named && <p className="qe-muted">Sin cliente.</p>}
       {error && <p className="qe-field-error" role="alert">{error}</p>}
-      <details className="qe-details" open={!named || undefined}>
+      <details id="qe-client-printed" className="qe-details" open={!named || undefined}>
         <summary><ChevronDown className="h-4 w-4" aria-hidden="true" />Datos impresos en el documento</summary>
         <div className="qe-grid-2">
           {printed('name', 'Nombre')}

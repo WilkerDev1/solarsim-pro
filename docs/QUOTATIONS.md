@@ -1,6 +1,8 @@
 # Cotizaciones
 
-Documento comercial simple (líneas, descuentos, ITBIS y total). **No es una factura fiscal ni una propuesta**: es una entidad propia, distinta de `ProjectSimulation` ([ADR 0007](adr/0007-cotizaciones-entidad-propia.md)). Este documento describe el contrato del dominio puro compartido en `shared/quotations/` y, en «Store y sincronización», el almacén del cliente. La API (rutas, numeración, CAS, borrado lógico y desenlaces en cascada) está en [DATABASE_AND_API_SPECIFICATION.md](DATABASE_AND_API_SPECIFICATION.md#cotizaciones-migración-011); «Catálogo» describe la vista que lista las cotizaciones (el editor llega en otra fase).
+Documento comercial simple (líneas, descuentos, ITBIS y total). **No es una factura fiscal ni una propuesta**: es una entidad propia, distinta de `ProjectSimulation` ([ADR 0007](adr/0007-cotizaciones-entidad-propia.md)). Este documento describe el contrato del dominio puro compartido en `shared/quotations/` y, en «Store y sincronización», el almacén del cliente. La API (rutas, numeración, CAS, borrado lógico y desenlaces en cascada) está en [DATABASE_AND_API_SPECIFICATION.md](DATABASE_AND_API_SPECIFICATION.md#cotizaciones-migración-011); «Catálogo» describe la vista que lista las cotizaciones; el editor, la hoja A4, el PDF y la vista previa del correo están en [QUOTATION_EDITOR.md](QUOTATION_EDITOR.md) y la conversión desde una propuesta en [QUOTATION_FROM_PROPOSAL.md](QUOTATION_FROM_PROPOSAL.md).
+
+**Estado.** Módulo completo en `beta` (fases F1–F8): dominio puro, API con las migraciones 011 y 012, store y sincronización, catálogo, editor con hoja A4 y PDF con adjuntos, plantillas, firmas y sellos, conversión desde propuesta y vista previa del correo. Sale con la release 2.10.0 ([qué exige](#qué-exige-el-release-2100)). **La app no envía correos**: prepara asunto y cuerpo, los copia y abre la aplicación de correo del usuario; el PDF se descarga y se adjunta a mano ([editor](QUOTATION_EDITOR.md#correo)).
 
 Reglas del módulo: TypeScript puro (sin `src/`, `server/`, `electron/`, Node ni terceros), imports relativos con extensión `.js`, sin relojes ni generación de ids (la fecha y `newId` entran como argumento), importes en **centavos enteros** y la tasa de ITBIS solo desde `ITBIS_RATE` (`shared/financialRules.ts`). Lo verifica `testQuotationSharedPurity`.
 
@@ -191,6 +193,16 @@ Vista `quotations-hub` (`src/components/quotations/QuotationsHubView.tsx`, pieza
 - **Estados vacíos**: sin cotizaciones, una explicación y «Nueva cotización» (si se puede escribir; crea una en blanco); sin resultados, cómo ampliar la búsqueda y «Quitar filtros».
 
 La vista sigue los tokens de `DESIGN.md` en claro y oscuro (`sidebarTheme`) y funciona desde 1024×700: el dock pasa debajo de la lista por debajo de 1400 px de ancho de ventana, los indicadores a dos columnas por debajo de 1280 px y la tabla, si no cabe, se desplaza dentro de su panel (nunca la página).
+
+## Qué exige el release 2.10.0
+
+Lista de comprobación del release que publica el módulo (procedimiento general en [MAINTENANCE_AND_UPDATES.md](MAINTENANCE_AND_UPDATES.md#publicar-una-versión-de-escritorio)):
+
+1. **API y migraciones antes que el cliente.** Desplegar la API con las migraciones 011 (`quotations`, `quotation_counters`) y 012 (solo `quotation_templates` y `quotation_signatures`) y con las rutas nuevas del release, que no son parte de ninguna migración: `POST /api/document-assets` (subida de un archivo suelto) y `GET /api/document-assets/:sha256/file` (descarga del archivo). Todo antes de publicar el escritorio: un cliente 2.10.0 contra la API anterior no sincroniza cotizaciones ni gestiona la clave `quotations` ([Funciones](APPLICATION_FEATURES.md#cotizaciones)). En el ensayo, comprobar que ambas migraciones se aplican y que las rutas de cotizaciones, plantillas y firmas responden.
+2. **Versión ≥ 2.10.0.** `FEATURE_POLICY_V3_CLIENT_VERSION` vale `2.10.0` y `release:bump`/`release:manifests` fallan con una versión menor (`scripts/qa/releaseVersionGuard.ts`). Si la release sale con otro número, ajustar la constante antes de construir, nunca a uno menor que el ya publicado.
+3. **Rollback de la API.** La API anterior reemplaza `feature_settings` entero al guardar y solo conoce dos claves. Durante el rollback, cualquier guardado de la política (desde 2.9.x o 2.10.0) borra `quotations: false`, y los clientes 2.10.0 verán Cotizaciones activada en esas organizaciones. Antes del rollback, anota esas organizaciones y no guardes la política mientras dure. Al volver, comprueba y restaura.
+4. **Sin cuota ni limpieza de `document_assets`** ([pendiente](#pendiente-cuota-y-limpieza-de-activos)): vigilar el tamaño de la tabla tras el release; hoy solo limitan el tamaño por archivo y por solicitud.
+5. **Sin más cambios de versión.** `MIN_CLIENT_VERSION` no cambia con este release. El correo no necesita nada del servidor: es un `mailto:` que el escritorio abre por el IPC `open-external-url`, que ahora admite `mailto:` con una lista blanca estricta (`shared/externalUrl.ts`) y devuelve si lo abrió.
 
 ## Pruebas
 
