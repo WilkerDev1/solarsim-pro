@@ -2,6 +2,7 @@ import { supplySummaryText } from '../../../shared/offGridSupply';
 import {
   ProposalGroupControls,
   useProposalLinkDrop,
+  proposalDropMessage,
 } from "../../features/proposals/ProposalGroupControls";
 import {
   proposalFamily,
@@ -36,8 +37,8 @@ export function ProjectDocumentList({
       <table className="w-full min-w-[760px] xl:min-w-[1120px] border-collapse text-left text-sm">
         <caption className="sr-only">
           Propuestas. Abrir un documento con su nombre; arrastrarlo para moverlo
-          a una carpeta, sobre otra para enlazarlo o a un espacio vacío para
-          desenlazarlo.
+          a una carpeta, mantenerlo sobre otra para enlazarlo o soltarlo enseguida
+          fuera de su grupo para desenlazarlo.
         </caption>
         <thead className="bg-slate-50 text-xs font-medium text-slate-600 dark:bg-zinc-800/60 dark:text-zinc-300">
           <tr>
@@ -83,7 +84,7 @@ function ProjectDocumentRow({ project }: { project: ProjectSimulation }) {
       key={project.id}
       data-proposal-drop-target
       draggable
-      onDragStart={(event) => startProposalDrag(event, project.id)}
+      onDragStart={(event) => startProposalDrag(event, project.id, project.client.name || "Sin nombre")}
       onDragEnd={stopProposalDrag}
       {...drop.events}
       className={`group hover:bg-slate-50 dark:hover:bg-zinc-800/40 ${drop.hover === "ready" ? "proposal-drop-ready" : ""}`}
@@ -104,9 +105,7 @@ function ProjectDocumentRow({ project }: { project: ProjectSimulation }) {
             <ProposalGroupControls project={project} />
             {drop.hover && (
               <span className="proposal-drop-message">
-                {drop.hover === "ready"
-                  ? "Soltar para enlazar debajo"
-                  : "Mantén aquí para enlazar…"}
+                {proposalDropMessage(drop.hover)}
               </span>
             )}
             {drop.feedback && (

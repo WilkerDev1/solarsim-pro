@@ -59,17 +59,75 @@ export function unlinkableDrag(sourceId: string | null, all: ProjectSimulation[]
   const project = all.find((p) => p.id === sourceId && !p.isDeleted);
   return project?.proposalLink?.parentId ? project : null;
 }
+/**
+ * Soltar sin esperar sobre una propuesta de otro grupo saca la arrastrada de su grupo: en la lista casi no
+ * quedan huecos vacíos donde soltarla. Dentro de su propio grupo (principal, hermanas, sus vinculadas) no.
+ */
+export function unlinkOnQuickDrop(sourceId: string | null, targetId: string, all: ProjectSimulation[]) {
+  const source = unlinkableDrag(sourceId, all);
+  const target = all.find((p) => p.id === targetId && !p.isDeleted);
+  if (!source || !target || source.id === target.id) return null;
+  return proposalFamily(source, all).root.id === proposalFamily(target, all).root.id ? null : source;
+}
 /** Marca de los destinos con su propia lógica de soltar (propuestas, carpetas): ahí no se desenlaza. */
 export const PROPOSAL_DROP_TARGET = "data-proposal-drop-target";
+const DRAG_STOP_EVENT = "solarsim-proposal-drag-stop";
 let draggingId: string | null = null;
-export function startProposalDrag(event: React.DragEvent, id: string) {
+let releaseFallback: (() => void) | null = null;
+/**
+ * Imagen de arrastre compacta: sin ella Chromium fotografía la fila de la tabla (en Wayland, un bloque enorme
+ * con las filas vecinas) y esa imagen puede quedarse pegada en pantalla.
+ */
+function setCompactDragImage(dataTransfer: DataTransfer, label: string) {
+  if (typeof document === "undefined" || typeof dataTransfer.setDragImage !== "function") return;
+  const chip = document.createElement("div");
+  chip.className = "proposal-drag-chip";
+  chip.textContent = label || "Sin nombre";
+  document.body.appendChild(chip);
+  dataTransfer.setDragImage(chip, 16, 16);
+  setTimeout(() => chip.remove(), 0);
+}
+/**
+ * Si el arrastre acaba sin dragend (Wayland, la ventana pierde el foco), el siguiente puntero suelto lo libera.
+ * Durante un arrastre nativo no llegan eventos de puntero, así que no corta un arrastre en curso.
+ */
+function armDragFallback() {
+  releaseFallback?.();
+  if (typeof window === "undefined") return;
+  const end = (event: PointerEvent) => {
+    if (event.type === "pointermove" && event.buttons) return;
+    stopProposalDrag();
+  };
+  const timer = setTimeout(() => {
+    window.addEventListener("pointermove", end, true);
+    window.addEventListener("pointerdown", end, true);
+  }, 0);
+  releaseFallback = () => {
+    clearTimeout(timer);
+    window.removeEventListener("pointermove", end, true);
+    window.removeEventListener("pointerdown", end, true);
+  };
+}
+export function startProposalDrag(event: React.DragEvent, id: string, label?: string) {
   draggingId = id;
   event.dataTransfer.setData("text/plain", id);
   event.dataTransfer.effectAllowed = "move";
+  if (label !== undefined) setCompactDragImage(event.dataTransfer, label);
+  armDragFallback();
 }
 export function stopProposalDrag() {
+  releaseFallback?.();
+  releaseFallback = null;
+  if (draggingId === null) return;
   draggingId = null;
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(DRAG_STOP_EVENT));
 }
 export function currentProposalDrag() {
   return draggingId;
+}
+/** Avisa a los destinos que limpien su resaltado cuando el arrastre termina, llegue o no el dragend. */
+export function onProposalDragStop(listener: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(DRAG_STOP_EVENT, listener);
+  return () => window.removeEventListener(DRAG_STOP_EVENT, listener);
 }
