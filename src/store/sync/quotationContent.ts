@@ -21,24 +21,43 @@ export function quotationContent(record: QuotationContent): QuotationContent {
 const inline = (image: string | undefined): boolean => !!image && !isAssetRef(image);
 
 /**
- * Inline images already uploaded to `/api/document-assets` (data URL → `asset:sha256:` reference). The reference is the
- * sha256 of the exact text, so once known it stands for that image in every comparison and publication.
+ * Reference of each inline image already hashed (data URL → `asset:sha256:`). The reference is the sha256 of the exact
+ * text, so it is the same in every workspace: it says what the image is called, not that a server has it (the uploads
+ * confirmed per workspace live in `DocumentAssetService`). The sync pass hashes every image before planning a PUT and
+ * never publishes a quotation whose new image could not be uploaded.
  */
-const uploadedRefs = new Map<string, string>();
+const knownRefs = new Map<string, string>();
 const MAX_KNOWN_REFS = 200;
-export function registerUploadedImage(dataUrl: string, ref: string): void {
+export function registerImageRef(dataUrl: string, ref: string): void {
   if (!isAssetRef(ref)) return;
-  if (uploadedRefs.size >= MAX_KNOWN_REFS) uploadedRefs.delete(uploadedRefs.keys().next().value!);
-  uploadedRefs.set(dataUrl, ref);
+  if (knownRefs.size >= MAX_KNOWN_REFS) knownRefs.delete(knownRefs.keys().next().value!);
+  knownRefs.set(dataUrl, ref);
 }
-/** What travels for an image slot: references as they are, uploaded inline images as their reference, the rest empty. */
-const published = (image: string | undefined): string => (inline(image) ? uploadedRefs.get(image!) ?? '' : image ?? '');
+export const knownImageRef = (dataUrl: string): string | undefined => knownRefs.get(dataUrl);
+/** What travels for an image slot: references as they are, hashed inline images as their reference, the rest empty. */
+const published = (image: string | undefined): string => (inline(image) ? knownRefs.get(image!) ?? '' : image ?? '');
 
-/** What the API accepts: images that are not `asset:sha256:` references (nor uploaded already) are sent empty. */
+/** Every image slot of a quotation: logo, attachment thumbnails, and the printed signature and stamp copies. */
+export function quotationImages(content: QuotationContent): string[] {
+  return [
+    content.issuer?.logo, ...(content.attachments ?? []).map((a) => a.thumbnailDataUrl), content.design?.signature?.image, content.design?.stampImage,
+  ].filter((image): image is string => !!image);
+}
+
+/** What the API accepts: images travel as `asset:sha256:` references (an image never hashed is sent empty). */
 export function publishableContent(record: QuotationContent): QuotationContent {
   const content = quotationContent(record);
+  const design = content.design && (content.design.signature || content.design.stampImage)
+    ? {
+      ...content.design,
+      ...(content.design.signature ? { signature: { ...content.design.signature, image: published(content.design.signature.image) } } : {}),
+      ...(content.design.stampImage ? { stampImage: published(content.design.stampImage) } : {}),
+    }
+    : content.design;
+  if (design && 'stampImage' in design && !design.stampImage) delete design.stampImage;
   return {
     ...content,
+    design,
     issuer: { ...content.issuer, logo: published(content.issuer?.logo) },
     attachments: (content.attachments ?? []).map((attachment) => {
       if (!inline(attachment.thumbnailDataUrl)) return attachment;
@@ -65,13 +84,20 @@ export const sameQuotationContent = (left: QuotationContent, right: QuotationCon
  */
 export function keepLocalImages(server: QuotationRecord, local: QuotationRecord | undefined): QuotationRecord {
   if (!local) return server;
-  const same = (remote: string | undefined, mine: string | undefined) => inline(mine) && (!remote || remote === uploadedRefs.get(mine!));
+  const same = (remote: string | undefined, mine: string | undefined) => inline(mine) && (!remote || remote === knownRefs.get(mine!));
+  // The printed copies only keep the local image when the server holds exactly its reference.
+  const sameRef = (remote: string | undefined, mine: string | undefined) => inline(mine) && !!remote && remote === knownRefs.get(mine!);
   const logo = same(server.issuer?.logo, local.issuer?.logo) ? local.issuer.logo : undefined;
   const thumbnails = new Map((local.attachments ?? []).filter((a) => inline(a.thumbnailDataUrl)).map((a) => [a.id, a.thumbnailDataUrl!]));
   const attachments = (server.attachments ?? []).map((a) => (thumbnails.has(a.id) && same(a.thumbnailDataUrl, thumbnails.get(a.id)) ? { ...a, thumbnailDataUrl: thumbnails.get(a.id) } : a));
   const changedAttachments = attachments.some((a, index) => a !== server.attachments[index]);
-  if (!logo && !changedAttachments) return server;
-  return { ...server, ...(logo ? { issuer: { ...server.issuer, logo } } : {}), ...(changedAttachments ? { attachments } : {}) };
+  const signature = server.design?.signature && sameRef(server.design.signature.image, local.design?.signature?.image) ? local.design.signature!.image : undefined;
+  const stamp = sameRef(server.design?.stampImage, local.design?.stampImage) ? local.design.stampImage : undefined;
+  if (!logo && !changedAttachments && !signature && !stamp) return server;
+  const design = signature || stamp
+    ? { ...server.design, ...(signature ? { signature: { ...server.design.signature!, image: signature } } : {}), ...(stamp ? { stampImage: stamp } : {}) }
+    : server.design;
+  return { ...server, design, ...(logo ? { issuer: { ...server.issuer, logo } } : {}), ...(changedAttachments ? { attachments } : {}) };
 }
 
 /** `target` with the image slots of `base` (logo and thumbnails of the same attachments). */

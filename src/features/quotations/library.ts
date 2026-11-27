@@ -1,23 +1,39 @@
-import { defaultQuotationSignature, defaultQuotationTemplate, type QuotationDesign } from '../../../shared/quotations';
+import {
+  defaultQuotationSignature, defaultQuotationTemplate, isQuotationContentLocked, selectedQuotationSignature,
+  type QuotationContent, type QuotationDesign, type QuotationPrintedSignature,
+} from '../../../shared/quotations';
 import type { QuotationSignature, QuotationTemplate } from '../../types/quotationLibrary';
 
-/**
- * Firma que imprime una cotización: la elegida en su diseño (`signatureId`) o, sin elección o si ya no existe, la
- * predeterminada. Con `showSignature` apagado, ninguna. La imagen puede ser una referencia: la resuelve quien dibuja.
- */
+/** Firma de la biblioteca que imprimiría un borrador (la elegida o la predeterminada), solo con `showSignature`. */
 export function quotationSignatureFor(design: QuotationDesign, signatures: readonly QuotationSignature[]): QuotationSignature | null {
-  if (!design.showSignature) return null;
-  const chosen = design.signatureId ? signatures.find((s) => s.id === design.signatureId && s.kind === 'signature') : undefined;
-  return chosen ?? defaultQuotationSignature(signatures, 'signature') ?? null;
+  return selectedQuotationSignature(design, signatures);
 }
 
 /**
- * Sello que imprime una cotización con `showStamp`: el predeterminado de la organización (p. ej. el logo de Electsun
+ * Sello que imprimiría un borrador con `showStamp`: el predeterminado de la organización (p. ej. el logo de Electsun
  * importado como sello) o, si no hay, el del membrete que la emitió (`stampForIssuer`).
  */
 export function quotationStampFor(design: QuotationDesign, signatures: readonly QuotationSignature[], issuerSeal: string | null): string | null {
   if (!design.showStamp) return null;
   return defaultQuotationSignature(signatures, 'stamp')?.image ?? issuerSeal ?? null;
+}
+
+/**
+ * Firma que imprime la cotización. Un borrador sigue la selección en la biblioteca; una bloqueada (emitida, aceptada…)
+ * solo su copia fija `design.signature` y, sin copia, ninguna (bajo la raya, el vendedor, como antes de las firmas).
+ */
+export function printedSignature(content: Pick<QuotationContent, 'status' | 'design'>, signatures: readonly QuotationSignature[]): QuotationPrintedSignature | null {
+  if (!content.design.showSignature) return null;
+  if (isQuotationContentLocked(content.status)) return content.design.signature ?? null;
+  const signer = quotationSignatureFor(content.design, signatures);
+  return signer ? { name: signer.name, role: signer.role, image: signer.image } : null;
+}
+
+/** Sello que imprime la cotización: en borrador, el de la biblioteca o el del membrete; bloqueada, su copia o el del membrete. */
+export function printedStamp(content: Pick<QuotationContent, 'status' | 'design'>, signatures: readonly QuotationSignature[], issuerSeal: string | null): string | null {
+  if (!content.design.showStamp) return null;
+  if (isQuotationContentLocked(content.status)) return content.design.stampImage || issuerSeal || null;
+  return quotationStampFor(content.design, signatures, issuerSeal);
 }
 
 /** Plantilla que reciben las cotizaciones nuevas. */

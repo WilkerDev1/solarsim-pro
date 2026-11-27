@@ -2,18 +2,23 @@ import type { Hono } from "hono";
 import type { PoolClient } from "pg";
 import {
   UNKNOWN_DOCUMENT_ASSET,
+  assetRefHash,
   isAssetRef,
 } from "../../../shared/documentAssets.js";
 import { isWriterRole } from "../../../shared/permissions.js";
 import {
+  QUOTATION_LIBRARY_LIMITS,
   validateQuotationSignature,
   validateQuotationTemplate,
   type LibraryValidation,
 } from "../../../shared/quotations/library.js";
-import { QUOTATION_LIMITS } from "../../../shared/quotations/validation.js";
 import type { Dependencies } from "../dependencies.js";
 import { lockCurrentMembership } from "../membership.js";
-import { readObjectBody } from "../request.js";
+import { isRecordId, readObjectBody } from "../request.js";
+import {
+  DOCUMENT_IMAGE_TYPES,
+  parseDataUrl,
+} from "../../../shared/fileSignatures.js";
 import { missingAssets } from "./documentAssets.js";
 import { normalizeSince } from "./quotations.js";
 
@@ -142,8 +147,7 @@ export function registerQuotationLibraryRoutes(
       const data = await readObjectBody(c),
         id = c.req.param("id");
       if (
-        !id ||
-        id.length > QUOTATION_LIMITS.id ||
+        !isRecordId(id) ||
         !Number.isSafeInteger(data.baseVersion) ||
         data.baseVersion < 0
       )
@@ -193,6 +197,30 @@ export function registerQuotationLibraryRoutes(
             code: UNKNOWN_DOCUMENT_ASSET,
             missing,
           });
+        // The stored asset must itself be an allowed image within the signature limit (an asset reference can name a
+        // PDF attachment or an old SVG logo of the organization).
+        if (images.length) {
+          const stored = (
+            await client.query<{ content: string }>(
+              "SELECT content FROM document_assets WHERE organization_id=$1 AND sha256 = ANY($2::char(64)[])",
+              [user.organizationId, images.map(assetRefHash)],
+            )
+          ).rows;
+          const invalid = stored.some((row) => {
+            const parsed = parseDataUrl(row.content);
+            return (
+              !parsed?.actual ||
+              parsed.actual !== parsed.declared ||
+              !DOCUMENT_IMAGE_TYPES.includes(parsed.actual as never) ||
+              parsed.byteLength > QUOTATION_LIBRARY_LIMITS.signatureImageBytes
+            );
+          });
+          if (invalid)
+            return fail(400, {
+              error: `La imagen debe ser PNG, JPEG o WebP de hasta ${QUOTATION_LIBRARY_LIMITS.signatureImageBytes / 1024} KB.`,
+              code: "invalid_signature_image",
+            });
+        }
         const existing = (
           await client.query(
             `SELECT * FROM ${table} WHERE organization_id=$1 AND id=$2 FOR UPDATE`,
@@ -240,20 +268,28 @@ export function registerQuotationLibraryRoutes(
             [collection.item]: current(latest),
           });
         }
+        let cleared: { id: string; version: number }[] = [];
         if (value.isDefault) {
           // One default (per kind for signatures): the others lose the flag and reach every device with the pull.
+          // Their new versions go back too, so the writer rebases its own copies without a spurious 409.
           const scope = collection.defaultScope(value);
-          await client.query(
-            `UPDATE ${table} SET data_json=jsonb_set(data_json,'{isDefault}','false'::jsonb),version=version+1,updated_at=clock_timestamp()
+          cleared = (
+            await client.query<{ id: string; version: number }>(
+              `UPDATE ${table} SET data_json=jsonb_set(data_json,'{isDefault}','false'::jsonb),version=version+1,updated_at=clock_timestamp()
             WHERE organization_id=$1 AND id<>$2 AND deleted_at IS NULL AND (data_json->>'isDefault')='true'
-            ${scope === null ? "" : "AND data_json->>'kind'=$3"}`,
-            scope === null
-              ? [user.organizationId, id]
-              : [user.organizationId, id, scope],
-          );
+            ${scope === null ? "" : "AND data_json->>'kind'=$3"} RETURNING id,version`,
+              scope === null
+                ? [user.organizationId, id]
+                : [user.organizationId, id, scope],
+            )
+          ).rows;
         }
         await client.query("COMMIT");
-        return c.json({ success: true, [collection.item]: record(row) });
+        return c.json({
+          success: true,
+          [collection.item]: record(row),
+          cleared,
+        });
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -267,6 +303,8 @@ export function registerQuotationLibraryRoutes(
       if (!user) return c.json({ error: "No autorizado" }, 401);
       if (!isWriterRole(user.role))
         return c.json({ error: "Permisos insuficientes" }, 403);
+      if (!isRecordId(c.req.param("id")))
+        return c.json({ error: messages.invalid }, 400);
       const client = await pool.connect();
       try {
         await client.query("BEGIN");

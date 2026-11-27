@@ -10,7 +10,7 @@ import type { QuotationContent, QuotationDesign } from './types.js';
 
 export type QuotationSignatureKind = 'signature' | 'stamp';
 /** Diseño que guarda una plantilla: el de la cotización sin el enlace a la plantilla. */
-export type QuotationTemplateDesign = Omit<QuotationDesign, 'templateId'>;
+export type QuotationTemplateDesign = Omit<QuotationDesign, 'templateId' | 'signature' | 'stampImage'>;
 
 export interface QuotationTemplateContent {
   name: string;
@@ -87,7 +87,7 @@ export function validateQuotationTemplate(raw: unknown): LibraryValidation<Quota
   if (typeof paymentTerms !== 'string') return { ok: false, error: paymentTerms.error };
   const design = validateQuotationDesign(raw.design);
   if (!design.ok) return design;
-  const { templateId: _templateId, ...templateDesign } = design.value;
+  const { templateId: _templateId, signature: _signature, stampImage: _stamp, ...templateDesign } = design.value;
   const days = raw.validityDays ?? null;
   if (days !== null && (typeof days !== 'number' || !Number.isSafeInteger(days) || days < 1 || days > QUOTATION_LIBRARY_LIMITS.maxValidityDays))
     return { ok: false, error: `La vigencia debe ser un número entero de días entre 1 y ${QUOTATION_LIBRARY_LIMITS.maxValidityDays}` };
@@ -150,7 +150,8 @@ export function defaultQuotationSignature<T extends QuotationSignatureContent & 
 
 /** Diseño de una cotización con la plantilla elegida (enlazada por `templateId`); los textos no se tocan. */
 export function designFromTemplate(template: Pick<QuotationTemplate, 'id' | 'design'>): QuotationDesign {
-  return { ...template.design, templateId: template.id };
+  const { signature: _signature, stampImage: _stamp, ...design } = template.design as QuotationDesign;
+  return { ...design, templateId: template.id };
 }
 
 /**
@@ -172,7 +173,7 @@ export function templateFromQuotation(
   content: Pick<QuotationContent, 'design' | 'notes' | 'paymentTerms' | 'issueDate' | 'validUntil'>,
   name: string,
 ): QuotationTemplateContent {
-  const { templateId: _templateId, ...design } = content.design;
+  const { templateId: _templateId, signature: _signature, stampImage: _stamp, ...design } = content.design;
   const span = content.validUntil && isIsoDate(content.validUntil) && isIsoDate(content.issueDate)
     ? Math.round((Date.UTC(...ymd(content.validUntil)) - Date.UTC(...ymd(content.issueDate))) / 86_400_000)
     : 0;
@@ -186,3 +187,27 @@ const ymd = (date: string): [number, number, number] => {
   const [year, month, day] = date.split('-').map(Number);
   return [year, month - 1, day];
 };
+
+type SignatureLike = QuotationSignatureContent & { id: string; updatedAt: string };
+
+/** Firma de la biblioteca que imprimiría un borrador: la elegida (si existe y es una firma) o la predeterminada. */
+export function selectedQuotationSignature<T extends SignatureLike>(design: QuotationDesign, signatures: readonly T[]): T | null {
+  if (!design.showSignature) return null;
+  const chosen = design.signatureId ? signatures.find((s) => s.id === design.signatureId && s.kind === 'signature') : undefined;
+  return chosen ?? defaultQuotationSignature(signatures, 'signature') ?? null;
+}
+
+/**
+ * Diseño con la copia fija de lo que se imprime (firma y sello de la biblioteca), al salir de borrador. Desde entonces
+ * la cotización ya no depende de la biblioteca: borrar una firma o cambiar la predeterminada no cambia su PDF.
+ */
+export function freezePrintedDesign(design: QuotationDesign, signatures: readonly SignatureLike[]): QuotationDesign {
+  const { signature: _signature, stampImage: _stamp, ...rest } = design;
+  const signer = selectedQuotationSignature(design, signatures);
+  const stamp = design.showStamp ? defaultQuotationSignature(signatures, 'stamp') : undefined;
+  return {
+    ...rest,
+    ...(signer ? { signature: { name: signer.name, role: signer.role, image: signer.image } } : {}),
+    ...(stamp ? { stampImage: stamp.image } : {}),
+  };
+}

@@ -107,6 +107,7 @@ export const createQuotationLibrarySlice: SimulationSlice<QuotationLibrarySlice>
   };
 
   const resolve = (kind: LibraryKind, id: string, resolution: 'accept_server' | 'keep_local') => {
+    set({ quotationLibrarySyncFeedback: null });
     const state = collection(kind), change = state.changes[id], user = account();
     const refused = state.deletions.find((d) => d.id === id && d.rejected);
     if (!change && refused) {
@@ -213,6 +214,16 @@ export const createQuotationLibrarySlice: SimulationSlice<QuotationLibrarySlice>
       if (!context.current()) return 'changed';
       // Recibo perdido: el servidor ya tiene exactamente este contenido.
       const receipt = saved.ok ? saved.record : saved.status === 409 && saved.record && contentEqual(libraryContent(kind, saved.record), content) ? saved.record : null;
+      if (saved.ok && saved.cleared.length) {
+        // The server cleared the previous default (version + 1). This device already cleared it locally: take that
+        // version as the new base, so a pending edit of it is not a spurious 409.
+        const cleared = new Map(saved.cleared.map((c) => [c.id, c.version]));
+        patch(kind, (s) => ({
+          items: s.items.map((item) => (cleared.has(item.id) && !item.isDefault ? { ...item, version: cleared.get(item.id)!, baseVersion: cleared.get(item.id)! } : item)),
+          changes: Object.fromEntries(Object.entries(s.changes).map(([key, c]) =>
+            [key, cleared.has(key) && c.baseVersion === cleared.get(key)! - 1 && c.server === undefined ? { ...c, baseVersion: cleared.get(key)! } : c])),
+        }));
+      }
       if (receipt) {
         const kept = await keepLocalImage(receipt, local);
         patch(kind, (s) => {

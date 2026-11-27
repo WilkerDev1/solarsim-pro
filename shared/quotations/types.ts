@@ -53,6 +53,14 @@ export interface QuotationIssuer {
   logo: string;
 }
 
+/** Firma tal como se imprime: copia fija en la cotización (no depende de la biblioteca una vez emitida). */
+export interface QuotationPrintedSignature {
+  name: string;
+  role: string;
+  /** Data URL de imagen (png, jpeg o webp) o referencia `asset:sha256:`; puede ser ''. */
+  image: string;
+}
+
 export interface QuotationDesign {
   templateId?: string;
   layout: 'clasica' | 'banda' | 'minimal';
@@ -61,6 +69,13 @@ export interface QuotationDesign {
   signatureId?: string;
   showSignature: boolean;
   showStamp: boolean;
+  /**
+   * Copia de la firma que se imprime, fijada al salir de borrador. Una cotización bloqueada solo imprime esta copia
+   * (sin ella, ninguna firma: así no cambian las emitidas antes de existir la biblioteca).
+   */
+  signature?: QuotationPrintedSignature;
+  /** Copia del sello de la biblioteca fijada al salir de borrador; sin ella, el sello del membrete que la emitió. */
+  stampImage?: string;
 }
 
 export interface QuotationAttachment {

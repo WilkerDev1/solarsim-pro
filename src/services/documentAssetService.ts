@@ -1,5 +1,7 @@
 import { fetchWithSessionRetry } from './syncService';
 import { assetRef, assetRefHash, isAssetRef } from '../../shared/documentAssets';
+import { sniffDocumentFileType } from '../../shared/fileSignatures';
+import { bytesToDataUrl } from '../utils/dataUrl';
 
 /**
  * Activos sueltos de la API (`/api/document-assets`, migración 009 ampliada): logo del emisor, firmas, sellos y
@@ -59,6 +61,28 @@ export const DocumentAssetService = {
   },
   transport(serverUrl: string, token: () => string): DocumentAssetTransport {
     return factory(serverUrl, token);
+  },
+  /** El servidor dice no tener estos hashes: la próxima publicación los vuelve a subir. */
+  forgetUploaded(scope: string, hashes: readonly string[]) {
+    const done = uploaded.get(scope);
+    for (const hash of hashes) done?.delete(hash);
+  },
+  /**
+   * Bytes de un activo con la ruta de descarga (`GET …/:sha256/file`), comprobados contra su referencia; `null` si no
+   * se pueden obtener.
+   */
+  async fileBytes(transport: DocumentAssetTransport | null, ref: string): Promise<ArrayBuffer | null> {
+    if (!transport || !isAssetRef(ref)) return null;
+    try {
+      const response = await transport(`/${assetRefHash(ref)}/file`);
+      if (!response.ok) return null;
+      const bytes = await response.arrayBuffer();
+      const type = sniffDocumentFileType(new Uint8Array(bytes, 0, Math.min(16, bytes.byteLength)));
+      if (!type || (await assetRefFor(bytesToDataUrl(bytes, type))) !== ref) return null;
+      return bytes;
+    } catch {
+      return null;
+    }
   },
   /**
    * Sube `dataUrl` (una vez por espacio de trabajo y sesión de la app) y devuelve su referencia. Un 4xx lanza

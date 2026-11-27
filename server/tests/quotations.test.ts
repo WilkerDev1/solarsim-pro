@@ -418,6 +418,11 @@ test("invalid content and bodies are rejected with 400", async () => {
 });
 
 test("inline images are not stored: logo and thumbnails must be asset references", async () => {
+  // The managed references must exist in the organization (unknown_document_asset otherwise).
+  await pool.query(
+    "INSERT INTO document_assets (organization_id,sha256,content,size_bytes) VALUES ($1,$2,'data:image/png;base64,AAAA',4) ON CONFLICT DO NOTHING",
+    [admin.organizationId, "a".repeat(64)],
+  );
   const attachment = (thumbnailDataUrl?: string) => ({
     id: "att-1",
     fileName: "ficha.pdf",
@@ -462,6 +467,86 @@ test("inline images are not stored: logo and thumbnails must be asset references
   );
   assert.equal(edited.status, 400);
   assert.equal(edited.body.code, "inline_image_not_allowed");
+});
+
+test("managed asset references must exist in the organization; other attachment keys are not checked", async () => {
+  const attachment = (extra: Record<string, unknown>) => ({
+    id: "att-x",
+    fileName: "ficha.pdf",
+    fileSize: 10,
+    pageCount: 1,
+    title: "Ficha",
+    uploadedAt: "2026-11-26T10:00:00.000Z",
+    mode: "related" as const,
+    origin: "catalog" as const,
+    ...extra,
+  });
+  const unknown = `asset:sha256:${"b".repeat(64)}`;
+  for (const body of [
+    content({ issuer: { ...content().issuer, logo: unknown } }),
+    content({
+      attachments: [attachment({ origin: "manual", assetId: unknown })],
+    }),
+    content({
+      design: {
+        ...content().design,
+        signature: { name: "Idali", role: "", image: unknown },
+      },
+    }),
+    content({ design: { ...content().design, stampImage: unknown } }),
+  ]) {
+    const result = await put(editor, "q-unknown-asset", 0, body);
+    assert.equal(result.status, 400, JSON.stringify(result.body));
+    assert.equal(result.body.code, "unknown_document_asset");
+    assert.deepEqual(result.body.missing, ["b".repeat(64)]);
+  }
+  // Another organization's asset is unknown here too.
+  await pool.query(
+    "INSERT INTO document_assets (organization_id,sha256,content,size_bytes) VALUES ($1,$2,'data:image/png;base64,AAAA',4) ON CONFLICT DO NOTHING",
+    [other.organizationId, "c".repeat(64)],
+  );
+  const foreign = await put(
+    editor,
+    "q-unknown-asset",
+    0,
+    content({
+      issuer: { ...content().issuer, logo: `asset:sha256:${"c".repeat(64)}` },
+    }),
+  );
+  assert.equal(foreign.body.code, "unknown_document_asset");
+  // An equipment_assets id (catalog datasheet) or a proposal annex key is not a managed reference.
+  const accepted = await put(
+    editor,
+    "q-unknown-asset",
+    0,
+    content({
+      attachments: [
+        attachment({ assetId: "5f0c2e8e-7b0a-4f7e-9d7c-1b2a3c4d5e6f" }),
+        {
+          ...attachment({ origin: "proposal", assetId: "att-catalog-xyz" }),
+          id: "att-y",
+        },
+      ],
+    }),
+  );
+  assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+  // Printed signature and stamp copies are images too: inline is refused.
+  const inline = await put(
+    editor,
+    "q-inline-signature",
+    0,
+    content({ design: { ...content().design, stampImage: DATA_URL } }),
+  );
+  assert.equal(inline.body.code, "inline_image_not_allowed");
+});
+
+test("ids with control characters are a 400, never a 500", async () => {
+  assert.equal((await put(editor, "q%00bad", 0)).status, 400);
+  assert.equal(
+    (await request("DELETE", "/api/quotations/q%00bad?baseVersion=1", editor))
+      .status,
+    400,
+  );
 });
 
 test("status changes follow the allowed transitions", async () => {

@@ -1065,3 +1065,6 @@
   color: var(--qe-muted);
   overflow-wrap: anywhere;
 }
+.qe-dropzone[data-disabled] {
+  opacity: 0.55;
+}

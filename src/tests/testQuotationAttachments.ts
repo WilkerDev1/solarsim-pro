@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { PDFDocument, PDFName } from 'pdf-lib';
 import {
-  catalogDatasheetCandidates, formatFileSize, mergeQuotationAttachments, pageCountLabel, prepareAttachmentFile, resolveAttachmentBytes,
+  catalogDatasheetCandidates, formatFileSize, jpegOrientation, mergeQuotationAttachments, pdfFailure, pageCountLabel, prepareAttachmentFile, resolveAttachmentBytes,
   skippedAttachmentsMessage,
 } from '../features/quotations/attachments';
 import { estimateClosingHeight, estimateSignaturesHeight, paginateQuotation, SHEET_LAYOUT } from '../features/quotations/paginate';
@@ -69,7 +69,7 @@ for (const [name, bytes, pattern] of [
 }
 const locked = await prepareAttachmentFile({ name: 'cifrado.pdf', bytes: await encryptedPdf() }, { id: 'x', now });
 assert.equal(locked.ok, false);
-if (!locked.ok) assert.match(locked.error, /contraseña/);
+if (!locked.ok) assert.match(locked.error, /contraseña o permisos/);
 const traversal = await prepareAttachmentFile({ name: '../../etc/passwd\u0000.pdf', bytes: three }, { id: 'x', now });
 assert.ok(traversal.ok);
 assert.ok(!traversal.attachment.fileName.includes('/'));
@@ -100,9 +100,8 @@ const saved: string[] = [];
 const deps = {
   local: async (id: string) => (id === 'local' ? three : null),
   save: async (id: string) => { saved.push(id); },
-  documentAsset: async (ref: string) => (ref === 'asset:sha256:' + 'a'.repeat(64) ? bytesToDataUrl(PNG_BYTES, 'image/png') : null),
+  documentAssetBytes: async (ref: string) => (ref === 'asset:sha256:' + 'a'.repeat(64) ? buffer(dataUrlToBytes(bytesToDataUrl(PNG_BYTES, 'image/png'))!) : null),
   equipmentAsset: async (assetId: string) => (assetId === 'asset-panel' ? new Blob([three]) : assetId === 'asset-html' ? new Blob(['<html>']) : null),
-  decode: dataUrlToBytes,
 };
 assert.equal(await resolveAttachmentBytes(attachment('local'), deps), three);
 assert.equal((await resolveAttachmentBytes(attachment('srv', { assetId: 'asset:sha256:' + 'a'.repeat(64) }), deps))?.byteLength, PNG_BYTES.length);
@@ -114,33 +113,65 @@ assert.equal(await resolveAttachmentBytes(attachment('boom', { assetId: 'asset-p
 
 // ── Fusión: PDF tal cual, imagen en A4, corrupto/cifrado/ausente se omiten sin romper ──
 const main = await pdfWith(2);
+const loaded: string[] = [];
+const item = (a: QuotationAttachment, bytes: ArrayBuffer | null) => ({ attachment: a, load: async () => { loaded.push(a.id); return bytes; } });
 const merged = await mergeQuotationAttachments(main, [
-  { attachment: attachment('pdf3'), bytes: three },
-  { attachment: attachment('foto', { title: 'Foto del techo' }), bytes: buffer(PNG_BYTES) },
-  { attachment: attachment('solo-enlazado', { mode: 'related' }), bytes: three },
-  { attachment: attachment('roto', { title: 'Ficha rota' }), bytes: buffer(Buffer.from('%PDF-1.4\nbasura')) },
-  { attachment: attachment('cifrado', { title: 'Contrato' }), bytes: await encryptedPdf() },
-  { attachment: attachment('ausente', { title: 'Plano' }), bytes: null },
-  { attachment: attachment('webp', { title: 'Render' }), bytes: buffer(Buffer.from('RIFF\0\0\0\0WEBPVP8 ')) },
-  { attachment: attachment('svg', { title: 'Logo' }), bytes: buffer(svg) },
+  item(attachment('pdf3'), three),
+  item(attachment('foto', { title: 'Foto del techo' }), buffer(PNG_BYTES)),
+  item(attachment('solo-enlazado', { mode: 'related' }), three),
+  item(attachment('roto', { title: 'Ficha rota' }), buffer(Buffer.from('%PDF-1.4\nbasura'))),
+  item(attachment('cifrado', { title: 'Contrato' }), await encryptedPdf()),
+  item(attachment('ausente', { title: 'Plano' }), null),
+  item(attachment('webp', { title: 'Render' }), buffer(Buffer.from('RIFF\0\0\0\0WEBPVP8 '))),
+  item(attachment('svg', { title: 'Logo' }), buffer(svg)),
 ]);
 const result = await PDFDocument.load(merged.bytes);
 assert.equal(result.getPageCount(), 2 + 3 + 1, 'cotización + PDF de 3 páginas + 1 página de imagen; «related» no entra');
 const imagePage = result.getPage(5);
 assert.deepEqual([Math.round(imagePage.getWidth()), Math.round(imagePage.getHeight())], [595, 842], 'la imagen va en una página A4');
 assert.equal(merged.merged, 2);
+assert.ok(!loaded.includes('solo-enlazado'), 'un adjunto relacionado ni se carga');
 assert.deepEqual(merged.skipped.map((s) => [s.id, s.reason]), [
   ['roto', 'está dañado'],
-  ['cifrado', 'está protegido con contraseña'],
+  ['cifrado', 'está protegido con contraseña o permisos'],
   ['ausente', 'no está disponible en este equipo ni en el servidor'],
   ['webp', 'formato de imagen que no se puede incluir'],
   ['svg', 'formato no admitido'],
 ]);
 assert.match(skippedAttachmentsMessage(merged.skipped)!, /sin 5 adjuntos: «Ficha rota» \(está dañado\)/);
 assert.equal(skippedAttachmentsMessage([]), null);
-const withConverter = await mergeQuotationAttachments(main, [{ attachment: attachment('webp'), bytes: buffer(Buffer.from('RIFF\0\0\0\0WEBPVP8 ')) }], async () => buffer(PNG_BYTES));
+const withConverter = await mergeQuotationAttachments(main, [item(attachment('webp'), buffer(Buffer.from('RIFF\0\0\0\0WEBPVP8 ')))], { toEmbeddable: async () => buffer(PNG_BYTES) });
 assert.equal(withConverter.merged, 1, 'WebP convertido a PNG se incluye');
 assert.equal((await mergeQuotationAttachments(main, [])).skipped.length, 0);
+// Tope total de memoria: lo que no cabe se omite sin cargarlo (si conoce su tamaño) y se avisa.
+loaded.length = 0;
+const capped = await mergeQuotationAttachments(main, [
+  item(attachment('a', { fileSize: three.byteLength }), three),
+  item(attachment('b', { fileSize: three.byteLength }), three),
+  item(attachment('c', { fileSize: 0 }), three),
+], { maxTotalBytes: three.byteLength + 10 });
+assert.equal(capped.merged, 1);
+assert.deepEqual(capped.skipped.map((s) => s.id), ['b', 'c']);
+assert.deepEqual(loaded, ['a', 'c'], 'el que ya se sabe que no cabe no se carga');
+// Motivos distintos: protegido, formato no soportado y dañado.
+assert.equal(pdfFailure(Object.assign(new Error('Input document to `PDFDocument.load` is encrypted'), { name: 'EncryptedPDFError' })), 'protected');
+assert.equal(pdfFailure(new Error('Object streams with compression filter X are not supported')), 'unsupported');
+assert.equal(pdfFailure(new Error('Failed to parse PDF document')), 'damaged');
+// Orientación EXIF de un JPEG (APP1 «Exif» con la etiqueta 0x0112).
+const exif = (orientation: number, little = false) => {
+  const u16 = (v: number) => (little ? [v & 0xff, v >> 8] : [v >> 8, v & 0xff]);
+  const u32 = (v: number) => (little ? [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, v >>> 24] : [v >>> 24, (v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff]);
+  const tiff = [...(little ? [0x49, 0x49] : [0x4d, 0x4d]), ...u16(42), ...u32(8), ...u16(1), ...u16(0x0112), ...u16(3), ...u32(1), ...u16(orientation), 0, 0, ...u32(0)];
+  const app1 = [0x45, 0x78, 0x69, 0x66, 0, 0, ...tiff];
+  return buffer(Uint8Array.from([0xff, 0xd8, 0xff, 0xe1, ...u16b(app1.length + 2), ...app1, 0xff, 0xd9]));
+};
+const u16b = (v: number) => [v >> 8, v & 0xff];
+assert.equal(jpegOrientation(exif(6)), 6);
+assert.equal(jpegOrientation(exif(8, true)), 8);
+assert.equal(jpegOrientation(exif(3)), 3);
+assert.equal(jpegOrientation(buffer(Uint8Array.from([0xff, 0xd8, 0xff, 0xdb, 0, 4, 0, 0]))), 1, 'sin EXIF');
+assert.equal(jpegOrientation(buffer(PNG_BYTES)), 1, 'no es JPEG');
+assert.equal(jpegOrientation(buffer(Uint8Array.from([0xff, 0xd8, 0xff, 0xe1, 0, 200]))), 1, 'EXIF truncado no lanza');
 
 // ── Edición pura de adjuntos y diseño ──
 let content = emptyQuotationContent('2026-11-26');
@@ -237,5 +268,107 @@ assert.deepEqual(store.getState().quotations.find((x) => x.id === id)!.attachmen
 assert.ok(store.getState().setQuotationStatus(id, 'draft').ok);
 assert.equal(actions.edit((c) => addAttachments(c, [attachment('nuevo')])), null);
 assert.equal(store.getState().quotations.find((x) => x.id === id)!.attachments.length, 1);
+
+// ── B1: una cotización emitida conserva la firma y el sello con que se emitió ──
+{
+  const { printedSignature, printedStamp } = await import('../features/quotations/library');
+  const { PDFAttachmentStorage } = await import('../services/pdfAttachmentStorage');
+  const api = () => store.getState();
+  const setSignatures = (items: QuotationSignature[]) =>
+    store.setState((s) => ({ quotationLibrary: { ...s.quotationLibrary, signatures: { ...s.quotationLibrary.signatures, items } } }));
+  setSignatures([sig('s-idali', 'signature', true, { name: 'Idali', role: 'Ventas' }), sig('stamp-org', 'stamp', true, { image: 'data:image/png;base64,c3RhbXA=' })]);
+  const draft = api().createQuotationRecord({ client: { name: 'Hotel', attention: '', taxId: '', phone: '', email: '', address: '' }, items: doc.items.slice(0, 1) });
+  assert.ok(draft.ok);
+  const qid = draft.ok ? draft.quotation.id : '';
+  const get = () => api().quotations.find((x) => x.id === qid)!;
+  const signatures = () => api().quotationLibrary.signatures.items;
+  // El borrador sigue la selección de la biblioteca.
+  assert.equal(printedSignature(get(), signatures())?.name, 'Idali');
+  setSignatures([...signatures(), sig('s-mayler', 'signature', false, { name: 'Mayler', role: 'Gerente' })]);
+  assert.ok(api().updateQuotationRecord(qid, { design: { ...get().design, signatureId: 's-mayler' } }).ok);
+  assert.equal(printedSignature(get(), signatures())?.name, 'Mayler', 'el borrador cambia al elegir otra firma');
+  assert.equal(get().design.signature, undefined, 'en borrador no hay copia fija');
+  // Emitir fija la copia.
+  assert.ok(api().setQuotationStatus(qid, 'issued').ok);
+  assert.deepEqual(get().design.signature, { name: 'Mayler', role: 'Gerente', image: PNG });
+  assert.equal(get().design.stampImage, 'data:image/png;base64,c3RhbXA=');
+  // Borrar la firma, cambiar la predeterminada o el sello no cambia lo que imprime la emitida.
+  setSignatures([sig('s-nueva', 'signature', true, { name: 'Otra persona' }), sig('stamp-nuevo', 'stamp', true, { image: 'data:image/png;base64,bnVldm8=' })]);
+  assert.deepEqual(printedSignature(get(), signatures()), { name: 'Mayler', role: 'Gerente', image: PNG });
+  assert.equal(printedStamp(get(), signatures(), 'seal-membrete'), 'data:image/png;base64,c3RhbXA=');
+  // Emitidas antes de las firmas (sin copia): ninguna firma aunque alguien importe la primera; el sello del membrete.
+  const legacy = { status: 'issued' as const, design: { layout: 'clasica' as const, accent: '#087b58', typography: 'sans' as const, showSignature: true, showStamp: true } };
+  assert.equal(printedSignature(legacy, signatures()), null, 'importar la primera firma no altera una emitida');
+  assert.equal(printedStamp(legacy, signatures(), 'seal-membrete'), 'seal-membrete', 'conserva el sello del membrete');
+  assert.equal(printedStamp(legacy, [], null), null);
+  // Reabrir vuelve a seguir la biblioteca; volver a emitir fija la selección de ese momento.
+  assert.ok(api().setQuotationStatus(qid, 'draft').ok);
+  assert.equal(printedSignature(get(), signatures())?.name, 'Otra persona', 'la elegida ya no existe: la predeterminada');
+  assert.ok(api().setQuotationStatus(qid, 'issued').ok);
+  assert.equal(get().design.signature?.name, 'Otra persona');
+  // Sin firma ni sello visibles, la copia no se guarda.
+  assert.ok(api().setQuotationStatus(qid, 'draft').ok);
+  assert.ok(api().updateQuotationRecord(qid, { design: { ...get().design, showSignature: false, showStamp: false } }).ok);
+  assert.ok(api().setQuotationStatus(qid, 'issued').ok);
+  assert.equal(get().design.signature, undefined);
+  assert.equal(get().design.stampImage, undefined);
+  // Compatibilidad: contenido sin copias sigue siendo válido y una copia mal formada se rechaza.
+  assert.ok(validateQuotationContent({ ...emptyQuotationContent('2026-11-26'), design: legacy.design }).ok);
+  assert.equal(validateQuotationContent({ ...emptyQuotationContent('2026-11-26'), design: { ...legacy.design, stampImage: 'data:image/svg+xml;base64,PHN2Zz4=' } }).ok, false);
+  assert.equal(validateQuotationContent({ ...emptyQuotationContent('2026-11-26'), design: { ...legacy.design, signature: 'Idali' } }).ok, false);
+
+  // ── I4: duplicar da ids nuevos a los adjuntos propios y copia sus bytes ──
+  assert.ok(api().setQuotationStatus(qid, 'draft').ok);
+  const bytes = await pdfWith(1);
+  await PDFAttachmentStorage.saveAttachment('att-own', qid, 'plano.pdf', bytes);
+  assert.ok(api().updateQuotationRecord(qid, { attachments: [attachment('att-own'), attachment('att-catalog-x', { origin: 'catalog', assetId: 'asset-x' })] }).ok);
+  const copy = api().duplicateQuotationRecord(qid);
+  assert.ok(copy.ok);
+  const copied = copy.ok ? copy.quotation.attachments : [];
+  assert.notEqual(copied[0].id, 'att-own', 'el adjunto propio recibe un id nuevo');
+  assert.equal(copied[1].id, 'att-catalog-x', 'la ficha del catálogo conserva el suyo');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(await PDFAttachmentStorage.getAttachment(copied[0].id), bytes, 'la copia tiene sus propios bytes');
+  const { attachmentBytesUnused } = await import('../features/quotations/attachments');
+  assert.equal(attachmentBytesUnused(api().quotations, attachment('att-own')), false, 'el original aún lo usa');
+  assert.equal(attachmentBytesUnused([], attachment('att-own')), true);
+  assert.equal(attachmentBytesUnused([], attachment('att-catalog-x', { origin: 'catalog' })), false, 'las fichas del catálogo nunca se borran');
+}
+
+// ── I1/I2/M9: publicar adjuntos e imágenes ──
+{
+  const { publishQuotationAssets, createUploadedAttachments } = await import('../store/sync/quotationAssets');
+  const memory = new Map<string, string>();
+  const uploads = createUploadedAttachments({ getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => { memory.set(k, v); } });
+  const pdf = await pdfWith(2);
+  const prepared = await prepareAttachmentFile({ name: 'plano.pdf', bytes: pdf }, { id: 'att-pub', now });
+  assert.ok(prepared.ok);
+  const withAttachment = emptyQuotationContent('2026-11-26', { attachments: [prepared.attachment, attachment('equipo', { origin: 'catalog', assetId: 'uuid-equipo' })] });
+  let reads = 0, posted = 0, failing = true;
+  const deps = {
+    scope: 'srv|org', uploads,
+    upload: async () => { if (failing) throw new Error('sin red'); posted++; return 'ok'; },
+    attachmentBytes: async () => { reads++; return pdf; },
+  };
+  assert.deepEqual((await publishQuotationAssets(withAttachment, deps)).pending, ['«plano»'], 'subida fallida: pendiente, no se publica');
+  failing = false;
+  assert.deepEqual((await publishQuotationAssets(withAttachment, deps)).pending, []);
+  assert.equal(posted, 1, 'la ficha de equipment_assets no se sube');
+  const readsBefore = reads;
+  assert.deepEqual((await publishQuotationAssets(withAttachment, deps)).pending, []);
+  assert.equal(reads, readsBefore, 'ya subido: ni se leen ni se rehashean sus bytes');
+  const restarted = createUploadedAttachments({ getItem: (k) => memory.get(k) ?? null, setItem: () => undefined });
+  await publishQuotationAssets(withAttachment, { ...deps, uploads: restarted });
+  assert.equal(reads, readsBefore, 'el registro sobrevive a un reinicio');
+  restarted.forgetHashes([prepared.attachment.assetId!.slice(13)]);
+  await publishQuotationAssets(withAttachment, { ...deps, uploads: restarted });
+  assert.equal(reads, readsBefore + 1, 'tras unknown_document_asset se vuelve a subir');
+  // Una imagen nueva que no se pudo subir deja la cotización pendiente; si la base ya la tiene, no hace falta subirla.
+  failing = true;
+  const logoContent = emptyQuotationContent('2026-11-26', { issuer: { name: 'E', taxId: '', address: '', phone: '', email: '', website: '', logo: PNG } });
+  assert.deepEqual((await publishQuotationAssets(logoContent, deps)).pending, ['una imagen']);
+  const base = { ...logoContent, issuer: { ...logoContent.issuer, logo: `asset:sha256:${sha(PNG)}` } };
+  assert.deepEqual((await publishQuotationAssets(logoContent, { ...deps, base })).pending, [], 'confirmada en la base: se envía su referencia');
+}
 
 console.log('Quotation attachments, signatures and templates tests passed.');

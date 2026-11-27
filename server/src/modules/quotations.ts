@@ -1,7 +1,12 @@
 import type { Hono } from "hono";
 import type { PoolClient } from "pg";
 import { isDeepStrictEqual } from "node:util";
-import { isAssetRef } from "../../../shared/documentAssets.js";
+import {
+  UNKNOWN_DOCUMENT_ASSET,
+  isAssetRef,
+} from "../../../shared/documentAssets.js";
+import { missingAssets } from "./documentAssets.js";
+import { isRecordId } from "../request.js";
 import { isWriterRole } from "../../../shared/permissions.js";
 import {
   formatQuotationNumber,
@@ -97,9 +102,21 @@ export function normalizeSince(value: string): string | null {
 }
 
 /** Images travel as `asset:sha256:` references only; the API never stores inline data URLs for quotations. */
+const imageSlots = (value: QuotationContent) => [
+  value.issuer.logo,
+  ...value.attachments.map((a) => a.thumbnailDataUrl),
+  value.design.signature?.image,
+  value.design.stampImage,
+];
 const hasInlineImage = (value: QuotationContent) =>
-  [value.issuer.logo, ...value.attachments.map((a) => a.thumbnailDataUrl)].some(
-    (image) => !!image && !isAssetRef(image),
+  imageSlots(value).some((image) => !!image && !isAssetRef(image));
+/**
+ * References this route manages (`asset:sha256:` of images and of uploaded attachments). Other attachment keys (an
+ * `equipment_assets` id of a catalog datasheet, or what a proposal annex carries) are not checked here.
+ */
+const managedAssetRefs = (value: QuotationContent) =>
+  [...imageSlots(value), ...value.attachments.map((a) => a.assetId)].filter(
+    (ref): ref is string => isAssetRef(ref),
   );
 
 /** Saved content normalized by the current validator, so a validator change never locks an issued quotation. */
@@ -162,8 +179,7 @@ export function registerQuotationRoutes(
     const data = await readObjectBody(c),
       id = c.req.param("id");
     if (
-      !id ||
-      id.length > QUOTATION_LIMITS.id ||
+      !isRecordId(id) ||
       !Number.isSafeInteger(data.baseVersion) ||
       data.baseVersion < 0
     )
@@ -215,6 +231,19 @@ export function registerQuotationRoutes(
         await client.query("ROLLBACK");
         return c.json(body, status);
       };
+      // Every managed reference must be an asset of this organization: the client uploads it first and, on this
+      // error, uploads it again and retries (it is never a permanent rejection).
+      const missing = await missingAssets(
+        client,
+        user.organizationId,
+        managedAssetRefs(value),
+      );
+      if (missing.length)
+        return fail(400, {
+          error: "La cotización usa un archivo que el servidor no tiene.",
+          code: UNKNOWN_DOCUMENT_ASSET,
+          missing,
+        });
       // Deleted ids are never revived: their number is spent and links were already removed.
       if (
         existing?.deleted_at ||
@@ -379,6 +408,8 @@ export function registerQuotationRoutes(
     if (!user) return c.json({ error: "No autorizado" }, 401);
     if (!isWriterRole(user.role))
       return c.json({ error: "Permisos insuficientes" }, 403);
+    if (!isRecordId(c.req.param("id")))
+      return c.json({ error: "Cotización inválida" }, 400);
     const client = await pool.connect();
     try {
       await client.query("BEGIN");

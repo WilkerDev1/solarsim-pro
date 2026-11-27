@@ -6,24 +6,40 @@ import { exportQuotationPdf, quotationPages } from '../../../features/quotations
 import { QuotationSheet, type QuotationSheetData } from '../sheet/QuotationSheet';
 import type { QuotationAttachment } from '../../../types/quotation';
 import { skippedAttachmentsMessage } from '../../../features/quotations/attachments';
-import { quotationAttachmentResolver } from '../../../features/quotations/assetImages';
+import { quotationAttachmentResolver, resolveAssetImage } from '../../../features/quotations/assetImages';
 
 const DEFAULT_SCALE = 0.62;
 
+/** Imagen de la hoja tal como está guardada (en línea o referencia), para resolverla antes de exportar. */
+export interface SheetImageSource {
+  label: string;
+  value: string;
+  apply: 'logo' | 'signature' | 'stamp';
+}
+
+interface ExportSheet {
+  quotation: QuotationSheetData;
+  stamp: string | null;
+  notice: string | null;
+}
+
 /**
- * Vista previa en vivo: la hoja real escalada, una página a la vez, y la descarga del PDF. Para exportar se montan
- * todas las páginas a tamaño real fuera de la vista y se rasterizan con `exportQuotationPdf`.
+ * Vista previa en vivo: la hoja real escalada, una página a la vez, y la descarga del PDF. Para exportar se espera a
+ * que lleguen las imágenes (logo, firma y sello), se montan todas las páginas a tamaño real fuera de la vista y se
+ * rasterizan con `exportQuotationPdf`, que añade los adjuntos incluidos.
  */
 export const QuotationPreview: React.FC<{
   quotation: QuotationSheetData;
   stampImage?: string | null;
   quotationId?: string;
   attachments?: readonly QuotationAttachment[];
-}> = ({ quotation, stampImage, quotationId, attachments = [] }) => {
+  imageSources?: readonly SheetImageSource[];
+}> = ({ quotation, stampImage, quotationId, attachments = [], imageSources = [] }) => {
   const pageCount = useMemo(() => paginateQuotation(quotation).length, [quotation]);
   const [page, setPage] = useState(0);
   const [scale, setScale] = useState(DEFAULT_SCALE);
-  const [exporting, setExporting] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [exportSheet, setExportSheet] = useState<ExportSheet | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const included = attachments.filter((a) => a.mode === 'include').length;
@@ -44,15 +60,36 @@ export const QuotationPreview: React.FC<{
 
   // La exportación corre cuando las páginas a tamaño real ya están montadas; no escribe en el store.
   useEffect(() => {
-    if (!exporting || !exportRoot.current) return;
+    if (!exportSheet || !exportRoot.current) return;
     let cancelled = false;
     const list = quotationId ? { list: attachments, resolve: quotationAttachmentResolver(quotationId) } : undefined;
     void exportQuotationPdf(quotationPages(exportRoot.current), quotation.number, list)
-      .then(({ skipped }) => { if (!cancelled) setExportNotice(skippedAttachmentsMessage(skipped)); })
+      .then(({ skipped }) => { if (!cancelled) setExportNotice([exportSheet.notice, skippedAttachmentsMessage(skipped)].filter(Boolean).join(' ') || null); })
       .catch((error: unknown) => { if (!cancelled) setExportError(error instanceof Error ? error.message : 'No se pudo generar el PDF.'); })
-      .finally(() => { if (!cancelled) setExporting(false); });
+      .finally(() => { if (!cancelled) setExportSheet(null); });
     return () => { cancelled = true; };
-  }, [exporting]);
+  }, [exportSheet]);
+
+  /** Antes de rasterizar espera al logo, la firma y el sello; lo que no llega se avisa en una línea. */
+  const startExport = async () => {
+    setExportError(null);
+    setExportNotice(null);
+    setPreparing(true);
+    const resolved = await Promise.all(imageSources.map(async (source) => ({ source, image: source.value ? await resolveAssetImage(source.value) : null })));
+    const image = (apply: SheetImageSource['apply']) => resolved.find((r) => r.source.apply === apply)?.image ?? null;
+    const missing = resolved.filter((r) => r.source.value && !r.image).map((r) => r.source.label);
+    setPreparing(false);
+    setExportSheet({
+      quotation: {
+        ...quotation,
+        issuer: { ...quotation.issuer, logo: image('logo') ?? quotation.issuer.logo },
+        signature: quotation.signature ? { ...quotation.signature, image: image('signature') ?? quotation.signature.image } : quotation.signature,
+      },
+      stamp: image('stamp') ?? stampImage ?? null,
+      notice: missing.length ? `No se pudo cargar ${missing.join(', ')}: el PDF sale sin esa imagen.` : null,
+    });
+  };
+  const busy = preparing || !!exportSheet;
 
   return (
     <section className="qe-preview-inner" aria-labelledby="qe-preview-title">
@@ -64,9 +101,9 @@ export const QuotationPreview: React.FC<{
             <span aria-live="polite">{sheetPageLabel(current + 1, pageCount)}</span>
             <button type="button" className="qe-icon-btn" aria-label="Página siguiente" disabled={current >= pageCount - 1} onClick={() => setPage(current + 1)}><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
           </div>
-          <button type="button" className="qe-btn" disabled={exporting} aria-busy={exporting} onClick={() => { setExportError(null); setExportNotice(null); setExporting(true); }}>
+          <button type="button" className="qe-btn" disabled={busy} aria-busy={busy} onClick={() => void startExport()}>
             <Download className="h-4 w-4" aria-hidden="true" />
-            {exporting ? 'Generando PDF…' : 'Descargar PDF'}
+            {preparing ? 'Cargando imágenes…' : exportSheet ? 'Generando PDF…' : 'Descargar PDF'}
           </button>
         </div>
       </div>
@@ -83,9 +120,9 @@ export const QuotationPreview: React.FC<{
         El PDF se genera como imagen de cada página.
         {included ? ` ${included === 1 ? 'Se añade 1 adjunto' : `Se añaden ${included} adjuntos`} al final al exportar.` : ''}
       </p>
-      {exporting && (
+      {exportSheet && (
         <div ref={exportRoot} aria-hidden="true" className="qe-export-root">
-          <QuotationSheet quotation={quotation} stampImage={stampImage} />
+          <QuotationSheet quotation={exportSheet.quotation} stampImage={exportSheet.stamp} />
         </div>
       )}
     </section>

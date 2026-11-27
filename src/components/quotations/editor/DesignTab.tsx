@@ -19,6 +19,8 @@ interface DesignTabProps {
   signatures: readonly QuotationSignature[];
   saveTemplate: (name: string) => string | null;
   openLibrary: (section: 'templates' | 'signatures') => void;
+  /** Color que se está eligiendo (solo la vista previa); `null` al confirmarlo o descartarlo. */
+  onPreviewAccent?: (accent: string | null) => void;
 }
 
 const LAYOUTS: { value: QuotationDesign['layout']; label: string; hint: string }[] = [
@@ -45,7 +47,7 @@ const SignatureThumb: React.FC<{ image: string; name: string }> = ({ image, name
 };
 
 /** Pestaña «Plantilla y firmas»: todo edita `design` y se ve al instante en la vista previa. */
-export const DesignTab: React.FC<DesignTabProps> = ({ content, readOnly, canSaveTemplate, edit, templates, signatures, saveTemplate, openLibrary }) => {
+export const DesignTab: React.FC<DesignTabProps> = ({ content, readOnly, canSaveTemplate, edit, templates, signatures, saveTemplate, openLibrary, onPreviewAccent }) => {
   const { design } = content;
   const [error, setError] = useState<string | null>(null);
   const [customAccent, setCustomAccent] = useState<string | null>(null);
@@ -117,8 +119,8 @@ export const DesignTab: React.FC<DesignTabProps> = ({ content, readOnly, canSave
                 type="color"
                 value={customAccent ?? design.accent}
                 disabled={readOnly}
-                onChange={(event) => setCustomAccent(event.target.value)}
-                onBlur={() => { if (customAccent && customAccent !== design.accent) change({ accent: customAccent.toLowerCase() }); setCustomAccent(null); }}
+                onChange={(event) => { setCustomAccent(event.target.value); onPreviewAccent?.(event.target.value.toLowerCase()); }}
+                onBlur={() => { if (customAccent && customAccent !== design.accent) change({ accent: customAccent.toLowerCase() }); setCustomAccent(null); onPreviewAccent?.(null); }}
               />
               <span aria-hidden="true">{isSwatch ? 'Otro' : design.accent}</span>
             </label>

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { useSimulationStore as store } from '../store/useSimulationStore';
 import { QuotationSyncService } from '../services/quotationSyncService';
+import { DocumentAssetService } from '../services/documentAssetService';
+import { createHash } from 'node:crypto';
 import { ClientSyncService } from '../services/clientSyncService';
 import { canTransitionQuotation, formatQuotationNumber, quotationNumberYear, validateQuotationContent } from '../../shared/quotations';
 import { isAssetRef } from '../../shared/documentAssets';
@@ -324,7 +326,17 @@ try {
   assert.equal(find(flow.quotation.id).status, 'accepted', 'Discarding restores the server copy');
   assert.equal(find(flow.quotation.id).notes, rows.get(flow.quotation.id)!.record.notes);
 
-  // 8. Inline images never travel and are not lost locally; asset references do travel.
+  // 8. Images travel as references: an image that could not be uploaded never travels as an empty slot.
+  let assetsOnline = false;
+  const uploadedAssets = new Map<string, string>();
+  DocumentAssetService.setTransportFactory(() => async (path, init = {}) => {
+    if (!assetsOnline) throw new Error('Sin conexión con los activos');
+    const { content } = JSON.parse(String(init.body));
+    const hash = createHash('sha256').update(content, 'utf8').digest('hex');
+    uploadedAssets.set(hash, content);
+    return Response.json({ success: true, sha256: hash, ref: `asset:sha256:${hash}` });
+  });
+  const LOGO_REF = `asset:sha256:${createHash('sha256').update(LOGO, 'utf8').digest('hex')}`;
   const imaged = api().createQuotationRecord({
     client: printed,
     issuer: { name: 'Emisor', taxId: '', address: '', phone: '', email: '', website: '', logo: LOGO },
@@ -335,11 +347,17 @@ try {
   });
   assert.ok(imaged.ok);
   calls.length = 0;
-  assert.equal((await sync()).success, true);
+  assert.equal((await sync()).success, false, 'the logo could not be uploaded: the quotation waits');
+  assert.ok(!rows.has(imaged.quotation.id), 'never published with an empty logo');
+  assert.match(api().quotationChanges[imaged.quotation.id].assetsPending!, /No se pudo subir/);
+  assert.equal(api().quotationChanges[imaged.quotation.id].rejected, undefined, 'not a permanent rejection');
+  assetsOnline = true;
+  assert.equal((await sync()).success, true, 'the next pass uploads and publishes');
   const sent = rows.get(imaged.quotation.id)!.record;
-  assert.equal(sent.issuer.logo, '');
-  assert.equal(sent.attachments[0].thumbnailDataUrl, undefined);
+  assert.equal(sent.issuer.logo, LOGO_REF, 'the logo travels as its reference');
+  assert.equal(sent.attachments[0].thumbnailDataUrl, LOGO_REF);
   assert.equal(sent.attachments[1].thumbnailDataUrl, ASSET);
+  assert.equal(uploadedAssets.get(LOGO_REF.slice(13)), LOGO);
   assert.equal(find(imaged.quotation.id).issuer.logo, LOGO, 'The local copy keeps its logo after the receipt');
   assert.equal(find(imaged.quotation.id).attachments[0].thumbnailDataUrl, LOGO);
   assert.equal(api().quotationChanges[imaged.quotation.id], undefined);
@@ -347,8 +365,21 @@ try {
   await sync();
   assert.equal(find(imaged.quotation.id).notes, 'Nota del equipo');
   assert.equal(find(imaged.quotation.id).issuer.logo, LOGO, 'A later pull keeps the local image too');
-  // A second device without the image stays in sync (its record was identical once images are excluded).
   assert.equal((await sync()).success, true);
+  // Already confirmed by the server (in the base): a later failing upload never erases it.
+  assetsOnline = false;
+  DocumentAssetService.setTransportFactory(() => async () => { throw new Error('Sin conexión con los activos'); });
+  assert.ok(api().updateQuotationRecord(imaged.quotation.id, { notes: 'Otra edición' }).ok);
+  assert.equal((await sync()).success, true);
+  assert.equal(rows.get(imaged.quotation.id)!.record.issuer.logo, LOGO_REF, 'the confirmed reference is sent again, never empty');
+  // The server lacks a referenced asset (unknown_document_asset): retryable, never a permanent rejection.
+  failNextPut = { status: 400, error: 'La cotización usa un archivo que el servidor no tiene.', code: 'unknown_document_asset' };
+  assert.ok(api().updateQuotationRecord(imaged.quotation.id, { notes: 'Tras perder un activo' }).ok);
+  assert.equal((await sync()).success, false);
+  assert.equal(api().quotationChanges[imaged.quotation.id].rejected, undefined);
+  assert.match(api().quotationChanges[imaged.quotation.id].assetsPending!, /se volverá a subir/);
+  assert.equal((await sync()).success, true, 'retried on the next pass');
+  assert.equal(rows.get(imaged.quotation.id)!.record.notes, 'Tras perder un activo');
 
   // 9. Deleting: published quotations use CAS; never-published drafts are dropped without a request.
   online = false;

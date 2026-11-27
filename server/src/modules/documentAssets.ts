@@ -23,7 +23,11 @@ import {
 } from "../../../shared/fileSignatures.js";
 import { isWriterRole } from "../../../shared/permissions.js";
 import { QUOTATION_LIBRARY_LIMITS } from "../../../shared/quotations/library.js";
+import { bodyLimit } from "hono/body-limit";
 import type { Dependencies } from "../dependencies.js";
+
+/** Body limit of `POST /api/document-assets`: 8 MiB in base64 (~10.7 MiB) plus the JSON wrapper. */
+export const DOCUMENT_ASSET_BODY_LIMIT = Math.round(11.5 * 1024 * 1024);
 import { lockCurrentMembership } from "../membership.js";
 import { readObjectBody } from "../request.js";
 
@@ -156,76 +160,94 @@ export function registerDocumentAssetRoutes(
    * the exact content, as in migration 009. Only PDF, PNG, JPEG and WebP whose real signature matches the declared
    * type, up to `QUOTATION_LIBRARY_LIMITS.attachmentBytes`; never SVG or HTML.
    */
-  app.post("/api/document-assets", async (c) => {
-    const user = await authenticate(c);
-    if (!user) return c.json({ error: "No autorizado" }, 401);
-    if (!isWriterRole(user.role))
-      return c.json({ error: "Permisos insuficientes" }, 403);
-    const body = await readObjectBody(c);
-    const content = typeof body.content === "string" ? body.content : "";
-    const checked = checkDocumentDataUrl(content, {
-      maxBytes: QUOTATION_LIBRARY_LIMITS.attachmentBytes,
-    });
-    if (!checked.ok)
-      return c.json(
-        checked.reason === "size"
-          ? {
-              error: `El archivo debe tener contenido y no superar ${QUOTATION_LIBRARY_LIMITS.attachmentBytes / 1024 / 1024} MB.`,
-              code: "asset_too_large",
-            }
-          : {
-              error:
-                "Formato no admitido: usa PDF, PNG, JPEG o WebP (el contenido debe coincidir con su tipo).",
-              code: "unsupported_asset_type",
-            },
-        checked.reason === "size" ? 413 : 415,
-      );
-    // The head was checked; the whole body must decode to exactly that many bytes with the same signature.
-    const bytes = Buffer.from(
-      content.slice(content.indexOf(",") + 1),
-      "base64",
-    );
-    if (
-      bytes.length !== checked.byteLength ||
-      sniffDocumentFileType(bytes) !== checked.type
-    )
-      return c.json(
-        { error: "El archivo está dañado.", code: "unsupported_asset_type" },
-        415,
-      );
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      const denied = await lockCurrentMembership(client, user);
-      if (denied) {
-        await client.query("ROLLBACK");
-        return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
-      }
-      const hash = assetSha256(content);
-      await client.query(
-        "INSERT INTO document_assets (organization_id,sha256,content,size_bytes) VALUES ($1,$2,$3,$4) ON CONFLICT (organization_id,sha256) DO NOTHING",
-        [
-          user.organizationId,
-          hash,
-          content,
-          Buffer.byteLength(content, "utf8"),
-        ],
-      );
-      await client.query("COMMIT");
-      return c.json({
-        success: true,
-        sha256: hash,
-        ref: assetRef(hash),
-        mimeType: checked.type,
-        sizeBytes: bytes.length,
+  app.post(
+    "/api/document-assets",
+    // 8 MiB of bytes are ~10.7 MiB of base64 plus the JSON wrapper: anything larger is refused before parsing.
+    bodyLimit({
+      maxSize: DOCUMENT_ASSET_BODY_LIMIT,
+      onError: (c) =>
+        c.json(
+          {
+            error: `El archivo debe tener contenido y no superar ${QUOTATION_LIBRARY_LIMITS.attachmentBytes / 1024 / 1024} MB.`,
+            code: "asset_too_large",
+          },
+          413,
+        ),
+    }),
+    async (c) => {
+      const user = await authenticate(c);
+      if (!user) return c.json({ error: "No autorizado" }, 401);
+      if (!isWriterRole(user.role))
+        return c.json({ error: "Permisos insuficientes" }, 403);
+      const body = await readObjectBody(c);
+      const content = typeof body.content === "string" ? body.content : "";
+      const checked = checkDocumentDataUrl(content, {
+        maxBytes: QUOTATION_LIBRARY_LIMITS.attachmentBytes,
       });
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
-  });
+      if (!checked.ok)
+        return c.json(
+          checked.reason === "size"
+            ? {
+                error: `El archivo debe tener contenido y no superar ${QUOTATION_LIBRARY_LIMITS.attachmentBytes / 1024 / 1024} MB.`,
+                code: "asset_too_large",
+              }
+            : {
+                error:
+                  "Formato no admitido: usa PDF, PNG, JPEG o WebP (el contenido debe coincidir con su tipo).",
+                code: "unsupported_asset_type",
+              },
+          checked.reason === "size" ? 413 : 415,
+        );
+      // The head was checked; the whole body must decode to exactly that many bytes with the same signature.
+      const bytes = Buffer.from(
+        content.slice(content.indexOf(",") + 1),
+        "base64",
+      );
+      if (
+        bytes.length !== checked.byteLength ||
+        sniffDocumentFileType(bytes) !== checked.type
+      )
+        return c.json(
+          { error: "El archivo está dañado.", code: "unsupported_asset_type" },
+          415,
+        );
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const denied = await lockCurrentMembership(client, user);
+        if (denied) {
+          await client.query("ROLLBACK");
+          return c.json(
+            { error: "La sesión o los permisos cambiaron" },
+            denied,
+          );
+        }
+        const hash = assetSha256(content);
+        await client.query(
+          "INSERT INTO document_assets (organization_id,sha256,content,size_bytes) VALUES ($1,$2,$3,$4) ON CONFLICT (organization_id,sha256) DO NOTHING",
+          [
+            user.organizationId,
+            hash,
+            content,
+            Buffer.byteLength(content, "utf8"),
+          ],
+        );
+        await client.query("COMMIT");
+        return c.json({
+          success: true,
+          sha256: hash,
+          ref: assetRef(hash),
+          mimeType: checked.type,
+          sizeBytes: bytes.length,
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+  );
 
   /**
    * The bytes of one stored file as a download, only inside its organization. The stored text is checked again (older

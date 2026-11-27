@@ -5,7 +5,6 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
 import { currentPreviewSession } from '../../services/proposalAttachmentResolver';
 import { loadEquipmentAssetBlob } from '../equipmentPreview/equipmentPreviewLoader';
-import { dataUrlToBytes } from '../../utils/dataUrl';
 import type { QuotationAttachment } from '../../types/quotation';
 import { resolveAttachmentBytes } from './attachments';
 
@@ -44,8 +43,7 @@ export function quotationAttachmentResolver(quotationId: string) {
   return (attachment: QuotationAttachment) => resolveAttachmentBytes(attachment, {
     local: (id) => PDFAttachmentStorage.getAttachment(id),
     save: (id, fileName, bytes) => PDFAttachmentStorage.saveAttachment(id, quotationId, fileName, bytes),
-    documentAsset: (ref) => DocumentAssetService.content(sessionTransport(), ref),
+    documentAssetBytes: (ref) => DocumentAssetService.fileBytes(sessionTransport(), ref),
     equipmentAsset: (assetId) => loadEquipmentAssetBlob(currentPreviewSession(), assetId),
-    decode: dataUrlToBytes,
   });
 }

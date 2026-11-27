@@ -40,7 +40,8 @@ export type LibraryListResult<T> =
   | { supported: false };
 
 export type LibraryWriteResult<T> =
-  | { ok: true; record: T }
+  /** `cleared`: filas que el servidor desmarcó como predeterminadas en la misma escritura, con su versión nueva. */
+  | { ok: true; record: T; cleared: { id: string; version: number }[] }
   | { ok: false; status: number; error: string; code?: string; record: T | null };
 
 export const QuotationLibrarySyncService = {
@@ -66,7 +67,10 @@ export const QuotationLibrarySyncService = {
     const response = await transport(kind, `/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ baseVersion, content }) });
     const data = await body(response);
     const saved = record<T>(data[ITEM[kind]]);
-    if (response.ok && saved) return { ok: true, record: saved };
+    const cleared = Array.isArray(data.cleared)
+      ? data.cleared.filter((c: any) => c && typeof c.id === 'string' && Number.isSafeInteger(c.version)).map((c: any) => ({ id: c.id, version: c.version }))
+      : [];
+    if (response.ok && saved) return { ok: true, record: saved, cleared };
     return { ok: false, status: response.status, error: data.error || 'No se pudo guardar.', ...(typeof data.code === 'string' ? { code: data.code } : {}), record: saved };
   },
   async remove<T>(transport: LibraryTransport, kind: LibraryKind, id: string, baseVersion: number): Promise<{ ok: boolean; status: number; error: string; record: T | null }> {

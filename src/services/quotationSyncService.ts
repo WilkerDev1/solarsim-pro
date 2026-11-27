@@ -20,7 +20,7 @@ export type QuotationListResult =
 
 export type QuotationWriteResult =
   | { ok: true; quotation: QuotationRecord }
-  | { ok: false; status: number; error: string; code?: string; quotation: QuotationRecord | null };
+  | { ok: false; status: number; error: string; code?: string; missing?: string[]; quotation: QuotationRecord | null };
 
 const body = async (response: Response): Promise<Record<string, any>> => {
   try {
@@ -71,6 +71,7 @@ export const QuotationSyncService = {
       status: response.status,
       error: data.error || 'No se pudo guardar la cotización.',
       ...(typeof data.code === 'string' ? { code: data.code } : {}),
+      ...(Array.isArray(data.missing) ? { missing: data.missing.filter((h: unknown): h is string => typeof h === 'string') } : {}),
       quotation,
     };
   },

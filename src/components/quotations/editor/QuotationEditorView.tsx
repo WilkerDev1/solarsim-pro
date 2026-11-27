@@ -18,7 +18,7 @@ import { QuotationPreview } from './QuotationPreview';
 import { DesignTab } from './DesignTab';
 import { AttachmentsTab } from './AttachmentsTab';
 import { templateFromQuotation } from '../../../../shared/quotations';
-import { quotationSignatureFor, quotationStampFor } from '../../../features/quotations/library';
+import { printedSignature, printedStamp } from '../../../features/quotations/library';
 import { useAssetImage } from '../../../features/quotations/assetImages';
 import { quotationSaveStatus } from './saveStatus';
 import '../../clients/client-link.css';
@@ -93,16 +93,26 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
     [content, defaults],
   );
   // Imágenes de la hoja: en línea al instante; las referencias del servidor, cuando llegan (mirar nunca escribe).
-  const signer = quotationSignatureFor(content.design, signatures);
+  // Un borrador sigue la biblioteca; una bloqueada imprime solo su copia fija (printedSignature/printedStamp).
+  const signer = useMemo(() => printedSignature(content, signatures), [content, signatures]);
+  const stampSource = printedStamp(content, signatures, seal);
   const signerImage = useAssetImage(signer?.image);
-  const stamp = useAssetImage(quotationStampFor(content.design, signatures, seal));
+  const stamp = useAssetImage(stampSource);
   const logo = useAssetImage(content.issuer.logo);
+  // Color personalizado mientras se elige: solo la vista previa, sin escribir hasta confirmarlo.
+  const [previewAccent, setPreviewAccent] = useState<string | null>(null);
   const sheet = useMemo(() => ({
     ...content,
     number: quotation.number,
+    design: previewAccent ? { ...content.design, accent: previewAccent } : content.design,
     issuer: { ...content.issuer, logo: logo ?? '' },
     signature: signer ? { name: signer.name, role: signer.role, image: signerImage } : null,
-  }), [content, quotation.number, logo, signer, signerImage]);
+  }), [content, quotation.number, logo, signer, signerImage, previewAccent]);
+  const imageSources = useMemo(() => [
+    { label: 'el logo del emisor', value: content.issuer.logo, apply: 'logo' as const },
+    { label: 'la firma', value: signer?.image ?? '', apply: 'signature' as const },
+    { label: 'el sello', value: stampSource ?? '', apply: 'stamp' as const },
+  ], [content.issuer.logo, signer, stampSource]);
   const saveTemplate = (name: string) => {
     const result = useSimulationStore.getState().createQuotationTemplate(templateFromQuotation(content, name));
     return result.ok ? null : result.error;
@@ -186,13 +196,13 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
               </>
             )}
             {tab === 'design' && (
-              <DesignTab content={content} readOnly={readOnly} canSaveTemplate={writable} edit={edit} templates={templates} signatures={signatures} saveTemplate={saveTemplate} openLibrary={openQuotationLibrary} />
+              <DesignTab content={content} readOnly={readOnly} canSaveTemplate={writable} edit={edit} templates={templates} signatures={signatures} saveTemplate={saveTemplate} openLibrary={openQuotationLibrary} onPreviewAccent={setPreviewAccent} />
             )}
             {tab === 'attachments' && <AttachmentsTab quotationId={id} content={content} readOnly={readOnly} edit={edit} catalog={catalog} />}
           </div>
         </div>
         <div className="qe-preview">
-          <QuotationPreview quotation={sheet} stampImage={stamp} quotationId={id} attachments={content.attachments} />
+          <QuotationPreview quotation={sheet} stampImage={stamp} quotationId={id} attachments={content.attachments} imageSources={imageSources} />
         </div>
       </div>
     </div>

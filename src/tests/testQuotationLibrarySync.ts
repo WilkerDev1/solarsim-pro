@@ -65,11 +65,14 @@ QuotationLibrarySyncService.setTransportFactory((url, token) => async (kind, pat
   const version = (row?.record.version ?? 0) + 1;
   const record = { ...value, id, organizationId: user.organizationId, version, baseVersion: version, createdById: user.id, createdBy: user.name, createdAt: row?.record.createdAt ?? changedAt, updatedAt: changedAt };
   table.set(id, { record, changedAt });
+  const cleared: { id: string; version: number }[] = [];
   if (value.isDefault)
     for (const [otherId, other] of table)
-      if (otherId !== id && !other.deleted && other.record.isDefault && (kind === 'templates' || other.record.kind === value.kind))
+      if (otherId !== id && !other.deleted && other.record.isDefault && (kind === 'templates' || other.record.kind === value.kind)) {
         table.set(otherId, { record: { ...other.record, isDefault: false, version: other.record.version + 1, baseVersion: other.record.version + 1 }, changedAt: tick() });
-  return json({ success: true, [ITEM[kind]]: record });
+        cleared.push({ id: otherId, version: other.record.version + 1 });
+      }
+  return json({ success: true, [ITEM[kind]]: record, cleared });
 });
 const assetFactory = (url: string) => async (path: string, init: RequestInit = {}) => {
   assert.equal(url, serverUrl);
@@ -283,5 +286,33 @@ const target = { ...api().quotations[0], status: 'accepted' as const };
 const plan = planQuotationPush(base, target);
 assert.deepEqual(plan.map((p) => p.status), ['accepted'], 'un solo PUT con el estado nuevo');
 assert.equal(plan[0].issuer.logo, '', 'con la imagen confirmada');
+
+// 11. Marcar otra predeterminada y editar la anterior antes de sincronizar: el servidor la desmarcó (versión + 1) y el
+// cliente toma esa versión como base, sin un 409 espurio.
+begin(session);
+const first = api().createQuotationTemplate(template('Primera', { isDefault: true }));
+assert.ok(first.ok);
+await sync();
+const second = api().createQuotationTemplate(template('Segunda'));
+assert.ok(second.ok);
+await sync();
+assert.ok(api().setDefaultQuotationTemplate(second.ok ? second.record.id : '').ok);
+assert.ok(api().updateQuotationTemplate(first.ok ? first.record.id : '', { name: 'Primera renombrada' }).ok);
+// Que la segunda se publique antes que la primera (orden de las claves del registro de cambios).
+store.setState((s) => {
+  const changes = s.quotationLibrary.templates.changes;
+  const secondId = second.ok ? second.record.id : '';
+  const { [secondId]: mine, ...rest } = changes;
+  return { quotationLibrary: { ...s.quotationLibrary, templates: { ...s.quotationLibrary.templates, changes: { [secondId]: mine, ...rest } } } };
+});
+assert.equal((await sync()).success, true, JSON.stringify(lib().templates.changes));
+const firstRow = tables.templates.get(first.ok ? first.record.id : '')!.record;
+assert.equal(firstRow.name, 'Primera renombrada');
+assert.equal(firstRow.isDefault, false);
+assert.equal(tables.templates.get(second.ok ? second.record.id : '')!.record.isDefault, true);
+// Resolver un aviso limpia el mensaje de sincronización.
+store.setState({ quotationLibrarySyncFeedback: 'pendiente' });
+api().resolveQuotationLibraryConflict('templates', 'no-existe', 'accept_server');
+assert.equal(api().quotationLibrarySyncFeedback, null);
 
 console.log('Quotation library sync tests passed.');

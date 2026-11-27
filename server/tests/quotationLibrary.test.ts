@@ -549,3 +549,99 @@ test("signatures: references only, one default per kind", async () => {
     200,
   );
 });
+
+test("signatures: the referenced asset must be an image within the limit", async () => {
+  const pdf = (await upload(editor, PDF)).body.ref;
+  const asPdf = await putSignature(editor, "sig-pdf", 0, {
+    kind: "signature",
+    name: "PDF",
+    image: pdf,
+  });
+  assert.equal(asPdf.status, 400);
+  assert.equal(asPdf.body.code, "invalid_signature_image");
+  const legacy = dataUrl(
+    "image/svg+xml",
+    Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+  );
+  await pool.query(
+    "INSERT INTO document_assets (organization_id,sha256,content,size_bytes) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+    [admin.organizationId, sha(legacy), legacy, legacy.length],
+  );
+  const asSvg = await putSignature(editor, "sig-svg", 0, {
+    kind: "stamp",
+    name: "SVG",
+    image: `asset:sha256:${sha(legacy)}`,
+  });
+  assert.equal(asSvg.status, 400);
+  assert.equal(asSvg.body.code, "invalid_signature_image");
+  const big = dataUrl(
+    "image/png",
+    Buffer.concat([PNG_BYTES, Buffer.alloc(600 * 1024)]),
+  );
+  const bigRef = (await upload(editor, big)).body.ref;
+  assert.equal(
+    (
+      await putSignature(editor, "sig-big", 0, {
+        kind: "stamp",
+        name: "Grande",
+        image: bigRef,
+      })
+    ).body.code,
+    "invalid_signature_image",
+  );
+});
+
+test("concurrent default writes leave exactly one default and report the rows they cleared", async () => {
+  const [a, b] = await Promise.all([
+    putTemplate(admin, "tpl-race-a", 0, template({ isDefault: true })),
+    putTemplate(editor, "tpl-race-b", 0, template({ isDefault: true })),
+  ]);
+  assert.equal(a.status, 200);
+  assert.equal(b.status, 200);
+  const listed = (await request("GET", "/api/quotation-templates", admin)).body
+    .templates;
+  assert.equal(
+    listed.filter((t: any) => t.isDefault).length,
+    1,
+    "the lock serializes both writes",
+  );
+  const last = [a, b].find((r) =>
+    r.body.cleared.some(
+      (c: any) => c.id === "tpl-race-a" || c.id === "tpl-race-b",
+    ),
+  );
+  assert.ok(last, "the second write cleared the first");
+  for (const cleared of last.body.cleared) {
+    const row = listed.find((t: any) => t.id === cleared.id);
+    assert.equal(
+      row.version,
+      cleared.version,
+      "cleared versions match the server",
+    );
+    assert.equal(row.isDefault, false);
+  }
+});
+
+test("ids with control characters and oversized uploads are rejected cleanly", async () => {
+  assert.equal((await putTemplate(editor, "t%00x", 0)).status, 400);
+  assert.equal(
+    (
+      await request(
+        "DELETE",
+        "/api/quotation-signatures/s%00x?baseVersion=1",
+        editor,
+      )
+    ).status,
+    400,
+  );
+  const response = await app.request("/api/document-assets", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${editor.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ content: "x".repeat(12 * 1024 * 1024) }),
+  });
+  assert.equal(response.status, 413);
+  assert.equal(((await response.json()) as any).code, "asset_too_large");
+});

@@ -60,9 +60,9 @@ export async function exportQuotationPdf(
     ...(included.length && attachments ? {
       finalize: async (pdf: ArrayBuffer) => {
         const { mergeQuotationAttachments } = await import('./attachments');
-        const items = [];
-        for (const attachment of included) items.push({ attachment, bytes: await attachments.resolve(attachment) });
-        const result = await mergeQuotationAttachments(pdf, items, (bytes) => webpToPng(bytes));
+        // Cada adjunto se carga justo antes de fusionarlo y se suelta después: nunca están todos en memoria a la vez.
+        const items = included.map((attachment) => ({ attachment, load: () => attachments.resolve(attachment) }));
+        const result = await mergeQuotationAttachments(pdf, items, { toEmbeddable: (bytes) => webpToPng(bytes) });
         skipped = result.skipped;
         return result.bytes;
       },

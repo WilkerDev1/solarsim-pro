@@ -1,12 +1,14 @@
 import React, { useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, FileStack, Trash2, Upload } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, FileStack, Trash2, Upload } from 'lucide-react';
 import { QUOTATION_LIMITS } from '../../../../shared/quotations';
 import type { QuotationAttachment, QuotationContent } from '../../../types/quotation';
 import type { SolarEquipmentItem } from '../../../types/equipment';
 import { addAttachments, moveAttachment, removeAttachment, updateAttachment } from '../../../domain/quotationEdit';
 import {
-  ATTACHMENT_ACCEPT, catalogDatasheetCandidates, formatFileSize, pageCountLabel, prepareAttachmentFile,
+  ATTACHMENT_ACCEPT, attachmentBytesUnused, catalogDatasheetCandidates, downloadAttachmentBytes, formatFileSize, pageCountLabel, prepareAttachmentFile,
 } from '../../../features/quotations/attachments';
+import { quotationAttachmentResolver } from '../../../features/quotations/assetImages';
+import { useSimulationStore } from '../../../store/useSimulationStore';
 import { PDFAttachmentStorage } from '../../../services/pdfAttachmentStorage';
 import { InfoTip } from '../../simulator/params/ui/InfoTip';
 import { TextField } from './fields';
@@ -39,8 +41,18 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
   const datasheets = catalogDatasheetCandidates(content, catalog, new Date().toISOString());
   const full = attachments.length >= QUOTATION_LIMITS.maxAttachments;
 
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const download = async (attachment: QuotationAttachment) => {
+    setDownloading(attachment.id);
+    const bytes = await quotationAttachmentResolver(quotationId)(attachment);
+    setDownloading(null);
+    if (!bytes) return setError(`«${attachment.title || attachment.fileName}» no está en este equipo ni se pudo descargar del servidor.`);
+    setError(null);
+    downloadAttachmentBytes(bytes, attachment);
+  };
+  const dropDisabled = busy || full;
   const upload = async (files: FileList | File[]) => {
-    if (readOnly || !files.length) return;
+    if (readOnly || dropDisabled || !files.length) return;
     setBusy(true);
     setError(null);
     const errors: string[] = [];
@@ -60,7 +72,7 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
   const remove = (attachment: QuotationAttachment) => {
     const failure = edit((c) => removeAttachment(c, attachment.id));
     setError(failure);
-    if (!failure && attachment.origin === 'manual') void PDFAttachmentStorage.deleteAttachment(attachment.id);
+    if (!failure && attachmentBytesUnused(useSimulationStore.getState().quotations, attachment)) void PDFAttachmentStorage.deleteAttachment(attachment.id);
   };
 
   return (
@@ -70,13 +82,15 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
           <div className="qe-card-head"><h2 id="qe-add-attachments-title">Agregar documentos</h2></div>
           <div
             className="qe-dropzone"
-            data-dragging={dragging || undefined}
-            onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+            data-dragging={(dragging && !dropDisabled) || undefined}
+            data-disabled={dropDisabled || undefined}
+            aria-disabled={dropDisabled || undefined}
+            onDragOver={(event) => { event.preventDefault(); if (!dropDisabled) setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={(event) => { event.preventDefault(); setDragging(false); void upload(event.dataTransfer.files); }}
           >
             <Upload className="h-5 w-5" aria-hidden="true" />
-            <span>Arrastra aquí archivos PDF o imágenes</span>
+            <span>{full ? 'Se alcanzó el máximo de adjuntos' : busy ? 'Leyendo archivos…' : 'Arrastra aquí archivos PDF o imágenes'}</span>
             <span className="qe-field-hint">PDF, PNG, JPEG o WebP de hasta 8 MB.</span>
           </div>
           <div className="qe-actions">
@@ -115,6 +129,7 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
                   className="qe-attachment-title"
                   onCommit={(title) => edit((c) => updateAttachment(c, attachment.id, { title }))}
                 />
+                <button type="button" className="qe-icon-btn" aria-label={`Descargar adjunto ${index + 1}`} disabled={downloading === attachment.id} aria-busy={downloading === attachment.id} onClick={() => void download(attachment)}><Download className="h-4 w-4" aria-hidden="true" /></button>
                 {!readOnly && (
                   <div className="qe-line-actions">
                     <button type="button" className="qe-icon-btn" aria-label={`Subir adjunto ${index + 1}`} disabled={index === 0} onClick={() => setError(edit((c) => moveAttachment(c, attachment.id, -1)))}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>

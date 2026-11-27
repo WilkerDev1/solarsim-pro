@@ -4,7 +4,7 @@
  * (`PDFAttachmentStorage`, por id de adjunto) y en el servidor como activo `asset:sha256:` (subidos al publicar); las
  * fichas del catálogo, en `equipment_assets` (su `assetId` es el id del activo del equipo).
  */
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 import { isAssetRef } from '../../../shared/documentAssets';
 import { sniffDocumentFileType, type DocumentFileType } from '../../../shared/fileSignatures';
 import { QUOTATION_LIBRARY_LIMITS, QUOTATION_LIMITS } from '../../../shared/quotations';
@@ -25,6 +25,62 @@ export const pageCountLabel = (count: number): string => (count <= 0 ? 'Páginas
 /** Nombre de archivo sin rutas ni caracteres de control, acotado al límite del contrato. */
 const safeFileName = (name: string) => name.replace(/[\u0000-\u001f\u007f/\\]+/g, '_').trim().slice(0, QUOTATION_LIMITS.fileName) || 'documento';
 const titleOf = (name: string) => name.replace(/\.[A-Za-z0-9]{1,5}$/, '').replace(/[_-]+/g, ' ').trim().slice(0, QUOTATION_LIMITS.label) || 'Documento';
+
+/** Por qué pdf-lib no pudo leer un PDF: protegido (contraseña o permisos), formato no soportado o dañado. */
+export type PdfFailure = 'protected' | 'unsupported' | 'damaged';
+export function pdfFailure(error: unknown): PdfFailure {
+  const text = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+  if (/encrypt/i.test(text)) return 'protected';
+  if (/not (yet )?supported|unsupported|unknown (compression|filter)|object stream/i.test(text)) return 'unsupported';
+  return 'damaged';
+}
+const PDF_FAILURE_MESSAGES: Record<PdfFailure, string> = {
+  protected: 'El PDF está protegido con contraseña o permisos: no se puede incluir.',
+  unsupported: 'El PDF usa un formato que no se puede leer aquí.',
+  damaged: 'El PDF está dañado y no se puede leer.',
+};
+const PDF_SKIP_REASONS: Record<PdfFailure, string> = {
+  protected: 'está protegido con contraseña o permisos',
+  unsupported: 'usa un formato de PDF no soportado',
+  damaged: 'está dañado',
+};
+
+/**
+ * Orientación EXIF (1–8) de un JPEG, o 1 si no tiene. pdf-lib incrusta los píxeles tal cual: una foto tomada de lado
+ * saldría girada sin esto.
+ */
+export function jpegOrientation(bytes: ArrayBuffer): number {
+  const view = new DataView(bytes);
+  if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return 1;
+  let offset = 2;
+  while (offset + 4 <= view.byteLength) {
+    const marker = view.getUint16(offset);
+    const size = view.getUint16(offset + 2);
+    if (marker === 0xffe1 && offset + 10 <= view.byteLength && view.getUint32(offset + 4) === 0x45786966) {
+      const tiff = offset + 10;
+      if (tiff + 8 > view.byteLength) return 1;
+      const little = view.getUint16(tiff) === 0x4949;
+      const first = tiff + view.getUint32(tiff + 4, little);
+      if (first + 2 > view.byteLength) return 1;
+      const entries = view.getUint16(first, little);
+      for (let i = 0; i < entries; i++) {
+        const entry = first + 2 + i * 12;
+        if (entry + 12 > view.byteLength) return 1;
+        if (view.getUint16(entry, little) === 0x0112) {
+          const value = view.getUint16(entry + 8, little);
+          return value >= 1 && value <= 8 ? value : 1;
+        }
+      }
+      return 1;
+    }
+    if ((marker & 0xff00) !== 0xff00 || marker === 0xffda) return 1;
+    offset += 2 + size;
+  }
+  return 1;
+}
+
+/** Giro que endereza la imagen (los espejos 2, 4, 5 y 7 se tratan como su giro más próximo). */
+const ROTATION: Record<number, 0 | 90 | 180 | 270> = { 1: 0, 2: 0, 3: 180, 4: 180, 5: 90, 6: 90, 7: 270, 8: 270 };
 
 export type PreparedAttachment = { ok: true; attachment: QuotationAttachment; bytes: ArrayBuffer; type: DocumentFileType } | { ok: false; error: string };
 
@@ -48,8 +104,7 @@ export async function prepareAttachmentFile(
     try {
       pageCount = (await PDFDocument.load(bytes.slice(0), { updateMetadata: false })).getPageCount();
     } catch (error) {
-      const encrypted = error instanceof Error && /encrypt/i.test(error.name + error.message);
-      return { ok: false, error: encrypted ? 'El PDF está protegido con contraseña: no se puede incluir.' : 'El PDF está dañado y no se puede leer.' };
+      return { ok: false, error: PDF_FAILURE_MESSAGES[pdfFailure(error)] };
     }
   }
   const fileName = safeFileName(file.name);
@@ -97,11 +152,10 @@ export function catalogDatasheetCandidates(
 export interface AttachmentBytesDeps {
   local: (attachmentId: string) => Promise<ArrayBuffer | null>;
   save: (attachmentId: string, fileName: string, bytes: ArrayBuffer) => Promise<void>;
-  /** Contenido (data URL) de un activo `asset:sha256:` del servidor. */
-  documentAsset: (ref: string) => Promise<string | null>;
+  /** Bytes de un activo `asset:sha256:` del servidor (`GET /api/document-assets/:sha256/file`). */
+  documentAssetBytes: (ref: string) => Promise<ArrayBuffer | null>;
   /** Bytes de una ficha del catálogo (`equipment_assets`). */
   equipmentAsset: (assetId: string) => Promise<Blob | null>;
-  decode: (dataUrl: string) => Uint8Array | null;
 }
 
 /** Bytes de un adjunto: de este equipo, del servidor (y se guardan aquí para la próxima vez) o `null`. Nunca lanza. */
@@ -111,11 +165,8 @@ export async function resolveAttachmentBytes(attachment: QuotationAttachment, de
     if (local) return local;
     if (!attachment.assetId) return null;
     let bytes: ArrayBuffer | null = null;
-    if (isAssetRef(attachment.assetId)) {
-      const content = await deps.documentAsset(attachment.assetId);
-      const decoded = content ? deps.decode(content) : null;
-      bytes = decoded ? decoded.buffer.slice(decoded.byteOffset, decoded.byteOffset + decoded.byteLength) as ArrayBuffer : null;
-    } else {
+    if (isAssetRef(attachment.assetId)) bytes = await deps.documentAssetBytes(attachment.assetId);
+    else {
       const blob = await deps.equipmentAsset(attachment.assetId);
       bytes = blob ? await blob.arrayBuffer() : null;
     }
@@ -131,48 +182,69 @@ export interface SkippedAttachment { id: string; title: string; reason: string }
 
 const A4: [number, number] = [595.28, 841.89];
 const MARGIN = 36;
+/** Tope de bytes de adjuntos que se leen en una exportación (cada uno se carga, se copia y se suelta en orden). */
+export const MAX_EXPORT_ATTACHMENT_BYTES = 64 * MB;
 
 /**
- * Añade al final del PDF de la cotización los adjuntos `include`, en su orden: un PDF con todas sus páginas tal cual y
- * una imagen en una página A4 ajustada a los márgenes. Un adjunto sin bytes, dañado, protegido con contraseña o de un
- * tipo que no se puede incrustar se omite y se informa; nunca rompe la exportación. `toEmbeddable` convierte las imágenes
- * que pdf-lib no incrusta (WebP) en PNG; sin él, se omiten.
+ * Añade al final del PDF de la cotización los adjuntos `include`, en su orden y de uno en uno (cada uno se carga, se
+ * copia y se suelta antes del siguiente): un PDF con todas sus páginas tal cual y una imagen en una página A4 ajustada
+ * a los márgenes y enderezada según su orientación EXIF. Un adjunto sin bytes, dañado, protegido, de un formato no
+ * soportado o que supera el tope total de la exportación se omite y se informa; nunca rompe la exportación.
+ * `toEmbeddable` convierte las imágenes que pdf-lib no incrusta (WebP) en PNG; sin él, se omiten.
  */
 export async function mergeQuotationAttachments(
   main: ArrayBuffer,
-  items: { attachment: QuotationAttachment; bytes: ArrayBuffer | null }[],
-  toEmbeddable?: (bytes: ArrayBuffer, type: DocumentFileType) => Promise<ArrayBuffer | null>,
+  items: { attachment: QuotationAttachment; load: () => Promise<ArrayBuffer | null> }[],
+  options: { toEmbeddable?: (bytes: ArrayBuffer, type: DocumentFileType) => Promise<ArrayBuffer | null>; maxTotalBytes?: number } = {},
 ): Promise<{ bytes: Uint8Array; skipped: SkippedAttachment[]; merged: number }> {
   const doc = await PDFDocument.load(main);
   const skipped: SkippedAttachment[] = [];
-  let merged = 0;
+  const maxTotal = options.maxTotalBytes ?? MAX_EXPORT_ATTACHMENT_BYTES;
+  let merged = 0, total = 0;
   const skip = (attachment: QuotationAttachment, reason: string) => skipped.push({ id: attachment.id, title: attachment.title || attachment.fileName, reason });
-  for (const { attachment, bytes } of items) {
+  for (const { attachment, load } of items) {
     if (attachment.mode !== 'include') continue;
+    if (attachment.fileSize > 0 && total + attachment.fileSize > maxTotal) { skip(attachment, 'supera el tamaño total de adjuntos de un PDF'); continue; }
+    const bytes = await load().catch(() => null);
     if (!bytes) { skip(attachment, 'no está disponible en este equipo ni en el servidor'); continue; }
+    if (total + bytes.byteLength > maxTotal) { skip(attachment, 'supera el tamaño total de adjuntos de un PDF'); continue; }
+    total += bytes.byteLength;
     const type = sniffDocumentFileType(new Uint8Array(bytes, 0, Math.min(16, bytes.byteLength)));
-    try {
-      if (type === 'application/pdf') {
-        const source = await PDFDocument.load(bytes.slice(0), { updateMetadata: false });
+    if (type === 'application/pdf') {
+      try {
+        const source = await PDFDocument.load(bytes, { updateMetadata: false });
         const pages = await doc.copyPages(source, source.getPageIndices());
         if (!pages.length) { skip(attachment, 'no tiene páginas'); continue; }
         pages.forEach((page) => doc.addPage(page));
-      } else if (type) {
-        const data = type === 'image/webp' ? (await toEmbeddable?.(bytes, type)) ?? null : bytes;
-        if (!data) { skip(attachment, 'formato de imagen que no se puede incluir'); continue; }
-        const image = type === 'image/jpeg' ? await doc.embedJpg(data) : await doc.embedPng(data);
-        const page = doc.addPage(A4);
-        const scale = Math.min((A4[0] - MARGIN * 2) / image.width, (A4[1] - MARGIN * 2) / image.height, 1);
-        const width = image.width * scale, height = image.height * scale;
-        page.drawImage(image, { x: (A4[0] - width) / 2, y: (A4[1] - height) / 2, width, height });
-      } else {
-        skip(attachment, 'formato no admitido');
-        continue;
+        merged++;
+      } catch (error) {
+        skip(attachment, PDF_SKIP_REASONS[pdfFailure(error)]);
       }
+      continue;
+    }
+    if (!type) { skip(attachment, 'formato no admitido'); continue; }
+    try {
+      const data = type === 'image/webp' ? (await options.toEmbeddable?.(bytes, type)) ?? null : bytes;
+      if (!data) { skip(attachment, 'formato de imagen que no se puede incluir'); continue; }
+      const image = type === 'image/jpeg' ? await doc.embedJpg(data) : await doc.embedPng(data);
+      const rotation = type === 'image/jpeg' ? ROTATION[jpegOrientation(bytes)] : 0;
+      const sideways = rotation === 90 || rotation === 270;
+      const [shownWidth, shownHeight] = sideways ? [image.height, image.width] : [image.width, image.height];
+      const scale = Math.min((A4[0] - MARGIN * 2) / shownWidth, (A4[1] - MARGIN * 2) / shownHeight, 1);
+      const width = image.width * scale, height = image.height * scale;
+      const boxW = shownWidth * scale, boxH = shownHeight * scale;
+      const left = (A4[0] - boxW) / 2, bottom = (A4[1] - boxH) / 2;
+      const page = doc.addPage(A4);
+      // pdf-lib gira en sentido antihorario alrededor de (x, y): cada caso coloca ese punto para que la imagen
+      // girada ocupe la caja centrada.
+      const placed = rotation === 90 ? { x: left, y: bottom + boxH, rotate: degrees(-90) }
+        : rotation === 270 ? { x: left + boxW, y: bottom, rotate: degrees(90) }
+          : rotation === 180 ? { x: left + boxW, y: bottom + boxH, rotate: degrees(180) }
+            : { x: left, y: bottom };
+      page.drawImage(image, { width, height, ...placed });
       merged++;
-    } catch (error) {
-      const encrypted = error instanceof Error && /encrypt/i.test(error.name + error.message);
-      skip(attachment, encrypted ? 'está protegido con contraseña' : 'está dañado');
+    } catch {
+      skip(attachment, 'formato de imagen no soportado');
     }
   }
   return { bytes: await doc.save(), skipped, merged };
@@ -183,4 +255,25 @@ export function skippedAttachmentsMessage(skipped: readonly SkippedAttachment[])
   if (!skipped.length) return null;
   const list = skipped.map((s) => `«${s.title}» (${s.reason})`).join(', ');
   return skipped.length === 1 ? `El PDF se generó sin un adjunto: ${list}.` : `El PDF se generó sin ${skipped.length} adjuntos: ${list}.`;
+}
+
+/**
+ * Los bytes de un adjunto quitado se borran de este equipo solo si es propio (`manual`) y ninguna cotización lo sigue
+ * usando con el mismo id (las duplicadas antes de que duplicar diera ids nuevos lo compartían).
+ */
+export function attachmentBytesUnused(quotations: readonly Pick<QuotationContent, 'attachments'>[], attachment: QuotationAttachment): boolean {
+  return attachment.origin === 'manual' && !quotations.some((q) => q.attachments.some((a) => a.id === attachment.id));
+}
+
+/** Descarga un adjunto con su nombre (el renderer no abre archivos del sistema: lo guarda el navegador). */
+export function downloadAttachmentBytes(bytes: ArrayBuffer, attachment: QuotationAttachment): void {
+  const type = sniffDocumentFileType(new Uint8Array(bytes, 0, Math.min(16, bytes.byteLength))) ?? 'application/octet-stream';
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = attachment.fileName || 'documento';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

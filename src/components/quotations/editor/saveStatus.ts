@@ -18,6 +18,7 @@ export function quotationSaveStatus(change: QuotationChange | undefined, context
   if (change?.rejected && change.rejected.revision === change.revision) {
     return { label: 'Rechazada por el servidor', tone: 'error', detail: change.rejected.error };
   }
+  if (change?.assetsPending) return { label: 'Adjunto pendiente de subir', tone: 'pending', detail: change.assetsPending };
   if (change) return { label: 'Pendiente de publicar', tone: 'pending' };
   return context.version > 0 ? { label: 'Publicado', tone: 'neutral' } : { label: 'Pendiente de publicar', tone: 'pending' };
 }
