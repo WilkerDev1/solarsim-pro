@@ -588,9 +588,15 @@
 }
 
 /* Dock de detalle */
+/* El detalle se desplaza por dentro, con su cabecera y sus acciones siempre a la vista. */
 .qh-dock {
   display: flex;
   flex-direction: column;
+  max-height: min(720px, calc(100dvh - 44px));
+}
+.qh-dock-head,
+.qh-dock-footer {
+  flex-shrink: 0;
 }
 .qh-dock-head {
   padding: 14px 16px;
@@ -606,10 +612,18 @@
   gap: 6px;
 }
 .qh-dock-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 0 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.qh-dock-body > * {
+  flex-shrink: 0;
 }
 .qh-preview {
   border: 1px solid var(--qh-border);
@@ -839,6 +853,13 @@
 @media (min-width: 1400px) {
   .qh-workspace {
     grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+  }
+  /* A la derecha de la lista, el detalle acompaña el desplazamiento de la página y ocupa el alto de la ventana. */
+  .qh-dock {
+    position: sticky;
+    top: 0;
+    /* Cabe bajo la cabecera y los indicadores sin desplazar la página; lo demás se recorre dentro del detalle. */
+    max-height: max(420px, calc(100dvh - 270px));
   }
 }
 @media (max-width: 1280px) {

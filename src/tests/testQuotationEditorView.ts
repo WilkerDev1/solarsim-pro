@@ -60,8 +60,8 @@ assert.ok(draft.includes('role="tablist"') && draft.includes('>Plantilla y firma
 assert.ok(/role="tab"[^>]*aria-selected="true"[^>]*>.*?Contenido/.test(draft), 'Contenido abierta al entrar');
 // Emisor de solo lectura con la acción explícita en borrador.
 assert.ok(draft.includes('>Emisor<') && draft.includes('Actualizar desde el membrete'));
-// Orden del tabulador en cada línea: descripción → cantidad → unidad → precio → descuento → ITBIS → acciones.
-const order = ['Descripción de la línea 1', '>Cant.<', '>Unidad<', '>Precio unit.<', '>Desc. %<', '>ITBIS<', 'Subir línea 1', 'Quitar línea 1'].map((text) => draft.indexOf(text));
+// Orden del tabulador en cada línea: descripción → cantidad → precio → ITBIS → «…» → unidad → descuento → acciones.
+const order = ['Descripción de la línea 1', 'Cantidad de la línea 1', 'Precio unitario de la línea 1', 'ITBIS de la línea 1', 'Más opciones de la línea 1', '>Unidad<', '>Descuento<', 'Subir línea 1', 'Quitar línea 1'].map((text) => draft.indexOf(text));
 assert.ok(order.every((at, i) => at > 0 && (i === 0 || at > order[i - 1])), `orden de la línea: ${order.join(', ')}`);
 // La moneda son botones con aria-pressed, no un grupo de radio que cambia con las flechas.
 assert.ok(draft.includes('aria-pressed="true"') && !draft.includes('role="radiogroup"'));

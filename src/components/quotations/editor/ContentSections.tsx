@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { AlignLeft, ArrowDown, ArrowUp, ArrowUpRight, Building2, Copy, FileSymlink, Package, Plus, RefreshCw, Trash2, Unlink } from 'lucide-react';
+import { AlignLeft, ArrowDown, ArrowUp, ArrowUpRight, Building2, Check, ChevronDown, Copy, CornerDownRight, FileSymlink, MoreHorizontal, Package, Plus, RefreshCw, Trash2, Unlink } from 'lucide-react';
 import { confirmAction } from '../../common/confirmAction';
 import {
-  QUOTATION_LIMITS, QUOTATION_SHEET_TEXTS, computeQuotationTotals, formatAmount, formatExchangeRate, formatMoney, formatQuantity, toCents,
+  QUOTATION_LIMITS, QUOTATION_SHEET_TEXTS, computeQuotationTotals, currencySymbol, formatAmount, formatExchangeRate, formatMoney, formatQuantity, toCents,
   type QuotationCurrency,
 } from '../../../../shared/quotations';
 import type { QuotationContent, QuotationLine } from '../../../types/quotation';
@@ -16,6 +16,7 @@ import { SOURCE_PROPOSAL_NOTICES, proposalName, type SourceProposalLink } from '
 import { catalogQuotationLine, type CatalogLineContext } from '../../../features/quotations/catalogLine';
 import { ClientPicker } from '../../clients/ClientPicker';
 import { CURRENCY_NAMES, CurrencyFlag } from '../common/CurrencyFlag';
+import { InfoTip } from '../../simulator/params/ui/InfoTip';
 import { NumberField, TextField } from './fields';
 import { CatalogPicker } from './CatalogPicker';
 
@@ -31,6 +32,7 @@ interface SectionProps {
 const newLineId = () => `line-${crypto.randomUUID()}`;
 const newDiscountId = () => `discount-${crypto.randomUUID()}`;
 const money = (cents: number) => formatAmount(cents);
+const initials = (name: string) => name.trim().split(/\s+/).filter((w) => /^[\p{L}\p{N}]/u.test(w)).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '·';
 
 const Card: React.FC<{ title: string; titleId: string; actions?: React.ReactNode; children: React.ReactNode }> = ({ title, titleId, actions, children }) => (
   <section className="qe-card" aria-labelledby={titleId}>
@@ -55,24 +57,22 @@ export const DocumentSection: React.FC<SectionProps & { number: string | null }>
   };
   return (
     <Card title="Datos del documento" titleId="qe-document-title">
-      <div className="qe-grid-2">
-        <div className="qe-field">
-          <label htmlFor="qe-number">Número</label>
-          <input id="qe-number" value={number ?? 'Sin número'} readOnly aria-describedby="qe-number-hint" className="qe-locked" />
-          <p id="qe-number-hint" className="qe-field-hint">{number ? 'Asignado al crear; no cambia.' : 'Se asigna al publicar la cotización.'}</p>
-        </div>
-        <TextField label="Vendedor" value={content.seller} readOnly={readOnly} maxLength={QUOTATION_LIMITS.label} onCommit={(seller) => edit((c) => setDocumentFields(c, { seller }))} />
+      <div className="qe-grid-3">
         <TextField label="Fecha de emisión" type="date" value={content.issueDate} readOnly={readOnly} onCommit={(issueDate) => edit((c) => setDocumentFields(c, { issueDate }))} />
-        <TextField label="Válida hasta" type="date" value={content.validUntil ?? ''} readOnly={readOnly} hint="Opcional." onCommit={(value) => edit((c) => setDocumentFields(c, { validUntil: value.trim() || null }))} />
+        <TextField label="Válida hasta" type="date" value={content.validUntil ?? ''} readOnly={readOnly} info="Opcional. Pasada esta fecha, una cotización emitida se muestra como vencida." onCommit={(value) => edit((c) => setDocumentFields(c, { validUntil: value.trim() || null }))} />
+        <TextField label="Vendedor" value={content.seller} readOnly={readOnly} maxLength={QUOTATION_LIMITS.label} onCommit={(seller) => edit((c) => setDocumentFields(c, { seller }))} />
       </div>
       <div className="qe-grid-currency">
         <div className="qe-field">
-          <span className="qe-label" id="qe-currency-label">Moneda</span>
+          <span className="qe-label-row">
+            <span className="qe-label" id="qe-currency-label">Moneda</span>
+            {!readOnly && <InfoTip text="Cambiar de moneda convierte los precios con la tasa del documento; se pide confirmación." label="Qué pasa al cambiar de moneda" />}
+          </span>
           <div
             className="qe-segmented"
             role="group"
             aria-labelledby="qe-currency-label"
-            aria-describedby={currencyError ? 'qe-currency-error' : !readOnly ? 'qe-currency-hint' : undefined}
+            aria-describedby={currencyError ? 'qe-currency-error' : undefined}
             onKeyDown={(event) => {
               // Las flechas solo mueven el foco; cambiar de moneda exige pulsar el botón.
               if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -88,27 +88,29 @@ export const DocumentSection: React.FC<SectionProps & { number: string | null }>
                 type="button"
                 aria-pressed={content.currency === currency}
                 disabled={readOnly && content.currency !== currency}
+                title={CURRENCY_NAMES[currency]}
                 onClick={() => void pickCurrency(currency)}
               >
                 <CurrencyFlag currency={currency} width={20} />
-                <span>{CURRENCY_NAMES[currency]}</span>
+                <span className="sr-only">{CURRENCY_NAMES[currency]}</span>
+                <span aria-hidden="true"><strong>{currencySymbol(currency)}</strong> {currency === 'DOP' ? 'Peso' : 'Dólar'}</span>
               </button>
             ))}
           </div>
-          {currencyError
-            ? <p id="qe-currency-error" className="qe-field-error" role="alert">{currencyError}</p>
-            : !readOnly && <p id="qe-currency-hint" className="qe-field-hint">Cambiar de moneda convierte los precios con la tasa del documento; se pide confirmación.</p>}
+          {currencyError && <p id="qe-currency-error" className="qe-field-error" role="alert">{currencyError}</p>}
         </div>
         <NumberField
           label="Tasa del dólar"
           value={content.exchangeRate}
           readOnly={readOnly}
           format={formatExchangeRate}
-          hint="RD$ por US$ 1."
+          prefix="RD$"
+          info="Pesos por cada dólar. Se usa al convertir importes y se imprime en el documento."
           onCommit={(rate) => edit((c) => setExchangeRate(c, rate))}
         />
+        <TextField label="Proyecto" value={content.projectLabel} readOnly={readOnly} maxLength={QUOTATION_LIMITS.label} placeholder="Por ejemplo, sistema de 12 kWp" onCommit={(projectLabel) => edit((c) => setDocumentFields(c, { projectLabel }))} />
       </div>
-      <TextField label="Proyecto" value={content.projectLabel} readOnly={readOnly} maxLength={QUOTATION_LIMITS.label} placeholder="Por ejemplo, alimentación de planta eléctrica" onCommit={(projectLabel) => edit((c) => setDocumentFields(c, { projectLabel }))} />
+      {!number && <p className="qe-muted qe-quiet-note">El número se asigna al publicar la cotización.</p>}
     </Card>
   );
 };
@@ -184,13 +186,13 @@ const SourceProposalField: React.FC<SectionProps & SourceProposalProps> = ({ rea
           {link.state === 'available' ? (
             <>
               <span className="qe-source-name">{proposalName(link.project)}</span>
-              <button type="button" className="qe-btn qe-btn-sm" onClick={() => onOpenProposal(link.project.id)}><ArrowUpRight className="h-4 w-4" aria-hidden="true" />Ver propuesta</button>
+              <button type="button" className="qe-link-btn" onClick={() => onOpenProposal(link.project.id)}>Ver propuesta<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button>
             </>
           ) : (
             <span className="qe-muted">{link.state === 'trashed' ? `${proposalName(link.project)}: ${SOURCE_PROPOSAL_NOTICES.trashed}` : SOURCE_PROPOSAL_NOTICES.missing}</span>
           )}
           {!readOnly && (
-            <button type="button" className="qe-btn qe-btn-sm" onClick={() => set(null)} aria-label="Quitar el enlace con la propuesta de origen"><Unlink className="h-4 w-4" aria-hidden="true" />Quitar enlace</button>
+            <button type="button" className="qe-icon-btn" onClick={() => set(null)} aria-label="Quitar el enlace con la propuesta de origen" title="Quitar enlace"><Unlink className="h-4 w-4" aria-hidden="true" /></button>
           )}
         </div>
       )}
@@ -209,6 +211,7 @@ export const ClientSection: React.FC<SectionProps & {
   const [error, setError] = useState<string | null>(null);
   const linked = content.clientId ? clients.find((c) => c.id === content.clientId) : undefined;
   const choose = (client: ClientRecord | null) => setError(chooseClient(client));
+  const named = !!content.client.name.trim();
   const printed = (key: keyof QuotationContent['client'], label: string, extra: Partial<React.ComponentProps<typeof TextField>> = {}) => (
     <TextField
       label={label}
@@ -221,26 +224,36 @@ export const ClientSection: React.FC<SectionProps & {
   );
   return (
     <Card title="Cliente y origen" titleId="qe-client-title">
-      {readOnly ? (
-        <p className="qe-muted">
-          {content.clientId ? (linked ? <>Enlazada con <strong>{linked.name}</strong> del directorio.</> : 'Enlazada con un cliente que ya no está en el directorio.') : 'Sin cliente del directorio.'}
-        </p>
-      ) : (
-        <>
-          <ClientPicker className="qe-client-picker qe-field" clients={clients} selectedId={content.clientId ?? null} onSelect={choose} label="Cliente del directorio" collapseWhenEmpty />
-          {content.clientId && !linked && <p className="qe-muted">El cliente enlazado ya no está en el directorio.</p>}
-          <p className="qe-field-hint">Elegir un cliente copia sus datos al documento. Después se editan aquí y cambiar o quitar el enlace no los reescribe.</p>
-        </>
+      {named && (
+        <div className="qe-client-chip">
+          <span className="qe-client-avatar" aria-hidden="true">{initials(content.client.name)}</span>
+          <span className="qe-client-text">
+            <strong>{content.client.name}</strong>
+            <small>{[content.client.phone, content.client.attention && `Atención: ${content.client.attention}`, content.client.taxId && `RNC ${content.client.taxId}`].filter(Boolean).join(' · ') || 'Sin teléfono ni contacto'}</small>
+          </span>
+          <span className={`qe-pill${linked ? ' qe-pill-on' : ''}`}>{linked ? 'Del directorio' : content.clientId ? 'Ya no está en el directorio' : 'Datos manuales'}</span>
+        </div>
       )}
+      {!readOnly && (
+        <div className="qe-client-link">
+          <ClientPicker className="qe-client-picker qe-field" clients={clients} selectedId={null} onSelect={choose} label={named ? 'Cambiar cliente' : 'Cliente del directorio'} collapseWhenEmpty />
+          <InfoTip text="Elegir un cliente copia sus datos al documento. Después se editan aquí; cambiar o quitar el enlace no los reescribe." label="Cómo funciona el enlace con el directorio" />
+          {content.clientId && <button type="button" className="qe-link-btn" onClick={() => choose(null)}><Unlink className="h-4 w-4" aria-hidden="true" />Quitar enlace</button>}
+        </div>
+      )}
+      {readOnly && !named && <p className="qe-muted">Sin cliente.</p>}
       {error && <p className="qe-field-error" role="alert">{error}</p>}
-      <div className="qe-grid-2">
-        {printed('name', 'Nombre')}
-        {printed('attention', 'Atención')}
-        {printed('taxId', 'RNC o cédula')}
-        {printed('phone', 'Teléfono', { type: 'tel' })}
-        {printed('email', 'Correo', { type: 'email', className: 'qe-span-2' })}
-        {printed('address', 'Dirección', { multiline: true, rows: 2, className: 'qe-span-2' })}
-      </div>
+      <details className="qe-details" open={!named || undefined}>
+        <summary><ChevronDown className="h-4 w-4" aria-hidden="true" />Datos impresos en el documento</summary>
+        <div className="qe-grid-2">
+          {printed('name', 'Nombre')}
+          {printed('attention', 'Atención')}
+          {printed('taxId', 'RNC o cédula')}
+          {printed('phone', 'Teléfono', { type: 'tel' })}
+          {printed('email', 'Correo', { type: 'email' })}
+          {printed('address', 'Dirección', { multiline: true, rows: 1 })}
+        </div>
+      </details>
       {source && <SourceProposalField content={content} readOnly={readOnly} edit={edit} {...source} />}
     </Card>
   );
@@ -250,58 +263,63 @@ const LineRow: React.FC<{
   line: QuotationLine;
   index: number;
   count: number;
-  label: string;
   netCents: number;
   readOnly: boolean;
   edit: Edit;
-}> = ({ line, index, count, label, netCents, readOnly, edit }) => {
+}> = ({ line, index, count, netCents, readOnly, edit }) => {
   const [actionError, setActionError] = useState<string | null>(null);
+  // Unidad, descuento y acciones viven en una segunda fila que se abre a demanda; un descuento ya puesto la deja abierta.
+  const [open, setOpen] = useState(line.discountPct > 0);
   const change = (patch: Partial<QuotationLine>) => edit((c) => updateLine(c, line.id, patch));
   const act = (update: (c: QuotationContent) => QuotationContent) => setActionError(edit(update));
   const position = index + 1;
   const detail = line.kind === 'detail';
   return (
     <li className={`qe-line${detail ? ' qe-line-detail' : ''}`} aria-label={`${detail ? 'Línea descriptiva' : 'Ítem'} ${position}`}>
-      <div className="qe-line-top">
-        <span className="qe-line-number" aria-hidden="true">{detail ? <AlignLeft className="h-3.5 w-3.5" /> : label}</span>
-        <TextField
-          label={`Descripción de la línea ${position}`}
-          hideLabel
-          multiline
-          rows={1}
-          value={line.description}
-          readOnly={readOnly}
-          maxLength={QUOTATION_LIMITS.lineDescription}
-          placeholder={detail ? 'Texto descriptivo (sin precio)' : 'Descripción del ítem'}
-          onCommit={(description) => change({ description })}
-        />
-      </div>
-      <div className="qe-line-values">
-        <NumberField className="qe-w-qty" label="Cant." value={line.quantity} readOnly={readOnly} format={formatQuantity} onCommit={(quantity) => change({ quantity })} />
-        <TextField className="qe-w-unit" label="Unidad" value={line.unit} readOnly={readOnly} maxLength={QUOTATION_LIMITS.unit} onCommit={(unit) => change({ unit })} />
+      <div className="qe-line-main">
+        <div className="qe-line-desc-cell">
+          {detail && <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />}
+          <TextField
+            className="qe-line-desc"
+            label={`Descripción de la línea ${position}`}
+            hideLabel
+            multiline
+            rows={1}
+            value={line.description}
+            readOnly={readOnly}
+            maxLength={QUOTATION_LIMITS.lineDescription}
+            placeholder={detail ? 'Texto descriptivo' : 'Descripción del ítem'}
+            onCommit={(description) => change({ description })}
+          />
+        </div>
+        <NumberField label={`Cantidad de la línea ${position}`} hideLabel value={line.quantity} readOnly={readOnly} format={formatQuantity} onCommit={(quantity) => change({ quantity })} />
         {detail ? (
-          <p className="qe-muted qe-detail-note">Línea descriptiva: no suma al total.</p>
+          <span className="qe-line-nosum">No suma al total</span>
         ) : (
           <>
-            <NumberField className="qe-w-price" label="Precio unit." value={line.unitPriceCents} readOnly={readOnly} format={money} toValue={toCents} onCommit={(unitPriceCents) => change({ unitPriceCents })} />
-            <NumberField className="qe-w-pct" label="Desc. %" value={line.discountPct} readOnly={readOnly} format={formatQuantity} onCommit={(discountPct) => change({ discountPct })} />
-            <div className="qe-field qe-check">
-              <label htmlFor={`qe-tax-${line.id}`}>ITBIS</label>
-              <input id={`qe-tax-${line.id}`} type="checkbox" checked={line.taxable} disabled={readOnly} onChange={(e) => setActionError(change({ taxable: e.target.checked }))} />
+            <NumberField label={`Precio unitario de la línea ${position}`} hideLabel value={line.unitPriceCents} readOnly={readOnly} format={money} toValue={toCents} onCommit={(unitPriceCents) => change({ unitPriceCents })} />
+            <div className="qe-line-tax">
+              <input type="checkbox" aria-label={`ITBIS de la línea ${position}`} checked={line.taxable} disabled={readOnly} onChange={(e) => setActionError(change({ taxable: e.target.checked }))} />
             </div>
-            <div className="qe-field qe-line-total">
-              <span className="qe-label">Total</span>
-              <output aria-label={`Total de la línea ${position}`}>{money(netCents)}</output>
-            </div>
+            <output className="qe-line-total" aria-label={`Total de la línea ${position}`}>{money(netCents)}</output>
           </>
+        )}
+        {!readOnly && (
+          <button type="button" className="qe-icon-btn qe-line-more" aria-expanded={open} aria-controls={`qe-extra-${line.id}`} aria-label={`Más opciones de la línea ${position}`} title="Unidad, descuento y acciones" onClick={() => setOpen((o) => !o)}>
+            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+          </button>
         )}
       </div>
       {!readOnly && (
-        <div className="qe-line-actions">
-          <button type="button" className="qe-icon-btn" aria-label={`Subir línea ${position}`} disabled={index === 0} onClick={() => act((c) => moveLine(c, line.id, -1))}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
-          <button type="button" className="qe-icon-btn" aria-label={`Bajar línea ${position}`} disabled={index === count - 1} onClick={() => act((c) => moveLine(c, line.id, 1))}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
-          <button type="button" className="qe-icon-btn" aria-label={`Duplicar línea ${position}`} onClick={() => act((c) => duplicateLine(c, line.id, newLineId))}><Copy className="h-4 w-4" aria-hidden="true" /></button>
-          <button type="button" className="qe-icon-btn qe-danger" aria-label={`Quitar línea ${position}`} onClick={() => act((c) => removeLine(c, line.id))}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+        <div className="qe-line-extra" id={`qe-extra-${line.id}`} hidden={!open}>
+          <TextField className="qe-inline-field" label="Unidad" value={line.unit} readOnly={readOnly} maxLength={QUOTATION_LIMITS.unit} placeholder="UD" onCommit={(unit) => change({ unit })} />
+          {!detail && <NumberField className="qe-inline-field" label="Descuento" suffix="%" value={line.discountPct} readOnly={readOnly} format={formatQuantity} onCommit={(discountPct) => change({ discountPct })} />}
+          <div className="qe-line-actions">
+            <button type="button" className="qe-icon-btn" aria-label={`Subir línea ${position}`} title="Subir" disabled={index === 0} onClick={() => act((c) => moveLine(c, line.id, -1))}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
+            <button type="button" className="qe-icon-btn" aria-label={`Bajar línea ${position}`} title="Bajar" disabled={index === count - 1} onClick={() => act((c) => moveLine(c, line.id, 1))}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
+            <button type="button" className="qe-icon-btn" aria-label={`Duplicar línea ${position}`} title="Duplicar" onClick={() => act((c) => duplicateLine(c, line.id, newLineId))}><Copy className="h-4 w-4" aria-hidden="true" /></button>
+            <button type="button" className="qe-icon-btn qe-danger" aria-label={`Quitar línea ${position}`} title="Quitar" onClick={() => act((c) => removeLine(c, line.id))}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+          </div>
         </div>
       )}
       {actionError && <p className="qe-field-error" role="alert">{actionError}</p>}
@@ -318,7 +336,6 @@ export const ItemsSection: React.FC<SectionProps & {
   const [error, setError] = useState<string | null>(null);
   const totals = useMemo(() => computeQuotationTotals(content), [content]);
   const netById = useMemo(() => new Map(totals.lines.map((l) => [l.id, l.netCents])), [totals]);
-  let itemNumber = 0;
   const add = (update: (c: QuotationContent) => QuotationContent, message: string | null = null) => {
     const failure = edit(update);
     setError(failure);
@@ -333,46 +350,60 @@ export const ItemsSection: React.FC<SectionProps & {
       setNotice(result.notice ? `Añadido «${result.line.description}»: ${result.notice}.` : `Añadido «${result.line.description}» con la oferta de ${result.supplierName}.`);
     }
   }, [catalogContext, edit]);
+  const applied = new Map(totals.discounts.map((d) => [d.id, d.appliedCents]));
   return (
     <Card
       title="Ítems"
       titleId="qe-items-title"
       actions={!readOnly && (
         <div className="qe-actions">
-          <button type="button" className="qe-btn qe-btn-sm" aria-expanded={picking} onClick={() => setPicking((open) => !open)}><Package className="h-4 w-4" aria-hidden="true" />Del catálogo de equipos</button>
-          <button type="button" className="qe-btn qe-btn-sm" onClick={() => add((c) => addDetailLine(c, newLineId))}><AlignLeft className="h-4 w-4" aria-hidden="true" />Línea descriptiva</button>
+          <button type="button" className="qe-btn qe-btn-sm" aria-expanded={picking} onClick={() => setPicking((isOpen) => !isOpen)}><Package className="h-4 w-4" aria-hidden="true" />Del catálogo de equipos</button>
           <button type="button" className="qe-btn qe-btn-sm" onClick={() => add((c) => addItemLine(c, newLineId))}><Plus className="h-4 w-4" aria-hidden="true" />Ítem libre</button>
         </div>
       )}
     >
       {picking && !readOnly && <CatalogPicker catalog={catalog} contextFor={catalogContext} onPick={pick} onClose={() => setPicking(false)} />}
-      {notice && <p className="qe-notice" role="status">{notice}</p>}
-      {error && <p className="qe-field-error" role="alert">{error}</p>}
       {content.items.length === 0 ? (
-        <p className="qe-muted">{readOnly ? 'Sin líneas.' : 'Todavía no hay líneas. Añade un ítem libre, una línea descriptiva o un equipo del catálogo.'}</p>
+        <p className="qe-muted qe-empty">{readOnly ? 'Sin líneas.' : 'Todavía no hay líneas. Empieza con un ítem libre o un equipo del catálogo.'}</p>
       ) : (
-        <ol className="qe-lines" aria-label="Líneas de la cotización">
-          {content.items.map((line, index) => (
-            <LineRow
-              key={line.id}
-              line={line}
-              index={index}
-              count={content.items.length}
-              label={line.kind === 'item' ? String(++itemNumber).padStart(2, '0') : ''}
-              netCents={netById.get(line.id) ?? 0}
-              readOnly={readOnly}
-              edit={edit}
-            />
-          ))}
-        </ol>
+        <>
+          <div className={`qe-lines-head${readOnly ? ' qe-lines-locked' : ''}`} aria-hidden="true">
+            <span>Descripción</span><span>Cant.</span><span>Precio</span><span>ITBIS</span><span>Total {currencySymbol(content.currency)}</span>
+          </div>
+          <ol className={`qe-lines${readOnly ? ' qe-lines-locked' : ''}`} aria-label="Líneas de la cotización">
+            {content.items.map((line, index) => (
+              <LineRow key={line.id} line={line} index={index} count={content.items.length} netCents={netById.get(line.id) ?? 0} readOnly={readOnly} edit={edit} />
+            ))}
+          </ol>
+        </>
       )}
+      {notice && <p className="qe-notice" role="status"><Check className="h-3.5 w-3.5" aria-hidden="true" />{notice}</p>}
+      {error && <p className="qe-field-error" role="alert">{error}</p>}
+      <div className="qe-items-foot">
+        {!readOnly ? (
+          <div className="qe-add-bar">
+            <button type="button" className="qe-add-btn" onClick={() => add((c) => addDetailLine(c, newLineId))}><AlignLeft className="h-4 w-4" aria-hidden="true" />Línea descriptiva</button>
+            {content.discounts.length < QUOTATION_LIMITS.maxDiscounts && (
+              <button type="button" className="qe-add-btn" onClick={() => add((c) => addDiscount(c, newDiscountId))}><Plus className="h-4 w-4" aria-hidden="true" />Descuento global</button>
+            )}
+          </div>
+        ) : <span />}
+        <dl className="qe-totals" aria-label="Resumen">
+          <div><dt>{QUOTATION_SHEET_TEXTS.subtotal}</dt><dd>{money(totals.subtotalCents)}</dd></div>
+          {content.discounts.map((discount) => (
+            <div key={discount.id}><dt>{discount.label.trim() || QUOTATION_SHEET_TEXTS.discount}</dt><dd>{money(-(applied.get(discount.id) ?? 0))}</dd></div>
+          ))}
+          <div><dt>{QUOTATION_SHEET_TEXTS.itbis}</dt><dd>{money(totals.taxCents)}</dd></div>
+          <div className="qe-totals-grand"><dt>Total {currencySymbol(content.currency)}</dt><dd>{money(totals.totalCents)}</dd></div>
+        </dl>
+      </div>
     </Card>
   );
 };
 
 export const DiscountsSection: React.FC<SectionProps> = ({ content, readOnly, edit }) => {
   const [error, setError] = useState<string | null>(null);
-  if (readOnly && !content.discounts.length) return null;
+  if (!content.discounts.length) return null;
   return (
     <Card
       title="Descuentos globales"

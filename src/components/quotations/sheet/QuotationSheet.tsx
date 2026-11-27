@@ -81,7 +81,7 @@ const SheetPageView: React.FC<PageProps> = ({ index, count, page, quotation, tot
       {page.texts.map((chunk, i) => <TextBlock key={i} chunk={chunk} />)}
       {page.closing && <Summary quotation={quotation} totals={totals} theme={theme} termsBeside={page.termsBeside} />}
       <div style={{ flex: '1 1 auto' }} />
-      {page.closing && <Signatures seller={quotation.seller} signature={quotation.signature ?? null} stamp={stamp} />}
+      {page.closing && <Signatures seller={quotation.seller} signature={quotation.signature ?? null} stamp={stamp} generated={quotation.design.showStamp && !stamp ? quotation.issuer : null} />}
       <Footer quotation={quotation} label={`${number} · ${sheetPageLabel(index + 1, count)}`} />
     </div>
   );
@@ -236,7 +236,30 @@ const Summary: React.FC<{ quotation: QuotationSheetData; totals: QuotationTotals
   );
 };
 
-const Signatures: React.FC<{ seller: string; signature: SheetSignature | null; stamp: string | null }> = ({ seller, signature, stamp }) => {
+const STAMP_INK = '#1f3fb4';
+
+/**
+ * Sello generado con los datos del emisor (RNC, logo o nombre y teléfono) cuando no hay un sello importado ni el del
+ * membrete. Solo con RNC o logo: un emisor sin identificar no sella. Mide lo mismo que el hueco del sello importado.
+ */
+const GeneratedStamp: React.FC<{ issuer: QuotationSheetData['issuer'] }> = ({ issuer }) => {
+  const caption: React.CSSProperties = { fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', lineHeight: 1.3, whiteSpace: 'nowrap' };
+  return (
+    <div data-quotation-stamp="generated" style={{ width: 140, height: 140, boxSizing: 'border-box', border: `2.5px solid ${STAMP_INK}`, borderRadius: '50%', padding: 5, transform: 'rotate(-9deg)', opacity: 0.86 }}>
+      <div style={{ width: '100%', height: '100%', boxSizing: 'border-box', border: `1px solid ${STAMP_INK}`, borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: STAMP_INK }}>
+        {issuer.taxId.trim() && <div style={caption}>{T.taxId} {sheetFit.stampLine(issuer.taxId)}</div>}
+        {isImage(issuer.logo)
+          ? <img alt="" src={issuer.logo} className="block h-auto max-h-[56px] w-auto max-w-[84px]" />
+          : <div style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.25, textAlign: 'center', maxWidth: 96, ...WRAP }}>{sheetFit.stampName(issuer.name)}</div>}
+        {issuer.phone.trim() && <div style={caption}>{T.phone.toUpperCase()} {sheetFit.stampLine(issuer.phone)}</div>}
+      </div>
+    </div>
+  );
+};
+
+export const canGenerateStamp = (issuer: QuotationSheetData['issuer']) => !!issuer.name.trim() && (!!issuer.taxId.trim() || isImage(issuer.logo));
+
+const Signatures: React.FC<{ seller: string; signature: SheetSignature | null; stamp: string | null; generated: QuotationSheetData['issuer'] | null }> = ({ seller, signature, stamp, generated }) => {
   const signer = (name: string, role: string, image: string | null, alt: string) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ height: 64, display: 'flex', alignItems: 'flex-end' }}>
@@ -253,7 +276,9 @@ const Signatures: React.FC<{ seller: string; signature: SheetSignature | null; s
     <div style={{ margin: '0 56px', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 170px minmax(0, 1fr)', gap: 32, alignItems: 'end', paddingBottom: 34 }}>
       {signer(signature?.name ?? seller, quotedBy, isImage(signature?.image) ? signature!.image : null, `Firma de ${signature?.name ?? ''}`.trim())}
       <div style={{ minHeight: 140, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {stamp && <img alt="Sello de la empresa" src={stamp} className="mx-auto block h-auto max-h-[140px] w-auto max-w-[160px]" />}
+        {stamp
+          ? <img alt="Sello de la empresa" src={stamp} className="mx-auto block h-auto max-h-[140px] w-auto max-w-[160px]" />
+          : generated && canGenerateStamp(generated) && <GeneratedStamp issuer={generated} />}
       </div>
       {signer('', T.receivedBy, null, '')}
     </div>

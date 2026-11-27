@@ -169,6 +169,10 @@ export const sheetFit = {
   discount: (label: string, value: string) => fitToWidth(label, discountLabelEm(value)),
   /** Pie: el emisor en el ancho que deja «número · Página X de N». */
   footer: (text: string, right: string) => fitToWidth(text, Math.max(6, (SHEET_LAYOUT.contentWidth - 24 - textWidthEm(right) * 10.5 * 1.05) / 10.5)),
+  /** Renglones del sello generado: caben dentro del aro (unos 104 px a 9 px con interletra). */
+  stampLine: (text: string) => fitToWidth(text.trim(), 13),
+  /** Nombre del emisor en el sello generado (sin logo): hasta dos renglones cortos. */
+  stampName: (text: string) => twoLines(text, 9),
   /** Emisor en la cabecera de las páginas siguientes: un renglón junto al título. */
   continuation: (name: string, title: string) => fitToWidth(name, Math.max(6, (SHEET_LAYOUT.contentWidth - 24 - textWidthEm(title) * 13 * 1.05) / 13)),
 };

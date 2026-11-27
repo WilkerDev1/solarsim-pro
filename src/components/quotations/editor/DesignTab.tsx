@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react';
-import { Check, LayoutTemplate, PenLine, Save } from 'lucide-react';
+import { LayoutTemplate, PenLine, Pipette, Save } from 'lucide-react';
 import { QUOTATION_LIBRARY_LIMITS, defaultQuotationSignature, designFromTemplate, templateFromQuotation, type QuotationDesign } from '../../../../shared/quotations';
 import type { QuotationContent } from '../../../types/quotation';
 import type { QuotationSignature, QuotationTemplate } from '../../../types/quotationLibrary';
@@ -24,10 +24,28 @@ interface DesignTabProps {
 }
 
 const LAYOUTS: { value: QuotationDesign['layout']; label: string; hint: string }[] = [
-  { value: 'clasica', label: 'Clásica', hint: 'Barra de color y tabla gris' },
+  { value: 'clasica', label: 'Clásica', hint: 'Barra fina y tabla gris' },
   { value: 'banda', label: 'Banda', hint: 'Encabezado a color' },
   { value: 'minimal', label: 'Minimal', hint: 'Solo líneas' },
 ];
+
+/** Miniatura de la disposición, con el acento actual: dice de un vistazo qué cambia entre Clásica, Banda y Minimal. */
+const LayoutThumb: React.FC<{ layout: QuotationDesign['layout']; accent: string }> = ({ layout, accent }) => {
+  const banda = layout === 'banda';
+  const minimal = layout === 'minimal';
+  return (
+    <span className="qe-thumb" aria-hidden="true">
+      <span style={{ height: banda ? 26 : layout === 'clasica' ? 4 : 0, background: accent, flexShrink: 0 }} />
+      <span className="qe-thumb-body">
+        <span className="qe-thumb-head"><i style={{ background: banda ? '#b9c3ce' : accent }} /><i /></span>
+        <span className="qe-thumb-rule" />
+        <i className="qe-thumb-th" style={{ background: banda ? accent : minimal ? 'transparent' : '#e3e8ee', borderBottom: minimal ? '1px solid #182230' : undefined, borderRadius: minimal ? 0 : 2 }} />
+        <i className="qe-thumb-line" /><i className="qe-thumb-line" /><i className="qe-thumb-line" />
+        <i className="qe-thumb-total" />
+      </span>
+    </span>
+  );
+};
 
 const Switch: React.FC<{ label: string; checked: boolean; disabled: boolean; onChange: (next: boolean) => void }> = ({ label, checked, disabled, onChange }) => {
   const id = useId();
@@ -74,46 +92,51 @@ export const DesignTab: React.FC<DesignTabProps> = ({ content, readOnly, canSave
           <h2 id="qe-template-title">Plantilla</h2>
           <button type="button" className="qe-link" onClick={() => openLibrary('templates')}>Gestionar plantillas</button>
         </div>
-        {templates.length ? (
-          <div className="qe-choice-list" role="group" aria-label="Plantillas guardadas">
-            {templates.map((template) => {
-              const selected = design.templateId === template.id;
-              return (
-                <button key={template.id} type="button" className="qe-choice" aria-pressed={selected} disabled={readOnly} onClick={() => change(designFromTemplate(template))}>
-                  <span className="qe-choice-swatch" style={{ background: template.design.accent }} aria-hidden="true" />
-                  <span className="qe-choice-text">
-                    <span className="qe-choice-name">{template.name}{template.isDefault && <span className="qe-chip">Predeterminada</span>}</span>
-                    <span className="qe-choice-hint">{template.description || `${LAYOUTS.find((l) => l.value === template.design.layout)?.label} · ${template.design.typography === 'serif' ? 'Serif' : 'Sans'}`}</span>
-                  </span>
-                  {selected && <Check className="h-4 w-4" aria-hidden="true" />}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="qe-muted">Aún no hay plantillas guardadas. Ajusta el diseño y guárdalo como plantilla para reutilizarlo.</p>
+        <div className="qe-layouts" role="group" aria-label="Disposición de la hoja">
+          {LAYOUTS.map((layout) => (
+            <button key={layout.value} type="button" className="qe-layout" aria-pressed={design.layout === layout.value} disabled={readOnly} onClick={() => change({ layout: layout.value })}>
+              <LayoutThumb layout={layout.value} accent={customAccent ?? design.accent} />
+              <span className="qe-layout-text">
+                <span className="qe-layout-name">{layout.label}</span>
+                <span className="qe-layout-hint">{layout.hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+        {templates.length > 0 && (
+          <>
+            <div className="qe-subhead"><span>Plantillas guardadas</span></div>
+            <div className="qe-choice-list" role="group" aria-label="Plantillas guardadas">
+              {templates.map((template) => {
+                const selected = design.templateId === template.id;
+                return (
+                  <button key={template.id} type="button" className="qe-choice" aria-pressed={selected} disabled={readOnly} onClick={() => change(designFromTemplate(template))}>
+                    <span className="qe-radio" aria-hidden="true" />
+                    <span className="qe-choice-text">
+                      <span className="qe-choice-name">{template.name}{template.isDefault && <span className="qe-chip">Predeterminada</span>}</span>
+                      <span className="qe-choice-hint">{template.description || `${LAYOUTS.find((l) => l.value === template.design.layout)?.label} · ${template.design.typography === 'serif' ? 'Serif' : 'Sans'}`}</span>
+                    </span>
+                    <span className="qe-choice-swatch" style={{ background: template.design.accent }} aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
       </section>
 
       <section className="qe-card" aria-labelledby="qe-appearance-title">
         <div className="qe-card-head"><h2 id="qe-appearance-title">Apariencia</h2></div>
-        <div className="qe-field">
-          <span className="qe-label" id="qe-layout-label">Disposición</span>
-          <div className="qe-segmented qe-segmented-3" role="group" aria-labelledby="qe-layout-label">
-            {LAYOUTS.map((layout) => (
-              <button key={layout.value} type="button" aria-pressed={design.layout === layout.value} disabled={readOnly} title={layout.hint} onClick={() => change({ layout: layout.value })}>
-                {layout.label}
-              </button>
-            ))}
+        <div className="qe-setting">
+          <div className="qe-setting-text">
+            <span id="qe-accent-label">Color de acento</span>
+            <small>Encabezado, número y tabla</small>
           </div>
-        </div>
-        <div className="qe-field">
-          <span className="qe-label" id="qe-accent-label">Color de acento <InfoTip text="Encabezado, número de la cotización y tabla." label="Dónde se usa el color" /></span>
           <div className="qe-swatches" role="group" aria-labelledby="qe-accent-label">
             {ACCENT_SWATCHES.map((swatch) => (
-              <button key={swatch.value} type="button" className="qe-swatch" style={{ background: swatch.value }} aria-label={swatch.label} aria-pressed={design.accent === swatch.value} disabled={readOnly} onClick={() => change({ accent: swatch.value })} />
+              <button key={swatch.value} type="button" className="qe-swatch" style={{ background: swatch.value }} aria-label={swatch.label} title={swatch.label} aria-pressed={design.accent === swatch.value} disabled={readOnly} onClick={() => change({ accent: swatch.value })} />
             ))}
-            <label className="qe-swatch-custom" data-selected={!isSwatch}>
+            <label className="qe-swatch-custom" data-selected={!isSwatch} title="Color personalizado" style={!isSwatch ? { background: customAccent ?? design.accent } : undefined}>
               <span className="sr-only">Color personalizado</span>
               <input
                 type="color"
@@ -122,13 +145,16 @@ export const DesignTab: React.FC<DesignTabProps> = ({ content, readOnly, canSave
                 onChange={(event) => { setCustomAccent(event.target.value); onPreviewAccent?.(event.target.value.toLowerCase()); }}
                 onBlur={() => { if (customAccent && customAccent !== design.accent) change({ accent: customAccent.toLowerCase() }); setCustomAccent(null); onPreviewAccent?.(null); }}
               />
-              <span aria-hidden="true">{isSwatch ? 'Otro' : design.accent}</span>
+              {isSwatch && <Pipette className="h-3.5 w-3.5" aria-hidden="true" />}
             </label>
           </div>
         </div>
-        <div className="qe-field">
-          <span className="qe-label" id="qe-font-label">Tipografía de títulos</span>
-          <div className="qe-segmented" role="group" aria-labelledby="qe-font-label">
+        <div className="qe-setting">
+          <div className="qe-setting-text">
+            <span id="qe-font-label">Tipografía de títulos</span>
+            <small>Título y total general</small>
+          </div>
+          <div className="qe-segmented qe-segmented-compact" role="group" aria-labelledby="qe-font-label">
             <button type="button" aria-pressed={design.typography === 'sans'} disabled={readOnly} onClick={() => change({ typography: 'sans' })}>Sans</button>
             <button type="button" aria-pressed={design.typography === 'serif'} disabled={readOnly} style={{ fontFamily: 'Georgia, serif' }} onClick={() => change({ typography: 'serif' })}>Serif</button>
           </div>
@@ -138,18 +164,18 @@ export const DesignTab: React.FC<DesignTabProps> = ({ content, readOnly, canSave
       <section className="qe-card" aria-labelledby="qe-signature-title">
         <div className="qe-card-head">
           <h2 id="qe-signature-title">Firma y sello</h2>
-          <button type="button" className="qe-link" onClick={() => openLibrary('signatures')}>Firmas y sellos</button>
+          <button type="button" className="qe-link" onClick={() => openLibrary('signatures')}>{signers.length ? 'Firmas y sellos' : 'Importar firma'}</button>
         </div>
         {signers.length ? (
           <div className="qe-choice-list" role="group" aria-label="Quién firma">
             {signers.map((signer) => (
               <button key={signer.id} type="button" className="qe-choice" aria-pressed={selectedSigner === signer.id} disabled={readOnly || !design.showSignature} onClick={() => change({ signatureId: signer.id })}>
-                <SignatureThumb image={signer.image} name={signer.name} />
+                <span className="qe-radio" aria-hidden="true" />
                 <span className="qe-choice-text">
-                  <span className="qe-choice-name">{signer.name}{signer.isDefault && <span className="qe-chip">Predeterminada</span>}</span>
-                  <span className="qe-choice-hint">{signer.role || 'Sin cargo'}</span>
+                  <span className="qe-choice-name">{signer.name}</span>
+                  <span className="qe-choice-hint">{[signer.role || 'Sin cargo', signer.isDefault && 'predeterminada'].filter(Boolean).join(' · ')}</span>
                 </span>
-                {selectedSigner === signer.id && <Check className="h-4 w-4" aria-hidden="true" />}
+                <SignatureThumb image={signer.image} name={signer.name} />
               </button>
             ))}
           </div>
@@ -161,14 +187,14 @@ export const DesignTab: React.FC<DesignTabProps> = ({ content, readOnly, canSave
           <Switch label="Sello de la empresa" checked={design.showStamp} disabled={readOnly} onChange={(showStamp) => change({ showStamp })} />
           <InfoTip
             label="De dónde sale el sello"
-            text={hasStamp ? 'Se imprime el sello predeterminado de la organización.' : 'Sin sello propio se imprime el del membrete que emitió la cotización, si lo tiene. Importa uno en Firmas y sellos.'}
+            text={hasStamp ? 'Se imprime el sello predeterminado de la organización.' : 'Sin sello importado se imprime el del membrete o, si no hay, uno generado con el logo, el RNC y el teléfono del emisor.'}
           />
         </div>
       </section>
 
       {canSaveTemplate && (
         naming === null ? (
-          <button type="button" className="qe-btn" onClick={() => { setSaved(null); setError(null); setNaming(''); }}>
+          <button type="button" className="qe-btn qe-btn-block" onClick={() => { setSaved(null); setError(null); setNaming(''); }}>
             <LayoutTemplate className="h-4 w-4" aria-hidden="true" />
             Guardar este diseño como plantilla
           </button>
