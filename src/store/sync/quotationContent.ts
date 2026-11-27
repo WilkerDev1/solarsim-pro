@@ -7,7 +7,7 @@ import { contentEqual } from './projectDifferences';
 import type { QuotationChange, QuotationRecord } from '../../types/quotation';
 
 const CONTENT_KEYS = [
-  'status', 'issueDate', 'validUntil', 'currency', 'exchangeRate', 'clientId', 'client', 'sourceProjectId', 'folderId', 'seller',
+  'status', 'issueDate', 'validUntil', 'currency', 'exchangeRate', 'clientId', 'client', 'sourceProjectId', 'dismissedSourceDocuments', 'folderId', 'seller',
   'projectLabel', 'items', 'discounts', 'notes', 'paymentTerms', 'design', 'attachments', 'issuer',
 ] as const satisfies readonly (keyof QuotationContent)[];
 

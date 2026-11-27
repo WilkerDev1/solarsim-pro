@@ -4,7 +4,7 @@
  * ni valida: el store valida con `validateQuotationContent` al guardar (`updateQuotationRecord`). Los ids nuevos
  * salen del generador inyectado (`newId`) para que las pruebas sean deterministas.
  */
-import { convertCents, formatExchangeRate } from '../../shared/quotations';
+import { QUOTATION_LIMITS, convertCents, formatExchangeRate } from '../../shared/quotations';
 import type {
   QuotationAttachment, QuotationContent, QuotationCurrency, QuotationDesign, QuotationDiscount, QuotationIssuer, QuotationLine, QuotationPrintedClient,
 } from '../../shared/quotations';
@@ -215,6 +215,103 @@ export function setSourceProject(content: QuotationContent, projectId: string | 
   if ((content.sourceProjectId ?? null) === (projectId || null)) return content;
   const { sourceProjectId: _previous, ...rest } = content;
   return projectId ? { ...rest, sourceProjectId: projectId } : rest;
+}
+
+/**
+ * Mueve un adjunto un puesto entre los de su grupo (`memberIds`: los de la propuesta o los demás), saltando los del
+ * otro grupo: en la pestaña cada grupo se ordena por separado, pero el PDF sigue el orden de la lista completa.
+ */
+export function moveAttachmentAmong(content: QuotationContent, id: string, offset: -1 | 1, memberIds: readonly string[]): QuotationContent {
+  const members = new Set(memberIds);
+  const index = content.attachments.findIndex((a) => a.id === id);
+  if (index < 0 || !members.has(id)) return content;
+  let target = index + offset;
+  while (target >= 0 && target < content.attachments.length && !members.has(content.attachments[target].id)) target += offset;
+  if (target < 0 || target >= content.attachments.length) return content;
+  const attachments = [...content.attachments];
+  [attachments[index], attachments[target]] = [attachments[target], attachments[index]];
+  return { ...content, attachments };
+}
+
+// --- Documentos de la propuesta de origen (docs/QUOTATION_FROM_PROPOSAL.md#documentos-de-la-propuesta-enlazada) ---
+
+/** Documentos que vienen de la propuesta enlazada: `sourceProjectId` del adjunto = el de la cotización. */
+export function sourceDocuments(content: Pick<QuotationContent, 'attachments' | 'sourceProjectId'>): QuotationAttachment[] {
+  const projectId = content.sourceProjectId;
+  return projectId ? content.attachments.filter((a) => a.sourceProjectId === projectId) : [];
+}
+
+/**
+ * Documentos de la propuesta que aún no están en la cotización: ni el mismo id, ni el mismo archivo (`assetId`, p. ej.
+ * una ficha que el usuario ya añadió desde el catálogo), ni uno que el usuario quitó (`dismissedSourceDocuments`).
+ */
+export function pendingSourceDocuments(content: QuotationContent, documents: readonly QuotationAttachment[]): QuotationAttachment[] {
+  const ids = new Set(content.attachments.map((a) => a.id));
+  const assets = new Set(content.attachments.map((a) => a.assetId).filter(Boolean));
+  const dismissed = new Set(content.dismissedSourceDocuments ?? []);
+  return documents.filter((doc) => {
+    if (ids.has(doc.id) || dismissed.has(doc.id) || (doc.assetId && assets.has(doc.assetId))) return false;
+    ids.add(doc.id);
+    if (doc.assetId) assets.add(doc.assetId);
+    return true;
+  });
+}
+
+export interface SourceDocumentsMerge {
+  content: QuotationContent;
+  /** Documentos añadidos. */
+  added: number;
+  /** Los que no cupieron (máximo de adjuntos). */
+  overflow: number;
+}
+
+/** Añade los documentos nuevos de la propuesta al final, hasta el máximo de adjuntos; nunca reactiva los quitados. */
+export function mergeSourceDocuments(content: QuotationContent, documents: readonly QuotationAttachment[]): SourceDocumentsMerge {
+  const pending = pendingSourceDocuments(content, documents);
+  const room = Math.max(0, QUOTATION_LIMITS.maxAttachments - content.attachments.length);
+  const fresh = pending.slice(0, room);
+  return { content: fresh.length ? { ...content, attachments: [...content.attachments, ...fresh] } : content, added: fresh.length, overflow: pending.length - fresh.length };
+}
+
+const withoutDismissed = (content: QuotationContent): QuotationContent => {
+  if (content.dismissedSourceDocuments === undefined) return content;
+  const { dismissedSourceDocuments: _dismissed, ...rest } = content;
+  return rest;
+};
+
+/**
+ * Enlaza una propuesta y trae sus documentos (como «Solo relacionado»). Cambiar de propuesta olvida los quitados de la
+ * anterior; los documentos de la anterior que siguieran en la lista se conservan tal cual.
+ */
+export function linkSourceProposal(content: QuotationContent, projectId: string, documents: readonly QuotationAttachment[]): SourceDocumentsMerge {
+  const linked = content.sourceProjectId === projectId ? content : withoutDismissed(setSourceProject(content, projectId));
+  return mergeSourceDocuments(linked, documents);
+}
+
+/**
+ * Quita un adjunto; si es de la propuesta enlazada, lo recuerda para que «Actualizar desde la propuesta» no lo vuelva a
+ * traer (se recuerdan hasta `maxDismissedSourceDocuments`, los más recientes).
+ */
+export function removeSourceDocument(content: QuotationContent, id: string): QuotationContent {
+  const attachment = content.attachments.find((a) => a.id === id);
+  if (!attachment) return content;
+  const removed = removeAttachment(content, id);
+  if (!content.sourceProjectId || attachment.sourceProjectId !== content.sourceProjectId) return removed;
+  const dismissed = [...(content.dismissedSourceDocuments ?? []).filter((d) => d !== id), id].slice(-QUOTATION_LIMITS.maxDismissedSourceDocuments);
+  return { ...removed, dismissedSourceDocuments: dismissed };
+}
+
+/**
+ * Quita el enlace con la propuesta. `keepDocuments`: sus documentos quedan como adjuntos normales (conservan su
+ * procedencia); si no, se quitan. Los quitados recordados se olvidan.
+ */
+export function unlinkSourceProposal(content: QuotationContent, keepDocuments: boolean): QuotationContent {
+  const projectId = content.sourceProjectId;
+  if (!projectId) return withoutDismissed(content);
+  const unlinked = withoutDismissed(setSourceProject(content, null));
+  if (keepDocuments) return unlinked;
+  const attachments = unlinked.attachments.filter((a) => a.sourceProjectId !== projectId);
+  return attachments.length === unlinked.attachments.length ? unlinked : { ...unlinked, attachments };
 }
 
 /** Claves de nivel superior que cambiaron (por referencia): el parche que se envía a `updateQuotationRecord`. */

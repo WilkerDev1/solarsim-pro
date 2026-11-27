@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { ArrowLeft, Eye, FileText, Lock, Paperclip, Palette, RotateCcw, Send } from 'lucide-react';
+import { ArrowLeft, Eye, FileSymlink, FileText, Lock, Paperclip, Palette, RotateCcw, Send } from 'lucide-react';
 import { canWrite } from '../../../../shared/permissions';
 import { canTransitionQuotation, effectiveQuotationStatus, isQuotationContentLocked, type QuotationStatus } from '../../../../shared/quotations';
 import { useSimulationStore } from '../../../store/useSimulationStore';
@@ -10,7 +10,10 @@ import type { SolarEquipmentItem } from '../../../types/equipment';
 import { newDocumentCompany, stampForIssuer } from '../../../features/quotations/issuer';
 import { quotationCatalogContext } from '../../../features/quotations/catalogLine';
 import { quotationEditorActions } from '../../../features/quotations/editorActions';
-import { selectSourceProject, sourceProposalLink, sourceProposalOptions } from '../../../features/quotations/linkedQuotations';
+import { proposalName, selectSourceProject, sourceProposalLink, sourceProposalOptions } from '../../../features/quotations/linkedQuotations';
+import { proposalDocumentAttachments } from '../../../features/quotations/proposalDocuments';
+import { pendingSourceDocuments, sourceDocuments } from '../../../domain/quotationEdit';
+import type { ProposalViewerTab, QuotationEditorEntry, QuotationEditorTab } from '../../../store/types';
 import { storeGenericPriceFor } from '../../simulator/params/logic/storeGenericPrice';
 import { localIsoDate } from '../../../utils/localDate';
 import { QuotationStatusChip } from '../common/QuotationStatusChip';
@@ -18,6 +21,7 @@ import { ClientSection, DiscountsSection, DocumentSection, IssuerSection, ItemsS
 import { QuotationPreview, type PreviewView } from './QuotationPreview';
 import { DesignTab } from './DesignTab';
 import { AttachmentsTab } from './AttachmentsTab';
+import { ProposalViewer } from './ProposalViewer';
 import { templateFromQuotation } from '../../../../shared/quotations';
 import { printedSignature, printedStamp } from '../../../features/quotations/library';
 import { useAssetImage } from '../../../features/quotations/assetImages';
@@ -30,18 +34,21 @@ import './source-proposal.css';
  * Editor de una cotización (docs/QUOTATION_EDITOR.md): formulario a la izquierda y la hoja real a la derecha. No hay
  * «Guardar»: cada cambio confirmado se guarda con `updateQuotationRecord`. Mirar nunca escribe.
  */
-export const QuotationEditorView: React.FC<{ initialPreview?: PreviewView }> = ({ initialPreview }) => {
-  const { activeQuotationId, quotation, closeQuotation } = useSimulationStore(useShallow((s) => ({
+export const QuotationEditorView: React.FC<{ initialPreview?: PreviewView; initialTab?: QuotationEditorTab; initialViewer?: ProposalViewerTab }> = ({ initialPreview, initialTab, initialViewer }) => {
+  const { activeQuotationId, quotation, closeQuotation, entry } = useSimulationStore(useShallow((s) => ({
     activeQuotationId: s.activeQuotationId,
     quotation: s.quotations.find((q) => q.id === s.activeQuotationId),
     closeQuotation: s.closeQuotation,
+    // Punto al que vuelve «Volver a COT-…» (pestaña y visor); solo se lee al montar el editor.
+    entry: s.quotationEditorEntry,
   })));
   // La vista activa se persiste pero la cotización activa no (o ya no existe): de vuelta al catálogo, sin escribir nada.
   useEffect(() => {
     if (!activeQuotationId || !quotation) closeQuotation();
   }, [activeQuotationId, quotation, closeQuotation]);
   if (!quotation) return null;
-  return <QuotationEditor key={quotation.id} quotation={quotation} initialPreview={initialPreview} />;
+  const start: QuotationEditorEntry = { tab: initialTab ?? entry?.tab ?? 'content', viewer: initialViewer ?? entry?.viewer ?? null };
+  return <QuotationEditor key={quotation.id} quotation={quotation} initialPreview={initialPreview} start={start} />;
 };
 
 const LOCK_REASONS: Record<QuotationStatus, string> = {
@@ -52,9 +59,12 @@ const LOCK_REASONS: Record<QuotationStatus, string> = {
   void: 'Anulada: solo se puede consultar.',
 };
 
-const QuotationEditor: React.FC<{ quotation: QuotationRecord; initialPreview?: PreviewView }> = ({ quotation, initialPreview }) => {
+/** Ancho del formulario con el visor abierto (px): el separador lo cambia dentro de estos límites. */
+const FORM_WIDTH = { min: 420, initial: 600, max: 900, step: 24 } as const;
+
+const QuotationEditor: React.FC<{ quotation: QuotationRecord; initialPreview?: PreviewView; start: QuotationEditorEntry }> = ({ quotation, initialPreview, start }) => {
   const {
-    change, sidebarTheme, currentUser, online, clients, sourceProject, catalog, defaults, seal, setQuotationStatus, closeQuotation, setActiveProject, templates, signatures, openQuotationLibrary, imageIssues,
+    change, sidebarTheme, currentUser, online, clients, sourceProject, catalog, defaults, seal, setQuotationStatus, closeQuotation, templates, signatures, openQuotationLibrary, imageIssues,
   } = useSimulationStore(useShallow((s) => ({
     imageIssues: s.quotationAssetIssues[quotation.id],
     templates: s.quotationLibrary.templates.items,
@@ -73,11 +83,14 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord; initialPreview?: P
     seal: stampForIssuer(s.companies, quotation.issuer),
     setQuotationStatus: s.setQuotationStatus,
     closeQuotation: s.closeQuotation,
-    setActiveProject: s.setActiveProject,
   })));
   const [statusError, setStatusError] = useState<string | null>(null);
-  const [pane, setPane] = useState<'form' | 'preview'>('form');
-  const [tab, setTab] = useState<'content' | 'design' | 'attachments'>('content');
+  const [tab, setTab] = useState<QuotationEditorTab>(start.tab);
+  // Visor de la propuesta de origen (solo lectura): sustituye a la vista previa mientras está abierto.
+  const [viewer, setViewer] = useState<ProposalViewerTab | null>(start.viewer);
+  const [pane, setPane] = useState<'form' | 'preview' | 'proposal'>(start.viewer ? 'proposal' : 'form');
+  const [formWidth, setFormWidth] = useState<number>(FORM_WIDTH.initial);
+  const drag = useRef<{ x: number; width: number } | null>(null);
   const id = quotation.id;
   const writable = canWrite(currentUser);
   const locked = isQuotationContentLocked(quotation.status);
@@ -144,6 +157,19 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord; initialPreview?: P
   };
   const readOnlyReason = !writable ? 'Solo lectura: tu rol no permite editar cotizaciones.' : LOCK_REASONS[quotation.status];
 
+  // Propuesta de origen: visor, documentos enlazados y «Abrir propuesta» (que deja «Volver a COT-…» en la propuesta).
+  const link = sourceProposalLink(sourceProject ? [sourceProject] : [], quotation.sourceProjectId);
+  const viewedProject = viewer && link.state === 'available' ? link.project : null;
+  const sourceDocs = useMemo(() => (sourceProject && !sourceProject.isDeleted ? proposalDocumentAttachments(sourceProject) : null), [sourceProject]);
+  const linkedDocumentCount = sourceDocuments(content).length;
+  const openViewer = () => { setViewer((current) => current ?? 'summary'); setPane('proposal'); };
+  const closeViewer = () => { setViewer(null); setPane((current) => (current === 'proposal' ? 'form' : current)); };
+  const openFullProposal = () => {
+    if (link.state !== 'available') return;
+    useSimulationStore.getState().openProposalFromQuotation({ quotationId: id, projectId: link.project.id, tab, viewer });
+  };
+  const clampWidth = (width: number) => Math.round(Math.min(FORM_WIDTH.max, Math.max(FORM_WIDTH.min, width)));
+
   return (
     <div className="quotation-editor" data-theme={sidebarTheme}>
       <header className="qe-header">
@@ -179,9 +205,14 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord; initialPreview?: P
       </header>
       <div className="qe-pane-switch" role="group" aria-label="Mostrar">
         <button type="button" aria-pressed={pane === 'form'} onClick={() => setPane('form')}><FileText className="h-4 w-4" aria-hidden="true" />Contenido</button>
-        <button type="button" aria-pressed={pane === 'preview'} onClick={() => setPane('preview')}><Eye className="h-4 w-4" aria-hidden="true" />Vista previa</button>
+        {viewedProject ? (
+          <button type="button" aria-pressed={pane === 'proposal'} onClick={() => setPane('proposal')}><FileSymlink className="h-4 w-4" aria-hidden="true" />Propuesta</button>
+        ) : (
+          <button type="button" aria-pressed={pane === 'preview'} onClick={() => setPane('preview')}><Eye className="h-4 w-4" aria-hidden="true" />Vista previa</button>
+        )}
       </div>
-      <div className="qe-body" data-pane={pane}>
+      <div className="qe-body" data-pane={viewedProject ? pane : pane === 'proposal' ? 'form' : pane} data-viewer={viewedProject ? '' : undefined}
+        style={viewedProject ? ({ '--qe-form-width': `${formWidth}px` } as React.CSSProperties) : undefined}>
         <div className="qe-form" aria-label="Contenido de la cotización" role="region">
           {readOnly && (
             <p className="qe-lock-notice" role="note">
@@ -218,9 +249,12 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord; initialPreview?: P
                   clients={clients}
                   chooseClient={actions.chooseClient}
                   source={{
-                    link: sourceProposalLink(sourceProject ? [sourceProject] : [], quotation.sourceProjectId),
+                    link,
                     loadOptions: () => { const { projects, folders } = useSimulationStore.getState(); return sourceProposalOptions(projects, folders); },
-                    onOpenProposal: (projectId) => setActiveProject(projectId, 'project-hub'),
+                    onOpenProposal: openViewer,
+                    onLink: actions.linkProposal,
+                    onUnlink: actions.unlinkProposal,
+                    documentCount: linkedDocumentCount,
                   }}
                 />
                 <ItemsSection content={content} readOnly={readOnly} edit={edit} catalog={catalog} catalogContext={catalogContext} />
@@ -231,10 +265,46 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord; initialPreview?: P
             {tab === 'design' && (
               <DesignTab content={content} readOnly={readOnly} canSaveTemplate={writable} edit={edit} templates={templates} signatures={signatures} saveTemplate={saveTemplate} openLibrary={openQuotationLibrary} onPreviewAccent={setPreviewAccent} />
             )}
-            {tab === 'attachments' && <AttachmentsTab quotationId={id} content={content} readOnly={readOnly} edit={edit} catalog={catalog} />}
+            {tab === 'attachments' && (
+              <AttachmentsTab quotationId={id} content={content} readOnly={readOnly} edit={edit} catalog={catalog} online={online}
+                sourceGroup={link.state === 'none' ? undefined : {
+                  name: link.state === 'missing' ? '(ya no disponible)' : proposalName(link.project),
+                  available: link.state === 'available',
+                  pending: sourceDocs ? pendingSourceDocuments(content, sourceDocs.attachments).length : 0,
+                  omitted: sourceDocs?.omitted.length ?? 0,
+                  refresh: actions.refreshProposalDocuments,
+                  remove: actions.removeProposalDocument,
+                }} />
+            )}
           </div>
         </div>
-        <div className="qe-preview">
+        {viewedProject && (
+          <div
+            className="qe-resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Ancho del formulario y del visor de la propuesta"
+            aria-valuemin={FORM_WIDTH.min}
+            aria-valuemax={FORM_WIDTH.max}
+            aria-valuenow={formWidth}
+            tabIndex={0}
+            onPointerDown={(event) => { drag.current = { x: event.clientX, width: formWidth }; event.currentTarget.setPointerCapture?.(event.pointerId); }}
+            onPointerMove={(event) => { if (drag.current) setFormWidth(clampWidth(drag.current.width + event.clientX - drag.current.x)); }}
+            onPointerUp={() => { drag.current = null; }}
+            onPointerCancel={() => { drag.current = null; }}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+              event.preventDefault();
+              setFormWidth((width) => clampWidth(width + (event.key === 'ArrowRight' ? FORM_WIDTH.step : -FORM_WIDTH.step)));
+            }}
+          />
+        )}
+        {viewedProject && viewer && (
+          <div className="qe-viewer-pane">
+            <ProposalViewer project={viewedProject} tab={viewer} onTabChange={setViewer} onClose={closeViewer} onOpenProposal={openFullProposal} />
+          </div>
+        )}
+        <div className="qe-preview" hidden={!!viewedProject || undefined}>
           <QuotationPreview quotation={sheet} stampImage={stamp} quotationId={id} attachments={content.attachments} imageSources={imageSources} initialView={initialPreview} onGoToClientEmail={readOnly ? undefined : goToClientEmail} />
         </div>
       </div>

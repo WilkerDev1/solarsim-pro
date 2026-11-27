@@ -239,6 +239,13 @@ export interface AISlice {
   applyExtractedInvoice: (data: ExtractedInvoiceData, createNewProject?: boolean) => void;
 }
 
+/** Pestaña del editor de cotización. */
+export type QuotationEditorTab = 'content' | 'design' | 'attachments';
+/** Pestaña del visor de la propuesta de origen dentro del editor. */
+export type ProposalViewerTab = 'summary' | 'document' | 'parameters';
+export interface QuotationEditorEntry { tab: QuotationEditorTab; viewer: ProposalViewerTab | null }
+export interface QuotationReturn extends QuotationEditorEntry { quotationId: string; projectId: string }
+
 export interface UISlice {
   /** Cotización abierta en el editor; no se persiste (al reabrir la app el editor vuelve al catálogo). */
   activeQuotationId: string | null;
@@ -246,6 +253,19 @@ export interface UISlice {
   openQuotation: (id: string) => void;
   /** Cierra el editor y vuelve al catálogo de cotizaciones. */
   closeQuotation: () => void;
+  /** Punto del editor al que reabre `returnToQuotation` (o `openQuotation`, que lo reinicia). No se persiste. */
+  quotationEditorEntry: QuotationEditorEntry | null;
+  /**
+   * Cotización desde la que se abrió su propuesta de origen («Abrir propuesta» en el visor): la vista de la propuesta
+   * muestra «Volver a COT-…» mientras sea esa propuesta. No se persiste.
+   */
+  quotationReturn: QuotationReturn | null;
+  /** Abre la propuesta completa (resumen) recordando la cotización y su pestaña para volver. */
+  openProposalFromQuotation: (target: QuotationReturn) => void;
+  /** Reabre el editor de la cotización recordada en la misma pestaña (y el visor, si estaba abierto). */
+  returnToQuotation: () => void;
+  /** Descarta «Volver a COT-…» sin abrir nada. */
+  dismissQuotationReturn: () => void;
   /** Sección del gestor de plantillas, firmas y sellos (`quotation-library`). */
   quotationLibrarySection: 'templates' | 'signatures';
   /** Abre el gestor; al cerrarlo se vuelve al editor si había una cotización abierta, si no al catálogo. */

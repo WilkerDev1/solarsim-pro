@@ -20,18 +20,7 @@ import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis } from '../../
 
 // Modular Page Components
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
-import { PDFCoverPage } from './pages/PDFCoverPage';
-import { PDFTableOfContents } from './pages/PDFTableOfContents';
-import { PDFExecutiveSummaryPage } from './pages/PDFExecutiveSummaryPage';
-import { PDFAboutUsPage } from './pages/PDFAboutUsPage';
-import { PDFSolarBenefitsPage } from './pages/PDFSolarBenefitsPage';
-import { PDFTechnicalIntroPage } from './pages/PDFTechnicalIntroPage';
-import { PDFProjectDescriptionPage } from './pages/PDFProjectDescriptionPage';
-import { PDFPage1Energy } from './pages/PDFPage1Energy';
-import { PDFPage2Quotation } from './pages/PDFPage2Quotation';
-import { PDFPage3ROI } from './pages/PDFPage3ROI';
-import { PDFPage4CashFlow } from './pages/PDFPage4CashFlow';
-import { PDFPage5CostMatrix } from './pages/PDFPage5CostMatrix';
+import { renderProposalSection } from './ProposalDocumentPages';
 
 import { Trash2, RotateCcw } from 'lucide-react';
 
@@ -139,35 +128,10 @@ export const PDFProposalView: React.FC = () => {
     saveToTemplate: (key: string) => saveDocumentTextsToCompanyTemplate([key]).saved.length > 0,
   }), [setDocumentTexts, saveDocumentTextsToCompanyTemplate]);
 
-  const renderSection = (id: PDFSectionId) => {
-    const page = { project, summary, activeTheme, showHeadersFooters, currentDateStr, pageNum: pageNumbers[id], totalPages: footerTotalPages };
-    switch (id) {
-      case 'cover':
-        return <PDFCoverPage key={id} project={project} summary={summary} activeTheme={activeTheme} currentDateStr={currentDateStr} />;
-      case 'tableOfContents':
-        return <PDFTableOfContents key={id} {...page} tocItems={tocItems} />;
-      case 'executiveSummary':
-        return <PDFExecutiveSummaryPage key={id} {...page} />;
-      case 'aboutUs':
-        return <PDFAboutUsPage key={id} {...page} />;
-      case 'benefits':
-        return <PDFSolarBenefitsPage key={id} {...page} />;
-      case 'techIntro':
-        return <PDFTechnicalIntroPage key={id} {...page} />;
-      case 'projectDescription':
-        return <PDFProjectDescriptionPage key={id} {...page} />;
-      case 'energy':
-        return <PDFPage1Energy key={id} {...page} isEditMode={editing} updateDocumentCustomization={updateDocumentCustomization} updateSpecs={updateSpecs} />;
-      case 'quotation':
-        return <PDFPage2Quotation key={id} {...page} />;
-      case 'roi':
-        return <PDFPage3ROI key={id} {...page} />;
-      case 'cashFlow':
-        return <PDFPage4CashFlow key={id} {...page} />;
-      case 'costMatrix':
-        return <PDFPage5CostMatrix key={id} {...page} />;
-    }
-  };
+  const renderSection = (id: PDFSectionId) => renderProposalSection(id, {
+    project, summary, activeTheme, showHeadersFooters, currentDateStr, pageNumbers, totalPages: footerTotalPages, tocItems,
+    editing: { isEditMode: editing, updateDocumentCustomization, updateSpecs },
+  });
 
   return (
     <div
