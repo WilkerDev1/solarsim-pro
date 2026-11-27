@@ -3,8 +3,9 @@ import { SimulationSlice, UISlice } from '../types';
 export const createUISlice: SimulationSlice<UISlice> = (set, get) => ({
   activeQuotationId: null,
   openQuotation: (id) => set({ activeQuotationId: id, activeView: 'quotation-editor', quotationEditorEntry: null, quotationReturn: null }),
-  closeQuotation: () => set({ activeQuotationId: null, activeView: 'quotations-hub' }),
+  closeQuotation: () => set({ activeQuotationId: null, activeView: 'quotations-hub', quotationEditorEntry: null }),
   quotationEditorEntry: null,
+  consumeQuotationEditorEntry: () => { if (get().quotationEditorEntry) set({ quotationEditorEntry: null }); },
   quotationReturn: null,
   openProposalFromQuotation: (target) => {
     if (!get().projects.some((p) => p.id === target.projectId)) return;
@@ -19,7 +20,7 @@ export const createUISlice: SimulationSlice<UISlice> = (set, get) => ({
   },
   dismissQuotationReturn: () => set({ quotationReturn: null }),
   quotationLibrarySection: 'templates',
-  openQuotationLibrary: (section) => set((s) => ({ activeView: 'quotation-library', quotationLibrarySection: section ?? s.quotationLibrarySection })),
+  openQuotationLibrary: (section) => set((s) => ({ activeView: 'quotation-library', quotationLibrarySection: section ?? s.quotationLibrarySection, quotationEditorEntry: null })),
   closeQuotationLibrary: () => set((s) => ({
     activeView: s.activeQuotationId && s.quotations.some((q) => q.id === s.activeQuotationId) ? 'quotation-editor' : 'quotations-hub',
   })),

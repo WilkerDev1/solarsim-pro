@@ -255,6 +255,8 @@ export interface UISlice {
   closeQuotation: () => void;
   /** Punto del editor al que reabre `returnToQuotation` (o `openQuotation`, que lo reinicia). No se persiste. */
   quotationEditorEntry: QuotationEditorEntry | null;
+  /** El editor la lee al montarse y la vacía: volver del gestor de plantillas o reabrir no la repite. */
+  consumeQuotationEditorEntry: () => void;
   /**
    * Cotización desde la que se abrió su propuesta de origen («Abrir propuesta» en el visor): la vista de la propuesta
    * muestra «Volver a COT-…» mientras sea esa propuesta. No se persiste.

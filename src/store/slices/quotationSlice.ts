@@ -9,7 +9,7 @@ import { QuotationSyncService, type QuotationWriteResult } from '../../services/
 import { workspaceScope } from '../sync/organizationWorkspace';
 import { reuseArray, reuseIfEqual, reuseRecord } from '../sync/structuralSharing';
 import {
-  canonicalQuotationContent, keepLocalImages, nextLocalQuotationNumber, planQuotationPush, quotationContent, sameQuotationContent,
+  canonicalQuotationContent, keepLocalImages, keepLocalOnlyFields, nextLocalQuotationNumber, planQuotationPush, quotationContent, sameQuotationContent,
 } from '../sync/quotationContent';
 import { localIsoDate } from '../../utils/localDate';
 import { DocumentAssetService } from '../../services/documentAssetService';
@@ -34,7 +34,7 @@ const withContent = (record: QuotationRecord, content: QuotationContent, updated
 
 /** Server number once assigned; it never changes afterwards. */
 const serverRecord = (server: QuotationRecord, local: QuotationRecord | undefined): QuotationRecord =>
-  keepLocalImages({ ...server, number: local?.number ?? server.number ?? null }, local);
+  keepLocalOnlyFields(keepLocalImages({ ...server, number: local?.number ?? server.number ?? null }, local), local);
 
 /**
  * Installs a write receipt together with the change it clears, so a later failure in the pass cannot orphan it.

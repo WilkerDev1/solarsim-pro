@@ -4,7 +4,7 @@
 // bytes no incluible, bloqueada y LECTOR, el visor de solo lectura no escribe nada ni cambia la propuesta activa, y
 // «Volver a COT-…» desde la propuesta.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -29,6 +29,8 @@ const { QuotationEditorView } = await import('../components/quotations/editor/Qu
 const { AttachmentsTab } = await import('../components/quotations/editor/AttachmentsTab');
 const { UnlinkSourcePrompt, linkedDocumentsNotice } = await import('../components/quotations/editor/ContentSections');
 const { ReturnToQuotationPill, returnPillLabel } = await import('../components/quotations/linked/ReturnToQuotationPill');
+const { ProposalViewerDocument } = await import('../components/quotations/editor/ProposalViewerDocument');
+const { calculateProjectFinancialSummary } = await import('../engine/financeEngine');
 
 const store = useSimulationStore;
 const initial = { ...store.getState() };
@@ -205,7 +207,12 @@ reset();
   actions.linkProposal('p-1');
   store.setState({ quotations: store.getState().quotations.map((q) => (q.id === id ? { ...q, status: 'issued' as const } : q)) });
   const locked = JSON.stringify(quotationById(id));
-  assert.ok(actions.refreshProposalDocuments().error || actions.removeProposalDocument('ficha-panel'), 'bloqueada: el store rechaza la edición');
+  store.setState({ projects: store.getState().projects.map((p) => (p.id === 'p-1' ? proposal('p-1', [...p1Annexes, annex('memoria'), annex('anexo-nuevo')]) : p)) });
+  assert.ok(actions.refreshProposalDocuments().error, 'bloqueada: el store rechaza «Actualizar»');
+  assert.equal(JSON.stringify(quotationById(id)), locked);
+  assert.ok(actions.removeProposalDocument('ficha-panel'), 'bloqueada: el store rechaza quitar');
+  assert.equal(JSON.stringify(quotationById(id)), locked);
+  assert.ok(actions.unlinkProposal(false), 'bloqueada: el store rechaza quitar el enlace');
   assert.equal(JSON.stringify(quotationById(id)), locked);
 }
 
@@ -276,6 +283,9 @@ reset();
   const unsubscribe = store.subscribe(() => { writes++; });
   const htmlFor: Record<string, string> = {};
   for (const tab of ['summary', 'document', 'parameters'] as const) htmlFor[tab] = renderToStaticMarkup(React.createElement(QuotationEditorView, { initialViewer: tab }));
+  // «Documento» se carga en diferido (las páginas pesan): el editor muestra un aviso breve y el módulo dibuja las páginas.
+  const viewed = store.getState().projects.find((p) => p.id === 'p-1')!;
+  const pagesHtml = renderToStaticMarkup(React.createElement(ProposalViewerDocument, { project: viewed, summary: calculateProjectFinancialSummary(viewed) }));
   unsubscribe();
   assert.equal(writes, 0, 'pintar el visor no llama a ningún escritor del store');
   assert.equal(stateSnapshot(), before, 'el store queda idéntico (propuestas, cotizaciones, cambios y sincronización)');
@@ -288,8 +298,9 @@ reset();
     assert.match(html, /aria-pressed="true"[^>]*>.*?Propuesta<\/button>/, 'en pantallas estrechas, el selector muestra «Propuesta»');
   }
   for (const text of ['Potencia instalada', 'Precio de la propuesta', 'Sistema propuesto', 'Producción y consumo', 'Precio y retorno']) assert.ok(htmlFor.summary.includes(text), text);
-  assert.match(htmlFor.document, /pdf-page/, 'Documento dibuja las páginas del PDF de la propuesta');
-  assert.doesNotMatch(htmlFor.document, /data-pdf-chrome/, 'sin cromo de edición');
+  assert.match(htmlFor.document, /Cargando el documento…/, 'Documento se carga en diferido');
+  assert.match(pagesHtml, /pdf-page/, 'Documento dibuja las páginas del PDF de la propuesta');
+  assert.doesNotMatch(pagesHtml, /data-pdf-chrome/, 'sin cromo de edición');
   for (const text of ['Consumo anual', 'Medición neta', 'Modo de precio', 'Tasa de descuento']) assert.ok(htmlFor.parameters.includes(text), text);
   assert.match(htmlFor.summary, /aria-selected="true"[^>]*>.*?Resumen/);
   // Sin visor: vista previa normal.
@@ -298,11 +309,38 @@ reset();
   assert.match(closed, /<div class="qe-preview">/);
 }
 
-// Guarda de código: el visor y las páginas compartidas no llaman a escritores ni montan la sincronización de anexos.
+// Guarda de código (lista blanca): el visor y todo lo que dibuja no toca el store salvo los selectores de lectura
+// permitidos aquí, no monta la sincronización de anexos ni pasa acciones de edición a las páginas.
 {
-  const files = ['src/components/quotations/editor/ProposalViewer.tsx', 'src/components/pdf/ProposalDocumentPages.tsx', 'src/components/hub/proposalSummaryData.ts', 'src/features/quotations/proposalDocuments.ts'];
-  const FORBIDDEN = /\b(?:setState|setActiveProject|setActiveView|updateSpecs\(|updateDocumentCustomization\(|setDocumentTexts|setDocumentLayout|recordUndoState|updateQuotationRecord|syncProjectsWithServer|ProposalAnnexSync|saveAttachment)\b/;
-  for (const file of files) assert.doesNotMatch(readFileSync(path.join(process.cwd(), file), 'utf8'), FORBIDDEN, `${file} no escribe`);
+  const root = process.cwd();
+  const pagesDir = 'src/components/pdf/pages';
+  const files = [
+    'src/components/quotations/editor/ProposalViewer.tsx', 'src/components/quotations/editor/ProposalViewerDocument.tsx',
+    'src/components/pdf/ProposalDocumentPages.tsx', 'src/components/hub/proposalSummaryData.ts', 'src/features/quotations/proposalDocuments.ts',
+    ...readdirSync(path.join(root, pagesDir), { recursive: true }).map(String).filter((f) => /\.tsx?$/.test(f)).map((f) => `${pagesDir}/${f}`),
+  ];
+  // Únicas lecturas del store permitidas (texto exacto).
+  const ALLOWED_STORE_READS = [
+    'useSimulationStore((s) => s.companies.find((c) => c.id === project.companyProfileId))',
+  ];
+  const offenders: string[] = [];
+  for (const file of files) {
+    const source = readFileSync(path.join(root, file), 'utf8');
+    let rest = source;
+    for (const allowed of ALLOWED_STORE_READS) rest = rest.split(allowed).join('');
+    if (/\buseSimulationStore\b(?!['"])/.test(rest.replace(/^import .*$/gm, ''))) offenders.push(`${file}: lectura del store fuera de la lista blanca`);
+    if (/\b(?:getState|setState)\s*\(/.test(source)) offenders.push(`${file}: getState/setState`);
+    if (/\b(?:ProposalAnnexSync|useDocumentLayout)\b/.test(source)) offenders.push(`${file}: monta la sincronización de anexos o el diseño editable`);
+  }
+  assert.ok(files.length > 10, 'incluye las páginas del documento');
+  assert.deepEqual(offenders, []);
+  // El visor nunca pasa `editing` a las páginas ni acciones al proveedor de textos.
+  const viewerDocument = readFileSync(path.join(root, 'src/components/quotations/editor/ProposalViewerDocument.tsx'), 'utf8');
+  assert.doesNotMatch(viewerDocument, /editing\s*[:=]|\bactions=|writable=\{true\}|mode="edit"/);
+  assert.match(viewerDocument, /mode="view" writable=\{false\}/);
+  // El detector funciona.
+  assert.ok(/\buseSimulationStore\b(?!['"])/.test('const x = useSimulationStore((s) => s.projects);'));
+  assert.ok(/\b(?:getState|setState)\s*\(/.test('useSimulationStore.getState({})'));
 }
 
 // --- (11) «Abrir propuesta» y «Volver a COT-…» -----------------------------------------------------------------------
@@ -339,6 +377,23 @@ reset({ syncSettings: { ...initial.syncSettings, currentUser: null, authToken: n
   const back = render(React.createElement(QuotationEditorView));
   assert.match(back, /id="qe-tab-attachments"[^>]*aria-selected="true"/);
   assert.match(back, /id="pv-tab-document"[^>]*aria-selected="true"/);
+  // El editor consume el punto de entrada al montarse; ir al gestor de plantillas y volver no reabre el visor.
+  store.getState().consumeQuotationEditorEntry();
+  assert.equal(store.getState().quotationEditorEntry, null);
+  store.setState({ quotationEditorEntry: { tab: 'attachments', viewer: 'document' } });
+  store.getState().openQuotationLibrary();
+  assert.equal(store.getState().quotationEditorEntry, null, 'el gestor reinicia el punto de entrada');
+  store.getState().closeQuotationLibrary();
+  assert.equal(store.getState().activeView, 'quotation-editor');
+  const fromLibrary = render(React.createElement(QuotationEditorView));
+  assert.doesNotMatch(fromLibrary, /Propuesta de origen · solo lectura/, 'volver del gestor no reabre el visor');
+  assert.match(fromLibrary, /id="qe-tab-content"[^>]*aria-selected="true"/);
+  store.setState({ quotationEditorEntry: { tab: 'attachments', viewer: 'document' } });
+  store.getState().closeQuotation();
+  assert.equal(store.getState().quotationEditorEntry, null, 'cerrar el editor también lo reinicia');
+  store.setState({ activeQuotationId: id, activeView: 'quotation-editor' });
+  // Código: el editor la consume en un efecto que solo cambia la vista (no el contenido).
+  assert.match(readFileSync(path.join(process.cwd(), 'src/components/quotations/editor/QuotationEditorView.tsx'), 'utf8'), /consumeQuotationEditorEntry\(\)/);
   // Abrir otra cotización por el catálogo reinicia el punto de entrada y olvida el regreso.
   state.openProposalFromQuotation({ quotationId: id, projectId: 'p-1', tab: 'content', viewer: null });
   store.getState().openQuotation(id);

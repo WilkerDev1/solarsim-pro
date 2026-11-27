@@ -35,13 +35,18 @@ import './source-proposal.css';
  * «Guardar»: cada cambio confirmado se guarda con `updateQuotationRecord`. Mirar nunca escribe.
  */
 export const QuotationEditorView: React.FC<{ initialPreview?: PreviewView; initialTab?: QuotationEditorTab; initialViewer?: ProposalViewerTab }> = ({ initialPreview, initialTab, initialViewer }) => {
-  const { activeQuotationId, quotation, closeQuotation, entry } = useSimulationStore(useShallow((s) => ({
+  const { activeQuotationId, quotation, closeQuotation, entry, consumeQuotationEditorEntry } = useSimulationStore(useShallow((s) => ({
     activeQuotationId: s.activeQuotationId,
     quotation: s.quotations.find((q) => q.id === s.activeQuotationId),
     closeQuotation: s.closeQuotation,
-    // Punto al que vuelve «Volver a COT-…» (pestaña y visor); solo se lee al montar el editor.
+    // Punto al que vuelve «Volver a COT-…» (pestaña y visor); se lee al montar el editor y se consume.
     entry: s.quotationEditorEntry,
+    consumeQuotationEditorEntry: s.consumeQuotationEditorEntry,
   })));
+  // Solo estado de la vista (no el contenido): el editor ya tomó su pestaña y su visor al montarse.
+  useEffect(() => {
+    if (entry) consumeQuotationEditorEntry();
+  }, [entry, consumeQuotationEditorEntry]);
   // La vista activa se persiste pero la cotización activa no (o ya no existe): de vuelta al catálogo, sin escribir nada.
   useEffect(() => {
     if (!activeQuotationId || !quotation) closeQuotation();
@@ -163,11 +168,13 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord; initialPreview?: P
   const sourceDocs = useMemo(() => (sourceProject && !sourceProject.isDeleted ? proposalDocumentAttachments(sourceProject) : null), [sourceProject]);
   const linkedDocumentCount = sourceDocuments(content).length;
   const openViewer = () => { setViewer((current) => current ?? 'summary'); setPane('proposal'); };
-  const closeViewer = () => { setViewer(null); setPane((current) => (current === 'proposal' ? 'form' : current)); };
-  const openFullProposal = () => {
-    if (link.state !== 'available') return;
-    useSimulationStore.getState().openProposalFromQuotation({ quotationId: id, projectId: link.project.id, tab, viewer });
-  };
+  // Estables para que el visor memorizado no vuelva a dibujar las páginas en cada edición de la cotización.
+  const closeViewer = useCallback(() => { setViewer(null); setPane((current) => (current === 'proposal' ? 'form' : current)); }, []);
+  const linkedProjectId = link.state === 'available' ? link.project.id : null;
+  const openFullProposal = useCallback(() => {
+    if (!linkedProjectId) return;
+    useSimulationStore.getState().openProposalFromQuotation({ quotationId: id, projectId: linkedProjectId, tab, viewer });
+  }, [id, linkedProjectId, tab, viewer]);
   const clampWidth = (width: number) => Math.round(Math.min(FORM_WIDTH.max, Math.max(FORM_WIDTH.min, width)));
 
   return (

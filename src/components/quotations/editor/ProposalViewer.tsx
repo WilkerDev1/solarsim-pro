@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useMemo } from 'react';
 import { ArrowUpRight, Eye, FileText, LayoutDashboard, SlidersHorizontal, X } from 'lucide-react';
 import { resolveAssumptions } from '../../../../shared/assumptions';
 import { NET_METERING_REGIME_LABELS } from '../../../../shared/netMetering';
 import { noSavingsNote, supplyPresentation, supplySummaryText } from '../../../../shared/offGridSupply';
 import { irrText } from '../../../../shared/returnIndicators';
-import { useSimulationStore } from '../../../store/useSimulationStore';
 import type { ProposalViewerTab } from '../../../store/types';
 import type { FinancialSummaryResult, ProjectSimulation } from '../../../types';
 import { calculateProjectFinancialSummary } from '../../../engine/financeEngine';
@@ -12,14 +11,12 @@ import { useEnergyCalculationMode } from '../../../features/application/useAppli
 import { proposalName } from '../../../features/quotations/linkedQuotations';
 import { DOCUMENT_STATUS_LABELS } from '../../../utils/clientSummary';
 import { calculateTotalBatteryCapacityKWh, calculateTotalInverterPowerKW } from '../../../utils/equipmentSpecsUtils';
-import { buildPdfLayout, normalizeSectionOrder } from '../../../utils/pdfLayout';
-import { formatProposalDate } from '../../../utils/formatDateUtils';
 import { paybackLabel, proposalDevices, savingsPresentation, summaryMoney } from '../../hub/proposalSummaryData';
-import { DocumentEditorProvider } from '../../pdf/editor/DocumentEditorContext';
-import { renderProposalSection } from '../../pdf/ProposalDocumentPages';
-import { documentLayoutView } from '../../pdf/useDocumentLayout';
 import { InfoTip } from '../../simulator/params/ui/InfoTip';
 import './proposal-viewer.css';
+
+// Las páginas del documento (y sus gráficos) pesan: se cargan solo al abrir «Documento».
+const ProposalViewerDocument = lazy(() => import('./ProposalViewerDocument'));
 
 /**
  * Visor de solo lectura de la propuesta de origen dentro del editor de cotización (docs/QUOTATION_EDITOR.md#visor-de-la-propuesta).
@@ -177,52 +174,6 @@ const ParametersTab: React.FC<{ project: ProjectSimulation }> = ({ project }) =>
   );
 };
 
-const PAGE_WIDTH = 850;
-
-/** Páginas del documento de la propuesta, a escala del panel y desplazables; modo `view`, sin acciones de edición. */
-const DocumentTab: React.FC<{ project: ProjectSimulation; summary: FinancialSummaryResult }> = ({ project, summary }) => {
-  const company = useSimulationStore((s) => s.companies.find((c) => c.id === project.companyProfileId));
-  const area = useRef<HTMLDivElement>(null);
-  const inner = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.5);
-  const [height, setHeight] = useState<number | null>(null);
-  // Solo estado local de la vista: escala según el ancho del panel y alto real de las páginas.
-  useEffect(() => {
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => {
-      const width = area.current?.clientWidth ?? 0;
-      if (width > 0) setScale(Math.min(1, Math.max(0.25, (width - 2) / PAGE_WIDTH)));
-      if (inner.current) setHeight(inner.current.offsetHeight);
-    });
-    if (area.current) observer.observe(area.current);
-    if (inner.current) observer.observe(inner.current);
-    return () => observer.disconnect();
-  }, []);
-  const layout = documentLayoutView(project);
-  const order = normalizeSectionOrder(project.customization?.sectionOrder);
-  const { pageNumbers, footerTotalPages, tocItems } = buildPdfLayout(order, layout.visibility, project.customization?.extraTocItems || [], project.customization?.attachedPdfs || []);
-  const currentDateStr = formatProposalDate(project.client?.quoteDate || project.customization?.quoteDate);
-  const annexes = (project.customization?.attachedPdfs ?? []).filter((a) => a.enabled).length;
-  return (
-    <>
-      <p className="qe-field-hint pv-doc-hint">
-        Vista de solo lectura del documento{annexes ? `; ${annexes === 1 ? 'su anexo se añade' : `sus ${annexes} anexos se añaden`} al exportarlo desde la propuesta` : ''}.
-      </p>
-      <div ref={area} className="pv-doc-area">
-        <div className="pv-doc-frame" style={{ width: PAGE_WIDTH * scale, height: height === null ? undefined : height * scale }}>
-          <div ref={inner} className="pv-doc-pages" style={{ width: PAGE_WIDTH, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-            <DocumentEditorProvider project={project} summary={summary} currentDateStr={currentDateStr} company={company} mode="view" writable={false}>
-              {order.map((id) => (layout.visibility[id]
-                ? renderProposalSection(id, { project, summary, activeTheme: layout.theme, showHeadersFooters: layout.showHeadersFooters, currentDateStr, pageNumbers, totalPages: footerTotalPages, tocItems })
-                : null))}
-            </DocumentEditorProvider>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
-
 export interface ProposalViewerProps {
   project: ProjectSimulation;
   tab: ProposalViewerTab;
@@ -232,7 +183,8 @@ export interface ProposalViewerProps {
   onOpenProposal: () => void;
 }
 
-export const ProposalViewer: React.FC<ProposalViewerProps> = ({ project, tab, onTabChange, onClose, onOpenProposal }) => {
+/** Memorizado: editar la cotización no vuelve a dibujar el visor (ni las páginas) mientras la propuesta y las acciones no cambien. */
+export const ProposalViewer: React.FC<ProposalViewerProps> = React.memo(({ project, tab, onTabChange, onClose, onOpenProposal }) => {
   const mode = useEnergyCalculationMode();
   const summary = useMemo(() => calculateProjectFinancialSummary(project, mode), [project, mode]);
   const meta = [DOCUMENT_STATUS_LABELS[project.status] ?? project.status, project.client.projectId?.trim() || null].filter(Boolean).join(' · ');
@@ -276,9 +228,14 @@ export const ProposalViewer: React.FC<ProposalViewerProps> = ({ project, tab, on
       </div>
       <div className="pv-body" role="tabpanel" id="pv-panel" aria-labelledby={`pv-tab-${tab}`} tabIndex={0}>
         {tab === 'summary' && <SummaryTab project={project} summary={summary} />}
-        {tab === 'document' && <DocumentTab project={project} summary={summary} />}
+        {tab === 'document' && (
+          <Suspense fallback={<p className="qe-field-hint pv-doc-hint" role="status">Cargando el documento…</p>}>
+            <ProposalViewerDocument project={project} summary={summary} />
+          </Suspense>
+        )}
         {tab === 'parameters' && <ParametersTab project={project} />}
       </div>
     </section>
   );
-};
+});
+ProposalViewer.displayName = 'ProposalViewer';

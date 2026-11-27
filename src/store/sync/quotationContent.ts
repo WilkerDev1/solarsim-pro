@@ -102,8 +102,28 @@ export function canonicalQuotationContent(record: QuotationContent): QuotationCo
   return validated.ok ? validated.value : publishable;
 }
 
-export const sameQuotationContent = (left: QuotationContent, right: QuotationContent): boolean =>
-  contentEqual(canonicalQuotationContent(left), canonicalQuotationContent(right));
+/**
+ * Campos opcionales que una API anterior descarta en silencio (la 2.10.0 valida con el `shared/` previo):
+ * `dismissedSourceDocuments`. Si la copia del servidor no lo trae y la local sí, no cuenta como diferencia y, al
+ * instalar la copia del servidor, se conserva el local (solo con la misma propuesta enlazada). Así funciona igual con
+ * la API anterior y con la nueva, sin depender del orden de despliegue (docs/QUOTATIONS.md).
+ */
+const withoutFieldsServerLacks = (local: QuotationContent, server: QuotationContent): QuotationContent => {
+  if (server.dismissedSourceDocuments !== undefined || local.dismissedSourceDocuments === undefined) return local;
+  const { dismissedSourceDocuments: _onlyLocal, ...rest } = local;
+  return rest;
+};
+
+/** La copia del servidor con lo que solo conoce este cliente (ver `withoutFieldsServerLacks`). */
+export function keepLocalOnlyFields<T extends QuotationContent>(server: T, local: QuotationContent | undefined): T {
+  if (!local?.dismissedSourceDocuments || server.dismissedSourceDocuments !== undefined) return server;
+  if (!server.sourceProjectId || server.sourceProjectId !== local.sourceProjectId) return server;
+  return { ...server, dismissedSourceDocuments: [...local.dismissedSourceDocuments] };
+}
+
+/** Misma publicación: `server` es la copia del servidor y `local` la de este equipo (el orden importa). */
+export const sameQuotationContent = (server: QuotationContent, local: QuotationContent): boolean =>
+  contentEqual(canonicalQuotationContent(server), canonicalQuotationContent(withoutFieldsServerLacks(local, server)));
 
 /**
  * The server never stores inline images: its empty value, or the reference of the same uploaded image, keeps the local
@@ -165,6 +185,9 @@ export function planQuotationPush(base: QuotationContent | undefined, local: Quo
     if (contentEqual({ ...kept, status: current.status }, current)) target = kept;
   }
   if (contentEqual(current, target)) return [];
+  // Solo añade lo que la API anterior no guarda (`dismissedSourceDocuments`): nada que publicar, o sería un bucle de PUT.
+  // Con cualquier otro cambio se publica todo, también el campo, para que la API nueva lo guarde.
+  if (sameQuotationContent(base, local)) return [];
   const plan: QuotationContent[] = [];
   const { status: _currentStatus, ...currentRest } = current;
   const { status: _targetStatus, ...targetRest } = target;
