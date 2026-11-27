@@ -20,6 +20,16 @@ import type { QuotationContent, QuotationRecord } from '../types/quotation';
   assert.equal(sameQuotationContent(content({ notes: 'x' }), local), false, 'cualquier otro cambio sigue contando');
   assert.deepEqual(planQuotationPush(server, local), [], 'solo añadir el campo no publica nada');
   assert.equal(planQuotationPush(content({ notes: 'x' }), local).length, 1);
+  // Bloqueada con la base sin el campo: el cambio de estado no la reabre, y el PUT lleva el campo.
+  const issuedBase = content({ status: 'issued', client: { ...content().client, name: 'C' }, items: [{ id: 'l1', kind: 'item', description: 'x', quantity: 1, unit: 'UD', unitPriceCents: 100, discountPct: 0, taxable: false }] });
+  const accepted = { ...issuedBase, status: 'accepted' as const, dismissedSourceDocuments: ['a1'] };
+  const plan = planQuotationPush(issuedBase, accepted);
+  assert.deepEqual(plan.map((c) => c.status), ['accepted']);
+  assert.deepEqual(plan[0].dismissedSourceDocuments, ['a1']);
+  assert.deepEqual(planQuotationPush(issuedBase, { ...accepted, status: 'void' }).map((c) => c.status), ['void']);
+  assert.deepEqual(planQuotationPush(issuedBase, { ...issuedBase, dismissedSourceDocuments: ['a1'] }), [], 'mismo estado y solo el campo: nada');
+  // Con la base que sí lo trae (API nueva), cambiar la lista estando bloqueada sigue siendo una edición.
+  assert.deepEqual(planQuotationPush({ ...issuedBase, dismissedSourceDocuments: ['a2'] }, accepted).map((c) => c.status), ['draft', 'issued', 'accepted']);
   const record = (c: QuotationContent): QuotationRecord => ({ ...c, id: 'q', number: 'COT-2026-0001', version: 1, baseVersion: 1, createdById: '', createdBy: '', createdAt: '', updatedAt: '' });
   assert.deepEqual(keepLocalOnlyFields(record(server), record(local)).dismissedSourceDocuments, ['a1'], 'se conserva lo local');
   assert.equal(keepLocalOnlyFields(record(content({ sourceProjectId: 'p2' })), record(local)).dismissedSourceDocuments, undefined, 'otra propuesta enlazada: no');
@@ -33,7 +43,7 @@ const api = () => store.getState();
 const ids = (id: string) => api().quotations.find((q) => q.id === id)!.attachments.map((a) => a.id);
 const local = (id: string) => api().quotations.find((q) => q.id === id)!;
 
-async function scenario(apiVersion: 'old' | 'new') {
+async function setup(apiVersion: 'old' | 'new') {
   const rows = new Map<string, Record<string, unknown> & { version: number; number?: string }>();
   const puts: QuotationContent[] = [];
   let dropNext = false;
@@ -65,12 +75,20 @@ async function scenario(apiVersion: 'old' | 'new') {
   const annex = (id: string, hash: string) => ({ id, enabled: true, fileName: `${id}.pdf`, title: id, fileSize: 10, pageCount: 1, uploadedAt: '2026-11-01', assetId: `asset:sha256:${hash.repeat(64)}`, origin: 'manual', addToTableOfContents: false });
   const project = { id: 'p1', isDeleted: false, client: { name: 'Propuesta' }, customization: { attachedPdfs: [annex('a1', 'a'), annex('a2', 'b'), annex('a3', 'c')] } };
   store.setState({ quotations: [], quotationChanges: {}, quotationDeletionQueue: [], quotationSyncCursor: null, quotationSyncFeedback: null, projects: [project as never] });
-  const created = api().createQuotationRecord({ client: { name: 'Cliente', attention: '', taxId: '', phone: '', email: '', address: '' } });
+  const created = api().createQuotationRecord({
+    client: { name: 'Cliente', attention: '', taxId: '', phone: '', email: '', address: '' },
+    items: [{ id: 'l1', kind: 'item', description: 'Sistema', quantity: 1, unit: 'UD', unitPriceCents: 100_00, discountPct: 0, taxable: false }],
+  });
   assert.ok(created.ok);
   const id = created.ok ? created.quotation.id : '';
   const actions = quotationEditorActions(api, id);
   assert.equal(actions.linkProposal('p1').added, 3);
   assert.equal((await api().syncQuotationsWithServer()).success, true);
+  return { rows, puts, id, actions, drop: () => { dropNext = true; } };
+}
+
+async function scenario(apiVersion: 'old' | 'new') {
+  const { rows, puts, id, actions, drop } = await setup(apiVersion);
 
   // Quitar y sincronizar: lo quitado sigue recordado y «Actualizar» no lo trae.
   assert.equal(actions.removeProposalDocument('a1'), null);
@@ -86,7 +104,7 @@ async function scenario(apiVersion: 'old' | 'new') {
 
   // Recibo perdido: el PUT llega pero no la respuesta; la siguiente pasada lo recupera sin reenviar ni conflicto.
   assert.equal(actions.removeProposalDocument('a2'), null);
-  dropNext = true;
+  drop();
   assert.equal((await api().syncQuotationsWithServer()).success, false);
   const lost = puts.length;
   const recovered = await api().syncQuotationsWithServer();
@@ -108,7 +126,55 @@ async function scenario(apiVersion: 'old' | 'new') {
   assert.equal(local(id).dismissedSourceDocuments, undefined, `${apiVersion}: con otra propuesta no se arrastra`);
 }
 
+/**
+ * Bloqueada con una base sin el campo (API anterior tras «Conservar la mía»): cambiar el estado no la reabre por el
+ * campo. «Usar la del servidor» descarta la lista local.
+ */
+async function lockedScenario(apiVersion: 'old' | 'new', next: 'accepted' | 'void') {
+  const { rows, puts, id, actions } = await setup(apiVersion);
+  assert.equal(actions.removeProposalDocument('a1'), null);
+  assert.ok(api().setQuotationStatus(id, 'issued').ok);
+  assert.equal((await api().syncQuotationsWithServer()).success, true);
+  assert.equal(local(id).status, 'issued');
+  assert.deepEqual(local(id).dismissedSourceDocuments, ['a1']);
+  // Otro equipo cambia la emitida en el servidor (otra versión) mientras aquí se cambia el estado: conflicto.
+  const other = () => rows.set(id, { ...rows.get(id)!, version: rows.get(id)!.version + 1, updatedAt: '2026-11-02T00:00:00.000Z' });
+  other();
+  assert.ok(api().setQuotationStatus(id, next).ok);
+  await api().syncQuotationsWithServer();
+  assert.ok(api().quotationChanges[id]?.serverQuotation, `${apiVersion}: conflicto`);
+  const before = puts.length;
+  api().resolveQuotationConflict(id, 'keep_local');
+  await api().syncQuotationsWithServer();
+  assert.deepEqual(puts.slice(before).map((c) => c.status), [next], `${apiVersion}: issued → ${next} sin reabrir por el campo`);
+  assert.equal(rows.get(id)!.status, next);
+  assert.equal(api().quotationChanges[id], undefined);
+  assert.deepEqual(local(id).dismissedSourceDocuments, ['a1'], `${apiVersion}: lo quitado sigue tras «Conservar la mía»`);
+  return { rows, id };
+}
+
+/** «Usar la del servidor»: la lista local no se conserva (se queda la del servidor, o ninguna si no la trae). */
+async function acceptServerScenario(apiVersion: 'old' | 'new') {
+  const { rows, id, actions } = await setup(apiVersion);
+  assert.equal(actions.removeProposalDocument('a1'), null);
+  assert.equal((await api().syncQuotationsWithServer()).success, true);
+  const serverList = apiVersion === 'new' ? ['a3'] : undefined;
+  rows.set(id, { ...rows.get(id)!, version: rows.get(id)!.version + 1, notes: 'del otro equipo', dismissedSourceDocuments: serverList });
+  assert.equal(actions.removeProposalDocument('a2'), null);
+  await api().syncQuotationsWithServer();
+  assert.ok(api().quotationChanges[id]?.serverQuotation, `${apiVersion}: conflicto`);
+  api().resolveQuotationConflict(id, 'accept_server');
+  assert.equal(local(id).notes, 'del otro equipo');
+  assert.deepEqual(local(id).dismissedSourceDocuments, serverList, `${apiVersion}: «Usar la del servidor» descarta la lista local`);
+  assert.deepEqual(ids(id), ['a1', 'a2', 'a3'].filter((a) => rows.get(id)!.attachments && (rows.get(id)!.attachments as { id: string }[]).some((x) => x.id === a)));
+}
+
 await scenario('old');
 await scenario('new');
+for (const apiVersion of ['old', 'new'] as const) {
+  await lockedScenario(apiVersion, 'accepted');
+  await lockedScenario(apiVersion, 'void');
+  await acceptServerScenario(apiVersion);
+}
 
 console.log('Quotation dismissed documents sync tests passed.');

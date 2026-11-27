@@ -108,6 +108,8 @@ export function canonicalQuotationContent(record: QuotationContent): QuotationCo
  * instalar la copia del servidor, se conserva el local (solo con la misma propuesta enlazada). Así funciona igual con
  * la API anterior y con la nueva, sin depender del orden de despliegue (docs/QUOTATIONS.md).
  */
+// TODO: cuando la API mínima (`MIN_CLIENT_VERSION` / versión mínima de la API) conozca `dismissedSourceDocuments`,
+// activar este relajo solo frente a una API anterior: con la nueva, un servidor sin el campo es un valor real.
 const withoutFieldsServerLacks = (local: QuotationContent, server: QuotationContent): QuotationContent => {
   if (server.dismissedSourceDocuments !== undefined || local.dismissedSourceDocuments === undefined) return local;
   const { dismissedSourceDocuments: _onlyLocal, ...rest } = local;
@@ -179,10 +181,13 @@ export function planQuotationPush(base: QuotationContent | undefined, local: Quo
   // as issued first. (A never-published `void` is discarded by the store without any request.)
   if (!base) return target.status === 'accepted' || target.status === 'rejected' ? [{ ...target, status: 'issued' }, target] : [target];
   let current = canonicalQuotationContent(base);
+  // Lo que la base no tiene porque la API anterior lo descarta (`dismissedSourceDocuments`) no cuenta como edición: una
+  // bloqueada no se reabre por él. El PUT sigue llevando `target` con el campo.
+  const comparable = (content: QuotationContent) => withoutFieldsServerLacks(content, current);
   // While it stays locked, an image uploaded later never reopens it: a status change keeps the confirmed images.
   if (isQuotationContentLocked(current.status) && isQuotationContentLocked(target.status)) {
     const kept = withImagesOf(target, current);
-    if (contentEqual({ ...kept, status: current.status }, current)) target = kept;
+    if (contentEqual(comparable({ ...kept, status: current.status }), current)) target = kept;
   }
   if (contentEqual(current, target)) return [];
   // Solo añade lo que la API anterior no guarda (`dismissedSourceDocuments`): nada que publicar, o sería un bucle de PUT.
@@ -190,7 +195,7 @@ export function planQuotationPush(base: QuotationContent | undefined, local: Quo
   if (sameQuotationContent(base, local)) return [];
   const plan: QuotationContent[] = [];
   const { status: _currentStatus, ...currentRest } = current;
-  const { status: _targetStatus, ...targetRest } = target;
+  const { status: _targetStatus, ...targetRest } = comparable(target);
   const edited = !contentEqual(currentRest, targetRest);
   if (isQuotationContentLocked(current.status) && (edited || !canTransitionQuotation(current.status, target.status))) {
     if (!canTransitionQuotation(current.status, 'draft')) return [target];
