@@ -20,16 +20,77 @@ export function quotationContent(record: QuotationContent): QuotationContent {
 
 const inline = (image: string | undefined): boolean => !!image && !isAssetRef(image);
 
-/** What the API accepts: images that are not `asset:sha256:` references are sent empty. */
+/**
+ * Reference of each inline image already hashed (data URL → `asset:sha256:`). The reference is the sha256 of the exact
+ * text, so it is the same in every workspace: it says what the image is called, not that a server has it (the uploads
+ * confirmed per workspace live in `DocumentAssetService`). The sync pass hashes every image before planning a PUT and
+ * never publishes a quotation whose new image could not be uploaded.
+ */
+const knownRefs = new Map<string, string>();
+const MAX_KNOWN_REFS = 200;
+export function registerImageRef(dataUrl: string, ref: string): void {
+  if (!isAssetRef(ref)) return;
+  if (knownRefs.size >= MAX_KNOWN_REFS) knownRefs.delete(knownRefs.keys().next().value!);
+  knownRefs.set(dataUrl, ref);
+}
+export const knownImageRef = (dataUrl: string): string | undefined => knownRefs.get(dataUrl);
+
+/**
+ * Inline images and attachment references the server refused for good (413/415/other non-retryable 4xx): an image
+ * travels as an empty slot and an attachment without its `assetId`, so the rest of the quotation is published. They
+ * are re-derived on every pass (a restart simply tries the upload again).
+ */
+const refusedImages = new Set<string>();
+const refusedAttachmentRefs = new Set<string>();
+export function markRefusedImage(dataUrl: string): void { refusedImages.add(dataUrl); }
+export function markRefusedAttachmentRef(ref: string): void { refusedAttachmentRefs.add(ref); }
+
+/** What travels for an image slot: references as they are, hashed inline images as their reference, the rest empty. */
+const published = (image: string | undefined): string =>
+  inline(image) ? (refusedImages.has(image!) ? '' : knownRefs.get(image!) ?? '') : image ?? '';
+
+export type QuotationImageSlot = 'logo' | 'thumbnail' | 'signature' | 'stamp';
+/** Every image slot of a quotation: logo, attachment thumbnails, and the printed signature and stamp copies. */
+export function quotationImageSlots(content: QuotationContent): { slot: QuotationImageSlot; image: string; label: string }[] {
+  const slots: { slot: QuotationImageSlot; image: string | undefined; label: string }[] = [
+    { slot: 'logo', image: content.issuer?.logo, label: 'el logo del emisor' },
+    ...(content.attachments ?? []).map((a) => ({ slot: 'thumbnail' as const, image: a.thumbnailDataUrl, label: `la miniatura de «${a.title || a.fileName}»` })),
+    { slot: 'signature', image: content.design?.signature?.image, label: 'la imagen de la firma' },
+    { slot: 'stamp', image: content.design?.stampImage, label: 'el sello' },
+  ];
+  return slots.filter((s): s is { slot: QuotationImageSlot; image: string; label: string } => !!s.image);
+}
+export function quotationImages(content: QuotationContent): string[] {
+  return quotationImageSlots(content).map((s) => s.image);
+}
+
+/** What the API accepts: images travel as `asset:sha256:` references (an image never hashed is sent empty). Never mutates. */
 export function publishableContent(record: QuotationContent): QuotationContent {
   const content = quotationContent(record);
+  let design = content.design;
+  if (design && (design.signature || design.stampImage)) {
+    const { signature, stampImage, ...rest } = design;
+    const stamp = published(stampImage);
+    design = {
+      ...rest,
+      ...(signature ? { signature: { ...signature, image: published(signature.image) } } : {}),
+      ...(stamp ? { stampImage: stamp } : {}),
+    };
+  }
   return {
     ...content,
-    issuer: { ...content.issuer, logo: inline(content.issuer?.logo) ? '' : content.issuer?.logo ?? '' },
+    design,
+    issuer: { ...content.issuer, logo: published(content.issuer?.logo) },
     attachments: (content.attachments ?? []).map((attachment) => {
-      if (!inline(attachment.thumbnailDataUrl)) return attachment;
-      const { thumbnailDataUrl: _inline, ...rest } = attachment;
-      return rest;
+      let out = attachment;
+      if (attachment.assetId && refusedAttachmentRefs.has(attachment.assetId)) {
+        const { assetId: _refused, ...rest } = out;
+        out = rest;
+      }
+      if (!inline(out.thumbnailDataUrl)) return out;
+      const { thumbnailDataUrl: local, ...rest } = out;
+      const ref = published(local);
+      return ref ? { ...rest, thumbnailDataUrl: ref } : rest;
     }),
   };
 }
@@ -44,16 +105,48 @@ export function canonicalQuotationContent(record: QuotationContent): QuotationCo
 export const sameQuotationContent = (left: QuotationContent, right: QuotationContent): boolean =>
   contentEqual(canonicalQuotationContent(left), canonicalQuotationContent(right));
 
-/** The server never stores inline images: its empty value keeps the local inline image of the same slot. */
+/**
+ * The server never stores inline images: its empty value, or the reference of the same uploaded image, keeps the local
+ * inline image of the same slot.
+ */
 export function keepLocalImages(server: QuotationRecord, local: QuotationRecord | undefined): QuotationRecord {
   if (!local) return server;
-  const logo = !server.issuer?.logo && inline(local.issuer?.logo) ? local.issuer.logo : undefined;
+  const same = (remote: string | undefined, mine: string | undefined) => inline(mine) && (!remote || remote === knownRefs.get(mine!));
+  // The printed copies only keep the local image when the server holds exactly its reference.
+  const sameRef = (remote: string | undefined, mine: string | undefined) => inline(mine) && !!remote && remote === knownRefs.get(mine!);
+  const logo = same(server.issuer?.logo, local.issuer?.logo) ? local.issuer.logo : undefined;
   const thumbnails = new Map((local.attachments ?? []).filter((a) => inline(a.thumbnailDataUrl)).map((a) => [a.id, a.thumbnailDataUrl!]));
-  const attachments = (server.attachments ?? []).map((a) => (!a.thumbnailDataUrl && thumbnails.has(a.id) ? { ...a, thumbnailDataUrl: thumbnails.get(a.id) } : a));
+  const attachments = (server.attachments ?? []).map((a) => (thumbnails.has(a.id) && same(a.thumbnailDataUrl, thumbnails.get(a.id)) ? { ...a, thumbnailDataUrl: thumbnails.get(a.id) } : a));
   const changedAttachments = attachments.some((a, index) => a !== server.attachments[index]);
-  if (!logo && !changedAttachments) return server;
-  return { ...server, ...(logo ? { issuer: { ...server.issuer, logo } } : {}), ...(changedAttachments ? { attachments } : {}) };
+  const signature = server.design?.signature && sameRef(server.design.signature.image, local.design?.signature?.image) ? local.design.signature!.image : undefined;
+  const stamp = sameRef(server.design?.stampImage, local.design?.stampImage) ? local.design.stampImage : undefined;
+  if (!logo && !changedAttachments && !signature && !stamp) return server;
+  const design = signature || stamp
+    ? { ...server.design, ...(signature ? { signature: { ...server.design.signature!, image: signature } } : {}), ...(stamp ? { stampImage: stamp } : {}) }
+    : server.design;
+  return { ...server, design, ...(logo ? { issuer: { ...server.issuer, logo } } : {}), ...(changedAttachments ? { attachments } : {}) };
 }
+
+/** `target` with the image slots of `base` (logo, thumbnails of the same attachments, printed signature and stamp). */
+const withImagesOf = (target: QuotationContent, base: QuotationContent): QuotationContent => {
+  const thumbnails = new Map(base.attachments.map((a) => [a.id, a.thumbnailDataUrl]));
+  const { stampImage: _mine, ...designRest } = target.design;
+  const design = {
+    ...designRest,
+    ...(target.design.signature && base.design.signature ? { signature: { ...target.design.signature, image: base.design.signature.image } } : {}),
+    ...(base.design.stampImage ? { stampImage: base.design.stampImage } : {}),
+  };
+  return {
+    ...target,
+    design,
+    issuer: { ...target.issuer, logo: base.issuer.logo },
+    attachments: target.attachments.map((a) => {
+      const { thumbnailDataUrl: _mine, ...rest } = a;
+      const theirs = thumbnails.has(a.id) ? thumbnails.get(a.id) : a.thumbnailDataUrl;
+      return theirs ? { ...rest, thumbnailDataUrl: theirs } : rest;
+    }),
+  };
+};
 
 /**
  * PUTs needed to move the server copy (`base`, confirmed at the change's base version) to `local`. The API only lets
@@ -61,11 +154,16 @@ export function keepLocalImages(server: QuotationRecord, local: QuotationRecord 
  * and a status that is not reachable in one step goes through `issued`. Empty = nothing to publish.
  */
 export function planQuotationPush(base: QuotationContent | undefined, local: QuotationContent): QuotationContent[] {
-  const target = canonicalQuotationContent(local);
+  let target = canonicalQuotationContent(local);
   // A creation is only accepted as `draft` or `issued`: an accepted/rejected one that was never published is created
   // as issued first. (A never-published `void` is discarded by the store without any request.)
   if (!base) return target.status === 'accepted' || target.status === 'rejected' ? [{ ...target, status: 'issued' }, target] : [target];
   let current = canonicalQuotationContent(base);
+  // While it stays locked, an image uploaded later never reopens it: a status change keeps the confirmed images.
+  if (isQuotationContentLocked(current.status) && isQuotationContentLocked(target.status)) {
+    const kept = withImagesOf(target, current);
+    if (contentEqual({ ...kept, status: current.status }, current)) target = kept;
+  }
   if (contentEqual(current, target)) return [];
   const plan: QuotationContent[] = [];
   const { status: _currentStatus, ...currentRest } = current;

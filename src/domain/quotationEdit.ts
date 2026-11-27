@@ -6,7 +6,7 @@
  */
 import { convertCents, formatExchangeRate } from '../../shared/quotations';
 import type {
-  QuotationContent, QuotationCurrency, QuotationDiscount, QuotationIssuer, QuotationLine, QuotationPrintedClient,
+  QuotationAttachment, QuotationContent, QuotationCurrency, QuotationDesign, QuotationDiscount, QuotationIssuer, QuotationLine, QuotationPrintedClient,
 } from '../../shared/quotations';
 
 export type IdFactory = () => string;
@@ -168,6 +168,43 @@ export function setIssuer(content: QuotationContent, issuer: QuotationIssuer): Q
 /** Cambia la tasa (DOP por USD) sin tocar importes. */
 export function setExchangeRate(content: QuotationContent, exchangeRate: number): QuotationContent {
   return content.exchangeRate === exchangeRate ? content : { ...content, exchangeRate };
+}
+
+/** Cambia el diseño (plantilla, disposición, acento, tipografía, firma y sello). Elegir otra firma o tipografía a mano conserva el enlace a la plantilla. */
+export function setDesign(content: QuotationContent, patch: Partial<QuotationDesign>): QuotationContent {
+  const design = { ...content.design, ...patch };
+  for (const key of ['templateId', 'signatureId'] as const) if (key in patch && !patch[key]) delete design[key];
+  return { ...content, design };
+}
+
+/** Añade adjuntos al final; los de un id ya presente no se repiten. */
+export function addAttachments(content: QuotationContent, attachments: readonly QuotationAttachment[]): QuotationContent {
+  const ids = new Set(content.attachments.map((a) => a.id));
+  const fresh = attachments.filter((a) => !ids.has(a.id) && !!ids.add(a.id));
+  return fresh.length ? { ...content, attachments: [...content.attachments, ...fresh] } : content;
+}
+
+export function updateAttachment(content: QuotationContent, id: string, patch: Partial<Pick<QuotationAttachment, 'title' | 'mode'>>): QuotationContent {
+  let changed = false;
+  const attachments = content.attachments.map((a) => {
+    if (a.id !== id || Object.entries(patch).every(([key, value]) => a[key as keyof QuotationAttachment] === value)) return a;
+    changed = true;
+    return { ...a, ...patch };
+  });
+  return changed ? { ...content, attachments } : content;
+}
+
+export function removeAttachment(content: QuotationContent, id: string): QuotationContent {
+  return content.attachments.some((a) => a.id === id) ? { ...content, attachments: content.attachments.filter((a) => a.id !== id) } : content;
+}
+
+export function moveAttachment(content: QuotationContent, id: string, offset: -1 | 1): QuotationContent {
+  const index = content.attachments.findIndex((a) => a.id === id);
+  const target = index + offset;
+  if (index < 0 || target < 0 || target >= content.attachments.length) return content;
+  const attachments = [...content.attachments];
+  [attachments[index], attachments[target]] = [attachments[target], attachments[index]];
+  return { ...content, attachments };
 }
 
 /**

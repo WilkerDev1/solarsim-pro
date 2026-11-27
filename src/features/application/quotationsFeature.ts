@@ -4,7 +4,7 @@ import type { AppView } from '../../store/types';
 import { effectiveFeatureSettings } from './featurePolicy';
 
 /** Vistas que pertenecen al módulo de cotizaciones. */
-export const isQuotationsView = (view: AppView): boolean => view === 'quotations-hub' || view === 'quotation-editor';
+export const isQuotationsView = (view: AppView): boolean => view === 'quotations-hub' || view === 'quotation-editor' || view === 'quotation-library';
 
 /** Función `quotations` en la política efectiva (organización con sesión; preferencia local sin ella). */
 export function useQuotationsFeature(): boolean {

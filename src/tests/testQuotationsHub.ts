@@ -64,7 +64,8 @@ try {
   const empty = render();
   assert.match(empty, /Todavía no hay cotizaciones/);
   assert.match(empty, /Nueva cotización/);
-  assert.doesNotMatch(empty, /Plantillas|Firmas|Papelera|Desde una propuesta/, 'sin entradas de fases posteriores');
+  assert.doesNotMatch(empty, /Papelera|Desde una propuesta/, 'sin entradas de fases posteriores');
+  assert.match(empty, /Plantillas y firmas/, 'acceso al gestor de plantillas, firmas y sellos');
 
   // --- Catálogo con datos (modo local: se puede escribir) -------------------------------------------------------------
   useSimulationStore.setState({ quotations: [reference, usdIssued] });

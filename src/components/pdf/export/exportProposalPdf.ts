@@ -12,6 +12,8 @@ export interface ExportProposalPdfOptions {
   resolveAttachmentBytes: AttachmentBytesResolver;
   /** Called when some enabled annexes have no bytes; returning 'cancel' aborts the download. Default: continue. */
   onMissingAttachments?: (missing: AttachedPDFDocument[]) => Promise<'continue' | 'cancel'>;
+  /** Replaces the annex merge (quotations): receives the rasterized PDF and returns the bytes to download. */
+  finalize?: (pdf: ArrayBuffer) => Promise<Uint8Array>;
 }
 
 const PDF_WIDTH_MM = 210;
@@ -68,6 +70,10 @@ export async function exportProposalPdf(options: ExportProposalPdfOptions): Prom
     if (document.body.contains(sandbox)) document.body.removeChild(sandbox);
   }
 
+  if (options.finalize) {
+    PDFMergeService.downloadPdfBytes(await options.finalize(pdf.output('arraybuffer')), options.fileName);
+    return;
+  }
   const enabled = options.attachments.filter((att) => att.enabled);
   if (!enabled.length) {
     pdf.save(options.fileName);

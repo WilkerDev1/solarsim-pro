@@ -1,7 +1,7 @@
 import { canWrite } from '../../../shared/permissions';
 import { assumptionFields } from '../../../shared/assumptions';
 import {
-  canTransitionQuotation, emptyQuotationContent, isQuotationContentLocked, validateQuotationContent, type QuotationContent,
+  canTransitionQuotation, emptyQuotationContent, freezePrintedDesign, isQuotationContentLocked, validateQuotationContent, type QuotationContent,
 } from '../../../shared/quotations';
 import type { QuotationSlice, SimulationSlice, SimulationStore } from '../types';
 import type { QuotationChange, QuotationMutationResult, QuotationRecord } from '../../types/quotation';
@@ -12,6 +12,11 @@ import {
   canonicalQuotationContent, keepLocalImages, nextLocalQuotationNumber, planQuotationPush, quotationContent, sameQuotationContent,
 } from '../sync/quotationContent';
 import { localIsoDate } from '../../utils/localDate';
+import { DocumentAssetService } from '../../services/documentAssetService';
+import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
+import { publishQuotationAssets, uploadedQuotationAttachments } from '../sync/quotationAssets';
+import { trackAttachmentCopy } from '../sync/attachmentCopies';
+import { UNKNOWN_DOCUMENT_ASSET, assetRefHash, isAssetRef } from '../../../shared/documentAssets';
 
 const SESSION_CHANGED = { success: false, message: 'La sesión cambió.' };
 const fail = (error: string) => ({ ok: false as const, error });
@@ -130,6 +135,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
     quotationSyncCursor: null,
     quotationNumberCounters: {},
     quotationSyncFeedback: null,
+    quotationAssetIssues: {},
 
     createQuotationRecord: (overrides = {}) => {
       if (!writable()) return fail('Tu rol no permite crear cotizaciones.');
@@ -155,7 +161,11 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
       const existing = editable(id, 'cambiar el estado de');
       if (typeof existing === 'string') return fail(existing);
       if (!canTransitionQuotation(existing.status, status)) return fail('Cambio de estado no permitido.');
-      return replace(existing, { ...quotationContent(existing), status });
+      // Al salir de borrador se fija la copia de la firma y el sello que se imprimen: la biblioteca ya no la cambia.
+      const design = existing.status === 'draft' && isQuotationContentLocked(status)
+        ? freezePrintedDesign(existing.design, get().quotationLibrary.signatures.items)
+        : existing.design;
+      return replace(existing, { ...quotationContent(existing), design, status });
     },
     duplicateQuotationRecord: (id) => {
       if (!writable()) return fail('Tu rol no permite crear cotizaciones.');
@@ -171,9 +181,26 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
       // Links to records that no longer exist are not copied.
       if (content.clientId && !state.clients.some((c) => c.id === content.clientId)) delete content.clientId;
       if (content.folderId && !state.folders.some((f) => f.id === content.folderId)) delete content.folderId;
+      // Adjuntos propios con id nuevo y sus bytes copiados: quitar uno en la copia nunca borra los del original. Las
+      // fichas del catálogo conservan su id (el mismo en todas las cotizaciones: son una caché del activo del equipo).
+      const copies: [string, string][] = [];
+      content.attachments = content.attachments.map((attachment) => {
+        if (attachment.origin === 'catalog') return attachment;
+        const id = `attachment-${crypto.randomUUID()}`;
+        copies.push([attachment.id, id]);
+        return { ...attachment, id };
+      });
       const validation = validateQuotationContent(content);
       if (!validation.ok) return fail(validation.error);
-      return insert(validation.value);
+      const result = insert(validation.value);
+      if (result.ok) {
+        const names = new Map(content.attachments.map((a) => [a.id, a.fileName]));
+        for (const [from, to] of copies)
+          trackAttachmentCopy(from, PDFAttachmentStorage.getAttachment(from)
+            .then((bytes) => (bytes ? PDFAttachmentStorage.saveAttachment(to, result.quotation.id, names.get(to) ?? '', bytes) : undefined))
+            .catch(() => undefined));
+      }
+      return result;
     },
     deleteQuotationRecord: (id) => {
       const existing = editable(id, 'eliminar');
@@ -316,6 +343,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
         workspaceScope(get().syncSettings) === scope;
       const own = (ownerId?: string) => !ownerId || ownerId === user.id;
       const transport = QuotationSyncService.transport(initial.syncSettings.serverUrl, () => get().syncSettings.authToken || '');
+      const assets = DocumentAssetService.transport(initial.syncSettings.serverUrl, () => get().syncSettings.authToken || '');
       const promise = (async () => {
         try {
           const cursor = get().quotationSyncCursor;
@@ -430,6 +458,32 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               failures++;
               continue;
             }
+            // Logo, thumbnails and attachments travel as `asset:sha256:` references: upload what this device has.
+            const { pending, issues } = await publishQuotationAssets(local, {
+              scope,
+              base: change.base,
+              upload: (dataUrl) => DocumentAssetService.ensureUploaded(assets, scope, dataUrl),
+              attachmentBytes: (attachmentId) => PDFAttachmentStorage.getAttachment(attachmentId),
+            });
+            if (!current()) return SESSION_CHANGED;
+            // Definitive refusals (413/415…): published without that image or attachment, with a notice saying what to do.
+            set((s) => {
+              const { [id]: _previous, ...others } = s.quotationAssetIssues;
+              return { quotationAssetIssues: issues.length ? { ...others, [id]: issues } : others };
+            });
+            const assetsPending = pending.length ? `No se pudo subir ${pending.join(', ')}: se reintentará en la próxima sincronización.` : undefined;
+            if ((get().quotationChanges[id]?.assetsPending) !== assetsPending)
+              set((s) => {
+                const latest = s.quotationChanges[id];
+                if (!latest) return {};
+                const { assetsPending: _old, ...rest } = latest;
+                return { quotationChanges: { ...s.quotationChanges, [id]: assetsPending ? { ...rest, assetsPending } : rest } };
+              });
+            if (assetsPending) {
+              // Never published without its images or attachments: an empty slot would erase them on the server.
+              failures++;
+              continue;
+            }
             const serverCopy = remote.get(id);
             if (serverCopy && sameQuotationContent(serverCopy, local)) {
               // Recover a lost PUT receipt only from identical authoritative content.
@@ -483,6 +537,28 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
                     return rest as QuotationRecord;
                   }),
                 }));
+              } else if (saved.status === 400 && saved.code === UNKNOWN_DOCUMENT_ASSET) {
+                // The server lacks an asset this quotation references: forget it as uploaded, so the next pass uploads
+                // it again from this device. Without its bytes here no retry can help: it waits for the user.
+                const missing = saved.missing ?? [];
+                DocumentAssetService.forgetUploaded(scope, missing);
+                uploadedQuotationAttachments.forgetHashes(missing);
+                const lost = new Set(missing);
+                const missingHere: string[] = [];
+                for (const attachment of local.attachments) {
+                  if (!attachment.assetId || !isAssetRef(attachment.assetId) || !lost.has(assetRefHash(attachment.assetId))) continue;
+                  if (!(await PDFAttachmentStorage.getAttachment(attachment.id).catch(() => null))) missingHere.push(`«${attachment.title || attachment.fileName}»`);
+                }
+                if (missingHere.length) {
+                  reject(id, change.revision, {
+                    ...saved,
+                    error: `El servidor no tiene ${missingHere.join(', ')} y este equipo tampoco: quita el adjunto o súbelo desde el equipo que lo tiene.`,
+                  });
+                } else {
+                  set((s) => (s.quotationChanges[id]
+                    ? { quotationChanges: { ...s.quotationChanges, [id]: { ...s.quotationChanges[id], assetsPending: 'El servidor no tiene un adjunto o una imagen de este equipo: se volverá a subir en la próxima sincronización.' } } }
+                    : {}));
+                }
               } else if (saved.status === 409) {
                 if (saved.quotation) conflict(id, saved.quotation);
                 else tombstone(id);
@@ -516,7 +592,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               // The cursor is stored only with the download it describes, fully applied.
               ...(listed.serverTimestamp ? { quotationSyncCursor: { scope, serverTimestamp: listed.serverTimestamp } } : {}),
               quotationSyncFeedback: failures || unresolved || refusedDeletions
-                ? `${failures} cotización(es) pendientes: hay conflictos, rechazos del servidor o permisos distintos. Revisa y sincroniza.`
+                ? `${failures} cotización(es) pendientes: hay conflictos, rechazos del servidor, subidas de imágenes o adjuntos pendientes o permisos distintos. Revisa y sincroniza.`
                 : null,
             };
           });

@@ -1,6 +1,7 @@
 import { registerFolderRoutes } from "./modules/folders.js";
 import { registerClientRoutes } from "./modules/clients.js";
 import { registerQuotationRoutes } from "./modules/quotations.js";
+import { registerQuotationLibraryRoutes } from "./modules/quotationLibrary.js";
 import { registerEquipmentAssetRoutes } from "./modules/equipmentAssets.js";
 import {
   UnknownDocumentAssetError,
@@ -120,6 +121,7 @@ export function createApp(options: {
   registerFolderRoutes(app, deps);
   registerClientRoutes(app, deps);
   registerQuotationRoutes(app, deps);
+  registerQuotationLibraryRoutes(app, deps);
   registerEquipmentAssetRoutes(app, deps);
   registerDocumentAssetRoutes(app, deps);
   registerTariffsRoutes(app, deps);

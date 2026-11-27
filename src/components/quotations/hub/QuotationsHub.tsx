@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { LayoutTemplate, RefreshCw } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { canWrite } from '../../../../shared/permissions';
 import type { QuotationCurrency } from '../../../../shared/quotations';
@@ -150,6 +150,9 @@ export function QuotationsHub() {
             </p>
           </div>
           <div className="qh-header-actions">
+            <button type="button" className="qh-btn qh-btn-lg" onClick={() => useSimulationStore.getState().openQuotationLibrary('templates')}>
+              <LayoutTemplate className="h-4 w-4" aria-hidden="true" />Plantillas y firmas
+            </button>
             {online && (
               <button type="button" className="qh-btn qh-btn-lg" disabled={syncing} aria-busy={syncing} onClick={() => void sync()}>
                 <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden="true" />

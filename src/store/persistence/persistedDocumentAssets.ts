@@ -20,14 +20,15 @@ const COMPANY_IMAGE_FIELDS = ['logoBase64', 'watermarkLogoBase64', 'signatureSea
 export const persistedAssetsKey = (name: string) => `${name}-assets`;
 
 /**
- * Cotizaciones: `issuer.logo` y `attachments[].thumbnailDataUrl`. Una imagen en línea se guarda con su propio prefijo
+ * Cotizaciones: `issuer.logo`, `attachments[].thumbnailDataUrl` y las copias fijas `design.signature.image` y
+ * `design.stampImage`; biblioteca (`quotationLibrary`): la imagen de cada firma o sello. Una imagen en línea se guarda con su propio prefijo
  * (`quotation-asset:sha256:`), no con `asset:sha256:`, porque en una cotización una referencia `asset:sha256:` es un
  * dato del servidor que debe volver a publicarse tal cual: expandirla al hidratar la convertiría en una imagen en
  * línea que la sincronización enviaría vacía. Por eso las claves de cotizaciones quedan fuera de la expansión general
  * y solo se expande su prefijo propio.
  */
 const QUOTATION_IMAGE_PREFIX = 'quotation-asset:sha256:';
-const QUOTATION_KEYS = ['quotations', 'quotationChanges', 'quotationDeletionQueue'] as const;
+const QUOTATION_KEYS = ['quotations', 'quotationChanges', 'quotationDeletionQueue', 'quotationLibrary'] as const;
 
 const subtleSha256: DocumentAssetHasher = async (text) => {
   const subtle = globalThis.crypto?.subtle;
@@ -66,8 +67,31 @@ const mapQuotationImages = (value: unknown, map: (text: string) => string): unkn
   const text = (item: unknown) => (typeof item === 'string' && item ? map(item) : item);
   const issuer = withField(value.issuer, 'logo', text);
   const attachments = mapArray(value.attachments, (attachment) => withField(attachment, 'thumbnailDataUrl', text));
-  if (issuer === value.issuer && attachments === value.attachments) return value;
-  return { ...value, ...(issuer !== value.issuer ? { issuer } : {}), ...(attachments !== value.attachments ? { attachments } : {}) };
+  // Copias fijas de la firma y el sello que se imprimen (design.signature.image, design.stampImage).
+  const design = withField(withField(value.design, 'signature', (signature) => withField(signature, 'image', text)), 'stampImage', text);
+  if (issuer === value.issuer && attachments === value.attachments && design === value.design) return value;
+  return {
+    ...value,
+    ...(issuer !== value.issuer ? { issuer } : {}),
+    ...(attachments !== value.attachments ? { attachments } : {}),
+    ...(design !== value.design ? { design } : {}),
+  };
+};
+/**
+ * Biblioteca de cotizaciones (`quotationLibrary`): la imagen de cada firma o sello, también en sus borrados en cola y
+ * en las copias del servidor de sus conflictos. Mismo trato que las cotizaciones: prefijo propio y fuera de la
+ * expansión general (una referencia `asset:sha256:` es un dato del servidor).
+ */
+const mapLibraryImages = (value: unknown, map: (text: string) => string): unknown => {
+  if (!isRecord(value) || !isRecord(value.signatures)) return value;
+  const text = (item: unknown) => (typeof item === 'string' && item ? map(item) : item);
+  const signature = (item: unknown) => withField(item, 'image', text);
+  const signatures = value.signatures as Rec;
+  const items = mapArray(signatures.items, signature);
+  const deletions = mapArray(signatures.deletions, (command) => withField(command, 'record', signature));
+  const changes = mapRecord(signatures.changes, (change) => withField(change, 'server', (server) => (server ? signature(server) : server)));
+  if (items === signatures.items && deletions === signatures.deletions && changes === signatures.changes) return value;
+  return { ...value, signatures: { ...signatures, items, deletions, changes } };
 };
 
 export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHasher; onLearned?: () => void } = {}): PersistCodec & {
@@ -140,6 +164,11 @@ export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHas
     const out = image(text, inner);
     return isAssetRef(out) ? QUOTATION_IMAGE_PREFIX + assetRefHash(out) : out;
   }));
+  const library = (value: unknown, pass: Pass) => cached(caches.quotation, value, pass, (inner) => mapLibraryImages(value, (text) => {
+    if (isAssetRef(text)) return text;
+    const out = image(text, inner);
+    return isAssetRef(out) ? QUOTATION_IMAGE_PREFIX + assetRefHash(out) : out;
+  }));
   const customization = (value: unknown, pass: Pass) =>
     cached(caches.customization, value, pass, (inner) => mapDocumentAssetFields({ customization: value }, (text) => image(text, inner)).customization);
   const company = (value: unknown, pass: Pass) => cached(caches.company, value, pass, (inner) => {
@@ -164,6 +193,7 @@ export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHas
       companies: (value) => mapArray(value, (item) => company(item, pass)),
       quotations: (value) => mapArray(value, (item) => quotation(item, pass)),
       quotationDeletionQueue: (value) => mapArray(value, (command) => withField(command, 'quotation', (data) => quotation(data, pass))),
+      quotationLibrary: (value) => library(value, pass),
     };
     let next: Rec | null = null;
     for (const [key, collapse] of Object.entries(fields)) {
@@ -192,6 +222,9 @@ export function createPersistedDocumentAssets(options: { hash?: DocumentAssetHas
     if (held.quotations !== undefined) held.quotations = mapArray(held.quotations, restore);
     if (held.quotationDeletionQueue !== undefined)
       held.quotationDeletionQueue = mapArray(held.quotationDeletionQueue, (command) => withField(command, 'quotation', restore));
+    if (held.quotationLibrary !== undefined)
+      held.quotationLibrary = mapLibraryImages(held.quotationLibrary, (text) =>
+        text.startsWith(QUOTATION_IMAGE_PREFIX) ? contentOf.get(text.slice(QUOTATION_IMAGE_PREFIX.length)) ?? '' : text);
     return { ...expanded, ...held };
   };
   const expandState = (state: Rec): Rec => {

@@ -12,11 +12,24 @@ import { SANS, SHEET_BODY, SHEET_INK, SHEET_MUTED, SHEET_ROW_RULE, SHEET_RULE, s
  * (.agents/rules/html2canvas_pdf_export_rules.md): ningún recorte sobre texto, imágenes con `max-h/max-w` + `w-auto
  * h-auto`, pie de 42 px. Cada página lleva `data-quotation-page` para que la exportación las encuentre.
  */
-export type QuotationSheetData = QuotationContent & { number: string | null };
+export type QuotationSheetData = QuotationContent & {
+  number: string | null;
+  /**
+   * Firma impresa ya resuelta (`sheetSignature`): solo con `design.showSignature`. La imagen es un data URL; sin ella
+   * queda el espacio en blanco para firmar a mano. Sin firma, bajo la raya va el vendedor.
+   */
+  signature?: SheetSignature | null;
+};
+
+export interface SheetSignature {
+  name: string;
+  role: string;
+  image: string | null;
+}
 
 export interface QuotationSheetProps {
   quotation: QuotationSheetData;
-  /** Sello del membrete activo (`signatureSealBase64`); se pinta solo si `design.showStamp`. */
+  /** Sello (el predeterminado de la organización o, sin él, el del membrete); se pinta solo si `design.showStamp`. */
   stampImage?: string | null;
   /** Dibuja solo esa página (índice desde 0); la numeración «Página X de N» sigue contando todas. */
   onlyPage?: number;
@@ -68,7 +81,7 @@ const SheetPageView: React.FC<PageProps> = ({ index, count, page, quotation, tot
       {page.texts.map((chunk, i) => <TextBlock key={i} chunk={chunk} />)}
       {page.closing && <Summary quotation={quotation} totals={totals} theme={theme} termsBeside={page.termsBeside} />}
       <div style={{ flex: '1 1 auto' }} />
-      {page.closing && <Signatures seller={quotation.seller} stamp={stamp} />}
+      {page.closing && <Signatures seller={quotation.seller} signature={quotation.signature ?? null} stamp={stamp} />}
       <Footer quotation={quotation} label={`${number} · ${sheetPageLabel(index + 1, count)}`} />
     </div>
   );
@@ -223,23 +236,26 @@ const Summary: React.FC<{ quotation: QuotationSheetData; totals: QuotationTotals
   );
 };
 
-const Signatures: React.FC<{ seller: string; stamp: string | null }> = ({ seller, stamp }) => {
-  const signer = (name: string, role: string) => (
+const Signatures: React.FC<{ seller: string; signature: SheetSignature | null; stamp: string | null }> = ({ seller, signature, stamp }) => {
+  const signer = (name: string, role: string, image: string | null, alt: string) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ height: 64 }} />
+      <div style={{ height: 64, display: 'flex', alignItems: 'flex-end' }}>
+        {image && <img alt={alt} src={image} className="block h-auto max-h-[64px] w-auto max-w-[220px]" />}
+      </div>
       <div style={{ borderTop: `1px solid ${SHEET_INK}`, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, minHeight: 18, ...WRAP }}>{sheetFit.signature(name) || ' '}</div>
-        <div style={{ fontSize: 11, color: SHEET_MUTED, lineHeight: 1.4 }}>{role}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, minHeight: 18, ...WRAP }}>{sheetFit.signature(name) || ' '}</div>
+        <div style={{ fontSize: 11, color: SHEET_MUTED, lineHeight: 1.4, ...WRAP }}>{role}</div>
       </div>
     </div>
   );
+  const quotedBy = signature ? sheetFit.signatureRole(signature.role) : T.quotedBy;
   return (
     <div style={{ margin: '0 56px', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 170px minmax(0, 1fr)', gap: 32, alignItems: 'end', paddingBottom: 34 }}>
-      {signer(seller, T.quotedBy)}
+      {signer(signature?.name ?? seller, quotedBy, isImage(signature?.image) ? signature!.image : null, `Firma de ${signature?.name ?? ''}`.trim())}
       <div style={{ minHeight: 140, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {stamp && <img alt="Sello de la empresa" src={stamp} className="mx-auto block h-auto max-h-[140px] w-auto max-w-[160px]" />}
       </div>
-      {signer('', T.receivedBy)}
+      {signer('', T.receivedBy, null, '')}
     </div>
   );
 };

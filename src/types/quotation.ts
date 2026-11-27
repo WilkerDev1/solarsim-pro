@@ -34,6 +34,11 @@ export interface QuotationChange {
   /** The conflict comes from a stale deletion (409 with a newer record): `keep_local` deletes it again. */
   deletionConflict?: boolean;
   rejected?: QuotationRejection;
+  /**
+   * Una imagen o un adjunto nuevos no se pudieron subir (o el servidor no los tiene): la cotización no se publica sin
+   * ellos y se reintenta en la siguiente pasada. Texto breve para el estado de guardado.
+   */
+  assetsPending?: string;
 }
 
 export interface QuotationDeletionCommand {

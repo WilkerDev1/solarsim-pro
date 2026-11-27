@@ -34,6 +34,7 @@ export function serializeSimulationStore(state: SimulationStore) {
     quotationDeletionQueue: state.quotationDeletionQueue,
     quotationSyncCursor: state.quotationSyncCursor,
     quotationNumberCounters: state.quotationNumberCounters,
+    quotationLibrary: state.quotationLibrary,
     tariffMatrix: state.tariffMatrix,
     defaultSimulationSettings: state.defaultSimulationSettings,
     defaultDocumentCustomization: state.defaultDocumentCustomization,

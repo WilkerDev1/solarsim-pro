@@ -20,6 +20,8 @@ export const QUOTATION_LIMITS = {
   fileName: 255,
   /** Longitud máxima del logo del emisor como data URL. */
   logoDataUrl: 500_000,
+  /** Longitud máxima de la imagen de la firma o del sello fijados en la cotización como data URL (512 KB en base64). */
+  signatureDataUrl: 700_000,
   /** Longitud máxima de la miniatura de un anexo como data URL. */
   thumbnailDataUrl: 100_000,
   timestamp: 40,
@@ -213,6 +215,16 @@ function design(raw: unknown): QuotationDesign {
   const signatureId = optionalText(data.signatureId, QUOTATION_LIMITS.id, 'Diseño: id de firma inválido');
   if (templateId) result.templateId = templateId;
   if (signatureId) result.signatureId = signatureId;
+  if (data.signature != null) {
+    const printed = object(data.signature, 'Diseño: la firma impresa es inválida');
+    result.signature = {
+      name: text(printed.name, QUOTATION_LIMITS.label, 'Diseño: el nombre de la firma es inválido o demasiado largo'),
+      role: text(printed.role, QUOTATION_LIMITS.label, 'Diseño: el cargo de la firma es inválido o demasiado largo'),
+      image: image(printed.image, QUOTATION_LIMITS.signatureDataUrl, 'Diseño: la imagen de la firma es inválida (use PNG, JPEG o WebP)'),
+    };
+  }
+  const stampImage = image(data.stampImage, QUOTATION_LIMITS.signatureDataUrl, 'Diseño: la imagen del sello es inválida (use PNG, JPEG o WebP)');
+  if (stampImage) result.stampImage = stampImage;
   return result;
 }
 
@@ -304,6 +316,16 @@ function parse(data: Record<string, unknown>): QuotationContent {
   if (sourceProjectId) value.sourceProjectId = sourceProjectId;
   if (folderId) value.folderId = folderId;
   return value;
+}
+
+/** Diseño de cotización o de plantilla normalizado (mismas reglas que `design` del contenido); nunca lanza. */
+export function validateQuotationDesign(data: unknown): { ok: true; value: QuotationDesign } | { ok: false; error: string } {
+  try {
+    return { ok: true, value: design(data) };
+  } catch (error) {
+    if (error instanceof Invalid) return { ok: false, error: error.message };
+    throw error;
+  }
 }
 
 /** Valida y normaliza contenido no confiable; descarta claves desconocidas y nunca lanza. */

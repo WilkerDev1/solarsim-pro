@@ -79,6 +79,9 @@ export const SHEET_LAYOUT = {
   signaturesFixed: 64 + 8 + 1 + 8 + 2 + 16,
   signaturesStamp: 140,
   signaturesNameEm: 18,
+  /** Cargo de la firma con «Cotizado por» (11 px, renglones de 16 px) en el ancho de la columna de firma. */
+  signaturesRoleEm: 21,
+  signaturesRoleLine: 16,
   signaturesBottom: 34,
 } as const;
 
@@ -109,7 +112,11 @@ export interface SheetPage {
 export type PaginationInput = Pick<
   QuotationContent,
   'items' | 'discounts' | 'notes' | 'paymentTerms' | 'projectLabel' | 'issuer' | 'client' | 'seller' | 'issueDate' | 'validUntil' | 'currency' | 'exchangeRate'
-> & { number?: string | null };
+> & {
+  number?: string | null;
+  /** Firma impresa (`design.showSignature` con una firma elegida o la predeterminada): nombre y cargo bajo la raya. */
+  signature?: { name: string; role: string } | null;
+};
 
 const L = SHEET_LAYOUT;
 
@@ -156,6 +163,8 @@ export const sheetFit = {
   headerName: (text: string) => twoLines(text, SHEET_LAYOUT.logoNameEm),
   /** Nombre bajo «Cotizado por»: hasta dos renglones. */
   signature: (text: string) => twoLines(text, SHEET_LAYOUT.signaturesNameEm),
+  /** Cargo de la firma con «Cotizado por»: hasta dos renglones. */
+  signatureRole: (role: string) => twoLines(signatureRoleText(role), SHEET_LAYOUT.signaturesRoleEm),
   /** Etiqueta de un descuento en la columna de totales: un renglón junto a su importe. */
   discount: (label: string, value: string) => fitToWidth(label, discountLabelEm(value)),
   /** Pie: el emisor en el ancho que deja «número · Página X de N». */
@@ -163,6 +172,11 @@ export const sheetFit = {
   /** Emisor en la cabecera de las páginas siguientes: un renglón junto al título. */
   continuation: (name: string, title: string) => fitToWidth(name, Math.max(6, (SHEET_LAYOUT.contentWidth - 24 - textWidthEm(title) * 13 * 1.05) / 13)),
 };
+
+/** Línea bajo el nombre de quien cotiza: «Cargo · Cotizado por» o solo «Cotizado por». */
+export function signatureRoleText(role: string): string {
+  return [role.trim(), QUOTATION_SHEET_TEXTS.quotedBy].filter(Boolean).join(' · ');
+}
 
 function discountLabelEm(value: string): number {
   return Math.max(4, (SHEET_LAYOUT.totalsWidth - 16 - textWidthEm(value) * 13) / 13);
@@ -267,13 +281,18 @@ export function estimateTotalsHeight(input: PaginationInput): number {
   return height + L.totalsTotalFixed + Math.max(L.totalsAmount, totalLabel * L.totalsTotalLine);
 }
 
-export function estimateSignaturesHeight(seller: string): number {
-  const name = wrappedLines(sheetFit.signature(seller) || ' ', L.signaturesNameEm) * L.rowLine;
-  return Math.max(L.signaturesFixed + name, L.signaturesStamp) + L.signaturesBottom;
+/**
+ * Firmas: espacio de la imagen de firma (64 px, la imagen se limita a esa altura), raya, nombre (el de la firma o el
+ * vendedor) y el renglón «Cargo · Cotizado por», que con un cargo largo ocupa hasta dos; el sello reserva 140 px.
+ */
+export function estimateSignaturesHeight(seller: string, signature?: { name: string; role: string } | null): number {
+  const name = wrappedLines(sheetFit.signature(signature?.name ?? seller) || ' ', L.signaturesNameEm) * L.rowLine;
+  const role = signature?.role.trim() ? wrappedLines(sheetFit.signatureRole(signature.role), L.signaturesRoleEm) * L.signaturesRoleLine : L.signaturesRoleLine;
+  return Math.max(L.signaturesFixed - L.signaturesRoleLine + role + name, L.signaturesStamp) + L.signaturesBottom;
 }
 
 export function estimateClosingHeight(input: PaginationInput, termsBeside: boolean): number {
-  return L.closingMargin + Math.max(estimateTotalsHeight(input), termsBeside ? sideBoxHeight(input) : 0) + estimateSignaturesHeight(input.seller);
+  return L.closingMargin + Math.max(estimateTotalsHeight(input), termsBeside ? sideBoxHeight(input) : 0) + estimateSignaturesHeight(input.seller, input.signature);
 }
 
 export function paginateQuotation(input: PaginationInput): SheetPage[] {
