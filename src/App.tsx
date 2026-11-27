@@ -40,6 +40,7 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 const AppAssistant = lazy(() => import('./features/assistant/components/AppAssistant').then(module => ({ default: module.AppAssistant })));
 import { AgentRuntimeHost } from './features/agentTools/AgentRuntimeHost';
 import { draftOwnerKey } from './utils/draftOwnerKey';
+import { ReturnToQuotationPill } from './components/quotations/linked/ReturnToQuotationPill';
 
 export const App: React.FC = () => {
   const { sessionGeneration, workspaceScope, activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, activeConflict, loadOrganizationFeaturePolicy } = useSimulationStore(useShallow((s) => ({ sessionGeneration: s.sessionGeneration, workspaceScope: s.workspaceScope, activeView: s.activeView, setActiveView: s.setActiveView, sidebarTheme: s.sidebarTheme, syncSettings: s.syncSettings, syncProjectsWithServer: s.syncProjectsWithServer, isTrashActive: s.isTrashActive, isSettingsModalOpen: s.isSettingsModalOpen, activeConflict: s.activeConflict, loadOrganizationFeaturePolicy: s.loadOrganizationFeaturePolicy })));
@@ -141,6 +142,7 @@ export const App: React.FC = () => {
             </Suspense>
           </ErrorBoundary>
         </main>
+        <ReturnToQuotationPill />
       </div>
 
       <Suspense fallback={null}>

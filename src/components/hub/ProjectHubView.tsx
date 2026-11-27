@@ -5,14 +5,11 @@ import { useSimulationStore } from "../../store/useSimulationStore";
 import { useShallow } from 'zustand/react/shallow';
 import { useEnergyCalculationMode } from "../../features/application/useApplicationFeatures";
 import { calculateProjectFinancialSummary } from "../../engine/financeEngine";
-import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis, supplyPresentation, supplySummaryText } from "../../../shared/offGridSupply";
-import { PAYBACK_NOT_REACHED_LABEL, irrText, isPaybackReached } from "../../../shared/returnIndicators";
+import { noSavingsNote, supplyPresentation, supplySummaryText } from "../../../shared/offGridSupply";
+import { irrText } from "../../../shared/returnIndicators";
 import { ProposalCommercialPanel } from "../../features/proposals/ProposalCommercialPanel";
 import { ProposalClientSection } from "../clients/ProposalClientLink";
 import {
-  getProjectPanels,
-  getProjectInverters,
-  getProjectBatteries,
   calculateTotalBatteryCapacityKWh,
   calculateTotalInverterPowerKW,
 } from "../../utils/equipmentSpecsUtils";
@@ -24,17 +21,11 @@ import { ProposalEnergyOverview } from "./components/ProposalEnergyOverview";
 import { useQuotationsFeature } from "../../features/application/quotationsFeature";
 import { ConvertProposalDialog } from "../quotations/convert/ConvertProposalDialog";
 import { ProposalQuotationsSection } from "../quotations/linked/LinkedQuotationSections";
+import { paybackLabel, proposalDevices, savingsPresentation, summaryMoney } from "./proposalSummaryData";
 import "./project-summary.css";
 import "../quotations/convert/convert-dialog.css";
 import "../quotations/linked/linked-quotations.css";
-const money = (value: number) =>
-  Number.isFinite(value)
-    ? value.toLocaleString("es-DO", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      })
-    : "—";
+const money = summaryMoney;
 export const ProjectHubView = () => {
   const {
     projects,
@@ -58,9 +49,8 @@ export const ProjectHubView = () => {
   const quotationsEnabled = useQuotationsFeature();
   const [converting, setConverting] = useState(false);
   // Sistema aislado sin comparación (o generador sin costo): estado explícito en vez de ceros.
-  const savingsBasis = resolveSavingsBasis(project?.rates);
-  const comparable = hasSavingsComparison(savingsBasis);
-  const noSavingsLabel = savingsBasis === "generator_missing_cost" ? "Falta costo del generador" : "Sin comparación";
+  const savings = savingsPresentation(project);
+  const { basis: savingsBasis, comparable, noSavingsLabel } = savings;
 
   if (!project || !summary)
     return (
@@ -72,29 +62,7 @@ export const ProjectHubView = () => {
         </button>
       </div>
     );
-  const devices = [
-    ...getProjectPanels(project.specs).map((p) => ({
-      id: `panel-${p.id}`,
-      name: p.brandModel,
-      count: p.count,
-      nominal: `${p.powerW} W`,
-      kind: "Panel",
-    })),
-    ...getProjectInverters(project.specs).map((p) => ({
-      id: `inverter-${p.id}`,
-      name: p.brandModel,
-      count: p.count,
-      nominal: `${p.powerKW} kW`,
-      kind: "Inversor",
-    })),
-    ...getProjectBatteries(project.specs).map((p) => ({
-      id: `battery-${p.id}`,
-      name: p.brandModel,
-      count: p.count,
-      nominal: `${p.capacityKWh} kWh`,
-      kind: "Batería",
-    })),
-  ].filter((device) => device.count > 0);
+  const devices = proposalDevices(project);
   const ownerKey = `${workspaceScope}|${sessionGeneration}|${project.id}`;
   return (
     <div className="project-summary">
@@ -179,11 +147,7 @@ export const ProjectHubView = () => {
         <div>
           <span>Retorno simple estimado</span>
           <strong>
-            {!comparable
-              ? noSavingsLabel
-              : isPaybackReached(summary) && Number.isFinite(summary.paybackYears) && summary.paybackYears > 0
-              ? `${summary.paybackYears.toFixed(1)} años`
-              : PAYBACK_NOT_REACHED_LABEL}
+            {paybackLabel(summary, savings)}
           </strong>
         </div>
       </div>

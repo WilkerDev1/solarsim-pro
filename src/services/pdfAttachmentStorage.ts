@@ -123,6 +123,21 @@ class PDFAttachmentStorageService {
     }
   }
 
+  /** Si hay bytes guardados para el id en este equipo (sin cargarlos en memoria). Nunca lanza. */
+  async hasAttachment(id: string): Promise<boolean> {
+    if (memoryCache.has(id)) return true;
+    try {
+      const db = await this.getDB();
+      return await new Promise<boolean>((resolve) => {
+        const req = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getKey(id);
+        req.onsuccess = () => resolve(req.result !== undefined);
+        req.onerror = () => resolve(false);
+      });
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Elimina un archivo PDF de la caché y de IndexedDB
    */

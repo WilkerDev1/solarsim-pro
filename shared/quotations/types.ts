@@ -107,6 +107,11 @@ export interface QuotationContent {
   clientId?: string;
   client: QuotationPrintedClient;
   sourceProjectId?: string;
+  /**
+   * Ids de los documentos de la propuesta de origen que el usuario quitó de esta cotización: «Actualizar desde la
+   * propuesta» no los vuelve a traer. Opcional (ausente = ninguno); se vacía al quitar o cambiar el enlace.
+   */
+  dismissedSourceDocuments?: string[];
   folderId?: string;
   seller: string;
   projectLabel: string;

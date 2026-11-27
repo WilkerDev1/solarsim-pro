@@ -440,32 +440,9 @@ export function buildProposalQuotationSource(project: ProjectSimulation, blocks:
   // --- Documentos: solo los que tienen una referencia reutilizable (sin copiar binarios) ---
   const attachments: ProposalQuotationSource['attachments'] = [];
   if (blocks.documents) {
-    for (const annex of project.customization?.attachedPdfs ?? []) {
-      if (!annex.enabled) continue;
-      const assetId = annexAssetId(annex);
-      if (!assetId || assetId.length > QUOTATION_LIMITS.assetId || !ASSET_ID.test(assetId)) {
-        omittedDocuments.push({ id: annex.id, title: annex.title || annex.fileName, reason: 'Está solo en este equipo: no tiene un archivo guardado que la cotización pueda enlazar.' });
-        continue;
-      }
-      if (attachments.length >= QUOTATION_LIMITS.maxAttachments) {
-        omittedDocuments.push({ id: annex.id, title: annex.title || annex.fileName, reason: `La cotización admite hasta ${QUOTATION_LIMITS.maxAttachments} documentos.` });
-        continue;
-      }
-      const thumb = annex.thumbnailDataUrl;
-      const thumbnailOk = typeof thumb === 'string' && thumb.length <= QUOTATION_LIMITS.thumbnailDataUrl && (isAssetRef(thumb) || IMAGE_DATA_URL.test(thumb));
-      attachments.push({
-        id: clip(annex.id, QUOTATION_LIMITS.id),
-        fileName: clip(annex.fileName, QUOTATION_LIMITS.fileName),
-        fileSize: Number.isSafeInteger(annex.fileSize) && annex.fileSize >= 0 ? annex.fileSize : 0,
-        pageCount: Number.isSafeInteger(annex.pageCount) && annex.pageCount >= 0 ? annex.pageCount : 0,
-        title: clip(annex.title || annex.fileName, QUOTATION_LIMITS.label),
-        uploadedAt: clip(annex.uploadedAt, QUOTATION_LIMITS.timestamp),
-        assetId,
-        origin: annex.origin === 'catalog' ? 'catalog' : 'proposal',
-        ...(annex.catalogItemId && annex.catalogItemId.length <= QUOTATION_LIMITS.id ? { catalogItemId: annex.catalogItemId } : {}),
-        ...(thumbnailOk ? { thumbnailDataUrl: thumb } : {}),
-      });
-    }
+    const documents = proposalSourceDocuments(project);
+    attachments.push(...documents.attachments);
+    omittedDocuments.push(...documents.omitted);
   }
 
   const issuer = issuerFromCompany(context.company);
@@ -487,6 +464,43 @@ export function buildProposalQuotationSource(project: ProjectSimulation, blocks:
     issuer,
   };
   return { source, omittedDocuments, notices, proposalTotalCents, proposalTaxCents, totalDifferenceCents, totalDifferenceReason, residualDiscountCents };
+}
+
+/**
+ * Documentos de la propuesta que pueden pasar a una cotización: anexos activos con una referencia reutilizable
+ * (`annexAssetId`), sin copiar binarios; el resto se omite con su motivo. Lo usan la conversión y el enlace desde el
+ * editor (`proposalDocumentAttachments`).
+ */
+export function proposalSourceDocuments(project: ProjectSimulation): { attachments: ProposalQuotationSource['attachments']; omitted: OmittedDocument[] } {
+  const attachments: ProposalQuotationSource['attachments'] = [];
+  const omitted: OmittedDocument[] = [];
+  for (const annex of project.customization?.attachedPdfs ?? []) {
+    if (!annex.enabled) continue;
+    const assetId = annexAssetId(annex);
+    if (!assetId || assetId.length > QUOTATION_LIMITS.assetId || !ASSET_ID.test(assetId)) {
+      omitted.push({ id: annex.id, title: annex.title || annex.fileName, reason: 'Está solo en este equipo: no tiene un archivo guardado que la cotización pueda enlazar.' });
+      continue;
+    }
+    if (attachments.length >= QUOTATION_LIMITS.maxAttachments) {
+      omitted.push({ id: annex.id, title: annex.title || annex.fileName, reason: `La cotización admite hasta ${QUOTATION_LIMITS.maxAttachments} documentos.` });
+      continue;
+    }
+    const thumb = annex.thumbnailDataUrl;
+    const thumbnailOk = typeof thumb === 'string' && thumb.length <= QUOTATION_LIMITS.thumbnailDataUrl && (isAssetRef(thumb) || IMAGE_DATA_URL.test(thumb));
+    attachments.push({
+      id: clip(annex.id, QUOTATION_LIMITS.id),
+      fileName: clip(annex.fileName, QUOTATION_LIMITS.fileName),
+      fileSize: Number.isSafeInteger(annex.fileSize) && annex.fileSize >= 0 ? annex.fileSize : 0,
+      pageCount: Number.isSafeInteger(annex.pageCount) && annex.pageCount >= 0 ? annex.pageCount : 0,
+      title: clip(annex.title || annex.fileName, QUOTATION_LIMITS.label),
+      uploadedAt: clip(annex.uploadedAt, QUOTATION_LIMITS.timestamp),
+      assetId,
+      origin: annex.origin === 'catalog' ? 'catalog' : 'proposal',
+      ...(annex.catalogItemId && annex.catalogItemId.length <= QUOTATION_LIMITS.id ? { catalogItemId: annex.catalogItemId } : {}),
+      ...(thumbnailOk ? { thumbnailDataUrl: thumb } : {}),
+    });
+  }
+  return { attachments, omitted };
 }
 
 export type ProposalConversion =
