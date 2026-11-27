@@ -16,8 +16,8 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 - [Editor del documento de propuesta](PROPOSAL_DOCUMENT_EDITOR.md): textos editables en la hoja, registro de textos, plantillas, diseño y propuesta web.
 - [Seguimiento comercial](PROPOSAL_COMMERCIAL_TRACKING.md): decisiones del cliente, responsables y reportes.
 - [Directorio de clientes](CLIENTS.md): clientes por organización, enlace opcional con propuestas y resumen de estados.
-- [Cotizaciones](QUOTATIONS.md): dominio puro compartido (`shared/quotations/`): tipos, totales en centavos con ITBIS sobre la base gravada, estados, numeración, validación y conversión desde propuesta; plantillas, firmas y sellos, y su store y sincronización.
-- [Editor de cotizaciones](QUOTATION_EDITOR.md): editor con vista previa en vivo, edición pura, línea del catálogo y su precio, pestañas «Plantilla y firmas» y «Adjuntos», gestor de plantillas, firmas y sellos, hoja A4 y paginación, y exportación a PDF con adjuntos.
+- [Cotizaciones](QUOTATIONS.md): dominio puro compartido (`shared/quotations/`): tipos, totales en centavos con ITBIS sobre la base gravada, estados, numeración, validación y conversión desde propuesta; plantillas, firmas y sellos, su store y sincronización, estado del módulo y qué exige el release 2.10.0.
+- [Editor de cotizaciones](QUOTATION_EDITOR.md): editor con vista previa en vivo, edición pura, línea del catálogo y su precio, pestañas «Plantilla y firmas» y «Adjuntos», gestor de plantillas, firmas y sellos, hoja A4 y paginación, exportación a PDF con adjuntos y vista previa del correo (`mailto:`, sin envío desde la app).
 - [Cotización desde una propuesta](QUOTATION_FROM_PROPOSAL.md): diálogo de conversión con sus cinco bloques, de dónde salen los importes y cómo cuadran con la propuesta, documentos que pasan, listas enlazadas y propuesta de origen en el editor.
 - [Subsistema IA](AI_SCANNERS_SPECIFICATION.md) y [tarifas en el flujo IA](AI_TARIFF_CONTEXT.md).
 - [Agentes y herramientas de IA](AGENT_TOOLS.md): registro común, permisos, actividad y deshacer, precios automáticos.
