@@ -49,6 +49,23 @@
 .dark .proposal-drop-message {
   color: #6be0b5;
 }
+/* Imagen de arrastre: se pinta fuera de pantalla solo para que Chromium la fotografíe. */
+.proposal-drag-chip {
+  position: fixed;
+  top: -200px;
+  left: -400px;
+  max-width: 320px;
+  padding: 6px 12px;
+  overflow: hidden;
+  font: 600 13px/1.4 system-ui, sans-serif;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #067451;
+  background: #e8f7f0;
+  border: 1px solid #087b58;
+  border-radius: 8px;
+  pointer-events: none;
+}
 .proposal-unlink-hint {
   position: fixed;
   left: 50%;

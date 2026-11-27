@@ -2,6 +2,7 @@ import { supplyPresentation, supplySummaryText } from '../../../shared/offGridSu
 import {
   ProposalGroupControls,
   useProposalLinkDrop,
+  proposalDropMessage,
 } from "../../features/proposals/ProposalGroupControls";
 import {
   proposalFamily,
@@ -37,7 +38,7 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
     <article
       data-proposal-drop-target
       draggable
-      onDragStart={(event) => startProposalDrag(event, project.id)}
+      onDragStart={(event) => startProposalDrag(event, project.id, project.client.name || "Sin nombre")}
       onDragEnd={stopProposalDrag}
       {...drop.events}
       style={
@@ -53,9 +54,7 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
       <ProposalGroupControls project={project} />
       {drop.hover && (
         <span className="proposal-drop-message">
-          {drop.hover === "ready"
-            ? "Soltar para enlazar debajo"
-            : "Mantén aquí para enlazar…"}
+          {proposalDropMessage(drop.hover)}
         </span>
       )}
       {drop.feedback && (
