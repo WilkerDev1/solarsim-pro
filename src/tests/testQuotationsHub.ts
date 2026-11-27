@@ -149,6 +149,15 @@ try {
   assert.doesNotMatch(refusedDeletion, /Usar la del servidor/);
   useSimulationStore.setState({ quotationDeletionQueue: [{ id: reference.id, ownerId: user.id, baseVersion: 1, rejected: { status: 403, error: 'Sin permiso.' } }] });
   assert.match(renderDock({ quotation: reference, today: TODAY, readOnly: false }), /rechazó eliminarla[^<]*Sin permiso\./);
+  useSimulationStore.setState({ quotationDeletionQueue: [] });
+
+  // --- Fila descriptiva sin cantidad (p. ej. «Incluye descuento…» de una conversión): celda de cantidad vacía, no «0» --
+  const withNote: QuotationRecord = {
+    ...reference,
+    items: [...reference.items, { id: 'note-1', kind: 'detail', description: 'Incluye descuento: Cierre (10 %) −RD$ 100.00', quantity: 0, unit: '', unitPriceCents: 0, discountPct: 0, taxable: false }],
+  };
+  const noteDock = renderDock({ quotation: withNote, today: TODAY, readOnly: false });
+  assert.match(noteDock, /<tr data-kind="detail"><td>Incluye descuento: Cierre \(10 %\) −RD\$ 100\.00<\/td><td><\/td><td><\/td><td><\/td><\/tr>/, 'sin «0» en la cantidad');
 } finally {
   useSimulationStore.setState(initial, true);
   syncServerSnapshot();

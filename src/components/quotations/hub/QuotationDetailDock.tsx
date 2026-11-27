@@ -178,7 +178,7 @@ export function QuotationDetailDock({ quotation, today, readOnly, onDuplicated }
                         <tr key={item.id} data-kind={item.kind}>
                           <td>{item.description || 'Sin descripción'}</td>
                           <td>{priced ? formatAmount(item.unitPriceCents) : ''}</td>
-                          <td>{quantityText(item.quantity, item.unit)}</td>
+                          <td>{priced || item.quantity > 0 ? quantityText(item.quantity, item.unit) : ''}</td>
                           <td>
                             {priced ? formatAmount(line?.netCents ?? 0) : ''}
                             {priced && item.discountPct > 0 && <span className="qh-line-discount">−{item.discountPct}%</span>}

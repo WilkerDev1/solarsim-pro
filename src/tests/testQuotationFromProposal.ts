@@ -217,4 +217,18 @@ assert.equal('assetId' in quotation.attachments[1], false);
   assert.deepEqual(again, result, 'misma entrada y mismo generador, mismo resultado');
 }
 
+// Una línea con precio puede llevar una fila descriptiva justo debajo (`note`: p. ej. el descuento ya incluido)
+{
+  const src = source();
+  src.pricedLines[0] = { ...src.pricedLines[0], note: 'Incluye descuento: Cierre (10 %) −RD$ 9,444.44' };
+  const out = build(src);
+  assert.deepEqual(out.items.slice(0, 3).map(i => [i.kind, i.description, i.quantity, i.unit, i.unitPriceCents]), [
+    ['item', 'Equipos fotovoltaicos', 1, 'UD', 85_000_00],
+    ['detail', 'Incluye descuento: Cierre (10 %) −RD$ 9,444.44', 0, '', 0],
+    ['item', 'Instalación y puesta en marcha', 1, 'UD', 12_500_50],
+  ]);
+  const [withNote, plain] = [computeQuotationTotals(out), computeQuotationTotals(build())];
+  assert.deepEqual([withNote.totalCents, withNote.taxCents, withNote.discountCents], [plain.totalCents, plain.taxCents, plain.discountCents], 'la fila no cambia los totales');
+}
+
 console.log('Quotation from-proposal tests passed.');
