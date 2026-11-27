@@ -89,3 +89,14 @@ export function checkDocumentDataUrl(
   if (parsed.byteLength < 1 || parsed.byteLength > maxBytes) return { ok: false, reason: 'size' };
   return { ok: true, type: parsed.actual, byteLength: parsed.byteLength };
 }
+
+/**
+ * Data URL con el tipo real de sus bytes: un JPEG guardado como `image/png` (p. ej. un `.png` que en realidad es
+ * JPEG) pasa a `image/jpeg`. `null` si no es un data URL base64 o si su contenido real no está en `allowed` (SVG,
+ * HTML, otro formato): eso se rechaza al importarlo, nunca se intenta subir.
+ */
+export function normalizeDocumentDataUrl(value: string, allowed: readonly DocumentFileType[] = DOCUMENT_IMAGE_TYPES): string | null {
+  const parsed = parseDataUrl(value);
+  if (!parsed?.actual || !allowed.includes(parsed.actual)) return null;
+  return parsed.declared === parsed.actual ? value : `data:${parsed.actual};base64,${parsed.base64}`;
+}

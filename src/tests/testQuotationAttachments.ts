@@ -366,9 +366,91 @@ assert.equal(store.getState().quotations.find((x) => x.id === id)!.attachments.l
   // Una imagen nueva que no se pudo subir deja la cotización pendiente; si la base ya la tiene, no hace falta subirla.
   failing = true;
   const logoContent = emptyQuotationContent('2026-11-26', { issuer: { name: 'E', taxId: '', address: '', phone: '', email: '', website: '', logo: PNG } });
-  assert.deepEqual((await publishQuotationAssets(logoContent, deps)).pending, ['una imagen']);
+  assert.deepEqual((await publishQuotationAssets(logoContent, deps)).pending, ['el logo del emisor']);
   const base = { ...logoContent, issuer: { ...logoContent.issuer, logo: `asset:sha256:${sha(PNG)}` } };
   assert.deepEqual((await publishQuotationAssets(logoContent, { ...deps, base })).pending, [], 'confirmada en la base: se envía su referencia');
+
+  // ── I-a: rechazos definitivos frente a fallos reintentables ──
+  const { isPermanentUploadFailure } = await import('../store/sync/quotationAssets');
+  const { DocumentAssetUploadError } = await import('../services/documentAssetService');
+  const { publishableContent, canonicalQuotationContent } = await import('../store/sync/quotationContent');
+  assert.equal(isPermanentUploadFailure(new DocumentAssetUploadError('x', 415)), true);
+  assert.equal(isPermanentUploadFailure(new DocumentAssetUploadError('x', 413)), true);
+  for (const status of [401, 403, 408, 429, 500, 503]) assert.equal(isPermanentUploadFailure(new DocumentAssetUploadError('x', status)), false, String(status));
+  assert.equal(isPermanentUploadFailure(new Error('sin red')), false);
+  const issuer = (logo: string) => ({ name: 'E', taxId: '', address: '', phone: '', email: '', website: '', logo });
+  // Un JPEG guardado como `.png`: se sube con su tipo real (no falla en cada pasada).
+  const jpegBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1]);
+  const jpegAsPng = `data:image/png;base64,${jpegBytes.toString('base64')}`;
+  const sentImages: string[] = [];
+  const okDeps = { ...deps, upload: async (dataUrl: string) => { sentImages.push(dataUrl); return 'ok'; } };
+  const mislabelled = emptyQuotationContent('2026-11-26', { issuer: issuer(jpegAsPng) });
+  const normalizedResult = await publishQuotationAssets(mislabelled, okDeps);
+  assert.deepEqual([normalizedResult.pending, normalizedResult.issues], [[], []]);
+  assert.equal(sentImages[0], `data:image/jpeg;base64,${jpegBytes.toString('base64')}`, 'normalizado al tipo real');
+  const jpegRef = `asset:sha256:${sha(`data:image/jpeg;base64,${jpegBytes.toString('base64')}`)}`;
+  assert.equal(publishableContent(mislabelled).issuer.logo, jpegRef, 'viaja la referencia del contenido normalizado');
+  // Un SVG con extensión de imagen: no se intenta subir; se publica vacío con un aviso que dice qué hacer.
+  const svgLogo = `data:image/png;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64')}`;
+  const svgContent = emptyQuotationContent('2026-11-26', { issuer: issuer(svgLogo) });
+  sentImages.length = 0;
+  const svgResult = await publishQuotationAssets(svgContent, okDeps);
+  assert.deepEqual(svgResult.pending, []);
+  assert.equal(sentImages.length, 0);
+  assert.match(svgResult.issues[0].message, /el logo del emisor.*vuelve a importarla como PNG, JPEG o WebP/);
+  assert.equal(publishableContent(svgContent).issuer.logo, '');
+  // 415 del servidor: imagen vacía con aviso, adjunto publicado sin su referencia; nada queda pendiente.
+  const refusedPng = `data:image/png;base64,${Buffer.concat([PNG_BYTES, Buffer.from('rechazada')]).toString('base64')}`;
+  const pdf2 = await pdfWith(3);
+  const refusedAttachment = await prepareAttachmentFile({ name: 'cifrado.pdf', bytes: pdf2 }, { id: 'att-415', now });
+  assert.ok(refusedAttachment.ok);
+  const refusedContent = emptyQuotationContent('2026-11-26', {
+    issuer: issuer(refusedPng), attachments: [refusedAttachment.attachment, attachment('ok-other', { origin: 'catalog', assetId: 'uuid' })],
+  });
+  const refused = await publishQuotationAssets(refusedContent, {
+    ...deps, uploads: createUploadedAttachments(null), attachmentBytes: async () => pdf2,
+    upload: async () => { throw new DocumentAssetUploadError('Formato no admitido', 415, 'unsupported_asset_type'); },
+  });
+  assert.deepEqual(refused.pending, [], 'un rechazo definitivo no bloquea la publicación');
+  assert.deepEqual(refused.issues.map((i) => [i.kind, i.attachmentId]), [['image', undefined], ['attachment', 'att-415']]);
+  assert.match(refused.issues[1].message, /quítalo o reemplázalo/);
+  const refusedPublished = publishableContent(refusedContent);
+  assert.equal(refusedPublished.issuer.logo, '');
+  assert.equal(refusedPublished.attachments[0].assetId, undefined, 'el adjunto rechazado viaja sin referencia');
+  assert.equal(refusedPublished.attachments[1].assetId, 'uuid', 'el resto, intacto');
+  // publishableContent nunca muta el contenido del store.
+  const frozen = emptyQuotationContent('2026-11-26', { design: { ...emptyQuotationContent('2026-11-26').design, signature: { name: 'A', role: '', image: svgLogo }, stampImage: svgLogo } });
+  const before = structuredClone(frozen);
+  publishableContent(frozen);
+  canonicalQuotationContent(frozen);
+  assert.deepEqual(frozen, before);
+
+  // ── I-b: emitida → aceptada sin la imagen local de la copia fija: un solo PUT con las referencias de la base ──
+  const { planQuotationPush } = await import('../store/sync/quotationContent');
+  const signRef = `asset:sha256:${'d'.repeat(64)}`, stampRef = `asset:sha256:${'e'.repeat(64)}`;
+  const issuedBase = {
+    ...emptyQuotationContent('2026-11-26', { client: { name: 'Hotel', attention: '', taxId: '', phone: '', email: '', address: '' }, items: doc.items.slice(0, 1) }),
+    status: 'issued' as const,
+  };
+  issuedBase.design = { ...issuedBase.design, signature: { name: 'Idali', role: 'Ventas', image: signRef }, stampImage: stampRef };
+  const hydratedLocal = { ...issuedBase, status: 'accepted' as const, design: { ...issuedBase.design, signature: { name: 'Idali', role: 'Ventas', image: '' } } };
+  delete (hydratedLocal.design as { stampImage?: string }).stampImage;
+  const plan = planQuotationPush(issuedBase, hydratedLocal);
+  assert.deepEqual(plan.map((p) => p.status), ['accepted'], 'sin reabrir');
+  assert.equal(plan[0].design.signature?.image, signRef, 'la firma del servidor se conserva');
+  assert.equal(plan[0].design.stampImage, stampRef, 'y el sello');
+}
+
+// ── Menor 3: una copia en curso protege los bytes de origen ──
+{
+  const { trackAttachmentCopy, attachmentCopiesSettled } = await import('../store/sync/attachmentCopies');
+  const { attachmentBytesUnused } = await import('../features/quotations/attachments');
+  let finish: () => void = () => undefined;
+  void trackAttachmentCopy('att-copiando', new Promise<void>((resolve) => { finish = resolve; }));
+  assert.equal(attachmentBytesUnused([], attachment('att-copiando')), false, 'mientras se copia, no se borra');
+  finish();
+  await attachmentCopiesSettled('att-copiando');
+  assert.equal(attachmentBytesUnused([], attachment('att-copiando')), true);
 }
 
 console.log('Quotation attachments, signatures and templates tests passed.');

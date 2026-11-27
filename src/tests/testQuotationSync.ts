@@ -26,7 +26,7 @@ let holdList: Promise<void> | null = null;
 let forbidDelete = false;
 let onPut: ((id: string) => void) | null = null;
 /** Next PUT answers this 4xx instead of the server's response (after `onPut`). */
-let failNextPut: { status: number; error: string; code?: string } | null = null;
+let failNextPut: { status: number; error: string; code?: string; missing?: string[] } | null = null;
 const invalidClients = new Set<string>();
 const invalidFolders = new Set<string>();
 const calls: string[] = [];
@@ -380,6 +380,16 @@ try {
   assert.match(api().quotationChanges[imaged.quotation.id].assetsPending!, /se volverá a subir/);
   assert.equal((await sync()).success, true, 'retried on the next pass');
   assert.equal(rows.get(imaged.quotation.id)!.record.notes, 'Tras perder un activo');
+  // Without the attachment's bytes on this device no retry can help: a visible rejection, no promise of a retry.
+  const lostRef = `asset:sha256:${'9'.repeat(64)}`;
+  assert.ok(api().updateQuotationRecord(imaged.quotation.id, { attachments: [...find(imaged.quotation.id).attachments, { id: 'lost', fileName: 'perdido.pdf', fileSize: 10, pageCount: 1, title: 'Perdido', uploadedAt: '2026-11-01', mode: 'include', origin: 'manual', assetId: lostRef }] }).ok);
+  failNextPut = { status: 400, error: 'Falta un archivo', code: 'unknown_document_asset', missing: ['9'.repeat(64)] } as typeof failNextPut;
+  assert.equal((await sync()).success, false);
+  const lostChange = api().quotationChanges[imaged.quotation.id];
+  assert.match(lostChange.rejected!.error, /quita el adjunto o súbelo desde el equipo que lo tiene/);
+  assert.equal(lostChange.assetsPending, undefined, 'no promete reintentar');
+  assert.match(api().quotationSyncFeedback!, /subidas de imágenes o adjuntos pendientes/);
+  api().resolveQuotationConflict(imaged.quotation.id, 'accept_server');
 
   // 9. Deleting: published quotations use CAS; never-published drafts are dropped without a request.
   online = false;

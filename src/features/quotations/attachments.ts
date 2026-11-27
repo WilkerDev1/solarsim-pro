@@ -13,6 +13,7 @@ import type { SolarEquipmentItem } from '../../types/equipment';
 import { assetRefFor } from '../../services/documentAssetService';
 import { datasheetFileName } from '../../utils/proposalDatasheets';
 import { bytesToDataUrl } from '../../utils/dataUrl';
+import { isAttachmentBeingCopied } from '../../store/sync/attachmentCopies';
 
 export const ATTACHMENT_ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp';
 
@@ -262,7 +263,7 @@ export function skippedAttachmentsMessage(skipped: readonly SkippedAttachment[])
  * usando con el mismo id (las duplicadas antes de que duplicar diera ids nuevos lo compartían).
  */
 export function attachmentBytesUnused(quotations: readonly Pick<QuotationContent, 'attachments'>[], attachment: QuotationAttachment): boolean {
-  return attachment.origin === 'manual' && !quotations.some((q) => q.attachments.some((a) => a.id === attachment.id));
+  return attachment.origin === 'manual' && !isAttachmentBeingCopied(attachment.id) && !quotations.some((q) => q.attachments.some((a) => a.id === attachment.id));
 }
 
 /** Descarga un adjunto con su nombre (el renderer no abre archivos del sistema: lo guarda el navegador). */

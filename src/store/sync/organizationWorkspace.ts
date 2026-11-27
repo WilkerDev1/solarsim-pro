@@ -403,6 +403,7 @@ export function changeWorkspace(
       clientSyncFeedback: null,
       quotationSyncFeedback: null,
       quotationLibrarySyncFeedback: null,
+      quotationAssetIssues: {},
       workspaceScope: initialized.workspaceScope,
       organizationWorkspaces: hidden.length
         ? { ...others, [nextScope]: captured }
@@ -430,6 +431,7 @@ export function changeWorkspace(
     clientSyncFeedback: null,
     quotationSyncFeedback: null,
     quotationLibrarySyncFeedback: null,
+    quotationAssetIssues: {},
     activeConflict: null,
     pendingImportConflict: null,
     pendingAgentActions: [],

@@ -52,8 +52,9 @@ const LOCK_REASONS: Record<QuotationStatus, string> = {
 
 const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }) => {
   const {
-    change, sidebarTheme, currentUser, online, clients, catalog, defaults, seal, setQuotationStatus, closeQuotation, templates, signatures, openQuotationLibrary,
+    change, sidebarTheme, currentUser, online, clients, catalog, defaults, seal, setQuotationStatus, closeQuotation, templates, signatures, openQuotationLibrary, imageIssues,
   } = useSimulationStore(useShallow((s) => ({
+    imageIssues: s.quotationAssetIssues[quotation.id],
     templates: s.quotationLibrary.templates.items,
     signatures: s.quotationLibrary.signatures.items,
     openQuotationLibrary: s.openQuotationLibrary,
@@ -169,6 +170,9 @@ const QuotationEditor: React.FC<{ quotation: QuotationRecord }> = ({ quotation }
               <span>{readOnlyReason}</span>
             </p>
           )}
+          {imageIssues?.filter((issue) => issue.kind === 'image').map((issue) => (
+            <p key={issue.message} className="qe-field-hint qe-asset-issue" role="note">{issue.message}</p>
+          ))}
           <div className="qe-tabs" role="tablist" aria-label="Secciones del editor">
             {tabs.map(({ id: tabId, label, icon: Icon }) => (
               <button key={tabId} type="button" role="tab" id={`qe-tab-${tabId}`} aria-controls={`qe-panel-${tabId}`} aria-selected={tab === tabId} tabIndex={tab === tabId ? 0 : -1} onClick={() => setTab(tabId)}

@@ -135,6 +135,11 @@ assert.ok(stamp.ok);
 assert.deepEqual(signatures().map((s) => s.isDefault), [true, true], 'firma y sello tienen su propia predeterminada');
 const disguised = api().createQuotationSignature({ kind: 'signature', name: 'Falsa', image: SVG_AS_PNG });
 assert.equal(disguised.ok, false, 'una imagen disfrazada no entra');
+const jpegBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1]).toString('base64');
+const mislabelled = api().createQuotationSignature({ kind: 'signature', name: 'JPEG como PNG', image: `data:image/png;base64,${jpegBytes}` });
+assert.ok(mislabelled.ok, 'un JPEG declarado PNG se importa con su tipo real');
+assert.equal(mislabelled.ok && mislabelled.record.image, `data:image/jpeg;base64,${jpegBytes}`);
+assert.ok(api().deleteQuotationSignature(mislabelled.ok ? mislabelled.record.id : '').ok);
 assert.equal((await sync()).success, false, 'sin sesión no hay sincronización');
 assert.equal(calls.length, 0, 'sin cuenta no se toca la red');
 

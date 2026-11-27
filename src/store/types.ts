@@ -370,6 +370,7 @@ import type {
   QuotationChange, QuotationDeletionCommand, QuotationMutationResult, QuotationRecord, QuotationSyncCursor,
 } from '../types/quotation';
 
+import type { QuotationAssetIssue } from './sync/quotationAssets';
 import type {
   LibraryKind, LibraryMutationResult, QuotationLibraryState, QuotationSignature, QuotationSignatureContent, QuotationTemplate, QuotationTemplateContent,
 } from '../types/quotationLibrary';
@@ -386,6 +387,8 @@ export interface QuotationSlice {
   /** Espacio local: última secuencia usada por año (`'2026' → 147`); nunca baja aunque se borre una cotización. */
   quotationNumberCounters: Record<string, number>;
   quotationSyncFeedback: string | null;
+  /** Imágenes o adjuntos que el servidor rechazó de forma definitiva en la última publicación, por cotización (no se guarda). */
+  quotationAssetIssues: Record<string, QuotationAssetIssue[]>;
   createQuotationRecord: (overrides?: Partial<QuotationContent>) => QuotationMutationResult;
   /** Edita el contenido de un borrador; nunca cambia `status`. */
   updateQuotationRecord: (id: string, patch: Partial<QuotationContent>) => QuotationMutationResult;

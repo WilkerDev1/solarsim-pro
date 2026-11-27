@@ -139,4 +139,17 @@ assert.equal(templateFromQuotation({ ...fresh, validUntil: null }, 'x').validity
 assert.equal(templateFromQuotation({ ...fresh, validUntil: '2026-11-26' }, 'x').validityDays, null, 'cero días no es vigencia');
 assert.ok(validateQuotationTemplate(saved).ok);
 
+// Normalizar al tipo real: un JPEG declarado PNG pasa a image/jpeg; lo que no es una imagen admitida, null.
+{
+  const { normalizeDocumentDataUrl } = await import('../../shared/fileSignatures');
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]).toString('base64');
+  assert.equal(normalizeDocumentDataUrl(`data:image/png;base64,${jpeg}`), `data:image/jpeg;base64,${jpeg}`);
+  assert.equal(normalizeDocumentDataUrl(PNG), PNG, 'ya correcto: el mismo texto');
+  assert.equal(normalizeDocumentDataUrl(SVG_AS_PNG), null);
+  assert.equal(normalizeDocumentDataUrl(PDF_AS_PNG), null, 'un PDF no es una imagen');
+  assert.equal(normalizeDocumentDataUrl(PDF_AS_PNG, ['application/pdf']), PDF_AS_PNG.replace('image/png', 'application/pdf'));
+  assert.equal(normalizeDocumentDataUrl('texto'), null);
+  // Firma importada con el tipo mal declarado: se valida tras normalizar (lo hace el store al crear).
+}
+
 console.log('Quotation library contract tests passed.');

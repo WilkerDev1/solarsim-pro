@@ -1,5 +1,6 @@
 import { normalizeTaxId } from '../../../shared/clients';
 import { QUOTATION_LIMITS } from '../../../shared/quotations';
+import { DOCUMENT_IMAGE_TYPES, normalizeDocumentDataUrl } from '../../../shared/fileSignatures';
 import type { CompanyProfile } from '../../types/companyProfile';
 import type { QuotationIssuer } from '../../types/quotation';
 
@@ -12,6 +13,16 @@ export const LOGO_REJECTED = 'El logo del emisor';
 export const EMPTY_QUOTATION_ISSUER: QuotationIssuer = { name: '', taxId: '', address: '', phone: '', email: '', website: '', logo: '' };
 
 const clip = (value: string | undefined, max: number) => (value ?? '').trim().slice(0, max);
+
+/**
+ * Logo con el tipo real de sus bytes (un JPEG guardado como PNG pasa a `image/jpeg`; si no, el servidor lo
+ * rechazaría en cada publicación). Un data URL que no es PNG, JPEG ni WebP se deja tal cual: la validación de la
+ * cotización lo rechaza y el borrador nace sin logo (`LOGO_REJECTED`).
+ */
+function realTypeLogo(logo: string): string {
+  if (!logo.startsWith('data:')) return logo;
+  return normalizeDocumentDataUrl(logo, DOCUMENT_IMAGE_TYPES) ?? logo;
+}
 
 /**
  * Emisor de una cotización nueva, copiado del membrete (docs/COMPANY_CENTER.md): identidad, contacto y logo tal como
@@ -27,7 +38,7 @@ export function issuerFromCompany(company: CompanyProfile | null | undefined): Q
     phone: clip(company.phone, QUOTATION_LIMITS.phone),
     email: clip(company.email, QUOTATION_LIMITS.label),
     website: clip(company.website, QUOTATION_LIMITS.label),
-    logo: company.logoBase64 ?? '',
+    logo: realTypeLogo(company.logoBase64 ?? ''),
   };
 }
 

@@ -1,9 +1,9 @@
 import { collectAssetRefs, isAssetRef, assetRefHash } from '../../../shared/documentAssets';
-import { sniffDocumentFileType } from '../../../shared/fileSignatures';
+import { DOCUMENT_IMAGE_TYPES, normalizeDocumentDataUrl, sniffDocumentFileType } from '../../../shared/fileSignatures';
 import type { QuotationAttachment, QuotationContent } from '../../../shared/quotations';
-import { assetRefFor } from '../../services/documentAssetService';
+import { DocumentAssetUploadError, assetRefFor } from '../../services/documentAssetService';
 import { bytesToDataUrl } from '../../utils/dataUrl';
-import { quotationImages, registerImageRef } from './quotationContent';
+import { markRefusedAttachmentRef, markRefusedImage, quotationImageSlots, registerImageRef } from './quotationContent';
 
 export interface QuotationAssetDeps {
   /** Espacio de trabajo de la pasada (las subidas confirmadas son de un servidor y una organización). */
@@ -16,6 +16,13 @@ export interface QuotationAssetDeps {
   attachmentBytes: (attachmentId: string) => Promise<ArrayBuffer | null>;
   /** Registro de adjuntos ya subidos (por defecto, el persistente de este equipo). */
   uploads?: UploadedAttachments;
+}
+
+/** Imagen o adjunto que el servidor no admite (rechazo definitivo): se publica sin él y se avisa qué hacer. */
+export interface QuotationAssetIssue {
+  kind: 'image' | 'attachment';
+  attachmentId?: string;
+  message: string;
 }
 
 /** Adjuntos ya subidos por espacio de trabajo, por id + tamaño + fecha de carga: no se rehashean en cada publicación. */
@@ -59,25 +66,49 @@ export const attachmentUploadKey = (scope: string, attachment: QuotationAttachme
   `${scope}|${attachment.id}|${attachment.fileSize}|${attachment.uploadedAt}|${assetRefHash(attachment.assetId ?? '')}`;
 
 /**
+ * Un rechazo definitivo de la API (413, 415 y otros 4xx que no dependen de la sesión ni del momento): reintentarlo
+ * daría lo mismo en cada pasada. 401, 403, 408 y 429, la red y los 5xx se reintentan.
+ */
+export function isPermanentUploadFailure(error: unknown): boolean {
+  return error instanceof DocumentAssetUploadError && error.status >= 400 && error.status < 500 && ![401, 403, 408, 429].includes(error.status);
+}
+
+const IMAGE_ADVICE = 'vuelve a importarla como PNG, JPEG o WebP válido.';
+
+/**
  * Antes de publicar una cotización: calcula la referencia de cada imagen en línea (logo, miniaturas, firma y sello
- * fijados) y sube a `/api/document-assets` lo que la base confirmada aún no referencia, más los bytes de los adjuntos
- * de este equipo. Devuelve lo que quedó pendiente: con algo pendiente la cotización NO se publica (se reintenta en la
- * siguiente pasada), así nunca viaja un hueco vacío que borre una imagen ni una referencia que el servidor no tiene.
+ * fijados; normalizada al tipo real de sus bytes, así un JPEG guardado como PNG funciona) y sube a
+ * `/api/document-assets` lo que la base confirmada aún no referencia, más los bytes de los adjuntos de este equipo.
+ *
+ * - `pending`: fallos de red, 5xx o de sesión. Con algo pendiente la cotización NO se publica (se reintenta en la
+ *   siguiente pasada): nunca viaja un hueco vacío que borre una imagen ni una referencia que el servidor no tiene.
+ * - `issues`: rechazos definitivos. Una imagen así viaja vacía y un adjunto sin su referencia, con un aviso que dice
+ *   qué hacer; no se reintentan ni bloquean el resto. Lo que la base ya tiene confirmado nunca se toca.
+ *
  * Un adjunto cuyos bytes no están aquí (llegó de otro equipo o de una duplicación) se publica: lo comprueba la API.
  */
-export async function publishQuotationAssets(content: QuotationContent, deps: QuotationAssetDeps): Promise<{ pending: string[] }> {
+export async function publishQuotationAssets(content: QuotationContent, deps: QuotationAssetDeps): Promise<{ pending: string[]; issues: QuotationAssetIssue[] }> {
   const confirmed = deps.base ? collectAssetRefs(deps.base) : new Set<string>();
   const uploads = deps.uploads ?? defaultUploads;
   const pending: string[] = [];
-  for (const image of quotationImages(content)) {
+  const issues: QuotationAssetIssue[] = [];
+  for (const { image, label } of quotationImageSlots(content)) {
     if (isAssetRef(image)) continue;
-    const ref = await assetRefFor(image);
+    const normalized = normalizeDocumentDataUrl(image, DOCUMENT_IMAGE_TYPES);
+    if (!normalized) {
+      markRefusedImage(image);
+      issues.push({ kind: 'image', message: `No se publicó ${label}: no es una imagen PNG, JPEG o WebP; ${IMAGE_ADVICE}` });
+      continue;
+    }
+    const ref = await assetRefFor(normalized);
     registerImageRef(image, ref);
     if (confirmed.has(assetRefHash(ref))) continue;
     try {
-      await deps.upload(image);
-    } catch {
-      pending.push('una imagen');
+      await deps.upload(normalized);
+    } catch (error) {
+      if (!isPermanentUploadFailure(error)) { pending.push(label); continue; }
+      markRefusedImage(image);
+      issues.push({ kind: 'image', message: `No se publicó ${label}: el servidor no la admite (${(error as Error).message}); ${IMAGE_ADVICE}` });
     }
   }
   for (const attachment of content.attachments ?? []) {
@@ -92,9 +123,12 @@ export async function publishQuotationAssets(content: QuotationContent, deps: Qu
     try {
       await deps.upload(dataUrl);
       uploads.add(key);
-    } catch {
-      pending.push(`«${attachment.title || attachment.fileName}»`);
+    } catch (error) {
+      const name = `«${attachment.title || attachment.fileName}»`;
+      if (!isPermanentUploadFailure(error)) { pending.push(name); continue; }
+      markRefusedAttachmentRef(attachment.assetId);
+      issues.push({ kind: 'attachment', attachmentId: attachment.id, message: `${name} no se pudo subir (${(error as Error).message}): quítalo o reemplázalo.` });
     }
   }
-  return { pending };
+  return { pending, issues };
 }

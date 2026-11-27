@@ -15,7 +15,8 @@ import { localIsoDate } from '../../utils/localDate';
 import { DocumentAssetService } from '../../services/documentAssetService';
 import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
 import { publishQuotationAssets, uploadedQuotationAttachments } from '../sync/quotationAssets';
-import { UNKNOWN_DOCUMENT_ASSET } from '../../../shared/documentAssets';
+import { trackAttachmentCopy } from '../sync/attachmentCopies';
+import { UNKNOWN_DOCUMENT_ASSET, assetRefHash, isAssetRef } from '../../../shared/documentAssets';
 
 const SESSION_CHANGED = { success: false, message: 'La sesión cambió.' };
 const fail = (error: string) => ({ ok: false as const, error });
@@ -134,6 +135,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
     quotationSyncCursor: null,
     quotationNumberCounters: {},
     quotationSyncFeedback: null,
+    quotationAssetIssues: {},
 
     createQuotationRecord: (overrides = {}) => {
       if (!writable()) return fail('Tu rol no permite crear cotizaciones.');
@@ -194,9 +196,9 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
       if (result.ok) {
         const names = new Map(content.attachments.map((a) => [a.id, a.fileName]));
         for (const [from, to] of copies)
-          void PDFAttachmentStorage.getAttachment(from)
+          trackAttachmentCopy(from, PDFAttachmentStorage.getAttachment(from)
             .then((bytes) => (bytes ? PDFAttachmentStorage.saveAttachment(to, result.quotation.id, names.get(to) ?? '', bytes) : undefined))
-            .catch(() => undefined);
+            .catch(() => undefined));
       }
       return result;
     },
@@ -457,13 +459,18 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               continue;
             }
             // Logo, thumbnails and attachments travel as `asset:sha256:` references: upload what this device has.
-            const { pending } = await publishQuotationAssets(local, {
+            const { pending, issues } = await publishQuotationAssets(local, {
               scope,
               base: change.base,
               upload: (dataUrl) => DocumentAssetService.ensureUploaded(assets, scope, dataUrl),
               attachmentBytes: (attachmentId) => PDFAttachmentStorage.getAttachment(attachmentId),
             });
             if (!current()) return SESSION_CHANGED;
+            // Definitive refusals (413/415…): published without that image or attachment, with a notice saying what to do.
+            set((s) => {
+              const { [id]: _previous, ...others } = s.quotationAssetIssues;
+              return { quotationAssetIssues: issues.length ? { ...others, [id]: issues } : others };
+            });
             const assetsPending = pending.length ? `No se pudo subir ${pending.join(', ')}: se reintentará en la próxima sincronización.` : undefined;
             if ((get().quotationChanges[id]?.assetsPending) !== assetsPending)
               set((s) => {
@@ -532,13 +539,26 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
                 }));
               } else if (saved.status === 400 && saved.code === UNKNOWN_DOCUMENT_ASSET) {
                 // The server lacks an asset this quotation references: forget it as uploaded, so the next pass uploads
-                // it again from this device. Retryable, never a permanent rejection.
+                // it again from this device. Without its bytes here no retry can help: it waits for the user.
                 const missing = saved.missing ?? [];
                 DocumentAssetService.forgetUploaded(scope, missing);
                 uploadedQuotationAttachments.forgetHashes(missing);
-                set((s) => (s.quotationChanges[id]
-                  ? { quotationChanges: { ...s.quotationChanges, [id]: { ...s.quotationChanges[id], assetsPending: 'El servidor no tiene un adjunto o una imagen: se volverá a subir en la próxima sincronización.' } } }
-                  : {}));
+                const lost = new Set(missing);
+                const missingHere: string[] = [];
+                for (const attachment of local.attachments) {
+                  if (!attachment.assetId || !isAssetRef(attachment.assetId) || !lost.has(assetRefHash(attachment.assetId))) continue;
+                  if (!(await PDFAttachmentStorage.getAttachment(attachment.id).catch(() => null))) missingHere.push(`«${attachment.title || attachment.fileName}»`);
+                }
+                if (missingHere.length) {
+                  reject(id, change.revision, {
+                    ...saved,
+                    error: `El servidor no tiene ${missingHere.join(', ')} y este equipo tampoco: quita el adjunto o súbelo desde el equipo que lo tiene.`,
+                  });
+                } else {
+                  set((s) => (s.quotationChanges[id]
+                    ? { quotationChanges: { ...s.quotationChanges, [id]: { ...s.quotationChanges[id], assetsPending: 'El servidor no tiene un adjunto o una imagen de este equipo: se volverá a subir en la próxima sincronización.' } } }
+                    : {}));
+                }
               } else if (saved.status === 409) {
                 if (saved.quotation) conflict(id, saved.quotation);
                 else tombstone(id);
@@ -572,7 +592,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               // The cursor is stored only with the download it describes, fully applied.
               ...(listed.serverTimestamp ? { quotationSyncCursor: { scope, serverTimestamp: listed.serverTimestamp } } : {}),
               quotationSyncFeedback: failures || unresolved || refusedDeletions
-                ? `${failures} cotización(es) pendientes: hay conflictos, rechazos del servidor o permisos distintos. Revisa y sincroniza.`
+                ? `${failures} cotización(es) pendientes: hay conflictos, rechazos del servidor, subidas de imágenes o adjuntos pendientes o permisos distintos. Revisa y sincroniza.`
                 : null,
             };
           });

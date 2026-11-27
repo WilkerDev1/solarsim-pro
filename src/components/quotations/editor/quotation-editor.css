@@ -823,6 +823,8 @@
 }
 .qe-chip {
   display: inline-flex;
+  align-self: flex-start;
+  width: fit-content;
   align-items: center;
   margin-left: 8px;
   padding: 1px 7px;
@@ -1067,4 +1069,7 @@
 }
 .qe-dropzone[data-disabled] {
   opacity: 0.55;
+}
+.qe-asset-issue {
+  color: var(--qe-pending);
 }

@@ -9,6 +9,7 @@ import {
 } from '../../../features/quotations/attachments';
 import { quotationAttachmentResolver } from '../../../features/quotations/assetImages';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { attachmentCopiesSettled } from '../../../store/sync/attachmentCopies';
 import { PDFAttachmentStorage } from '../../../services/pdfAttachmentStorage';
 import { InfoTip } from '../../simulator/params/ui/InfoTip';
 import { TextField } from './fields';
@@ -37,6 +38,9 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const { attachments } = content;
+  // Rechazos definitivos del servidor en la última publicación (p. ej. 415): se dice qué hacer junto al adjunto.
+  const issues = useSimulationStore((s) => s.quotationAssetIssues[quotationId]);
+  const issueOf = (id: string) => issues?.find((issue) => issue.attachmentId === id)?.message;
   const included = attachments.filter((a) => a.mode === 'include').length;
   const datasheets = catalogDatasheetCandidates(content, catalog, new Date().toISOString());
   const full = attachments.length >= QUOTATION_LIMITS.maxAttachments;
@@ -72,7 +76,11 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
   const remove = (attachment: QuotationAttachment) => {
     const failure = edit((c) => removeAttachment(c, attachment.id));
     setError(failure);
-    if (!failure && attachmentBytesUnused(useSimulationStore.getState().quotations, attachment)) void PDFAttachmentStorage.deleteAttachment(attachment.id);
+    // Una duplicación puede estar copiando estos bytes: se espera a que termine antes de decidir si se borran.
+    if (!failure)
+      void attachmentCopiesSettled(attachment.id).then(() => {
+        if (attachmentBytesUnused(useSimulationStore.getState().quotations, attachment)) void PDFAttachmentStorage.deleteAttachment(attachment.id);
+      });
   };
 
   return (
@@ -141,6 +149,7 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
               <p className="qe-attachment-meta">
                 {[ORIGIN_LABELS[attachment.origin], pageCountLabel(attachment.pageCount), formatFileSize(attachment.fileSize), attachment.fileName].filter(Boolean).join(' · ')}
               </p>
+              {issueOf(attachment.id) && <p className="qe-field-error" role="note">{issueOf(attachment.id)}</p>}
               <div className="qe-segmented" role="group" aria-label={`Uso del adjunto ${index + 1}`}>
                 <button type="button" aria-pressed={attachment.mode === 'include'} disabled={readOnly} onClick={() => setError(edit((c) => updateAttachment(c, attachment.id, { mode: 'include' })))}>Incluir en el PDF</button>
                 <button type="button" aria-pressed={attachment.mode === 'related'} disabled={readOnly} onClick={() => setError(edit((c) => updateAttachment(c, attachment.id, { mode: 'related' })))}>Solo relacionado</button>

@@ -12,6 +12,7 @@ import { QuotationLibrarySyncService } from '../../services/quotationLibrarySync
 import { DocumentAssetService, DocumentAssetUploadError, assetRefFor } from '../../services/documentAssetService';
 import { workspaceScope } from '../sync/organizationWorkspace';
 import { contentEqual } from '../sync/projectDifferences';
+import { DOCUMENT_IMAGE_TYPES, normalizeDocumentDataUrl } from '../../../shared/fileSignatures';
 
 type AnyRecord = QuotationTemplate | QuotationSignature;
 type AnyContent = QuotationTemplateContent | QuotationSignatureContent;
@@ -32,6 +33,14 @@ export function libraryContent(kind: LibraryKind, record: AnyRecord | AnyContent
 /** Ámbito de la predeterminada: una plantilla en total; una firma y un sello. */
 const sameDefaultScope = (kind: LibraryKind, a: AnyContent, b: AnyContent) =>
   kind === 'templates' || (a as QuotationSignatureContent).kind === (b as QuotationSignatureContent).kind;
+
+/** Una imagen importada cuyo tipo declarado no es el real (JPEG guardado como PNG) se guarda con su tipo real. */
+const withRealImageType = <T extends Partial<AnyContent>>(raw: T): T => {
+  const image = (raw as Partial<QuotationSignatureContent>).image;
+  if (typeof image !== 'string' || !image.startsWith('data:')) return raw;
+  const normalized = normalizeDocumentDataUrl(image, DOCUMENT_IMAGE_TYPES);
+  return normalized && normalized !== image ? { ...raw, image: normalized } : raw;
+};
 
 const inlineImage = (kind: LibraryKind, record: AnyContent | undefined) =>
   kind === 'signatures' && record && !isAssetRef((record as QuotationSignatureContent).image) ? (record as QuotationSignatureContent).image : null;
@@ -62,7 +71,7 @@ export const createQuotationLibrarySlice: SimulationSlice<QuotationLibrarySlice>
 
   const create = (kind: LibraryKind, raw: Partial<AnyContent>): LibraryMutationResult<AnyRecord> => {
     if (!writable()) return fail(`Tu rol no permite crear ${NOUN[kind]}.`);
-    const validation = VALIDATORS[kind](raw);
+    const validation = VALIDATORS[kind](withRealImageType(raw));
     if (!validation.ok) return fail(validation.error);
     const user = account(), now = new Date().toISOString();
     const record = {
@@ -81,7 +90,7 @@ export const createQuotationLibrarySlice: SimulationSlice<QuotationLibrarySlice>
     const existing = collection(kind).items.find((item) => item.id === id);
     if (!existing) return fail(kind === 'templates' ? 'Plantilla no encontrada.' : 'Firma no encontrada.');
     const base = libraryContent(kind, existing) ?? existing;
-    const validation = VALIDATORS[kind]({ ...base, ...changes, ...(kind === 'signatures' ? { kind: (existing as QuotationSignature).kind } : {}) });
+    const validation = VALIDATORS[kind](withRealImageType({ ...base, ...changes, ...(kind === 'signatures' ? { kind: (existing as QuotationSignature).kind } : {}) }));
     if (!validation.ok) return fail(validation.error);
     if (contentEqual(validation.value, base)) return { ok: true, record: existing };
     const record = { ...existing, ...validation.value, updatedAt: new Date().toISOString() } as AnyRecord;
@@ -219,7 +228,9 @@ export const createQuotationLibrarySlice: SimulationSlice<QuotationLibrarySlice>
         // version as the new base, so a pending edit of it is not a spurious 409.
         const cleared = new Map(saved.cleared.map((c) => [c.id, c.version]));
         patch(kind, (s) => ({
-          items: s.items.map((item) => (cleared.has(item.id) && !item.isDefault ? { ...item, version: cleared.get(item.id)!, baseVersion: cleared.get(item.id)! } : item)),
+          // Only the copy that is exactly one version behind (the clear itself); anything else is left to the pull.
+          items: s.items.map((item) => (cleared.has(item.id) && !item.isDefault && item.version === cleared.get(item.id)! - 1
+            ? { ...item, version: cleared.get(item.id)!, baseVersion: cleared.get(item.id)! } : item)),
           changes: Object.fromEntries(Object.entries(s.changes).map(([key, c]) =>
             [key, cleared.has(key) && c.baseVersion === cleared.get(key)! - 1 && c.server === undefined ? { ...c, baseVersion: cleared.get(key)! } : c])),
         }));
