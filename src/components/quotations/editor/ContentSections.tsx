@@ -292,7 +292,7 @@ const LineRow: React.FC<{
             onCommit={(description) => change({ description })}
           />
         </div>
-        <NumberField label={`Cantidad de la línea ${position}`} hideLabel value={line.quantity} readOnly={readOnly} format={formatQuantity} onCommit={(quantity) => change({ quantity })} />
+        <NumberField label={`Cantidad de la línea ${position}`} hideLabel value={line.quantity} readOnly={readOnly} format={formatQuantity} emptyWhenZero={detail} placeholder={detail ? '—' : undefined} onCommit={(quantity) => change({ quantity })} />
         {detail ? (
           <span className="qe-line-nosum">No suma al total</span>
         ) : (

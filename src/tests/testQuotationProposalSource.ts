@@ -152,6 +152,10 @@ const engineDiscountCents = (p: ProjectSimulation, rate = 1) => {
 /** Base gravada de la propuesta: la base en centavos cuyo 18 % es exactamente su ITBIS. */
 const baseForTax = (taxCents: number) => Math.round((taxCents * 10000) / 1800);
 const minus = (cents: number, currency: QuotationCurrency) => `−${formatMoney(cents, currency)}`;
+/** Suma de lo que dicen las filas «Incluye descuento…» (el primer importe de cada una: el único o el total). */
+const includedInNotes = (value: QuotationContent) => value.items
+  .filter((l) => l.kind === 'detail' && /^Incluye/.test(l.description))
+  .reduce((sum, l) => sum + Math.round(Number(/−(?:US|RD)\$ ([\d,]+\.\d\d)/.exec(l.description)?.[1].replace(/,/g, '') ?? 'NaN') * 100), 0);
 
 /** Igualdad exacta con la propuesta: total, ITBIS y base gravada; sin descuentos de documento; descuento visible. */
 const assertExact = (p: ProjectSimulation, b = blocks(), c = ctx(), what = '') => {
@@ -178,9 +182,14 @@ const assertExact = (p: ProjectSimulation, b = blocks(), c = ctx(), what = '') =
   if (discount > 0) {
     assert(globalIndex >= 0, `${what}: hay línea global`);
     assert(note && note.kind === 'detail' && /^Incluye descuentos?[: ]/.test(note.description), `${what}: el descuento se ve justo debajo de la línea global`);
-    assert(note.description.includes(minus(discount, value.currency)), `${what}: con su importe (${note.description})`);
-    assert.equal(note.quantity, 0, 'fila descriptiva sin cantidad');
-    assert(note.description.length <= 500);
+    // Entre la fila de la línea global y las de los extras exentos que absorbieron el resto, todo el descuento.
+    assert.equal(includedInNotes(value), discount, `${what}: las filas suman el descuento (${note.description})`);
+    if (value.items.filter((l) => /^Incluye/.test(l.description)).length === 1) assert(note.description.includes(minus(discount, value.currency)));
+    for (const [i, l] of value.items.entries()) {
+      if (!/^Incluye/.test(l.description)) continue;
+      assert(l.kind === 'detail' && l.quantity === 0 && l.description.length <= 500, 'fila descriptiva sin cantidad');
+      assert(value.items[i - 1]?.kind === 'item' && !value.items[i - 1].taxable, 'debajo de una línea sin ITBIS');
+    }
   } else {
     assert.equal(value.items.some((l) => /^Incluye descuento/.test(l.description)), false);
   }
@@ -258,42 +267,80 @@ for (const currencyOn of [true, false]) {
   assert.match(value.items[1].description, /; D21 −US\$ 30\.00$/, 'si caben, todos con su importe');
 }
 
-// (f) El descuento supera el importe sin ITBIS disponible: lo que cabe va a la línea global y el resto, como descuento del
-// documento; la diferencia exacta se avisa solo por ese resto.
+// (f) El descuento supera la línea global: lo que no cabe ahí se imputa a los extras exentos visibles (precio rebajado y
+// su propia fila «Incluye descuento…» debajo) y el total sigue cuadrando. Solo lo que tampoco cabe en las líneas sin
+// ITBIS va como descuento del documento, con la diferencia exacta avisada.
 {
   const bigExempt: CustomQuotationItem = { id: 'x-big', description: 'Obra civil', quantity: 1, unit: 'UD', unitPriceUSD: 10_000, exonerateITBIS: true, applyMargin: false };
   const bigTaxable: CustomQuotationItem = { id: 'x-tax', description: 'Transformador', quantity: 2, unit: 'UD', unitPriceUSD: 1_500, exonerateITBIS: false, applyMargin: false };
+  const liquidation: CustomQuotationDiscount[] = [{ id: 'd', description: 'Liquidación', type: 'percentage', value: 60 }];
+  const lowWp = (items: CustomQuotationItem[], customDiscounts = liquidation) => project((x) => {
+    x.specs = { ...x.specs, pricingMode: 'direct_watt', pricePerWattUSD: 0.2 };
+    x.financials = { ...x.financials, customItems: items, customDiscounts };
+  });
+  const noteBelow = (value: QuotationContent, description: RegExp) => {
+    const index = value.items.findIndex((l) => l.kind === 'item' && description.test(l.description));
+    assert(index >= 0, `línea ${description}`);
+    return { line: value.items[index], note: value.items[index + 1] };
+  };
   for (const currencyOn of [true, false]) {
     const rate = currencyOn ? 1 : 58.5;
-    const p = project((x) => {
-      x.specs = { ...x.specs, pricingMode: 'direct_watt', pricePerWattUSD: 0.2 };
-      x.financials = { ...x.financials, customItems: [bigExempt, bigTaxable], customDiscounts: [{ id: 'd', description: 'Liquidación', type: 'percentage', value: 60 }] };
-    });
-    const { value, build } = convert(p, blocks({ currency: currencyOn }));
-    const t = totals(value);
+    // Caso del revisor: la Obra civil exenta da para todo el resto → cuadre exacto, sin descuento de documento.
+    const p = lowWp([bigExempt, bigTaxable]);
+    const { value } = convert(p, blocks({ currency: currencyOn }));
     const discount = engineDiscountCents(p, rate);
-    const global = value.items.find((l) => /llave en mano/.test(l.description));
-    assert(global && build.residualDiscountCents > 0, 'hay resto');
-    const note = value.items[value.items.indexOf(global) + 1];
-    const included = discount - build.residualDiscountCents;
-    assert.equal(global.unitPriceCents, 0, 'la parte sin ITBIS se descuenta entera');
-    assert(note.kind === 'detail' && note.description === `Incluye descuento: Liquidación (60 %) ${minus(included, value.currency)}`);
-    assert.equal(t.discountCents, build.residualDiscountCents, 'el resto, como descuento del documento');
-    assert.deepEqual(value.discounts.map((d) => [d.label, d.type, d.value]), [['Liquidación (60 %)', 'fixed', build.residualDiscountCents]]);
-    assert.equal(build.totalDifferenceCents, t.totalCents - contractCents(p, rate), 'diferencia exacta');
-    assert(build.totalDifferenceCents < 0, 'el ITBIS del resto prorrateado sobre lo gravado');
-    assert.equal(build.totalDifferenceReason, 'residual_discount');
-    assert.equal(build.notices.some((n) => /base descontada|superan/.test(n)), false, 'no va entre los avisos plegados');
-    // Sin líneas gravadas el resto tampoco cambia el total.
-    const exemptOnly = project((x) => {
-      x.specs = { ...x.specs, pricingMode: 'direct_watt', pricePerWattUSD: 0.2 };
-      x.financials = { ...x.financials, customItems: [bigExempt], customDiscounts: [{ id: 'd', description: 'Liquidación', type: 'percentage', value: 60 }] };
-    });
-    const r = convert(exemptOnly, blocks({ currency: currencyOn }));
-    assert(r.build.residualDiscountCents > 0);
-    assert.equal(totals(r.value).totalCents, contractCents(exemptOnly, rate));
-    assert.equal(r.build.totalDifferenceCents, 0);
+    const global = noteBelow(value, /llave en mano/);
+    const civil = noteBelow(value, /^Obra civil$/);
+    assert.equal(global.line.unitPriceCents, 0, 'la línea global se descuenta entera');
+    const onGlobal = Number(/−(?:US|RD)\$ ([\d,]+\.\d\d)$/.exec(global.note.description)?.[1].replace(/,/g, '')) * 100;
+    const onCivil = Math.round(10_000 * rate * 100) - civil.line.unitPriceCents;
+    assert.equal(global.note.description, `Incluye descuento: Liquidación (60 %) ${minus(Math.round(onGlobal), value.currency)}`);
+    assert.equal(civil.note.kind, 'detail');
+    assert.equal(civil.note.description, `Incluye descuento: Liquidación (60 %) ${minus(onCivil, value.currency)}`, 'misma fila que la del sistema');
+    assert.equal(Math.round(onGlobal) + onCivil, discount, 'entre las dos filas, todo el descuento');
+    assert.equal(civil.line.quantity, 1);
+    assert.equal(noteBelow(value, /^Transformador$/).line.unitPriceCents, Math.round(1_500 * rate * 100), 'lo gravado no se toca');
+    assertExact(p, blocks({ currency: currencyOn }), ctx(), `resto en la Obra civil (${value.currency})`);
+
+    // Extra exento con cantidad ≠ 1 y un resto que su precio unitario no expresa al centavo: pasa a 1 lote por su neto.
+    const piece: CustomQuotationItem = { id: 'x-piece', description: 'Postes', quantity: 3, unit: 'UD', unitPriceUSD: 1_000, exonerateITBIS: true, applyMargin: false };
+    const q = lowWp([piece], [{ id: 'd', description: 'Cierre', type: 'fixed', value: 0 }]);
+    const list = calculateProjectFinancialSummary(q).listGrossInvestmentUSD;
+    const odd = lowWp([piece], [{ id: 'd', description: 'Cierre', type: 'fixed', value: Math.round((list - 3_000 + 1_000.01) * 100) / 100 }]);
+    const r = convert(odd, blocks({ currency: currencyOn }));
+    const poles = noteBelow(r.value, /^Postes/);
+    if (currencyOn) {
+      assert.deepEqual([poles.line.description, poles.line.quantity, poles.line.unit, poles.line.unitPriceCents], ['Postes (3 UD)', 1, 'lote', 199_999], 'un lote por el neto exacto');
+      assert.equal(poles.note.description, `Incluye descuento: Cierre ${minus(100_001, 'USD')}`);
+    }
+    assertExact(odd, blocks({ currency: currencyOn }), ctx(), `extra en lote (${r.value.currency})`);
+
+    // Sin extras exentos visibles: el resto no cabe en ninguna línea sin ITBIS y va al documento («<concepto> · resto»).
+    const s = lowWp([bigTaxable]);
+    const res = convert(s, blocks({ currency: currencyOn }));
+    const t = totals(res.value);
+    assert(res.build.residualDiscountCents > 0, 'hay resto');
+    const g = noteBelow(res.value, /llave en mano/);
+    assert.equal(g.line.unitPriceCents, 0);
+    assert.equal(g.note.description, `Incluye descuento: Liquidación (60 %) ${minus(engineDiscountCents(s, rate) - res.build.residualDiscountCents, res.value.currency)}`);
+    assert.deepEqual(res.value.discounts.map((d) => [d.label, d.type, d.value]), [['Liquidación · resto', 'fixed', res.build.residualDiscountCents]], 'sin repetir el porcentaje en un monto fijo');
+    assert.equal(t.discountCents, res.build.residualDiscountCents);
+    assert.equal(res.build.totalDifferenceCents, t.totalCents - contractCents(s, rate), 'diferencia exacta');
+    assert(res.build.totalDifferenceCents < 0, 'el ITBIS del resto prorrateado sobre lo gravado');
+    assert.equal(res.build.totalDifferenceReason, 'residual_discount');
+    assert.equal(res.build.notices.some((n) => /superan/.test(n)), false, 'no va entre los avisos plegados');
   }
+}
+
+// (f2) Un extra gravado oculto diminuto cuya base exacta no deja nada para la parte gravada: no se crea esa línea (su
+// centavo va a la línea global) y el ITBIS sigue siendo el de la propuesta.
+{
+  const tinyHidden: CustomQuotationItem = { id: 'x-tiny', description: 'Sello', quantity: 1, unitPriceUSD: 0.01, exonerateITBIS: false, applyMargin: false, hideInQuotation: true };
+  const p = project((x) => { x.financials = { ...x.financials, customItems: [taxableExtra, tinyHidden] }; });
+  const { value } = convert(p);
+  assert.equal(value.items.some((l) => /Parte del sistema con ITBIS/.test(l.description)), false, 'sin parte gravada de 0 o negativa');
+  assert.equal(totals(value).taxCents, engineTaxCents(p));
+  assert.equal(totals(value).totalCents, contractCents(p));
 }
 
 // (g) Sin descuentos, sin diferencia ni fila de descuento.
@@ -308,7 +355,7 @@ for (const currencyOn of [true, false]) {
   const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
   const pick = <T,>(list: readonly T[]): T => list[Math.floor(rnd() * list.length)];
   const money = (max: number) => Math.round(rnd() * max * 1000) / 1000;
-  let exact = 0, residual = 0, taxRounding = 0, manualCases = 0;
+  let exact = 0, residual = 0, taxRounding = 0, manualCases = 0, superanCases = 0;
   for (let n = 0; n < 600; n++) {
     const mode = pick(['cost_matrix', 'direct_watt', 'manual'] as const);
     const exemption = rnd() < 0.5;
@@ -339,14 +386,39 @@ for (const currencyOn of [true, false]) {
     const t = totals(value);
     const label = `fuzz ${n} (${mode}, exención ${exemption}, ${value.currency}, ${extras.length} extras, ${disc.length} descuentos)`;
     if (mode === 'manual') manualCases++;
-    if (build.notices.some((x) => /superan/.test(x))) continue; // extras por encima del precio: ya se avisa
+    const contract = contractCents(p, rate);
+    const discount = mode === 'manual' ? 0 : engineDiscountCents(p, rate);
+    // Cota independiente del resto: el descuento menos lo imputable a líneas sin ITBIS, es decir, la línea global antes
+    // del descuento (total − ITBIS − líneas listadas + descuento) y los extras exentos visibles a su precio de lista.
+    const multiplier = 1.25;
+    const exemptList = mode === 'manual' ? 0 : extras
+      .filter((e) => !e.hideInQuotation && e.exonerateITBIS && e.quantity > 0)
+      .reduce((sum, e) => sum + totals({ items: [{ id: 'e', kind: 'item', description: '', quantity: e.quantity, unit: '', unitPriceCents: toCents(e.unitPriceUSD * (e.applyMargin ? multiplier : 1) * rate), discountPct: 0, taxable: false }], discounts: [] }).subtotalCents, 0);
+    const taxableLines = t.lines.filter((_, i) => value.items[i].taxable).reduce((sum, l) => sum + l.grossCents, 0);
+    const taxOfLines = Math.floor((taxableLines * 1800 + 5000) / 10000);
+    const globalList = contract - taxOfLines - taxableLines - exemptList + discount;
+    const expectedResidual = Math.max(0, discount - Math.max(0, globalList) - exemptList);
+    assert.equal(build.residualDiscountCents, expectedResidual, `${label}: resto = descuento − lo imputable a líneas sin ITBIS`);
+    assert.equal(includedInNotes(value), discount - expectedResidual, `${label}: las filas «Incluye descuento» suman lo incluido`);
+    assert.equal(build.totalDifferenceCents, t.totalCents - contract, `${label}: diferencia exacta`);
+    const superan = build.notices.some((x) => /superan el precio/.test(x));
+    assert.equal(superan, globalList < 0, `${label}: aviso de extras por encima del precio`);
+    if (build.totalDifferenceCents !== 0) {
+      assert(superan || build.residualDiscountCents > 0, `${label}: diferencia sin motivo`);
+      if (!superan && build.residualDiscountCents > 0 && taxableLines > 0) {
+        assert.equal(build.totalDifferenceReason, 'residual_discount', label);
+      } else assert.equal(build.totalDifferenceReason, 'other', label);
+    }
     if (build.residualDiscountCents > 0) {
       residual++;
-      assert.equal(build.totalDifferenceCents, t.totalCents - contractCents(p, rate), `${label}: diferencia exacta`);
       // Solo el resto es descuento del documento (acotado a lo que queda: descuentos que suman más que todo el documento).
       assert.equal(t.discountCents, Math.min(build.residualDiscountCents, t.subtotalCents), `${label}: solo el resto es descuento del documento`);
+      assert(value.discounts.every((d) => d.type === 'fixed' && / · resto$/.test(d.label) && !/%\)/.test(d.label)), `${label}: etiquetas del resto`);
+      // Lo imputable a líneas sin ITBIS se agotó: todas las listadas exentas quedan en 0.
+      assert(value.items.every((l) => l.kind !== 'item' || l.taxable || l.unitPriceCents === 0), `${label}: líneas sin ITBIS agotadas`);
       continue;
     }
+    if (superan) { superanCases++; continue; }
     assert.equal(t.totalCents, contractCents(p, rate), `${label}: total`);
     assert.equal(build.totalDifferenceCents, 0, label);
     assert.deepEqual(value.discounts, [], label);
@@ -365,7 +437,6 @@ for (const currencyOn of [true, false]) {
       assert(Math.abs(t.taxCents - tax) <= bound, `${label}: ITBIS ${t.taxCents} vs ${tax}`);
       if (t.taxCents !== tax) taxRounding++; else exact++;
     }
-    const discount = mode === 'manual' ? 0 : engineDiscountCents(p, rate);
     if (discount > 0) {
       const g = value.items.findIndex((l) => /llave en mano/.test(l.description));
       assert(g >= 0 && /^Incluye descuentos?[: ]/.test(value.items[g + 1]?.description ?? ''), `${label}: descuento visible`);
@@ -374,7 +445,7 @@ for (const currencyOn of [true, false]) {
   assert(exact >= 400, `casos exactos: ${exact}`);
   assert(residual >= 5, `casos con resto: ${residual}`);
   assert(manualCases >= 100);
-  console.log(`  fuzz: ${exact} exactos, ${residual} con resto, ${taxRounding} con ITBIS de extras visibles redondeado por línea`);
+  console.log(`  fuzz: ${exact} exactos, ${residual} con resto, ${superanCases} con extras por encima del precio, ${taxRounding} con ITBIS de extras visibles redondeado por línea`);
 }
 
 // --- (4) Precio manual con extras que lo superan: extras como filas sin precio, total = precio manual -------------------

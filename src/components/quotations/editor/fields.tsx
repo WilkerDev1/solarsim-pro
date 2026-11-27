@@ -120,18 +120,25 @@ export interface NumberFieldProps extends FieldShell {
   toValue?: (typed: number) => number;
   suffix?: string;
   prefix?: string;
+  /** El 0 se muestra como campo vacío (con `placeholder`) y vaciar el campo guarda 0: p. ej. la cantidad de una fila descriptiva. */
+  emptyWhenZero?: boolean;
+  placeholder?: string;
 }
 
-export const NumberField: React.FC<NumberFieldProps> = ({ value, onCommit, format, toValue = (n) => n, suffix, prefix, readOnly, ...shell }) => {
+/** Texto tecleado → valor; con `emptyWhenZero`, un campo vacío vale 0 (si no, vacío es inválido: `null`). */
+export function parseNumberDraft(text: string, toValue: (typed: number) => number, emptyWhenZero = false): number | null {
+  if (emptyWhenZero && !text.trim()) return 0;
+  const parsed = parseDecimalInput(text);
+  return parsed === null ? null : toValue(parsed);
+}
+
+export const NumberField: React.FC<NumberFieldProps> = ({ value, onCommit, format, toValue = (n) => n, suffix, prefix, readOnly, emptyWhenZero = false, placeholder, ...shell }) => {
   const id = useId();
   const field = useDraft<number>({
-    display: format(value),
+    display: emptyWhenZero && value === 0 ? '' : format(value),
     readOnly: !!readOnly,
     commit: onCommit,
-    parse: (text) => {
-      const parsed = parseDecimalInput(text);
-      return parsed === null ? null : toValue(parsed);
-    },
+    parse: (text) => parseNumberDraft(text, toValue, emptyWhenZero),
     same: (next) => next === value,
     invalidMessage: 'Escribe un número válido (por ejemplo, 39.20).',
   });
@@ -147,6 +154,7 @@ export const NumberField: React.FC<NumberFieldProps> = ({ value, onCommit, forma
           className="qe-number"
           value={field.draft}
           readOnly={readOnly}
+          placeholder={readOnly ? undefined : placeholder}
           aria-invalid={field.error ? true : undefined}
           aria-describedby={describedBy(id, field.error, shell.hint)}
           onChange={(e) => field.onChange(e.target.value)}

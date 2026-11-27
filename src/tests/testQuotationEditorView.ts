@@ -35,6 +35,29 @@ const render = () => renderToStaticMarkup(React.createElement(QuotationEditorVie
 const inputs = (html: string) => html.match(/<(input|textarea)\b[^>]*>/g) ?? [];
 const editable = (html: string) => inputs(html).filter((tag) => !/\b(readonly|disabled)=""/.test(tag) && !/type="search"/.test(tag));
 
+// Línea descriptiva con cantidad 0 (p. ej. la fila «Incluye descuento…» de una conversión): campo vacío con indicación,
+// no «0»; teclear un número sigue funcionando y vaciarlo vuelve a 0.
+{
+  const { parseNumberDraft } = await import('../components/quotations/editor/fields');
+  setup(record({ items: [
+    { id: 'l1', kind: 'item', description: 'Sistema', quantity: 1, unit: 'UD', unitPriceCents: 98000, discountPct: 0, taxable: false },
+    { id: 'l2', kind: 'detail', description: 'Incluye descuento: Cierre −RD$ 10.00', quantity: 0, unit: '', unitPriceCents: 0, discountPct: 0, taxable: false },
+  ] }));
+  const html = render();
+  const quantity = (n: number) => {
+    const id = new RegExp(`<label for="([^"]+)"[^>]*>Cantidad de la línea ${n}<`).exec(html)?.[1];
+    return id ? inputs(html).find((tag) => tag.includes(`id="${id}"`)) : undefined;
+  };
+  assert(quantity(2), 'campo de cantidad de la línea descriptiva');
+  assert.match(quantity(2)!, /value=""/, 'vacío, no «0»');
+  assert.match(quantity(2)!, /placeholder="—"/);
+  assert.match(quantity(1)!, /value="1"/, 'una línea con precio sigue mostrando su cantidad');
+  assert.equal(parseNumberDraft('', (n) => n, true), 0, 'vaciarlo vuelve a 0');
+  assert.equal(parseNumberDraft('  ', (n) => n, true), 0);
+  assert.equal(parseNumberDraft('3', (n) => n, true), 3, 'teclear un número sigue funcionando');
+  assert.equal(parseNumberDraft('', (n) => n, false), null, 'en los demás campos vacío sigue siendo inválido');
+}
+
 // Borrador: campos editables, emitir, sin «Guardar», vista previa en vivo con la hoja.
 setup(record());
 const draft = render();
