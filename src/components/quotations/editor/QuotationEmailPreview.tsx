@@ -2,8 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Copy, Mail, RotateCcw } from 'lucide-react';
 import type { QuotationSheetData } from '../sheet/QuotationSheet';
 import {
-  buildMailtoUrl, quotationEmailAttachments, quotationEmailBody, quotationEmailRecipient, quotationEmailSignature, quotationEmailSummary,
-  quotationEmailText, type QuotationEmailText,
+  buildMailtoUrl, editEmailDraft, emailDraftView, quotationEmailAttachments, quotationEmailBody, quotationEmailContext, quotationEmailRecipient,
+  quotationEmailSignature, quotationEmailSummary, quotationEmailText, resetEmailDraft, type QuotationEmailDraft, type QuotationEmailText,
 } from '../../../features/quotations/quotationEmail';
 import { openExternalUrl } from '../../../utils/openExternalUrl';
 
@@ -25,26 +25,27 @@ const isImage = (value: string | null | undefined) => !!value && /^data:image\//
 /**
  * Vista previa del correo (docs/QUOTATION_EDITOR.md#correo): De, Para y Asunto, el cuerpo con el resumen de la
  * cotización y los archivos que lo acompañarían. Asunto, saludo y despedida se editan aquí para este envío
- * (`overrides`, estado local del editor): nunca se guardan en la cotización, así que también un LECTOR o una
+ * (`draft`, estado local del editor; lógica pura en `quotationEmail.ts`): nunca se guardan en la cotización, así que también un LECTOR o una
  * cotización bloqueada pueden prepararlo, copiarlo y abrirlo. La app no envía ni adjunta nada.
  */
 export const QuotationEmailPreview: React.FC<{
   quotation: QuotationSheetData;
-  overrides: Partial<QuotationEmailText>;
-  onOverridesChange: (next: Partial<QuotationEmailText>) => void;
+  draft: QuotationEmailDraft;
+  onDraftChange: (next: QuotationEmailDraft) => void;
   /** Lleva al campo «Correo» del cliente; sin él (bloqueada o LECTOR) solo se avisa. */
   onGoToClientEmail?: () => void;
-}> = ({ quotation, overrides, onOverridesChange, onGoToClientEmail }) => {
+}> = ({ quotation, draft, onDraftChange, onGoToClientEmail }) => {
   const [feedback, setFeedback] = useState<Feedback>(null);
   const defaults = useMemo(() => quotationEmailText(quotation), [quotation]);
   const summary = useMemo(() => quotationEmailSummary(quotation), [quotation]);
   const signature = useMemo(() => quotationEmailSignature(quotation), [quotation]);
   const files = useMemo(() => quotationEmailAttachments(quotation.number, quotation.attachments), [quotation.number, quotation.attachments]);
-  const text: QuotationEmailText = { ...defaults, ...overrides };
-  const edited = (Object.keys(overrides) as (keyof QuotationEmailText)[]).some((key) => overrides[key] !== undefined && overrides[key] !== defaults[key]);
+  const context = quotationEmailContext(quotation);
+  const { text, edited, stale } = emailDraftView(draft, defaults, context);
   const body = quotationEmailBody(text, summary, signature);
   const recipient = quotationEmailRecipient(quotation.client);
-  const set = (key: keyof QuotationEmailText) => (value: string) => onOverridesChange({ ...overrides, [key]: value });
+  const set = (key: keyof QuotationEmailText) => (value: string) => onDraftChange(editEmailDraft(draft, key, value, context));
+  const reset = () => { onDraftChange(resetEmailDraft()); setFeedback(null); };
   const seller = quotation.seller.trim();
   const fromName = seller || quotation.issuer.name.trim();
   const fromDetail = [seller ? quotation.issuer.name.trim() : '', quotation.issuer.email.trim()].filter(Boolean).join(' · ');
@@ -59,7 +60,7 @@ export const QuotationEmailPreview: React.FC<{
     // Si el cuerpo no cabe en el enlace, primero se copia entero para pegarlo en el mensaje.
     const copied = mail.truncated ? await copyToClipboard(body) : false;
     const opened = await openExternalUrl(mail.url).catch(() => false);
-    if (!opened) setFeedback({ tone: 'error', message: 'No se pudo abrir la aplicación de correo. Copia el mensaje y pégalo en un correo nuevo.' });
+    if (!opened) setFeedback({ tone: 'error', message: 'No se pudo abrir la aplicación de correo. Usa «Copiar mensaje» y pégalo en un correo nuevo.' });
     else if (mail.truncated) {
       setFeedback({
         tone: 'ok',
@@ -101,7 +102,7 @@ export const QuotationEmailPreview: React.FC<{
           </div>
           <div className="qe-mail-row qe-mail-row-subject">
             <label className="qe-mail-label" htmlFor="qe-mail-subject">Asunto</label>
-            <input id="qe-mail-subject" className="qe-mail-subject" aria-label="Asunto del correo" value={text.subject} maxLength={250} onChange={(e) => set('subject')(e.target.value)} />
+            <input id="qe-mail-subject" className="qe-mail-subject" aria-label="Asunto del correo" value={text.subject} onChange={(e) => set('subject')(e.target.value)} />
             <button type="button" className="qe-icon-btn" aria-label="Copiar asunto" title="Copiar asunto" onClick={() => void copy(text.subject.replace(/\s+/g, ' ').trim(), 'Asunto copiado.')}>
               <Copy className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -137,7 +138,7 @@ export const QuotationEmailPreview: React.FC<{
         </div>
         <ul className="qe-mail-files" aria-label="Archivos que acompañan el mensaje">
           {files.map((file) => (
-            <li key={`${file.separate ? 'r' : 'q'}-${file.name}`} className="qe-mail-file" title={file.note}>
+            <li key={file.id} className="qe-mail-file" title={file.note}>
               <span className="qe-mail-file-kind" aria-hidden="true">{file.kind}</span>
               <span className="qe-mail-file-name">{file.name}</span>
               {file.separate ? <span className="qe-mail-file-tag">Aparte</span> : <span className="sr-only">: {file.note}</span>}
@@ -155,12 +156,17 @@ export const QuotationEmailPreview: React.FC<{
           Abrir en la aplicación de correo
         </button>
         {edited && (
-          <button type="button" className="qe-link qe-mail-reset" onClick={() => { onOverridesChange({}); setFeedback(null); }}>
+          <button type="button" className="qe-link qe-mail-reset" onClick={reset}>
             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
             Restablecer texto
           </button>
         )}
       </div>
+      {stale && (
+        <p className="qe-field-hint qe-preview-hint" role="note">
+          La cotización cambió después de editar el texto (número, estado o cliente): revísalo o usa «Restablecer texto».
+        </p>
+      )}
       {feedback && (
         <p className={feedback.tone === 'error' ? 'qe-field-error qe-preview-hint' : 'qe-field-hint qe-preview-hint'} role={feedback.tone === 'error' ? 'alert' : 'status'}>{feedback.message}</p>
       )}

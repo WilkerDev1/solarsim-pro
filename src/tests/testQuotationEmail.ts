@@ -12,8 +12,9 @@ import type { QuotationRecord } from '../types/quotation';
 
 registerHooks({ load: (url, context, next) => (url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context)) });
 const {
-  MAILTO_MAX_LENGTH, buildMailtoUrl, isValidEmailAddress, quotationEmailAttachments, quotationEmailBody, quotationEmailRecipient,
-  quotationEmailSignature, quotationEmailSummary, quotationEmailText, summarizePaymentTerms,
+  EMPTY_EMAIL_DRAFT, MAILTO_MAX_LENGTH, SUBJECT_MAX_CHARS, buildMailtoUrl, editEmailDraft, emailDraftView, isValidEmailAddress, limitSubject,
+  quotationEmailAttachments, quotationEmailBody, quotationEmailContext, quotationEmailRecipient, quotationEmailSignature, quotationEmailSummary,
+  quotationEmailText, resetEmailDraft, summarizePaymentTerms,
 } = await import('../features/quotations/quotationEmail');
 const { openExternalUrl } = await import('../utils/openExternalUrl');
 
@@ -126,21 +127,61 @@ assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(hugeBody), 'sin emoji parti
 const hugeSubject = buildMailtoUrl({ to: '', subject: '😀'.repeat(500), body: 'b' });
 assert.ok(hugeSubject.url.length <= MAILTO_MAX_LENGTH, 'un asunto enorme también cabe');
 assert.equal(buildMailtoUrl({ to: '', subject: 's', body: 'b'.repeat(100) }, 60).truncated, true, 'tope configurable');
+// Sin sitio para el cuerpo (la nota no cabe): el asunto también se acota y el enlace respeta el tope.
+for (const max of [40, 25, 16]) {
+  const tight = buildMailtoUrl({ to: '', subject: 'Cotización COT-2026-0147 — M&A Electsun SRL', body: 'Hola'.repeat(50) }, max);
+  assert.ok(tight.truncated && tight.url.length <= max, `tope ${max}: ${tight.url.length}`);
+  assert.equal(isOpenableExternalUrl(tight.url), true, 'sigue siendo un mailto: permitido');
+}
+const tightTo = buildMailtoUrl({ to: 'miguel@example.com', subject: 'Asunto largo de prueba', body: 'x'.repeat(500) }, 40);
+assert.ok(tightTo.url.length <= 40 && tightTo.url.startsWith('mailto:miguel@example.com?subject='), tightTo.url);
+// Todo enlace que arma el constructor pasa la lista blanca del proceso principal.
+for (const built of [plain, injected, unicode, huge, hugeSubject]) assert.equal(isOpenableExternalUrl(built.url), true, built.url.slice(0, 60));
 
 // --- Adjuntos ------------------------------------------------------------------------------------------------------
 const attachment = (id: string, mode: QuotationAttachment['mode'], fileName: string): QuotationAttachment => ({ id, fileName, fileSize: 1000, pageCount: 1, title: `Título ${id}`, uploadedAt: '2026-11-23T00:00:00.000Z', mode, origin: 'manual' });
 const files = quotationEmailAttachments('COT-2026-0147', [attachment('a1', 'include', 'ficha.pdf'), attachment('a2', 'related', 'plano.png'), attachment('a3', 'include', 'otra.pdf'), attachment('a4', 'related', '')]);
+assert.deepEqual(files.map((f) => f.id), ['quotation-pdf', 'a2', 'a4'], 'clave estable por id');
 assert.deepEqual(files.map((f) => [f.name, f.kind, f.separate]), [['COT-2026-0147.pdf', 'PDF', false], ['plano.png', 'PNG', true], ['Título a4', 'PDF', true]]);
 assert.ok(files[0].note.includes('2 adjuntos'), `el PDF dice qué incluye: ${files[0].note}`);
 assert.equal(quotationEmailAttachments(null, [])[0].name, 'Cotizacion-borrador.pdf', 'nombre real de exportación sin número');
 assert.equal(quotationEmailAttachments(null, []).length, 1);
+// Dos adjuntos con el mismo nombre de archivo: dos entradas con claves distintas.
+const twins = quotationEmailAttachments('COT-2026-0147', [attachment('f1', 'related', 'ficha.pdf'), attachment('f2', 'related', 'ficha.pdf')]);
+assert.deepEqual(twins.map((f) => [f.id, f.name]), [['quotation-pdf', 'COT-2026-0147.pdf'], ['f1', 'ficha.pdf'], ['f2', 'ficha.pdf']]);
+
+// --- Texto editado para este envío (lógica pura de la vista) -------------------------------------------------------
+const ctx = quotationEmailContext(issued);
+const defaults = quotationEmailText(issued);
+assert.deepEqual(emailDraftView(EMPTY_EMAIL_DRAFT, defaults, ctx), { text: defaults, edited: false, stale: false });
+let draftState = editEmailDraft(EMPTY_EMAIL_DRAFT, 'subject', 'Asunto a mano', ctx);
+draftState = editEmailDraft(draftState, 'opening', 'Buenas tardes:', ctx);
+draftState = editEmailDraft(draftState, 'closing', 'Saludos.', ctx);
+const viewed = emailDraftView(draftState, defaults, ctx);
+assert.deepEqual(viewed.text, { subject: 'Asunto a mano', opening: 'Buenas tardes:', closing: 'Saludos.' });
+assert.equal(viewed.edited, true);
+assert.equal(viewed.stale, false);
+assert.ok(quotationEmailBody(viewed.text, summary, []).startsWith('Buenas tardes:'), 'el cuerpo usa lo editado');
+assert.equal(emailDraftView(editEmailDraft(EMPTY_EMAIL_DRAFT, 'subject', defaults.subject, ctx), defaults, ctx).edited, false, 'igual a lo generado no cuenta como editado');
+assert.deepEqual(resetEmailDraft(), EMPTY_EMAIL_DRAFT, 'Restablecer texto vuelve a lo generado');
+assert.deepEqual(emailDraftView(resetEmailDraft(), defaults, ctx).text, defaults);
+// Quedó viejo: cambian el número, el estado o el nombre del cliente después de editar.
+for (const changed of [source('COT-2026-0148'), { ...issued, status: 'issued' as const }, source('COT-2026-0147', { client: { ...base().client, name: 'Otro cliente' } })]) {
+  assert.equal(emailDraftView(draftState, quotationEmailText(changed), quotationEmailContext(changed)).stale, true);
+}
+assert.equal(emailDraftView(editEmailDraft(EMPTY_EMAIL_DRAFT, 'subject', 'x', quotationEmailContext(draft)), quotationEmailText(issued), quotationEmailContext(issued)).stale, true, 'borrador sin número → emitida');
+// Máximo del asunto: el mismo para el generador y el campo.
+assert.equal(Array.from(limitSubject('😀'.repeat(SUBJECT_MAX_CHARS + 50))).length, SUBJECT_MAX_CHARS);
+assert.equal(Array.from(editEmailDraft(EMPTY_EMAIL_DRAFT, 'subject', 'a'.repeat(500), ctx).overrides.subject ?? '').length, SUBJECT_MAX_CHARS);
+assert.equal(limitSubject('corto'), 'corto');
 
 // --- Enlaces externos ----------------------------------------------------------------------------------------------
 assert.equal(isOpenableExternalUrl('https://example.com'), true);
 assert.equal(isOpenableExternalUrl(plain.url), true);
 for (const bad of ['javascript:alert(1)', 'file:///etc/passwd', 'mailto:a@b.com\r\nX: y', '', 42, 'ftp://x']) assert.equal(isOpenableExternalUrl(bad), false, `rechaza ${String(bad)}`);
 const opened: string[] = [];
-assert.equal(await openExternalUrl(plain.url, { electron: { openExternalUrl: async (u: string) => { opened.push(`electron:${u}`); } }, assign: (u) => opened.push(`web:${u}`) }), true);
+assert.equal(await openExternalUrl(plain.url, { electron: { openExternalUrl: async (u: string) => { opened.push(`electron:${u}`); return true; } }, assign: (u) => opened.push(`web:${u}`) }), true);
+assert.equal(await openExternalUrl(plain.url, { electron: { openExternalUrl: async () => false } }), false, 'el puente rechaza: no se da por abierto');
 assert.equal(await openExternalUrl(plain.url, { assign: (u) => opened.push(`web:${u}`) }), true);
 assert.equal(await openExternalUrl('javascript:alert(1)', { assign: (u) => opened.push(`web:${u}`) }), false);
 assert.deepEqual(opened, [`electron:${plain.url}`, `web:${plain.url}`], 'Electron por su puente; web con location; nunca lo no permitido');
@@ -150,8 +191,8 @@ const { QuotationEmailPreview } = await import('../components/quotations/editor/
 const { QuotationPreview } = await import('../components/quotations/editor/QuotationPreview');
 const emailProps = (number: string | null, overrides: Partial<QuotationContent> = {}, extra: Record<string, unknown> = {}) => ({
   quotation: { ...source(number, overrides), signature: null },
-  overrides: {},
-  onOverridesChange: () => {},
+  draft: EMPTY_EMAIL_DRAFT,
+  onDraftChange: () => {},
   onGoToClientEmail: () => {},
   ...extra,
 });
@@ -163,8 +204,14 @@ assert.ok(!draftHtml.includes('ficha.pdf'), 'un adjunto incluido no se lista apa
 assert.ok(!draftHtml.includes('Restablecer texto'), 'sin cambios no hay nada que restablecer');
 assert.ok(/<input[^>]*aria-label="Asunto del correo"/.test(draftHtml) && /<textarea[^>]*aria-label="Saludo e introducción"/.test(draftHtml), 'asunto y cuerpo editables');
 // Texto cambiado para este envío: se ve y se ofrece restablecer.
-const edited = renderToStaticMarkup(React.createElement(QuotationEmailPreview, emailProps('COT-2026-0147', {}, { overrides: { subject: 'Asunto a mano' } })));
+const edited = renderToStaticMarkup(React.createElement(QuotationEmailPreview, emailProps('COT-2026-0147', {}, { draft: editEmailDraft(EMPTY_EMAIL_DRAFT, 'subject', 'Asunto a mano', ctx) })));
 assert.ok(edited.includes('value="Asunto a mano"') && edited.includes('Restablecer texto'));
+assert.ok(!edited.includes('La cotización cambió'), 'sin cambios en la cotización no hay aviso');
+const staleHtml = renderToStaticMarkup(React.createElement(QuotationEmailPreview, emailProps('COT-2026-0148', {}, { draft: editEmailDraft(EMPTY_EMAIL_DRAFT, 'subject', 'Asunto a mano', ctx) })));
+assert.ok(staleHtml.includes('La cotización cambió') && staleHtml.includes('Restablecer texto'), 'aviso discreto del texto viejo');
+// Claves por id: dos «ficha.pdf» relacionados se dibujan los dos.
+const twinsHtml = renderToStaticMarkup(React.createElement(QuotationEmailPreview, emailProps('COT-2026-0147', { attachments: [attachment('f1', 'related', 'ficha.pdf'), attachment('f2', 'related', 'ficha.pdf')] })));
+assert.equal(twinsHtml.match(/>ficha\.pdf</g)?.length, 2);
 // Sin correo del cliente: aviso discreto y enlace al campo (si se puede editar); bloqueada o LECTOR, solo el aviso.
 const noEmail = renderToStaticMarkup(React.createElement(QuotationEmailPreview, emailProps('COT-2026-0147', { client: { ...base().client, email: '' } })));
 assert.ok(noEmail.includes('Agregar correo del cliente') && /<button[^>]*>[^<]*Agregar correo del cliente/.test(noEmail), 'botón que lleva al campo');
@@ -207,6 +254,9 @@ for (const [label, quotation, user] of [['emitida', record({ status: 'issued' })
   const before = useSimulationStore.getState();
   const html = renderToStaticMarkup(React.createElement(QuotationEditorView));
   assert.ok(html.includes('aria-label="Formato de la vista previa"') && html.includes('>Correo<'), `${label}: conmutador visible`);
+  const mailHtml = renderToStaticMarkup(React.createElement(QuotationEditorView, { initialPreview: 'email' }));
+  assert.ok(mailHtml.includes('Vista previa del correo') && mailHtml.includes('Copiar mensaje') && !mailHtml.includes('data-quotation-page'), `${label}: vista Correo dentro del editor`);
+  assert.ok(!mailHtml.includes('Agregar correo del cliente'), `${label}: sin enlace al campo en solo lectura`);
   const after = useSimulationStore.getState();
   assert.equal(after.quotations, before.quotations, `${label}: mirar no escribe cotizaciones`);
   assert.equal(after.quotationChanges, before.quotationChanges, `${label}: mirar no encola cambios`);

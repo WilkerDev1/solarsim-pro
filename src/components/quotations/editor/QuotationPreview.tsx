@@ -7,7 +7,7 @@ import { QuotationSheet, type QuotationSheetData } from '../sheet/QuotationSheet
 import type { QuotationAttachment } from '../../../types/quotation';
 import { skippedAttachmentsMessage } from '../../../features/quotations/attachments';
 import { quotationAttachmentResolver, resolveAssetImage } from '../../../features/quotations/assetImages';
-import type { QuotationEmailText } from '../../../features/quotations/quotationEmail';
+import { EMPTY_EMAIL_DRAFT, type QuotationEmailDraft } from '../../../features/quotations/quotationEmail';
 import { QuotationEmailPreview } from './QuotationEmailPreview';
 
 const DEFAULT_SCALE = 0.62;
@@ -50,7 +50,7 @@ export const QuotationPreview: React.FC<{
 }> = ({ quotation, stampImage, quotationId, attachments = [], imageSources = [], initialView = 'pdf', onGoToClientEmail }) => {
   const [view, setView] = useState<PreviewView>(initialView);
   // Texto del correo cambiado para este envío: estado local, se pierde al salir del editor y nunca se guarda.
-  const [emailOverrides, setEmailOverrides] = useState<Partial<QuotationEmailText>>({});
+  const [emailDraft, setEmailDraft] = useState<QuotationEmailDraft>(EMPTY_EMAIL_DRAFT);
   const pageCount = useMemo(() => paginateQuotation(quotation).length, [quotation]);
   const [page, setPage] = useState(0);
   const [scale, setScale] = useState(DEFAULT_SCALE);
@@ -158,7 +158,7 @@ export const QuotationPreview: React.FC<{
         </div>
       ) : (
         <div className="qe-view-panel" role="tabpanel" id="qe-view-panel-email" aria-labelledby="qe-view-tab-email">
-          <QuotationEmailPreview quotation={quotation} overrides={emailOverrides} onOverridesChange={setEmailOverrides} onGoToClientEmail={onGoToClientEmail} />
+          <QuotationEmailPreview quotation={quotation} draft={emailDraft} onDraftChange={setEmailDraft} onGoToClientEmail={onGoToClientEmail} />
         </div>
       )}
       {exportSheet && (

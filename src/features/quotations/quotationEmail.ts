@@ -8,11 +8,14 @@ import {
   QUOTATION_SHEET_TEXTS, computeQuotationTotals, formatMoney, formatSheetDate,
   type QuotationAttachment, type QuotationContent, type QuotationPrintedClient,
 } from '../../../shared/quotations';
+import { isValidEmailAddress } from '../../../shared/externalUrl';
 import { quotationPdfFileName } from './exportQuotationPdf';
+
+export { isValidEmailAddress };
 
 export type QuotationEmailSource = Pick<
   QuotationContent, 'client' | 'projectLabel' | 'validUntil' | 'paymentTerms' | 'seller' | 'issuer' | 'currency' | 'items' | 'discounts'
-> & { number: string | null };
+> & { number: string | null; status?: QuotationContent['status'] };
 
 /** Lo editable del correo para un envío (estado local del editor, nunca se guarda en la cotización). */
 export interface QuotationEmailText {
@@ -32,6 +35,8 @@ export interface QuotationEmailSummary {
 }
 
 export interface QuotationEmailFile {
+  /** Clave estable: `quotation-pdf` o el id del adjunto. */
+  id: string;
   name: string;
   /** Tipo que se muestra en la etiqueta: PDF, PNG, JPG, WEBP. */
   kind: string;
@@ -42,6 +47,7 @@ export interface QuotationEmailFile {
 
 /** Tope del enlace `mailto:` completo: por debajo de los ~2 000 caracteres que aceptan Windows y Outlook. */
 export const MAILTO_MAX_LENGTH = 2000;
+/** Máximo del asunto en puntos de código: lo aplican el generador (con «…») y el campo editable (`limitSubject`). */
 export const SUBJECT_MAX_CHARS = 200;
 const TERMS_MAX_CHARS = 120;
 const TRUNCATION_NOTE = '[Mensaje recortado: pega aquí el mensaje completo que copiaste desde SolarSim.]';
@@ -55,6 +61,12 @@ function clip(text: string, max: number): string {
   const cut = list.slice(0, max - 1).join('');
   const space = cut.lastIndexOf(' ');
   return `${(space > max * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+/** Asunto tecleado: en una línea no se fuerza aquí (se respeta lo escrito), pero nunca más de `SUBJECT_MAX_CHARS`. */
+export function limitSubject(text: string): string {
+  const list = chars(text);
+  return list.length <= SUBJECT_MAX_CHARS ? text : list.slice(0, SUBJECT_MAX_CHARS).join('');
 }
 
 /** Condiciones de pago en una línea: la primera no vacía, acotada; «…» si había más. */
@@ -99,14 +111,6 @@ export function quotationEmailBody(text: QuotationEmailText, summary: QuotationE
   return [text.opening.trim(), facts, text.closing.trim(), signature.join('\n')].filter(Boolean).join('\n\n');
 }
 
-/**
- * Dirección simple y segura para un `mailto:`: una sola, ASCII, sin espacios, comas, `?`, `&` ni `<>` (así no puede
- * añadir destinatarios ni cabeceras), con dominio de al menos dos partes y hasta 254 caracteres.
- */
-export function isValidEmailAddress(text: string): boolean {
-  return text.length <= 254 && /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(text) && !/\.\.|^\.|\.@|@-|-\./.test(text);
-}
-
 /** Correo impreso del cliente, sin espacios ni saltos de línea, y si sirve para el `mailto:`. */
 export function quotationEmailRecipient(client: QuotationPrintedClient): { address: string; valid: boolean } {
   const address = client.email.replace(/\s+/g, '');
@@ -139,21 +143,29 @@ export function buildMailtoUrl(
   maxLength: number = MAILTO_MAX_LENGTH,
 ): { url: string; truncated: boolean; recipientIncluded: boolean } {
   const to = message.to.trim();
-  const recipientIncluded = isValidEmailAddress(to);
-  const head = `mailto:${recipientIncluded ? encodeURIComponent(to).replace(/%40/g, '@') : ''}?subject=`;
+  let recipientIncluded = isValidEmailAddress(to);
+  let head = `mailto:${recipientIncluded ? encodeURIComponent(to).replace(/%40/g, '@') : ''}?subject=`;
+  // Un tope absurdo que ni siquiera deja sitio al destinatario: se abre sin él antes que pasarse.
+  if (recipientIncluded && head.length > maxLength) {
+    recipientIncluded = false;
+    head = 'mailto:?subject=';
+  }
   let subject = oneLine(message.subject);
   const body = message.body.replace(/\r\n?/g, '\n').replace(/\n/g, '\r\n');
-  const build = (s: string, b: string) => `${head}${encode(s)}&body=${encode(b)}`;
-  const full = build(subject, body);
+  const full = `${head}${encode(subject)}&body=${encode(body)}`;
   if (full.length <= maxLength) return { url: full, truncated: false, recipientIncluded };
   const subjectBudget = Math.max(0, Math.floor((maxLength - head.length) / 2));
   if (encode(subject).length > subjectBudget) subject = fitEncoded(subject, subjectBudget);
-  const note = `\r\n\r\n${TRUNCATION_NOTE}`;
+  const note = encode(`\r\n\r\n${TRUNCATION_NOTE}`);
   const fixed = `${head}${encode(subject)}&body=`;
-  const room = maxLength - fixed.length - encode(note).length;
-  const kept = room > 0 ? fitEncoded(body, room).trimEnd() : '';
-  const url = room > 0 ? `${fixed}${encode(kept + note)}` : fixed;
-  return { url, truncated: true, recipientIncluded };
+  const room = maxLength - fixed.length - note.length;
+  if (room > 0) {
+    const kept = fitEncoded(body, room).trimEnd();
+    return { url: `${fixed}${encode(kept)}${note}`, truncated: true, recipientIncluded };
+  }
+  // Sin sitio para el cuerpo: solo el asunto, acotado a lo que quede (el mensaje se pega desde el portapapeles).
+  subject = fitEncoded(subject, Math.max(0, maxLength - head.length));
+  return { url: `${head}${encode(subject)}`, truncated: true, recipientIncluded };
 }
 
 const kindOf = (name: string) => {
@@ -168,6 +180,7 @@ const kindOf = (name: string) => {
 export function quotationEmailAttachments(number: string | null, attachments: readonly QuotationAttachment[]): QuotationEmailFile[] {
   const included = attachments.filter((a) => a.mode === 'include').length;
   const pdf: QuotationEmailFile = {
+    id: 'quotation-pdf',
     name: quotationPdfFileName(number),
     kind: 'PDF',
     separate: false,
@@ -175,6 +188,41 @@ export function quotationEmailAttachments(number: string | null, attachments: re
   };
   return [pdf, ...attachments.filter((a) => a.mode === 'related').map((a) => {
     const name = a.fileName.trim() || a.title.trim() || 'Adjunto';
-    return { name, kind: kindOf(name), separate: true, note: 'Aparte: descárgalo en Adjuntos y adjúntalo a mano' };
+    return { id: a.id, name, kind: kindOf(name), separate: true, note: 'Aparte: descárgalo en Adjuntos y adjúntalo a mano' };
   })];
+}
+
+/**
+ * Texto del correo editado para este envío (estado local de la vista previa, nunca se guarda). `context` recuerda
+ * de qué cotización se partió al editar (`quotationEmailContext`): si después cambian el número, el estado o el
+ * cliente, el texto editado puede haber quedado viejo y la vista lo avisa.
+ */
+export interface QuotationEmailDraft {
+  overrides: Partial<QuotationEmailText>;
+  context: string | null;
+}
+
+export const EMPTY_EMAIL_DRAFT: QuotationEmailDraft = { overrides: {}, context: null };
+
+/** Lo que, si cambia, deja viejo un texto editado: número, estado y nombre o atención del cliente. */
+export function quotationEmailContext(source: QuotationEmailSource): string {
+  return JSON.stringify([source.number, source.status ?? null, oneLine(source.client.name), oneLine(source.client.attention)]);
+}
+
+/** Cambia un texto (el asunto, acotado con `limitSubject`); la primera edición fija el contexto. */
+export function editEmailDraft(draft: QuotationEmailDraft, key: keyof QuotationEmailText, value: string, context: string): QuotationEmailDraft {
+  return {
+    overrides: { ...draft.overrides, [key]: key === 'subject' ? limitSubject(value) : value },
+    context: draft.context ?? context,
+  };
+}
+
+/** «Restablecer texto»: vuelve a lo generado. */
+export const resetEmailDraft = (): QuotationEmailDraft => EMPTY_EMAIL_DRAFT;
+
+/** Texto que se muestra y envía, si difiere de lo generado y si quedó viejo respecto a la cotización actual. */
+export function emailDraftView(draft: QuotationEmailDraft, defaults: QuotationEmailText, context: string): { text: QuotationEmailText; edited: boolean; stale: boolean } {
+  const text = { ...defaults, ...draft.overrides };
+  const edited = (Object.keys(draft.overrides) as (keyof QuotationEmailText)[]).some((key) => draft.overrides[key] !== undefined && draft.overrides[key] !== defaults[key]);
+  return { text, edited, stale: edited && draft.context !== null && draft.context !== context };
 }

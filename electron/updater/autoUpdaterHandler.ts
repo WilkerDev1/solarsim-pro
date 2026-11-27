@@ -135,10 +135,14 @@ export function registerAutoUpdater() {
     };
   });
 
-  ipcMain.handle('open-external-url', async (_event, url: string) => {
-    // http(s) y mailto: (correo de la cotización), sin caracteres de control (shared/externalUrl.ts).
-    if (isOpenableExternalUrl(url)) {
+  // Frontera real de los enlaces externos: lista blanca estricta (shared/externalUrl.ts). Devuelve si se abrió.
+  ipcMain.handle('open-external-url', async (_event, url: unknown): Promise<boolean> => {
+    if (!isOpenableExternalUrl(url)) return false;
+    try {
       await shell.openExternal(url);
+      return true;
+    } catch {
+      return false;
     }
   });
 

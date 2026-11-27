@@ -25,7 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getPlatformInfo: () => ipcRenderer.invoke('get-platform-info'),
-  openExternalUrl: (url: string) => ipcRenderer.invoke('open-external-url', url),
+  openExternalUrl: (url: string): Promise<boolean> => ipcRenderer.invoke('open-external-url', url),
   installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) =>
     ipcRenderer.invoke('install-linux-package', packageType, version),
   parseInvoiceWithAI: (payload: any) =>
