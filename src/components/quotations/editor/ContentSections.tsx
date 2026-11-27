@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { AlignLeft, ArrowDown, ArrowUp, ArrowUpRight, Building2, Check, ChevronDown, Copy, CornerDownRight, FileSymlink, MoreHorizontal, Package, Plus, RefreshCw, Trash2, Unlink } from 'lucide-react';
+import { AlignLeft, ArrowDown, ArrowUp, Building2, Check, ChevronDown, Copy, CornerDownRight, Eye, FileSymlink, MoreHorizontal, Package, Plus, RefreshCw, Trash2, Unlink } from 'lucide-react';
 import { confirmAction } from '../../common/confirmAction';
 import {
   QUOTATION_LIMITS, QUOTATION_SHEET_TEXTS, computeQuotationTotals, currencySymbol, formatAmount, formatExchangeRate, formatMoney, formatQuantity, toCents,
@@ -157,14 +157,57 @@ export interface SourceProposalProps {
   link: SourceProposalLink;
   /** Opciones de «Enlazar propuesta…», pedidas solo al enfocar o abrir el selector. */
   loadOptions: () => { id: string; label: string }[];
+  /** «Ver propuesta»: abre el visor de solo lectura dentro del editor (no cambia la propuesta activa). */
   onOpenProposal: (projectId: string) => void;
+  /** Enlaza la propuesta y trae sus documentos (`quotationEditorActions.linkProposal`); sin él, solo el enlace. */
+  onLink?: (projectId: string) => { error: string | null; added: number; overflow: number };
+  /** Quita el enlace conservando o quitando sus documentos (`unlinkProposal`). */
+  onUnlink?: (keepDocuments: boolean) => string | null;
+  /** Documentos de la propuesta enlazada en la cotización: con alguno, quitar el enlace pregunta qué hacer con ellos. */
+  documentCount?: number;
 }
 
-const SourceProposalField: React.FC<SectionProps & SourceProposalProps> = ({ readOnly, edit, link, loadOptions, onOpenProposal }) => {
+/** Mensaje tras enlazar: cuántos documentos de la propuesta llegaron a «Adjuntos». */
+export function linkedDocumentsNotice(added: number, overflow: number): string | null {
+  const parts = [
+    added ? `${added === 1 ? 'Se agregó 1 documento' : `Se agregaron ${added} documentos`} de la propuesta en Adjuntos, como «Solo relacionado».` : '',
+    overflow ? `${overflow === 1 ? '1 documento no cupo' : `${overflow} documentos no cupieron`} (máximo ${QUOTATION_LIMITS.maxAttachments} adjuntos).` : '',
+  ].filter(Boolean);
+  return parts.length ? parts.join(' ') : null;
+}
+
+/** Pregunta al quitar el enlace con documentos de la propuesta: conservarlos, quitarlos o cancelar. */
+export const UnlinkSourcePrompt: React.FC<{ count: number; onAnswer: (answer: 'keep' | 'remove' | 'cancel') => void }> = ({ count, onAnswer }) => (
+  <div className="qe-unlink-prompt" role="group" aria-labelledby="qe-unlink-prompt-title">
+    <p id="qe-unlink-prompt-title">
+      {count === 1 ? 'La cotización tiene 1 documento de esta propuesta.' : `La cotización tiene ${count} documentos de esta propuesta.`} ¿Qué hacemos con {count === 1 ? 'él' : 'ellos'} al quitar el enlace?
+    </p>
+    <div className="qe-actions">
+      <button type="button" className="qe-btn qe-btn-sm" onClick={() => onAnswer('keep')}>Conservar documentos</button>
+      <button type="button" className="qe-btn qe-btn-sm qe-btn-danger" onClick={() => onAnswer('remove')}>Quitarlos</button>
+      <button type="button" className="qe-link-btn" onClick={() => onAnswer('cancel')}>Cancelar</button>
+    </div>
+  </div>
+);
+
+const SourceProposalField: React.FC<SectionProps & SourceProposalProps> = ({ readOnly, edit, link, loadOptions, onOpenProposal, onLink, onUnlink, documentCount = 0 }) => {
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [confirmingUnlink, setConfirmingUnlink] = useState(false);
   const [options, setOptions] = useState<{ id: string; label: string }[] | null>(null);
   const load = () => { if (!options) setOptions(loadOptions()); };
-  const set = (projectId: string | null) => { setOptions(null); setError(edit((c) => setSourceProject(c, projectId))); };
+  const linkTo = (projectId: string) => {
+    setOptions(null);
+    if (!onLink) return setError(edit((c) => setSourceProject(c, projectId)));
+    const result = onLink(projectId);
+    setError(result.error);
+    setNotice(result.error ? null : linkedDocumentsNotice(result.added, result.overflow));
+  };
+  const unlink = (keepDocuments: boolean) => {
+    setConfirmingUnlink(false);
+    setNotice(null);
+    setError(onUnlink ? onUnlink(keepDocuments) : edit((c) => setSourceProject(c, null)));
+  };
   return (
     <div className="qe-field qe-source" role="group" aria-labelledby="qe-source-label">
       <span className="qe-label" id="qe-source-label">Propuesta de origen</span>
@@ -173,11 +216,12 @@ const SourceProposalField: React.FC<SectionProps & SourceProposalProps> = ({ rea
           <div className="qe-source-row">
             <FileSymlink className="h-4 w-4" aria-hidden="true" />
             <label htmlFor="qe-source-select" className="sr-only">Enlazar propuesta</label>
-            <select id="qe-source-select" value="" onFocus={load} onPointerDown={load} onChange={(e) => { if (e.target.value) set(e.target.value); }}>
+            <select id="qe-source-select" value="" onFocus={load} onPointerDown={load} onChange={(e) => { if (e.target.value) linkTo(e.target.value); }}>
               <option value="">Enlazar propuesta…</option>
               {options?.length === 0 && <option value="" disabled>No hay propuestas para enlazar</option>}
               {options?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
             </select>
+            <InfoTip label="Qué trae enlazar una propuesta" text="El enlace y sus documentos (fichas y anexos guardados), en Adjuntos como «Solo relacionado». No cambia líneas, cliente ni importes, y la propuesta no se modifica." />
           </div>
         )
       ) : (
@@ -186,16 +230,21 @@ const SourceProposalField: React.FC<SectionProps & SourceProposalProps> = ({ rea
           {link.state === 'available' ? (
             <>
               <span className="qe-source-name">{proposalName(link.project)}</span>
-              <button type="button" className="qe-link-btn" onClick={() => onOpenProposal(link.project.id)}>Ver propuesta<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button>
+              <button type="button" className="qe-link-btn" onClick={() => onOpenProposal(link.project.id)}>Ver propuesta<Eye className="h-4 w-4" aria-hidden="true" /></button>
             </>
           ) : (
             <span className="qe-muted">{link.state === 'trashed' ? `${proposalName(link.project)}: ${SOURCE_PROPOSAL_NOTICES.trashed}` : SOURCE_PROPOSAL_NOTICES.missing}</span>
           )}
           {!readOnly && (
-            <button type="button" className="qe-icon-btn" onClick={() => set(null)} aria-label="Quitar el enlace con la propuesta de origen" title="Quitar enlace"><Unlink className="h-4 w-4" aria-hidden="true" /></button>
+            <button type="button" className="qe-icon-btn" aria-expanded={documentCount > 0 ? confirmingUnlink : undefined}
+              onClick={() => (documentCount > 0 ? setConfirmingUnlink((open) => !open) : unlink(true))} aria-label="Quitar el enlace con la propuesta de origen" title="Quitar enlace"><Unlink className="h-4 w-4" aria-hidden="true" /></button>
           )}
         </div>
       )}
+      {confirmingUnlink && !readOnly && link.state !== 'none' && (
+        <UnlinkSourcePrompt count={documentCount} onAnswer={(answer) => (answer === 'cancel' ? setConfirmingUnlink(false) : unlink(answer === 'keep'))} />
+      )}
+      {notice && <p className="qe-field-hint" role="status">{notice}</p>}
       {error && <p className="qe-field-error" role="alert">{error}</p>}
     </div>
   );
@@ -292,7 +341,7 @@ const LineRow: React.FC<{
             onCommit={(description) => change({ description })}
           />
         </div>
-        <NumberField label={`Cantidad de la línea ${position}`} hideLabel value={line.quantity} readOnly={readOnly} format={formatQuantity} onCommit={(quantity) => change({ quantity })} />
+        <NumberField label={`Cantidad de la línea ${position}`} hideLabel value={line.quantity} readOnly={readOnly} format={formatQuantity} emptyWhenZero={detail} placeholder={detail ? '—' : undefined} onCommit={(quantity) => change({ quantity })} />
         {detail ? (
           <span className="qe-line-nosum">No suma al total</span>
         ) : (

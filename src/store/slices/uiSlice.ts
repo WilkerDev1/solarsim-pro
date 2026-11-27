@@ -1,11 +1,26 @@
 import { SimulationSlice, UISlice } from '../types';
 
-export const createUISlice: SimulationSlice<UISlice> = (set) => ({
+export const createUISlice: SimulationSlice<UISlice> = (set, get) => ({
   activeQuotationId: null,
-  openQuotation: (id) => set({ activeQuotationId: id, activeView: 'quotation-editor' }),
-  closeQuotation: () => set({ activeQuotationId: null, activeView: 'quotations-hub' }),
+  openQuotation: (id) => set({ activeQuotationId: id, activeView: 'quotation-editor', quotationEditorEntry: null, quotationReturn: null }),
+  closeQuotation: () => set({ activeQuotationId: null, activeView: 'quotations-hub', quotationEditorEntry: null }),
+  quotationEditorEntry: null,
+  consumeQuotationEditorEntry: () => { if (get().quotationEditorEntry) set({ quotationEditorEntry: null }); },
+  quotationReturn: null,
+  openProposalFromQuotation: (target) => {
+    if (!get().projects.some((p) => p.id === target.projectId)) return;
+    set({ quotationReturn: { ...target } });
+    get().setActiveProject(target.projectId, 'project-hub');
+  },
+  returnToQuotation: () => {
+    const target = get().quotationReturn;
+    if (!target) return;
+    if (!get().quotations.some((q) => q.id === target.quotationId)) return set({ quotationReturn: null });
+    set({ activeQuotationId: target.quotationId, activeView: 'quotation-editor', quotationEditorEntry: { tab: target.tab, viewer: target.viewer }, quotationReturn: null });
+  },
+  dismissQuotationReturn: () => set({ quotationReturn: null }),
   quotationLibrarySection: 'templates',
-  openQuotationLibrary: (section) => set((s) => ({ activeView: 'quotation-library', quotationLibrarySection: section ?? s.quotationLibrarySection })),
+  openQuotationLibrary: (section) => set((s) => ({ activeView: 'quotation-library', quotationLibrarySection: section ?? s.quotationLibrarySection, quotationEditorEntry: null })),
   closeQuotationLibrary: () => set((s) => ({
     activeView: s.activeQuotationId && s.quotations.some((q) => q.id === s.activeQuotationId) ? 'quotation-editor' : 'quotations-hub',
   })),

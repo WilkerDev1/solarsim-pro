@@ -19,7 +19,11 @@ export interface ProposalQuotationSource {
   seller: string;
   /** Equipos y servicios sin precio. */
   detailLines: { description: string; quantity: number; unit: string; catalogItemId?: string }[];
-  pricedLines: { description: string; quantity: number; unit: string; unitPriceCents: number; taxable: boolean }[];
+  /**
+   * Líneas con precio. `note` añade justo debajo una fila descriptiva sin cantidad (p. ej. el descuento que la línea ya
+   * lleva incluido, docs/QUOTATION_FROM_PROPOSAL.md); no cambia los totales.
+   */
+  pricedLines: { description: string; quantity: number; unit: string; unitPriceCents: number; taxable: boolean; note?: string }[];
   discounts: { label: string; type: 'fixed' | 'percentage'; value: number }[];
   paymentTerms: string;
   notes: string;
@@ -41,23 +45,29 @@ export interface QuotationFromProposalOptions {
 }
 
 /**
- * Borrador ('draft') con las líneas con precio primero y las descriptivas después; no muta `source` ni comparte
+ * Borrador ('draft') con las líneas con precio primero (cada una seguida de su `note`, si la tiene) y las descriptivas
+ * después; no muta `source` ni comparte
  * referencias con él. Una vigencia anterior a `today` se descarta (`null`). El resultado pasa por
  * `validateQuotationContent`: `ok` trae el contenido ya normalizado (validarlo otra vez no lo cambia) y `!ok` el
  * motivo, p. ej. una propuesta sin id o importes fuera de tope.
  */
 export function quotationFromProposal(source: ProposalQuotationSource, options: QuotationFromProposalOptions): QuotationValidation {
   if (typeof source.projectId !== 'string' || !source.projectId.trim()) return { ok: false, error: 'La propuesta de origen no tiene id' };
-  const priced: QuotationLine[] = source.pricedLines.map(item => ({
-    id: options.newId(),
-    kind: 'item',
-    description: item.description,
-    quantity: item.quantity,
-    unit: item.unit,
-    unitPriceCents: item.unitPriceCents,
-    discountPct: 0,
-    taxable: item.taxable,
-  }));
+  const priced: QuotationLine[] = source.pricedLines.flatMap(item => [
+    {
+      id: options.newId(),
+      kind: 'item' as const,
+      description: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPriceCents: item.unitPriceCents,
+      discountPct: 0,
+      taxable: item.taxable,
+    },
+    ...(item.note
+      ? [{ id: options.newId(), kind: 'detail' as const, description: item.note, quantity: 0, unit: '', unitPriceCents: 0, discountPct: 0, taxable: false }]
+      : []),
+  ]);
   const details: QuotationLine[] = source.detailLines.map(item => ({
     id: options.newId(),
     kind: 'detail',

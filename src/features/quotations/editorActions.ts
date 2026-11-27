@@ -3,10 +3,16 @@ import type { ClientRecord } from '../../types/client';
 import type { CompanyProfile } from '../../types/companyProfile';
 import type { QuotationContent } from '../../types/quotation';
 import { quotationContent } from '../../store/sync/quotationContent';
-import { contentPatch, printedClientFromDirectory, setIssuer, setPrintedClient } from '../../domain/quotationEdit';
+import {
+  contentPatch, linkSourceProposal, mergeSourceDocuments, printedClientFromDirectory, removeSourceDocument, setIssuer, setPrintedClient, unlinkSourceProposal,
+} from '../../domain/quotationEdit';
+import { proposalDocumentAttachments } from './proposalDocuments';
 import { LOGO_REJECTED, issuerFromCompany } from './issuer';
 
-type EditorStore = Pick<SimulationStore, 'quotations' | 'updateQuotationRecord' | 'linkQuotationToClient'>;
+type EditorStore = Pick<SimulationStore, 'quotations' | 'updateQuotationRecord' | 'linkQuotationToClient' | 'projects'>;
+
+/** Resultado de traer documentos de la propuesta: error del store, añadidos y los que no cupieron. */
+export interface SourceDocumentsResult { error: string | null; added: number; overflow: number }
 
 /**
  * Acciones del editor sobre una cotización, separadas de React para probarlas con el store real. Cada edición se aplica
@@ -40,5 +46,28 @@ export function quotationEditorActions(getState: () => EditorStore, id: string) 
     if (failure && issuer.logo && failure.startsWith(LOGO_REJECTED)) return edit((content) => setIssuer(content, { ...issuer, logo: '' }));
     return failure;
   };
-  return { edit, link, chooseClient, refreshIssuer };
+  /**
+   * Documentos de la propuesta de origen (solo lee la propuesta: nunca la modifica). Enlazar trae los que F7 sabe
+   * convertir; «Actualizar» añade los nuevos sin duplicar ni reactivar los quitados.
+   */
+  const withSourceDocuments = (projectId: string, merge: (content: QuotationContent, docs: ReturnType<typeof proposalDocumentAttachments>['attachments']) => ReturnType<typeof mergeSourceDocuments>): SourceDocumentsResult => {
+    const project = getState().projects.find((p) => p.id === projectId && !p.isDeleted);
+    const docs = project ? proposalDocumentAttachments(project).attachments : [];
+    let added = 0, overflow = 0;
+    const error = edit((content) => {
+      const result = merge(content, docs);
+      ({ added, overflow } = result);
+      return result.content;
+    });
+    return { error, added: error ? 0 : added, overflow };
+  };
+  const linkProposal = (projectId: string): SourceDocumentsResult => withSourceDocuments(projectId, (content, docs) => linkSourceProposal(content, projectId, docs));
+  const refreshProposalDocuments = (): SourceDocumentsResult => {
+    const latest = getState().quotations.find((q) => q.id === id);
+    if (!latest?.sourceProjectId) return { error: null, added: 0, overflow: 0 };
+    return withSourceDocuments(latest.sourceProjectId, mergeSourceDocuments);
+  };
+  const unlinkProposal = (keepDocuments: boolean): string | null => edit((content) => unlinkSourceProposal(content, keepDocuments));
+  const removeProposalDocument = (attachmentId: string): string | null => edit((content) => removeSourceDocument(content, attachmentId));
+  return { edit, link, chooseClient, refreshIssuer, linkProposal, refreshProposalDocuments, unlinkProposal, removeProposalDocument };
 }

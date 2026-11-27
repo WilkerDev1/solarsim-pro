@@ -28,6 +28,8 @@ export const QUOTATION_LIMITS = {
   maxItems: 200,
   maxDiscounts: 20,
   maxAttachments: 40,
+  /** Documentos de la propuesta de origen quitados que se recuerdan (`dismissedSourceDocuments`). */
+  maxDismissedSourceDocuments: 100,
   maxQuantity: 1_000_000,
   /** Precio unitario máximo en centavos (RD$/US$ 1 000 millones). */
   maxUnitPriceCents: 100_000_000_000,
@@ -315,6 +317,13 @@ function parse(data: Record<string, unknown>): QuotationContent {
   if (clientId) value.clientId = clientId;
   if (sourceProjectId) value.sourceProjectId = sourceProjectId;
   if (folderId) value.folderId = folderId;
+  const dismissedIds = new Set<string>();
+  const dismissed = list(
+    data.dismissedSourceDocuments, QUOTATION_LIMITS.maxDismissedSourceDocuments,
+    `Demasiados documentos quitados de la propuesta (máx. ${QUOTATION_LIMITS.maxDismissedSourceDocuments})`, 'Los documentos quitados deben ser una lista',
+  ).map(raw => uniqueId(raw, dismissedIds, 'documento quitado'));
+  // Sin propuesta de origen no hay nada que recordar.
+  if (sourceProjectId && dismissed.length) value.dismissedSourceDocuments = dismissed;
   return value;
 }
 

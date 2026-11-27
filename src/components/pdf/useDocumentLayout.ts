@@ -19,7 +19,6 @@ export interface DocumentLayoutState {
 export function useDocumentLayout(project: ProjectSimulation): DocumentLayoutState {
   const setDocumentLayout = useSimulationStore((state) => state.setDocumentLayout);
   const layout = project.customization?.layout;
-  // Sin comparación de ahorro (sistema aislado) las páginas de retorno y flujo de caja no se muestran (no se guarda nada).
   const savingsBasis = resolveSavingsBasis(project.rates);
   const visibility = useMemo(() => savingsSectionsVisibility(resolveSectionVisibility(layout), savingsBasis), [layout, savingsBasis]);
   const theme = useMemo(() => PDF_COLOR_THEMES.find((item) => item.id === layout?.themeId) ?? PDF_COLOR_THEMES[0], [layout?.themeId]);

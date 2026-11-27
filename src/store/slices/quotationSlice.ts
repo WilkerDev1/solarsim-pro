@@ -9,7 +9,7 @@ import { QuotationSyncService, type QuotationWriteResult } from '../../services/
 import { workspaceScope } from '../sync/organizationWorkspace';
 import { reuseArray, reuseIfEqual, reuseRecord } from '../sync/structuralSharing';
 import {
-  canonicalQuotationContent, keepLocalImages, nextLocalQuotationNumber, planQuotationPush, quotationContent, sameQuotationContent,
+  canonicalQuotationContent, keepLocalImages, keepLocalOnlyFields, nextLocalQuotationNumber, planQuotationPush, quotationContent, sameQuotationContent,
 } from '../sync/quotationContent';
 import { localIsoDate } from '../../utils/localDate';
 import { DocumentAssetService } from '../../services/documentAssetService';
@@ -33,8 +33,11 @@ const withContent = (record: QuotationRecord, content: QuotationContent, updated
 };
 
 /** Server number once assigned; it never changes afterwards. */
-const serverRecord = (server: QuotationRecord, local: QuotationRecord | undefined): QuotationRecord =>
-  keepLocalImages({ ...server, number: local?.number ?? server.number ?? null }, local);
+const serverRecord = (server: QuotationRecord, local: QuotationRecord | undefined, { keepLocalOnly = true } = {}): QuotationRecord => {
+  const record = keepLocalImages({ ...server, number: local?.number ?? server.number ?? null }, local);
+  // Lo que una API anterior descarta (`dismissedSourceDocuments`) se conserva, salvo al elegir la copia del servidor.
+  return keepLocalOnly ? keepLocalOnlyFields(record, local) : record;
+};
 
 /**
  * Installs a write receipt together with the change it clears, so a later failure in the pass cannot orphan it.
@@ -295,7 +298,8 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
         if (resolution === 'accept_server') {
           delete changes[id];
           set({
-            quotations: [...state.quotations.filter((q) => q.id !== id), serverRecord(server, local)],
+            // «Usar la del servidor»: su contenido tal cual, también sin la lista local de documentos quitados.
+            quotations: [...state.quotations.filter((q) => q.id !== id), serverRecord(server, local, { keepLocalOnly: false })],
             quotationChanges: changes,
             quotationSyncFeedback: null,
           });

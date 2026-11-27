@@ -36,16 +36,19 @@ export interface DialogChoice { blocks: ConversionBlocks; error: string | null }
 export const toggleBlockChoice = (choice: DialogChoice, id: ConversionBlock): DialogChoice => ({ blocks: { ...choice.blocks, [id]: !choice.blocks[id] }, error: null });
 
 /**
- * Diferencia exacta entre el total del borrador y el de la propuesta, en la moneda del borrador; `null` si cuadra.
+ * Diferencia exacta entre el total del borrador y el de la propuesta, en la moneda del borrador; `null` si cuadra (lo
+ * normal, también con descuentos e ITBIS). Solo aparece en casos raros, como un descuento mayor que todas las líneas sin ITBIS.
  * Va junto al resumen, visible (no entre los avisos plegados), porque cambia lo que se cobra.
  */
-export function totalDifferenceText(build: Pick<ProposalSourceBuild, 'totalDifferenceCents' | 'totalDifferenceReason'>, currency: QuotationCurrency): string | null {
+export function totalDifferenceText(
+  build: Pick<ProposalSourceBuild, 'totalDifferenceCents' | 'totalDifferenceReason' | 'residualDiscountCents'>, currency: QuotationCurrency,
+): string | null {
   const diff = build.totalDifferenceCents;
   if (!diff) return null;
   const amount = formatMoney(Math.abs(diff), currency);
   const where = diff < 0 ? 'por debajo' : 'por encima';
-  const why = build.totalDifferenceReason === 'discounted_itbis'
-    ? 'el ITBIS se calcula sobre la base ya descontada'
+  const why = build.totalDifferenceReason === 'residual_discount'
+    ? `${formatMoney(build.residualDiscountCents, currency)} del descuento superan las líneas sin ITBIS y se descuentan de todo el documento, ITBIS incluido`
     : 'revisa los importes del borrador';
   return `El total quedará ${amount} ${where} del de la propuesta: ${why}.`;
 }
