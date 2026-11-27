@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
+import { openExternalUrl } from '../../utils/openExternalUrl';
 import {
   X,
   RefreshCw,
@@ -129,11 +130,7 @@ export const UpdateModal: React.FC = () => {
   };
 
   const handleOpenUrl = (url: string) => {
-    if (window.electronAPI && typeof window.electronAPI.openExternalUrl === 'function') {
-      window.electronAPI.openExternalUrl(url);
-    } else {
-      window.open(url, '_blank');
-    }
+    void openExternalUrl(url);
   };
 
   return (

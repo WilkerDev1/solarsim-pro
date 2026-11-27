@@ -50,7 +50,7 @@ En el CT (con el usuario de servicio indicado en el archivo privado):
    docker save <imagen en ejecución> | gzip > "$D/<imagen>.tar.gz"
    ```
 
-2. **Ensayo de restauración.** Desde la raíz de un checkout de la revisión a desplegar, con Docker local: `$S 'cat <checkpoint>/solarsim_prod.dump' | python3 scripts/qa/restoreBackupRehearsal.py`. El script guarda el dump completo (datos de producción) en una carpeta privada de `TMPDIR` (0700, archivo 0600) y la borra al terminar; si se interrumpe a la fuerza puede quedar `solarsim-logical-qa-*/input.dump`. Ejecutarlo solo en una máquina de confianza con disco cifrado y comprobar después que no quedan restos. Debe listar las migraciones de esa revisión (incluidas las nuevas: con la 009 la salida termina en `"migrations":[1,2,3,4,5,6,7,8,9]`). El script recibe el dump por stdin, lo restaura en PostgreSQL 16 sin red (`--network none`, 1 GB de memoria con los datos en tmpfs) con socket Unix privado, ejecuta `server/tests/backupRehearsal.ts` (migraciones del repositorio dos veces, conteos iguales, huellas iguales del contenido de cada propuesta salvo `specs`, `equipmentTotals` iguales antes y después, ningún proyecto con el espejo heredado, cero huérfanos) y `pg_amcheck --heapallindexed --parent-check`; al terminar elimina contenedor y temporales. No monta ni modifica la base de producción.
+2. **Ensayo de restauración.** Desde la raíz de un checkout de la revisión a desplegar, con Docker local: `$S 'cat <checkpoint>/solarsim_prod.dump' | python3 scripts/qa/restoreBackupRehearsal.py`. El script guarda el dump completo (datos de producción) en una carpeta privada de `TMPDIR` (0700, archivo 0600) y la borra al terminar; si se interrumpe a la fuerza puede quedar `solarsim-logical-qa-*/input.dump`. Ejecutarlo solo en una máquina de confianza con disco cifrado y comprobar después que no quedan restos. Debe listar las migraciones de esa revisión (incluidas las nuevas: con la 012 la salida termina en `"migrations":[1,2,3,4,5,6,7,8,9,10,11,12]`). El script recibe el dump por stdin, lo restaura en PostgreSQL 16 sin red (`--network none`, 1 GB de memoria con los datos en tmpfs) con socket Unix privado, ejecuta `server/tests/backupRehearsal.ts` (migraciones del repositorio dos veces, conteos iguales, huellas iguales del contenido de cada propuesta salvo `specs`, `equipmentTotals` iguales antes y después, ningún proyecto con el espejo heredado, cero huérfanos) y `pg_amcheck --heapallindexed --parent-check`; al terminar elimina contenedor y temporales. No monta ni modifica la base de producción.
 3. **Compatibilidad de clientes.** La API exige `baseVersion` (CAS), publicación autenticada y, desde la 2.7.1, `X-SolarSim-Client` con versión ≥ `MIN_CLIENT_VERSION` (426 en caso contrario; ver más abajo). Los clientes 2.6.0 y 2.7.0 dejan de sincronizar: coordinar la versión de escritorio y del Worker, avisar al equipo y exportar el trabajo pendiente de quienes vayan a cambiar.
 4. **Construir y reemplazar solo la API.** La imagen se etiqueta `solarsim-api-api:<versión>-<sha corto>` para poder volver a ella. PostgreSQL, Caddy y el túnel no se recrean.
 
@@ -153,6 +153,19 @@ Orden (ya no es frágil):
 
 Rollback: la imagen 2.7.4 es compatible con los datos (normaliza `feature_settings` a una clave e ignora la otra). Si una política se guardó con `netMeteringRegimeSelector: false` y un cliente 2.7.4 la vuelve a guardar con la API anterior, la clave se pierde y vuelve al valor por defecto (visible).
 
+### Cotizaciones: política de funciones con tres claves (`FEATURE_POLICY_V3_CLIENT_VERSION`)
+
+La política gana la clave `quotations` (función «Cotizaciones», activada por defecto). Sin migración: la fila que no la tiene vale el defecto al leerse.
+
+- **Reparto por versión.** La API lee y guarda según `X-SolarSim-Client` (`featureKeysForClient`): antes de `FEATURE_POLICY_V2_CLIENT_VERSION` (2.8.0), una clave; desde 2.8.0 y antes de `FEATURE_POLICY_V3_CLIENT_VERSION` (`shared/clientVersion.ts`, `2.10.0`; una prerrelease `2.10.0-beta.N` es anterior), dos; desde esa versión, tres. El PATCH acepta exactamente las claves de esa versión y las **fusiona** con la fila guardada: un cliente 2.9.x (o una compilación de `beta` que aún se identifica como 2.9.4) guarda sus dos claves sin tocar `quotations`, y uno que envíe tres recibe 400. Los anteriores a 2.8.0 no guardan.
+- **Cliente.** Guarda solo las claves que el servidor le devolvió (`managedFeatures` de la política); las demás se muestran deshabilitadas en Ajustes con «Disponible para la organización a partir de la versión X del cliente», así nunca inventa ni pisa un valor.
+- **Orden: API antes que el cliente.**
+  1. Checkpoint y ensayo de restauración.
+  2. **API** (y Worker) de la versión nueva. Los clientes 2.9.x siguen leyendo y guardando sus dos claves.
+  3. **Release de escritorio** con versión ≥ `FEATURE_POLICY_V3_CLIENT_VERSION` (lo exigen `release:bump` y `release:manifests`, ver [Mantenimiento](MAINTENANCE_AND_UPDATES.md#publicar-una-versión-de-escritorio)). Contra una API anterior el cliente nuevo funciona con dos claves, pero la organización no puede gestionar las cotizaciones (quedan visibles por defecto) hasta que la API sea la nueva.
+- **Marcha atrás.** Volver a una API 2.9.x es compatible con los datos (lee dos claves), pero su PATCH **reemplaza** la fila con esas dos: la primera vez que alguien guarde la política, `quotations` se pierde y vuelve al defecto (visible). Además, la API 2.9.x tampoco devuelve esa clave al leer: desde el momento de la marcha atrás, y aunque nadie guarde, los clientes 2.10 de las organizaciones que la apagaron vuelven a mostrar Cotizaciones. Antes de volver atrás, anotar el valor de `quotations` de cada organización que la haya apagado y reaplicarlo tras recuperar la API nueva.
+- **Versión mínima.** No cambia. Cuando `MIN_CLIENT_VERSION` alcance `FEATURE_POLICY_V3_CLIENT_VERSION`, el reparto por versión deja de tener efecto.
+
 ### Versión 2.8.2: imágenes del documento una sola vez (migración 009)
 
 Migración aditiva 009 (`document_assets`) con relleno: mueve logos y miniaturas de anexos de cada propuesta a la tabla y deja referencias, sin cambiar `version` ni `updated_at` ([API](DATABASE_AND_API_SPECIFICATION.md#imágenes-del-documento-migración-009)). Los clientes que no piden `?assetRefs=1` (2.8.1 y anteriores, agentes) siguen recibiendo las imágenes en línea: `MIN_CLIENT_VERSION` no cambia.
@@ -174,6 +187,17 @@ Migración aditiva 010 (`equipment_price_observations`, [ADR 0006](adr/0006-prec
 5. Subir `MIN_CLIENT_VERSION=2.9.0` en el `.env` de la API y recrear solo `api` ([versión mínima](MAINTENANCE_AND_UPDATES.md#versión-mínima-de-cliente)).
 
 Rollback: una API anterior a la 010 no usa la tabla nueva y funcionaría sobre la base migrada, pero los clientes 2.9.0 recibirían 404 en `/api/equipment-prices/*`; en ese caso conservan su cola local sin mostrar errores. La 010 no se revierte con DDL. Para volver a un estado sin la tabla, restaurar el checkpoint en una base nueva (sección siguiente). Los registros confirmados después del checkpoint se perderían.
+
+### Versión 2.10.0: cotizaciones (migraciones 011 y 012)
+
+Lista completa en [Cotizaciones](QUOTATIONS.md#qué-exige-el-release-2100).
+
+1. Checkpoint y ensayo de restauración. El ensayo debe terminar en `[1..12]` con los mismos conteos que producción.
+2. **API** 2.10.0 (aplica la 011 y la 012 al arrancar; solo crean tablas nuevas). Trae además `POST /api/document-assets` y `GET /api/document-assets/:sha256/file`. Los clientes 2.9.x siguen leyendo y guardando sus dos claves de la política.
+3. **Worker** y **MCP remoto** 2.10.0: solo cambia el número de versión; redesplegarlos es opcional.
+4. **Release de escritorio** 2.10.0, firmada y publicada, después de la API.
+5. `MIN_CLIENT_VERSION` no cambia.
+6. Rollback: ver [Cotizaciones: política de funciones con tres claves](#cotizaciones-política-de-funciones-con-tres-claves-feature_policy_v3_client_version). Además, la API anterior no desenlaza cotizaciones al borrar clientes o carpetas.
 
 ## Rollback de la API
 

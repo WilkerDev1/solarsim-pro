@@ -77,8 +77,12 @@ export interface DefaultSimulationSettings {
   annualEnergyTariffEscalationPct: number;
 }
 
-/** Vistas principales de la aplicación. `clients-hub` lo implementa el directorio de clientes. */
-export type AppView = 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub' | 'clients-hub';
+/**
+ * Vistas principales de la aplicación. `clients-hub` lo implementa el directorio de clientes; `quotations-hub` y
+ * `quotation-editor`, el módulo de cotizaciones. `activeView` se persiste y `activeQuotationId` no: al hidratar,
+ * `quotation-editor` pasa a `quotations-hub`.
+ */
+export type AppView = 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub' | 'clients-hub' | 'quotations-hub' | 'quotation-editor' | 'quotation-library';
 /** Pestañas del modal de Ajustes. `agents` agrupa permisos, actividad y conexión MCP. */
 export type SettingsTab = 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features' | 'agents';
 
@@ -236,6 +240,17 @@ export interface AISlice {
 }
 
 export interface UISlice {
+  /** Cotización abierta en el editor; no se persiste (al reabrir la app el editor vuelve al catálogo). */
+  activeQuotationId: string | null;
+  /** Abre una cotización en el editor. */
+  openQuotation: (id: string) => void;
+  /** Cierra el editor y vuelve al catálogo de cotizaciones. */
+  closeQuotation: () => void;
+  /** Sección del gestor de plantillas, firmas y sellos (`quotation-library`). */
+  quotationLibrarySection: 'templates' | 'signatures';
+  /** Abre el gestor; al cerrarlo se vuelve al editor si había una cotización abierta, si no al catálogo. */
+  openQuotationLibrary: (section?: 'templates' | 'signatures') => void;
+  closeQuotationLibrary: () => void;
   appAssistantEnabled: boolean;
   setAppAssistantEnabled: (enabled: boolean) => void;
   isNewProjectModalOpen: boolean;
@@ -350,6 +365,64 @@ export interface NotificationSlice {
 
 import { TariffSlice } from './slices/tariffSlice';
 import { ClientSlice } from './slices/clientSlice';
+import type { QuotationContent, QuotationStatus } from '../../shared/quotations';
+import type {
+  QuotationChange, QuotationDeletionCommand, QuotationMutationResult, QuotationRecord, QuotationSyncCursor,
+} from '../types/quotation';
+
+import type { QuotationAssetIssue } from './sync/quotationAssets';
+import type {
+  LibraryKind, LibraryMutationResult, QuotationLibraryState, QuotationSignature, QuotationSignatureContent, QuotationTemplate, QuotationTemplateContent,
+} from '../types/quotationLibrary';
+
+export type QuotationActionResult = { ok: true } | { ok: false; error: string };
+
+/** Cotizaciones (docs/QUOTATIONS.md): API pura, llamable fuera de React; las reglas viven en `shared/quotations`. */
+export interface QuotationSlice {
+  quotations: QuotationRecord[];
+  quotationChanges: Record<string, QuotationChange>;
+  quotationDeletionQueue: QuotationDeletionCommand[];
+  /** Cursor `since` de la última descarga aplicada entera en este espacio de trabajo. */
+  quotationSyncCursor: QuotationSyncCursor | null;
+  /** Espacio local: última secuencia usada por año (`'2026' → 147`); nunca baja aunque se borre una cotización. */
+  quotationNumberCounters: Record<string, number>;
+  quotationSyncFeedback: string | null;
+  /** Imágenes o adjuntos que el servidor rechazó de forma definitiva en la última publicación, por cotización (no se guarda). */
+  quotationAssetIssues: Record<string, QuotationAssetIssue[]>;
+  createQuotationRecord: (overrides?: Partial<QuotationContent>) => QuotationMutationResult;
+  /** Edita el contenido de un borrador; nunca cambia `status`. */
+  updateQuotationRecord: (id: string, patch: Partial<QuotationContent>) => QuotationMutationResult;
+  setQuotationStatus: (id: string, status: QuotationStatus) => QuotationMutationResult;
+  duplicateQuotationRecord: (id: string) => QuotationMutationResult;
+  deleteQuotationRecord: (id: string) => QuotationActionResult;
+  /** Enlace opcional; los datos impresos `client` nunca cambian. */
+  linkQuotationToClient: (id: string, clientId: string | null) => QuotationActionResult;
+  moveQuotationToFolder: (id: string, folderId: string | null) => QuotationActionResult;
+  resolveQuotationConflict: (id: string, resolution: 'accept_server' | 'keep_local') => void;
+  syncQuotationsWithServer: () => Promise<{ success: boolean; message: string }>;
+}
+
+/**
+ * Plantillas, firmas y sellos de cotización (docs/QUOTATIONS.md#plantillas-firmas-y-sellos): recursos del espacio de
+ * trabajo; sin cuenta todo funciona en este equipo, con sesión se sincronizan con CAS como las cotizaciones.
+ */
+export interface QuotationLibrarySlice {
+  quotationLibrary: QuotationLibraryState;
+  quotationLibrarySyncFeedback: string | null;
+  createQuotationTemplate: (content: Partial<QuotationTemplateContent>) => LibraryMutationResult<QuotationTemplate>;
+  updateQuotationTemplate: (id: string, changes: Partial<QuotationTemplateContent>) => LibraryMutationResult<QuotationTemplate>;
+  duplicateQuotationTemplate: (id: string) => LibraryMutationResult<QuotationTemplate>;
+  /** Marca la predeterminada (desmarca las demás); `null` deja ninguna. */
+  setDefaultQuotationTemplate: (id: string | null) => QuotationActionResult;
+  deleteQuotationTemplate: (id: string) => QuotationActionResult;
+  createQuotationSignature: (content: Partial<QuotationSignatureContent>) => LibraryMutationResult<QuotationSignature>;
+  updateQuotationSignature: (id: string, changes: Partial<QuotationSignatureContent>) => LibraryMutationResult<QuotationSignature>;
+  /** Una predeterminada por tipo: firma y sello. */
+  setDefaultQuotationSignature: (id: string) => QuotationActionResult;
+  deleteQuotationSignature: (id: string) => QuotationActionResult;
+  resolveQuotationLibraryConflict: (kind: LibraryKind, id: string, resolution: 'accept_server' | 'keep_local') => void;
+  syncQuotationLibraryWithServer: () => Promise<{ success: boolean; message: string }>;
+}
 import { FeatureSettingsSlice } from './slices/featureSettingsSlice';
 import { AgentSlice } from './slices/agentSlice';
 import { EquipmentPriceSlice } from './slices/equipmentPriceSlice';
@@ -362,6 +435,8 @@ export type SimulationStore = ProjectSlice &
   UISlice &
   FolderSlice &
   ClientSlice &
+  QuotationSlice &
+  QuotationLibrarySlice &
   TariffSlice &
   CompanyProfileSlice &
   VersionHistorySlice &

@@ -311,6 +311,8 @@ test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, co
     { version: 8, name: "agent_access" },
     { version: 9, name: "document_assets" },
     { version: 10, name: "equipment_price_observations" },
+    { version: 11, name: "quotations" },
+    { version: 12, name: "quotation_library" },
   ]);
 
   // 4. Verify ZERO data loss: row counts of all 8 tables are strictly preserved

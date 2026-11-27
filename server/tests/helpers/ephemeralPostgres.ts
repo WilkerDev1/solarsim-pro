@@ -4,6 +4,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
 
 const exec = promisify(execFile);
+/** Every suite starts its container at once: startup can be slow on a loaded machine. */
+const STARTUP_TIMEOUT_MS = 60_000;
 
 export interface EphemeralPostgres {
   pool: pg.Pool;
@@ -46,14 +48,17 @@ export async function startEphemeralPostgres(
       user: "solarsim_test",
       password: "isolated-test-only",
       database: "solarsim_test",
-      connectionTimeoutMillis: 1000,
+      // Also bounds the wait for a free pooled connection (e.g. many concurrent requests in one suite).
+      connectionTimeoutMillis: 10_000,
     });
-    for (let attempt = 0; ; attempt++) {
+    // A deadline rather than an attempt count, keeping the short retry interval.
+    const deadline = Date.now() + STARTUP_TIMEOUT_MS;
+    for (;;) {
       try {
         await pool.query("SELECT 1");
         break;
       } catch {
-        if (attempt === 49)
+        if (Date.now() >= deadline)
           throw new Error("Isolated PostgreSQL did not start");
         await delay(100);
       }

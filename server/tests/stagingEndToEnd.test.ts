@@ -22,6 +22,7 @@ import {
   CLIENT_VERSION,
 } from "../../src/services/clientIdentity.js";
 import { asClient } from "./helpers/clientHeader.js";
+import { featureKeysForClient } from "../../shared/applicationFeatures.js";
 import type { ProjectSimulation } from "../../src/types/index.js";
 
 const jwtSecret = "staging-e2e-secret-key-32-chars-long-0123456789";
@@ -256,10 +257,10 @@ test("Staging E2E: completo ciclo de confirmación de política, publicación we
       },
       body: JSON.stringify({
         baseVersion: currentPolicy.version,
-        settings: {
-          selfConsumptionProjection: true,
-          netMeteringRegimeSelector: true,
-        },
+        // La forma que gestiona la versión con la que se identifica este cliente (2 o 3 claves).
+        settings: Object.fromEntries(
+          featureKeysForClient(CLIENT_IDENTITY_VALUE).map((key) => [key, true]),
+        ),
       }),
     });
     assert.equal(policyPatch.status, 200);

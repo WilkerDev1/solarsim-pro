@@ -1,6 +1,14 @@
 import { SimulationSlice, UISlice } from '../types';
 
 export const createUISlice: SimulationSlice<UISlice> = (set) => ({
+  activeQuotationId: null,
+  openQuotation: (id) => set({ activeQuotationId: id, activeView: 'quotation-editor' }),
+  closeQuotation: () => set({ activeQuotationId: null, activeView: 'quotations-hub' }),
+  quotationLibrarySection: 'templates',
+  openQuotationLibrary: (section) => set((s) => ({ activeView: 'quotation-library', quotationLibrarySection: section ?? s.quotationLibrarySection })),
+  closeQuotationLibrary: () => set((s) => ({
+    activeView: s.activeQuotationId && s.quotations.some((q) => q.id === s.activeQuotationId) ? 'quotation-editor' : 'quotations-hub',
+  })),
   appAssistantEnabled: false,
   setAppAssistantEnabled: (enabled) => set({ appAssistantEnabled: enabled === true }),
   isNewProjectModalOpen: false,

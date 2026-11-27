@@ -18,6 +18,7 @@ import { ProjectSimulation, FinancialSummaryResult } from '../../types';
 import { ShareProposalService, ShareResult, DEFAULT_WORKER_URL } from '../../services/shareProposalService';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
+import { openExternalUrl } from '../../utils/openExternalUrl';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { createShareRequestGuard } from './shareRequestGuard';
@@ -118,11 +119,7 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
 
   const handleOpenBrowser = () => {
     if (!shareResult?.shareUrl) return;
-    if (window.electronAPI?.openExternalUrl) {
-      window.electronAPI.openExternalUrl(shareResult.shareUrl);
-    } else {
-      window.open(shareResult.shareUrl, '_blank');
-    }
+    void openExternalUrl(shareResult.shareUrl);
   };
 
   const handleSaveWorkerUrl = () => {

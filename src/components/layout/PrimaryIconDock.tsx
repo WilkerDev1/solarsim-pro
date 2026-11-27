@@ -16,9 +16,11 @@ import {
   X,
   Building2,
   Users,
+  ReceiptText,
 } from "lucide-react";
 
 import { aiMenuStackClass } from "./aiMenuStack";
+import { enforceQuotationsFeature, isQuotationsView, useQuotationsFeature } from "../../features/application/quotationsFeature";
 
 interface PrimaryIconDockProps {
   beforeNavigate?: () => void;
@@ -53,6 +55,13 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
 
   const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
   const aiMenuRef = useRef<HTMLDivElement>(null);
+  const quotationsEnabled = useQuotationsFeature();
+  const quotationsActive = !assistantActive && !isSettingsModalOpen && isQuotationsView(activeView);
+
+  // Apagar la función estando en cotizaciones vuelve a Inicio (solo cambia la vista).
+  useEffect(() => {
+    enforceQuotationsFeature();
+  }, [quotationsEnabled, activeView]);
 
   const isDark = sidebarTheme === "dark";
   const hasUpdate =
@@ -218,6 +227,32 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
                 <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
               )}
           </button>
+
+          {/* Cotizaciones: catálogo y editor (función registrada `quotations`) */}
+          {quotationsEnabled && (
+            <button
+              onClick={() => {
+                beforeNavigate?.();
+                if (isSettingsModalOpen) closeSettingsModal();
+                setActiveView("quotations-hub");
+                setIsTrashActive(false);
+                setIsAIMenuOpen(false);
+              }}
+              className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer relative ${
+                quotationsActive
+                  ? "bg-emerald-900/60 text-emerald-300"
+                  : "text-slate-400 hover:text-white hover:bg-[#283243]"
+              }`}
+              aria-current={quotationsActive ? "page" : undefined}
+              aria-label="Cotizaciones"
+              title="Cotizaciones: catálogo y editor"
+            >
+              <ReceiptText className="w-5 h-5" aria-hidden="true" />
+              {quotationsActive && (
+                <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
+              )}
+            </button>
+          )}
 
           {/* 3. Botón Unificado de IA Gemini con Menú Selector */}
           <div className="relative">

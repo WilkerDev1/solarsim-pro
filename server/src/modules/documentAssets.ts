@@ -14,7 +14,22 @@ import {
   mapDocumentAssetFields,
   replaceAssetRefs,
 } from "../../../shared/documentAssets.js";
+import {
+  DOCUMENT_FILE_TYPES,
+  checkDocumentDataUrl,
+  parseDataUrl,
+  sniffDocumentFileType,
+  type DocumentFileType,
+} from "../../../shared/fileSignatures.js";
+import { isWriterRole } from "../../../shared/permissions.js";
+import { QUOTATION_LIBRARY_LIMITS } from "../../../shared/quotations/library.js";
+import { bodyLimit } from "hono/body-limit";
 import type { Dependencies } from "../dependencies.js";
+
+/** Body limit of `POST /api/document-assets`: 8 MiB in base64 (~10.7 MiB) plus the JSON wrapper. */
+export const DOCUMENT_ASSET_BODY_LIMIT = Math.round(11.5 * 1024 * 1024);
+import { lockCurrentMembership } from "../membership.js";
+import { readObjectBody } from "../request.js";
 
 type Db = Pool | PoolClient;
 export const assetSha256 = (value: string) =>
@@ -138,6 +153,155 @@ export function registerDocumentAssetRoutes(
     c.header("Cache-Control", "private, max-age=31536000, immutable");
     return c.json({ success: true, sha256: hash, content: row.content });
   });
+
+  /**
+   * Uploads one loose file (quotation logo, signature, stamp or attachment) that belongs to no proposal. The body is
+   * `{ content: "data:<type>;base64,…" }`: the same text the reference hashes, so `asset:sha256:` stays the sha256 of
+   * the exact content, as in migration 009. Only PDF, PNG, JPEG and WebP whose real signature matches the declared
+   * type, up to `QUOTATION_LIBRARY_LIMITS.attachmentBytes`; never SVG or HTML.
+   */
+  app.post(
+    "/api/document-assets",
+    // 8 MiB of bytes are ~10.7 MiB of base64 plus the JSON wrapper: anything larger is refused before parsing.
+    bodyLimit({
+      maxSize: DOCUMENT_ASSET_BODY_LIMIT,
+      onError: (c) =>
+        c.json(
+          {
+            error: `El archivo debe tener contenido y no superar ${QUOTATION_LIBRARY_LIMITS.attachmentBytes / 1024 / 1024} MB.`,
+            code: "asset_too_large",
+          },
+          413,
+        ),
+    }),
+    async (c) => {
+      const user = await authenticate(c);
+      if (!user) return c.json({ error: "No autorizado" }, 401);
+      if (!isWriterRole(user.role))
+        return c.json({ error: "Permisos insuficientes" }, 403);
+      const body = await readObjectBody(c);
+      const content = typeof body.content === "string" ? body.content : "";
+      const checked = checkDocumentDataUrl(content, {
+        maxBytes: QUOTATION_LIBRARY_LIMITS.attachmentBytes,
+      });
+      if (!checked.ok)
+        return c.json(
+          checked.reason === "size"
+            ? {
+                error: `El archivo debe tener contenido y no superar ${QUOTATION_LIBRARY_LIMITS.attachmentBytes / 1024 / 1024} MB.`,
+                code: "asset_too_large",
+              }
+            : {
+                error:
+                  "Formato no admitido: usa PDF, PNG, JPEG o WebP (el contenido debe coincidir con su tipo).",
+                code: "unsupported_asset_type",
+              },
+          checked.reason === "size" ? 413 : 415,
+        );
+      // The head was checked; the whole body must decode to exactly that many bytes with the same signature.
+      const bytes = Buffer.from(
+        content.slice(content.indexOf(",") + 1),
+        "base64",
+      );
+      if (
+        bytes.length !== checked.byteLength ||
+        sniffDocumentFileType(bytes) !== checked.type
+      )
+        return c.json(
+          { error: "El archivo está dañado.", code: "unsupported_asset_type" },
+          415,
+        );
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const denied = await lockCurrentMembership(client, user);
+        if (denied) {
+          await client.query("ROLLBACK");
+          return c.json(
+            { error: "La sesión o los permisos cambiaron" },
+            denied,
+          );
+        }
+        const hash = assetSha256(content);
+        await client.query(
+          "INSERT INTO document_assets (organization_id,sha256,content,size_bytes) VALUES ($1,$2,$3,$4) ON CONFLICT (organization_id,sha256) DO NOTHING",
+          [
+            user.organizationId,
+            hash,
+            content,
+            Buffer.byteLength(content, "utf8"),
+          ],
+        );
+        await client.query("COMMIT");
+        return c.json({
+          success: true,
+          sha256: hash,
+          ref: assetRef(hash),
+          mimeType: checked.type,
+          sizeBytes: bytes.length,
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+  );
+
+  /**
+   * The bytes of one stored file as a download, only inside its organization. The stored text is checked again (older
+   * proposal images may hold any data URL): only the allowed types are served, always as an attachment with `nosniff`
+   * and a sandboxing CSP, so nothing is ever rendered as a page of the API's origin.
+   */
+  app.get("/api/document-assets/:sha256/file", async (c) => {
+    const user = await authenticate(c);
+    if (!user) return c.json({ error: "No autorizado" }, 401);
+    const hash = c.req.param("sha256");
+    if (!SHA256_HEX.test(hash))
+      return c.json({ error: "Identificador inválido" }, 400);
+    const row = (
+      await pool.query<{ content: string }>(
+        "SELECT content FROM document_assets WHERE organization_id=$1 AND sha256=$2",
+        [user.organizationId, hash],
+      )
+    ).rows[0];
+    if (!row) return c.json({ error: "Archivo no encontrado" }, 404);
+    const parsed = parseDataUrl(row.content);
+    if (
+      !parsed?.actual ||
+      parsed.actual !== parsed.declared ||
+      !DOCUMENT_FILE_TYPES.includes(parsed.actual)
+    )
+      return c.json({ error: "Este archivo no se puede descargar." }, 415);
+    const bytes = Buffer.from(parsed.base64, "base64");
+    if (sniffDocumentFileType(bytes) !== parsed.actual)
+      return c.json({ error: "Este archivo no se puede descargar." }, 415);
+    const extension = EXTENSIONS[parsed.actual];
+    const requested = (c.req.query("name") ?? "")
+      .replace(/[\u0000-\u001f\u007f"\\/:*?<>|]/g, "_")
+      .trim()
+      .slice(0, 120);
+    const base =
+      requested.replace(/\.[A-Za-z0-9]{1,5}$/, "") ||
+      `documento-${hash.slice(0, 8)}`;
+    c.header("Content-Type", parsed.actual);
+    c.header(
+      "Content-Disposition",
+      `attachment; filename="${base.replace(/[^\x20-\x7e]/g, "_")}${extension}"; filename*=UTF-8''${encodeURIComponent(base + extension)}`,
+    );
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("Content-Security-Policy", "default-src 'none'; sandbox");
+    c.header("Cache-Control", "private, no-store");
+    return c.body(new Uint8Array(bytes));
+  });
 }
+
+const EXTENSIONS: Record<DocumentFileType, string> = {
+  "application/pdf": ".pdf",
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/webp": ".webp",
+};
 
 export { isAssetRef, assetRefHash };

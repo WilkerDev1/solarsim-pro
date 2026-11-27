@@ -1,4 +1,4 @@
-import { ApplicationFeatureSettings, DEFAULT_FEATURE_SETTINGS, featureScope, normalizeFeatureSettings, OrganizationFeaturePolicy } from '../../../shared/applicationFeatures';
+import { ApplicationFeatureSettings, DEFAULT_FEATURE_SETTINGS, featureScope, normalizeFeatureSettings, OrganizationFeaturePolicy, type ApplicationFeatureId } from '../../../shared/applicationFeatures';
 import type { SyncSettings } from '../../types';
 
 export interface FeaturePolicyState {
@@ -13,4 +13,13 @@ export function effectiveFeatureSettings(state: FeaturePolicyState): Application
   return policy?.organizationId === currentUser.organizationId
     ? normalizeFeatureSettings(policy.settings)
     : { ...DEFAULT_FEATURE_SETTINGS };
+}
+
+/**
+ * Claves de la política que el servidor gestiona para la versión de este cliente: solo esas se cambian y se envían al
+ * guardar. Una política guardada por una versión anterior (sin `managedFeatures`) se trata como la de dos claves, así
+ * nunca se envía una clave que el servidor no haya confirmado.
+ */
+export function organizationManagedFeatures(policy: Pick<OrganizationFeaturePolicy, 'managedFeatures'> | undefined): ApplicationFeatureId[] {
+  return policy?.managedFeatures ?? ['selfConsumptionProjection', 'netMeteringRegimeSelector'];
 }

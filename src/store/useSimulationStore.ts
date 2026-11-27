@@ -14,6 +14,8 @@ import { createAISlice } from './slices/aiSlice';
 import { createUISlice } from './slices/uiSlice';
 import { createFolderSlice } from './slices/folderSlice';
 import { createClientSlice } from './slices/clientSlice';
+import { createQuotationSlice } from './slices/quotationSlice';
+import { createQuotationLibrarySlice } from './slices/quotationLibrarySlice';
 import { createTariffSlice } from './slices/tariffSlice';
 import { createCompanyProfileSlice } from './slices/companyProfileSlice';
 import { createVersionHistorySlice } from './slices/versionHistorySlice';
@@ -79,6 +81,8 @@ export const useSimulationStore = create<SimulationStore>()(
       ...createUISlice(...a),
       ...createFolderSlice(...a),
       ...createClientSlice(...a),
+      ...createQuotationSlice(...a),
+      ...createQuotationLibrarySlice(...a),
       ...createTariffSlice(...a),
       ...createCompanyProfileSlice(...a),
       ...createVersionHistorySlice(...a),

@@ -18,6 +18,11 @@ export function isItemItbisExonerated(item: QuotationItemFlags): boolean {
   return item.exonerateITBIS !== undefined ? item.exonerateITBIS : (item.applyITBIS ?? true);
 }
 
+/** Paneles e inversores nunca llevan ITBIS; el resto del equipo (baterías) va gravado. */
+export function equipmentTypeCarriesItbis(type: string): boolean {
+  return type !== 'panel' && type !== 'inverter';
+}
+
 /** Extra items carry the project margin unless it was explicitly switched off. */
 export function appliesItemMargin(item: QuotationItemFlags): boolean {
   return item.applyMargin !== false;

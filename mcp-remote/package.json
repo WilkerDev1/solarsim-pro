@@ -1,6 +1,6 @@
 {
   "name": "solarsim-mcp-remote",
-  "version": "2.9.4",
+  "version": "2.10.0",
   "private": true,
   "type": "module",
   "description": "Servidor MCP remoto de SolarSim Pro: adaptador sin estado entre clientes MCP y la API (docs/MCP_REMOTE.md).",
