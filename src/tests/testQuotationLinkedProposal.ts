@@ -282,7 +282,7 @@ reset();
   let writes = 0;
   const unsubscribe = store.subscribe(() => { writes++; });
   const htmlFor: Record<string, string> = {};
-  for (const tab of ['summary', 'document', 'parameters'] as const) htmlFor[tab] = renderToStaticMarkup(React.createElement(QuotationEditorView, { initialViewer: tab }));
+  for (const tab of ['summary', 'document', 'parameters', 'costs'] as const) htmlFor[tab] = renderToStaticMarkup(React.createElement(QuotationEditorView, { initialViewer: tab }));
   // «Documento» se carga en diferido (las páginas pesan): el editor muestra un aviso breve y el módulo dibuja las páginas.
   const viewed = store.getState().projects.find((p) => p.id === 'p-1')!;
   const pagesHtml = renderToStaticMarkup(React.createElement(ProposalViewerDocument, { project: viewed, summary: calculateProjectFinancialSummary(viewed) }));
@@ -291,7 +291,7 @@ reset();
   assert.equal(stateSnapshot(), before, 'el store queda idéntico (propuestas, cotizaciones, cambios y sincronización)');
   assert.equal(store.getState().activeProjectId, 'p-3', 'la propuesta activa no cambia');
   for (const html of Object.values(htmlFor)) {
-    for (const text of ['Propuesta de origen · solo lectura', 'Centro Médico Hispánico', 'Resumen', 'Documento', 'Parámetros', 'Abrir propuesta', 'Cerrar el visor de la propuesta']) assert.ok(html.includes(text), text);
+    for (const text of ['Propuesta de origen · solo lectura', 'Centro Médico Hispánico', 'Resumen', 'Documento', 'Parámetros', 'Costos', 'Abrir propuesta', 'Cerrar el visor de la propuesta']) assert.ok(html.includes(text), text);
     assert.match(html, /class="qe-body"[^>]*data-viewer=""/);
     assert.match(html, /role="separator"/, 'panel redimensionable');
     assert.match(html, /class="qe-preview" hidden=""/, 'el visor sustituye a la vista previa');
@@ -302,6 +302,13 @@ reset();
   assert.match(pagesHtml, /pdf-page/, 'Documento dibuja las páginas del PDF de la propuesta');
   assert.doesNotMatch(pagesHtml, /data-pdf-chrome/, 'sin cromo de edición');
   for (const text of ['Consumo anual', 'Medición neta', 'Modo de precio', 'Tasa de descuento']) assert.ok(htmlFor.parameters.includes(text), text);
+  // «Costos»: la misma tabla interna de costos del simulador (matriz de costos), en solo lectura salvo la moneda.
+  for (const text of ['Costos proyectos', 'Uso Interno Confidencial', 'Factor Venta', 'Precio Neto', 'Total Neto (Costo Total)', 'Precio kilos costo', 'Métricas de Margen', 'Ganancia Proyectada', 'Precio Unit. USD', 'Precio Total RD', 'ITBIS USD']) assert.ok(htmlFor.costs.includes(text), `costos: ${text}`);
+  const viewedSummary = calculateProjectFinancialSummary(viewed);
+  assert.ok(viewedSummary.costMatrix.items.length > 0, 'la propuesta de prueba tiene filas en la matriz');
+  for (const item of viewedSummary.costMatrix.items) assert.ok(htmlFor.costs.includes(item.name.replace(/&/g, '&amp;')), `fila ${item.name}`);
+  assert.ok(htmlFor.costs.includes(viewedSummary.costMatrix.gananciaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })), 'ganancia de la propuesta vista');
+  assert.match(htmlFor.costs, /aria-pressed="true"[^>]*>[^<]*Dual/, 'la moneda empieza en Dual y se marca con aria-pressed');
   assert.match(htmlFor.summary, /aria-selected="true"[^>]*>.*?Resumen/);
   // Sin visor: vista previa normal.
   const closed = renderToStaticMarkup(React.createElement(QuotationEditorView));
@@ -316,7 +323,7 @@ reset();
   const pagesDir = 'src/components/pdf/pages';
   const files = [
     'src/components/quotations/editor/ProposalViewer.tsx', 'src/components/quotations/editor/ProposalViewerDocument.tsx',
-    'src/components/pdf/ProposalDocumentPages.tsx', 'src/components/hub/proposalSummaryData.ts', 'src/features/quotations/proposalDocuments.ts',
+    'src/components/pdf/ProposalDocumentPages.tsx', 'src/components/hub/proposalSummaryData.ts', 'src/components/simulator/tabs/CostMatrixTable.tsx', 'src/features/quotations/proposalDocuments.ts',
     ...readdirSync(path.join(root, pagesDir), { recursive: true }).map(String).filter((f) => /\.tsx?$/.test(f)).map((f) => `${pagesDir}/${f}`),
   ];
   // Únicas lecturas del store permitidas (texto exacto).

@@ -1,5 +1,5 @@
-import React, { Suspense, lazy, useMemo } from 'react';
-import { ArrowUpRight, Eye, FileText, LayoutDashboard, SlidersHorizontal, X } from 'lucide-react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
+import { ArrowUpRight, Eye, FileText, LayoutDashboard, SlidersHorizontal, Table2, X } from 'lucide-react';
 import { resolveAssumptions } from '../../../../shared/assumptions';
 import { NET_METERING_REGIME_LABELS } from '../../../../shared/netMetering';
 import { noSavingsNote, supplyPresentation, supplySummaryText } from '../../../../shared/offGridSupply';
@@ -13,6 +13,7 @@ import { DOCUMENT_STATUS_LABELS } from '../../../utils/clientSummary';
 import { calculateTotalBatteryCapacityKWh, calculateTotalInverterPowerKW } from '../../../utils/equipmentSpecsUtils';
 import { paybackLabel, proposalDevices, savingsPresentation, summaryMoney } from '../../hub/proposalSummaryData';
 import { InfoTip } from '../../simulator/params/ui/InfoTip';
+import { CostMatrixTable, type CostTableCurrency } from '../../simulator/tabs/CostMatrixTable';
 import './proposal-viewer.css';
 
 // Las páginas del documento (y sus gráficos) pesan: se cargan solo al abrir «Documento».
@@ -23,12 +24,14 @@ const ProposalViewerDocument = lazy(() => import('./ProposalViewerDocument'));
  * Recibe la propuesta y solo calcula con funciones puras (`calculateProjectFinancialSummary`, `renderProposalSection`
  * con el documento en modo `view`): no cambia `activeProjectId`, no llama a escritores del store ni monta la
  * sincronización de anexos, así que no hay guardado ni sincronización. El simulador no se muestra: lee y escribe siempre la
- * propuesta activa (ver la documentación); en su lugar, «Parámetros» desglosa lo que lo alimenta.
+ * propuesta activa (ver la documentación); en su lugar, «Parámetros» desglosa lo que lo alimenta y «Costos» muestra la
+ * misma tabla interna de costos del simulador (`CostMatrixTable`).
  */
 export const PROPOSAL_VIEWER_TABS: readonly { id: ProposalViewerTab; label: string; icon: typeof Eye }[] = [
   { id: 'summary', label: 'Resumen', icon: LayoutDashboard },
   { id: 'document', label: 'Documento', icon: FileText },
   { id: 'parameters', label: 'Parámetros', icon: SlidersHorizontal },
+  { id: 'costs', label: 'Costos', icon: Table2 },
 ];
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -186,6 +189,8 @@ export interface ProposalViewerProps {
 /** Memorizado: editar la cotización no vuelve a dibujar el visor (ni las páginas) mientras la propuesta y las acciones no cambien. */
 export const ProposalViewer: React.FC<ProposalViewerProps> = React.memo(({ project, tab, onTabChange, onClose, onOpenProposal }) => {
   const mode = useEnergyCalculationMode();
+  // Moneda de la tabla de costos: solo de esta vista (no se guarda en la propuesta).
+  const [costCurrency, setCostCurrency] = useState<CostTableCurrency>('ALL');
   const summary = useMemo(() => calculateProjectFinancialSummary(project, mode), [project, mode]);
   const meta = [DOCUMENT_STATUS_LABELS[project.status] ?? project.status, project.client.projectId?.trim() || null].filter(Boolean).join(' · ');
   const focusTab = (next: ProposalViewerTab) => {
@@ -234,6 +239,11 @@ export const ProposalViewer: React.FC<ProposalViewerProps> = React.memo(({ proje
           </Suspense>
         )}
         {tab === 'parameters' && <ParametersTab project={project} />}
+        {tab === 'costs' && (
+          <div className="pv-costs">
+            <CostMatrixTable project={project} summary={summary} currency={costCurrency} onCurrencyChange={setCostCurrency} />
+          </div>
+        )}
       </div>
     </section>
   );

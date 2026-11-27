@@ -289,3 +289,12 @@
 .pv-doc-pages .pdf-page {
   box-shadow: 0 1px 2px rgba(24, 34, 48, 0.08), 0 12px 32px rgba(24, 34, 48, 0.1);
 }
+
+/* Costos: la tabla interna del simulador (siempre en claro, como en el simulador); se desplaza en horizontal si no cabe. */
+.pv-costs {
+  min-width: 0;
+  color: #182230;
+}
+.pv-costs > div {
+  box-shadow: none;
+}
