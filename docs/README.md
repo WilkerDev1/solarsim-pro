@@ -18,6 +18,7 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 - [Directorio de clientes](CLIENTS.md): clientes por organización, enlace opcional con propuestas y resumen de estados.
 - [Cotizaciones](QUOTATIONS.md): dominio puro compartido (`shared/quotations/`): tipos, totales en centavos con ITBIS sobre la base gravada, estados, numeración, validación y conversión desde propuesta.
 - [Editor de cotizaciones](QUOTATION_EDITOR.md): editor con vista previa en vivo, edición pura, línea del catálogo y su precio, hoja A4 y paginación, y exportación a PDF.
+- [Cotización desde una propuesta](QUOTATION_FROM_PROPOSAL.md): diálogo de conversión con sus cinco bloques, de dónde salen los importes y cómo cuadran con la propuesta, documentos que pasan, listas enlazadas y propuesta de origen en el editor.
 - [Subsistema IA](AI_SCANNERS_SPECIFICATION.md) y [tarifas en el flujo IA](AI_TARIFF_CONTEXT.md).
 - [Agentes y herramientas de IA](AGENT_TOOLS.md): registro común, permisos, actividad y deshacer, precios automáticos.
 - [Servidor MCP local](MCP_LOCAL.md): conexión de Claude Code y Codex, token, guardas y modelo de amenazas.

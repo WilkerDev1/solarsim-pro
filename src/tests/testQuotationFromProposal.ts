@@ -89,6 +89,20 @@ assert.equal(quotation.attachments[0].catalogItemId, 'eq-panel');
 assert.equal(quotation.attachments[0].thumbnailDataUrl, 'data:image/png;base64,AAAA');
 assert.equal('assetId' in quotation.attachments[1], false);
 
+// origen de un anexo: 'proposal' por defecto; una ficha del catálogo puede llegar como 'catalog' (siempre relacionada)
+{
+  const src = source();
+  src.attachments = [{ ...src.attachments[0], origin: 'catalog' }, { ...src.attachments[1], origin: 'proposal' }, { ...src.attachments[1], id: 'att-3' }];
+  const out = build(src);
+  assert.deepEqual(out.attachments.map((a) => [a.id, a.origin, a.mode, a.sourceProjectId]), [
+    ['att-1', 'catalog', 'related', 'proj-77'], ['att-2', 'proposal', 'related', 'proj-77'], ['att-3', 'proposal', 'related', 'proj-77'],
+  ]);
+  assert.equal(out.attachments[0].catalogItemId, 'eq-panel');
+  // un origen que no sea de una propuesta (p. ej. 'manual') no se acepta desde la conversión: queda 'proposal'
+  const manual = build({ ...source(), attachments: [{ ...source().attachments[1], origin: 'manual' as unknown as 'proposal' }] });
+  assert.equal(manual.attachments[0].origin, 'proposal');
+}
+
 // resultado válido y estable ante la validación (idempotente)
 {
   const result = validateQuotationContent(quotation);
