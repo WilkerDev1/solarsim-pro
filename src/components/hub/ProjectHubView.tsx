@@ -1,6 +1,6 @@
-import { isWriterRole } from '../../../shared/permissions';
+import { canWrite, isWriterRole } from '../../../shared/permissions';
 import { useMemo, useState } from "react";
-import { ArrowLeft, MapPin, Share2, FileText } from "lucide-react";
+import { ArrowLeft, MapPin, Share2, FileText, FilePlus2 } from "lucide-react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { useShallow } from 'zustand/react/shallow';
 import { useEnergyCalculationMode } from "../../features/application/useApplicationFeatures";
@@ -21,7 +21,12 @@ import { ProposalDates } from "../dashboard/ProposalDates";
 import { LegacyRegimeBadge } from "../../features/proposals/LegacyRegimeBadge";
 import { ProposalHistory } from "./components/ProposalHistory";
 import { ProposalEnergyOverview } from "./components/ProposalEnergyOverview";
+import { useQuotationsFeature } from "../../features/application/quotationsFeature";
+import { ConvertProposalDialog } from "../quotations/convert/ConvertProposalDialog";
+import { ProposalQuotationsSection } from "../quotations/linked/LinkedQuotationSections";
 import "./project-summary.css";
+import "../quotations/convert/convert-dialog.css";
+import "../quotations/linked/linked-quotations.css";
 const money = (value: number) =>
   Number.isFinite(value)
     ? value.toLocaleString("es-DO", {
@@ -50,6 +55,8 @@ export const ProjectHubView = () => {
   const [section, setSection] = useState<"overview" | "finance" | "history">(
     "overview",
   );
+  const quotationsEnabled = useQuotationsFeature();
+  const [converting, setConverting] = useState(false);
   // Sistema aislado sin comparación (o generador sin costo): estado explícito en vez de ceros.
   const savingsBasis = resolveSavingsBasis(project?.rates);
   const comparable = hasSavingsComparison(savingsBasis);
@@ -123,6 +130,12 @@ export const ProjectHubView = () => {
             <FileText size={16} />
             Ver documento
           </button>
+          {quotationsEnabled && !project.isDeleted && canWrite(syncSettings.currentUser) && (
+            <button onClick={() => setConverting(true)}>
+              <FilePlus2 size={16} />
+              Crear cotización
+            </button>
+          )}
           <button
             className="summary-primary"
             disabled={project.isDeleted || !syncSettings.authToken}
@@ -348,8 +361,10 @@ export const ProjectHubView = () => {
         <aside className="summary-side">
           <ProposalClientSection key={`client-${ownerKey}`} project={project} />
           <ProposalCommercialPanel key={ownerKey} project={project} />
+          <ProposalQuotationsSection key={`quotations-${ownerKey}`} projectId={project.id} />
         </aside>
       </div>
+      {converting && <ConvertProposalDialog initialProjectId={project.id} onClose={() => setConverting(false)} />}
     </div>
   );
 };

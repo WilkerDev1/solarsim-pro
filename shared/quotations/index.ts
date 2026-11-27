@@ -12,7 +12,7 @@ export { QUOTATION_LIMITS, isIsoDate, validateQuotationContent, type QuotationVa
 export {
   QUOTATION_SHEET_TEXTS, currencySymbol, formatExchangeRate, formatQuantity, formatSheetDate, itbisPercentLabel, sheetCurrencyLabel, sheetPageLabel,
 } from './sheetTexts.js';
-export { quotationFromProposal, type ProposalQuotationSource, type QuotationFromProposalOptions } from './fromProposal.js';
+export { quotationFromProposal, type ProposalAttachmentOrigin, type ProposalQuotationSource, type QuotationFromProposalOptions } from './fromProposal.js';
 export { validateQuotationDesign } from './validation.js';
 export {
   QUOTATION_LIBRARY_LIMITS, addDaysIso, applyTemplateToNewContent, checkSignatureImage, defaultQuotationSignature, defaultQuotationTemplate,

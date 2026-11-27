@@ -13,6 +13,7 @@ import { EditableText } from '../editor/EditableText';
 import { OptionalTextRow } from '../editor/OptionalTextRow';
 import { RichText } from '../editor/RichText';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
+import { cleanInstallationDesc } from '../../../utils/installationDescription';
 
 interface PDFPage2QuotationProps {
   project: ProjectSimulation;
@@ -23,16 +24,6 @@ interface PDFPage2QuotationProps {
   pageNum: number;
   totalPages: number;
 }
-
-const cleanInstallationDesc = (desc?: string): string => {
-  const defaultDesc = 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).';
-  if (!desc || typeof desc !== 'string' || !desc.trim()) return defaultDesc;
-  if (desc.includes('Notas del Sistema:')) {
-    const base = desc.split('Notas del Sistema:')[0].trim().replace(/\.\s*$/, '');
-    return base ? `${base}.` : defaultDesc;
-  }
-  return desc;
-};
 
 export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   project,

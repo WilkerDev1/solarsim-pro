@@ -9,6 +9,7 @@ import { draftOwnerKey } from '../../utils/draftOwnerKey';
 import { ClientDetailPanel } from './ClientDetailPanel';
 import { ClientForm, EMPTY_CLIENT } from './ClientForm';
 import './clients-hub.css';
+import '../quotations/linked/linked-quotations.css';
 
 /** Drafts belong to one workspace owner: switching account or organization remounts the view and drops them. */
 export function ClientsHubView() {

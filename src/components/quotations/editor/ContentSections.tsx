@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { AlignLeft, ArrowDown, ArrowUp, Building2, Copy, Package, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { AlignLeft, ArrowDown, ArrowUp, ArrowUpRight, Building2, Copy, FileSymlink, Package, Plus, RefreshCw, Trash2, Unlink } from 'lucide-react';
 import { confirmAction } from '../../common/confirmAction';
 import {
   QUOTATION_LIMITS, QUOTATION_SHEET_TEXTS, computeQuotationTotals, formatAmount, formatExchangeRate, formatMoney, formatQuantity, toCents,
@@ -10,8 +10,9 @@ import type { ClientRecord } from '../../../types/client';
 import type { SolarEquipmentItem } from '../../../types/equipment';
 import {
   addDetailLine, addDiscount, addItemLine, appendLine, changeCurrency, currencyChangeSummary, duplicateLine, moveLine, removeDiscount,
-  removeLine, setDocumentFields, setExchangeRate, setPrintedClient, updateDiscount, updateLine,
+  removeLine, setDocumentFields, setExchangeRate, setPrintedClient, setSourceProject, updateDiscount, updateLine,
 } from '../../../domain/quotationEdit';
+import { SOURCE_PROPOSAL_NOTICES, proposalName, type SourceProposalLink } from '../../../features/quotations/linkedQuotations';
 import { catalogQuotationLine, type CatalogLineContext } from '../../../features/quotations/catalogLine';
 import { ClientPicker } from '../../clients/ClientPicker';
 import { CURRENCY_NAMES, CurrencyFlag } from '../common/CurrencyFlag';
@@ -145,11 +146,66 @@ export const IssuerSection: React.FC<{ content: QuotationContent; readOnly: bool
   );
 };
 
+/**
+ * Propuesta de origen: «Ver propuesta» navega a su resumen; en un borrador se puede enlazar a una propuesta o quitar el
+ * enlace (solo el enlace, no importa contenido). Una propuesta en la papelera o que ya no está se indica con un texto
+ * discreto, sin romper. La lista de propuestas del selector se carga al abrirlo o enfocarlo, no al pintar el editor.
+ */
+export interface SourceProposalProps {
+  link: SourceProposalLink;
+  /** Opciones de «Enlazar propuesta…», pedidas solo al enfocar o abrir el selector. */
+  loadOptions: () => { id: string; label: string }[];
+  onOpenProposal: (projectId: string) => void;
+}
+
+const SourceProposalField: React.FC<SectionProps & SourceProposalProps> = ({ readOnly, edit, link, loadOptions, onOpenProposal }) => {
+  const [error, setError] = useState<string | null>(null);
+  const [options, setOptions] = useState<{ id: string; label: string }[] | null>(null);
+  const load = () => { if (!options) setOptions(loadOptions()); };
+  const set = (projectId: string | null) => { setOptions(null); setError(edit((c) => setSourceProject(c, projectId))); };
+  return (
+    <div className="qe-field qe-source" role="group" aria-labelledby="qe-source-label">
+      <span className="qe-label" id="qe-source-label">Propuesta de origen</span>
+      {link.state === 'none' ? (
+        readOnly ? <p className="qe-muted">Sin propuesta de origen.</p> : (
+          <div className="qe-source-row">
+            <FileSymlink className="h-4 w-4" aria-hidden="true" />
+            <label htmlFor="qe-source-select" className="sr-only">Enlazar propuesta</label>
+            <select id="qe-source-select" value="" onFocus={load} onPointerDown={load} onChange={(e) => { if (e.target.value) set(e.target.value); }}>
+              <option value="">Enlazar propuesta…</option>
+              {options?.length === 0 && <option value="" disabled>No hay propuestas para enlazar</option>}
+              {options?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+            </select>
+          </div>
+        )
+      ) : (
+        <div className="qe-source-row">
+          <FileSymlink className="h-4 w-4" aria-hidden="true" />
+          {link.state === 'available' ? (
+            <>
+              <span className="qe-source-name">{proposalName(link.project)}</span>
+              <button type="button" className="qe-btn qe-btn-sm" onClick={() => onOpenProposal(link.project.id)}><ArrowUpRight className="h-4 w-4" aria-hidden="true" />Ver propuesta</button>
+            </>
+          ) : (
+            <span className="qe-muted">{link.state === 'trashed' ? `${proposalName(link.project)}: ${SOURCE_PROPOSAL_NOTICES.trashed}` : SOURCE_PROPOSAL_NOTICES.missing}</span>
+          )}
+          {!readOnly && (
+            <button type="button" className="qe-btn qe-btn-sm" onClick={() => set(null)} aria-label="Quitar el enlace con la propuesta de origen"><Unlink className="h-4 w-4" aria-hidden="true" />Quitar enlace</button>
+          )}
+        </div>
+      )}
+      {error && <p className="qe-field-error" role="alert">{error}</p>}
+    </div>
+  );
+};
+
 export const ClientSection: React.FC<SectionProps & {
   clients: readonly ClientRecord[];
   /** Elegir copia los datos del cliente a los impresos; quitar solo desenlaza (`quotationEditorActions`). */
   chooseClient: (client: ClientRecord | null) => string | null;
-}> = ({ content, readOnly, edit, clients, chooseClient }) => {
+  /** Propuesta de origen; sin ella (pruebas antiguas) no se muestra. */
+  source?: SourceProposalProps;
+}> = ({ content, readOnly, edit, clients, chooseClient, source }) => {
   const [error, setError] = useState<string | null>(null);
   const linked = content.clientId ? clients.find((c) => c.id === content.clientId) : undefined;
   const choose = (client: ClientRecord | null) => setError(chooseClient(client));
@@ -164,7 +220,7 @@ export const ClientSection: React.FC<SectionProps & {
     />
   );
   return (
-    <Card title="Cliente" titleId="qe-client-title">
+    <Card title="Cliente y origen" titleId="qe-client-title">
       {readOnly ? (
         <p className="qe-muted">
           {content.clientId ? (linked ? <>Enlazada con <strong>{linked.name}</strong> del directorio.</> : 'Enlazada con un cliente que ya no está en el directorio.') : 'Sin cliente del directorio.'}
@@ -185,6 +241,7 @@ export const ClientSection: React.FC<SectionProps & {
         {printed('email', 'Correo', { type: 'email', className: 'qe-span-2' })}
         {printed('address', 'Dirección', { multiline: true, rows: 2, className: 'qe-span-2' })}
       </div>
+      {source && <SourceProposalField content={content} readOnly={readOnly} edit={edit} {...source} />}
     </Card>
   );
 };

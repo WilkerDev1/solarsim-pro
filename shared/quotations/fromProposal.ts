@@ -6,6 +6,9 @@ import { DEFAULT_QUOTATION_DESIGN } from './types.js';
 import { validateQuotationContent, type QuotationValidation } from './validation.js';
 import type { QuotationAttachment, QuotationContent, QuotationCurrency, QuotationDesign, QuotationIssuer, QuotationLine, QuotationPrintedClient } from './types.js';
 
+/** Origen de un documento que llega desde una propuesta. */
+export type ProposalAttachmentOrigin = 'proposal' | 'catalog';
+
 export interface ProposalQuotationSource {
   projectId: string;
   clientId?: string;
@@ -21,7 +24,11 @@ export interface ProposalQuotationSource {
   paymentTerms: string;
   notes: string;
   validUntil: string | null;
-  attachments: Omit<QuotationAttachment, 'mode' | 'origin' | 'sourceProjectId'>[];
+  /**
+   * Documentos de la propuesta, siempre como «Solo relacionado». `origin` es `'catalog'` para una ficha técnica del
+   * catálogo (con su `catalogItemId`) y `'proposal'` (por defecto) para el resto; cualquier otro valor queda `'proposal'`.
+   */
+  attachments: (Omit<QuotationAttachment, 'mode' | 'origin' | 'sourceProjectId'> & { origin?: ProposalAttachmentOrigin })[];
   issuer: QuotationIssuer;
 }
 
@@ -84,7 +91,7 @@ export function quotationFromProposal(source: ProposalQuotationSource, options: 
     attachments: source.attachments.map(attachment => ({
       ...attachment,
       mode: 'related' as const,
-      origin: 'proposal' as const,
+      origin: attachment.origin === 'catalog' ? ('catalog' as const) : ('proposal' as const),
       sourceProjectId: source.projectId,
     })),
     issuer: { ...source.issuer },
