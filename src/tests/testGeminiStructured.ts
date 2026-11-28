@@ -151,9 +151,12 @@ await assert.rejects(requestGeminiStructured({ ...base, apiKey: ' ' }, transport
   }
 }
 
-// 7. Ningún servicio arma su propia variante: las peticiones estructuradas pasan por requestGeminiStructured.
-for (const file of readdirSync('src/services').filter((name) => /^gemini.*Service\.ts$/.test(name))) {
+// 7. Los escáneres (F1b) ya no pasan por este helper REST: usan la política sobre el puerto LlmClient
+// (src/services/llm/structuredPolicy.ts, probada en testStructuredPolicy). Este helper queda solo para el camino legado
+// (parseProposalWithAI y electron/ai) hasta F6, y ningún servicio gemini*Service lo importa.
+for (const file of readdirSync('src/services').filter((name) => /^gemini.*Service\.ts$/.test(name) && name !== 'geminiInvoiceService.ts')) {
   const source = readFileSync(`src/services/${file}`, 'utf8');
-  assert(!/requestGeminiJson|parseGeminiJson|geminiResponseText/.test(source), `${file} usa requestGeminiStructured`);
+  assert(!/geminiTransport|requestGeminiStructured|requestGeminiJson|parseGeminiJson|geminiResponseText|GeminiTransport/.test(source), `${file} no usa shared/geminiTransport`);
+  assert(/structuredPolicy/.test(source), `${file} pide la salida estructurada por la política del puerto`);
 }
 console.log('Gemini structured requests: one helper, injected transport, bounded JSON retry and limits (synthetic only).');
