@@ -5,6 +5,7 @@ import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { applyProjectEdit, type ProjectEdit } from '../domain/projectEdit';
+import { applyProjectEdits, editsFromPatch } from '../domain/projectEditTransaction';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
@@ -19,9 +20,11 @@ import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipm
 import { EMPTY_UNDO_HISTORY } from '../store/undo/projectUndoJournal';
 
 /**
- * Edición de proyecto (ADR 0004). La misma matriz de escenarios corre contra dos adaptadores:
+ * Edición de proyecto (ADR 0004). La misma matriz de escenarios corre contra tres adaptadores:
  *  1. el store (`updateSpecs`, `updateRates`…): caracteriza el comportamiento que tenían las porciones antes del refactor;
- *  2. `applyProjectEdit` sin Zustand: la regla vive en un módulo puro.
+ *  2. `applyProjectEdit` sin Zustand: la regla vive en un módulo puro;
+ *  3. la transacción `applyProjectEdits` con el parche como ediciones por ruta y la validación del dock (F2a2): lo que
+ *     escribe el dock por `commitProjectEdits` sigue las mismas reglas que la edición suelta.
  * Cada cambio de comportamiento pretendido lleva su expectativa anotada con la decisión que lo autoriza:
  *  (b) el precio de proveedor pasa por la misma ruta que cualquier edición (deshacer, autodimensionado, normalización);
  *  (c) mirar un proyecto nunca escribe: las reglas del catálogo corren en la siguiente edición real.
@@ -92,6 +95,20 @@ const viaModule: Apply = (project, edit, catalog = CATALOG) => {
   const next = applyProjectEdit(project, edit, { equipmentCatalog: catalog });
   assert.deepEqual(project, frozen, 'applyProjectEdit no muta el proyecto de entrada');
   return next;
+};
+
+/**
+ * La transacción con el parche de la edición como lote por ruta (lo que hace el dock). El precio de proveedor y el consumo
+ * con `lockAutoPanels` no son rutas: siguen por `applyProjectEdit` (registro, UNREGISTERED_SIMULATOR_CONTROLS).
+ */
+const viaTransaction: Apply = (project, edit, catalog = CATALOG) => {
+  if (edit.kind === 'supplierPrice' || (edit.kind === 'consumption' && edit.lockAutoPanels)) return viaModule(project, edit, catalog);
+  const edits = edit.kind === 'consumption' ? [{ path: 'monthlyConsumption', value: edit.monthlyConsumption }] : editsFromPatch(edit.kind, edit.patch);
+  const frozen = structuredClone(project);
+  const result = applyProjectEdits(project, edits, { equipmentCatalog: catalog }, { validation: 'dock' });
+  assert.deepEqual(project, frozen, 'applyProjectEdits no muta el proyecto de entrada');
+  if (!result.ok) throw new Error(`la transacción rechazó ${JSON.stringify(edits)}: ${JSON.stringify(result.errors)}`);
+  return result.project;
 };
 
 // ── Matriz de escenarios ────────────────────────────────────────────────────────────────────
@@ -224,6 +241,7 @@ function runMatrix(apply: Apply, label: string) {
 
 runMatrix(viaStore, 'store');
 runMatrix(viaModule, 'módulo');
+runMatrix(viaTransaction, 'transacción');
 
 // ── Precio de proveedor aplicado desde el catálogo ──────────────────────────────────────────
 function runSupplierPriceMatrix(apply: Apply, label: string) {

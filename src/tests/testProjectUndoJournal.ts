@@ -136,6 +136,29 @@ const edit = { source: 'user' as const, coalesceKey: 'edit' };
   assert.deepEqual(undoAvailability(moved, 'a2'), { canUndo: true, canRedo: false });
 }
 
+// ── 1b. Rutas de campo de la transacción (F2a2): al agrupar, el primer antes y el último después ──────────────────────────
+{
+  const a = base('fields');
+  const dock = { source: 'dock' as const, coalesceKey: 'edit' };
+  let h: UndoHistory = activateJournal(EMPTY_UNDO_HISTORY, a);
+  const coverage = (before: number, after: number) => ({ path: 'rates.targetCoveragePct', before, after, derived: false });
+  const original = a.rates.targetCoveragePct;
+  h = recordUndo(h, withCoverage(a, 80), { ...dock, fields: [coverage(original, 80), { path: 'specs.panels[0].count', before: 38, after: 30, derived: true }], now: 0 });
+  h = recordUndo(h, withCoverage(a, 81), { ...dock, fields: [coverage(80, 81), { path: 'specs.panels[0].count', before: 30, after: 31, derived: true }], now: 100 });
+  let entry = h.journals.fields.undo[0];
+  assert.equal(h.journals.fields.undo.length, 1);
+  assert.deepEqual(entry.fields, [coverage(original, 81), { path: 'specs.panels[0].count', before: 38, after: 31, derived: true }], 'una ruta por paso: el primer antes, el último después');
+  // Una ruta que vuelve a su valor inicial dentro de la ráfaga sale del paso; un registro sin rutas (camino antiguo) no las borra.
+  h = recordUndo(h, withCoverage(a, 82), { ...dock, fields: [coverage(81, 82), { path: 'specs.panels[0].count', before: 31, after: 38, derived: true }], now: 200 });
+  entry = h.journals.fields.undo[0];
+  assert.deepEqual(entry.fields?.map((f) => f.path), ['rates.targetCoveragePct']);
+  h = recordUndo(h, withName(withCoverage(a, 82), 'Otro'), { ...dock, now: 300 });
+  assert.deepEqual(h.journals.fields.undo[0].fields?.map((f) => f.path), ['rates.targetCoveragePct']);
+  // Las ediciones de siempre (sin transacción) no traen rutas de campo.
+  const plain = recordUndo(activateJournal(EMPTY_UNDO_HISTORY, a), withCoverage(a, 50), { ...edit, now: 0 });
+  assert.equal(plain.journals.fields.undo[0].fields, undefined);
+}
+
 // ── 2. Store: crear, duplicar y volver a la propuesta ─────────────────────────────────────────────────────────────────────
 const store = useSimulationStore;
 const s = () => store.getState();

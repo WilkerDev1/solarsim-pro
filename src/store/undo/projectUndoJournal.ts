@@ -7,8 +7,9 @@
 // - Activar una propuesta (abrir, crear, duplicar, restaurar, importar, borrador de IA) siembra la base de ESA propuesta. Si ya
 //   tenía diario y su contenido coincide con la última instantánea, se conserva; si cambió mientras estaba cerrada
 //   (sincronización, agente, conflicto), se siembra de nuevo sin pasos.
-// - Cada paso guarda solo las rutas que cambiaron, con su antes y su después. Hoy la ruta es la sección (las mismas que restaura
-//   `restoreProjectContent`); F2a2 la afinará a rutas de campo.
+// - Cada paso guarda solo las secciones que cambiaron, con su antes y su después (las que restaura `restoreProjectContent`),
+//   y, desde F2a2, las rutas de campo del registro que tocó la transacción (`fields`, derivadas incluidas): restaurar la
+//   sección devuelve también lo que cambiaron las reglas; `fields` es lo que el diff, la tarjeta y F3 nombran.
 // - Agrupar es explícito: dos registros seguidos con la misma `coalesceKey`, la misma fuente y el mismo turno, separados por
 //   menos de `UNDO_COALESCE_WINDOW_MS`, son un solo paso (ventana deslizante, como el debounce anterior). Sin clave no se agrupa.
 import type { ProjectSimulation } from '../../types';
@@ -22,10 +23,19 @@ export type UndoSection = (typeof UNDO_SECTIONS)[number];
 export type UndoSnapshot = Pick<ProjectSimulation, UndoSection>;
 
 export interface UndoPathChange {
-  /** Hoy una sección de `UNDO_SECTIONS`; en F2a2, una ruta de campo. */
+  /** Una sección de `UNDO_SECTIONS`: la unidad que restauran deshacer y rehacer. */
   path: string;
   before: unknown;
   after: unknown;
+}
+
+/** Ruta de campo del registro que cambió en el paso (F2a2), con su antes y su después. */
+export interface UndoFieldChange {
+  path: string;
+  before: unknown;
+  after: unknown;
+  /** La cambió una regla o una dependencia, no la edición. */
+  derived: boolean;
 }
 
 export interface UndoEntry {
@@ -34,6 +44,8 @@ export interface UndoEntry {
   turnId?: string;
   coalesceKey?: string;
   paths: UndoPathChange[];
+  /** Rutas de campo que tocaron las transacciones del paso (`commitProjectEdits`); las ediciones antiguas no las traen. */
+  fields?: UndoFieldChange[];
   /** Momento del último registro agrupado en este paso (para la ventana de agrupado). */
   at: number;
 }
@@ -60,6 +72,21 @@ export interface UndoRecordOptions {
   source?: UndoSource;
   coalesceKey?: string;
   turnId?: string;
+  /** Rutas de campo de la transacción que produjo este estado. */
+  fields?: readonly UndoFieldChange[];
+}
+
+/** Junta las rutas de dos registros agrupados: el primer antes y el último después; sin efecto neto, la ruta se va. */
+function mergeFields(previous: readonly UndoFieldChange[] | undefined, next: readonly UndoFieldChange[] | undefined): UndoFieldChange[] | undefined {
+  if (!previous?.length && !next?.length) return undefined;
+  const merged = (previous ?? []).map((change) => ({ ...change }));
+  for (const change of next ?? []) {
+    const existing = merged.find((item) => item.path === change.path);
+    if (existing) { existing.after = clone(change.after); existing.derived = existing.derived && change.derived; }
+    else merged.push({ ...change, before: clone(change.before), after: clone(change.after) });
+  }
+  const effective = merged.filter((change) => !same(change.before, change.after));
+  return effective.length ? effective : undefined;
 }
 
 export const UNDO_COALESCE_WINDOW_MS = 600;
@@ -133,11 +160,15 @@ export function recordUndo(history: UndoHistory, project: ProjectSimulation, opt
     for (const section of changed)
       if (!paths.some((change) => change.path === section)) paths.push({ path: section, before: journal.head[section], after: head[section] });
     const effective = paths.filter((change) => !same(change.before, change.after));
-    undo = effective.length ? [...journal.undo.slice(0, -1), { ...last, paths: effective, at: options.now }] : journal.undo.slice(0, -1);
+    const fields = mergeFields(last.fields, options.fields);
+    const merged: UndoEntry = { ...last, paths: effective, at: options.now };
+    if (fields) merged.fields = fields; else delete merged.fields;
+    undo = effective.length ? [...journal.undo.slice(0, -1), merged] : journal.undo.slice(0, -1);
   } else {
     const entry: UndoEntry = {
       projectId: project.id, source, paths: changed.map((section) => ({ path: section, before: journal.head[section], after: head[section] })), at: options.now,
       ...(options.turnId ? { turnId: options.turnId } : {}), ...(options.coalesceKey ? { coalesceKey: options.coalesceKey } : {}),
+      ...(options.fields?.length ? { fields: mergeFields(undefined, options.fields) } : {}),
     };
     undo = [...journal.undo, entry].slice(-MAX_UNDO_ENTRIES);
   }
