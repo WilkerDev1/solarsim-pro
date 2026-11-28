@@ -57,6 +57,8 @@ const run = (name: string, args: Record<string, unknown>, context = ctx()) => ex
 const projectOf = (id: string) => s().projects.find((p) => p.id === id)!;
 const undoSteps = (id: string) => s().undoHistory.journals[id]?.undo.length ?? 0;
 const allowAll = () => store.setState({ agentPolicy: { ...DEFAULT_AGENT_POLICY, internal: { read: 'allow', draft: 'allow', guarded: 'allow' } } });
+/** Perfil «confirmar» (F3b): los precios vuelven a pedir confirmación en la app; así se prueba el camino de la cola. */
+const confirmPrices = () => store.setState({ agentPolicy: { ...DEFAULT_AGENT_POLICY, appAssistantProfile: 'confirm' } });
 
 /** La forma común de todas las herramientas: cambios, resultados antes y después, avisos y el resumen vivo. */
 function assertCommonShape(result: AssistantToolResponse, label: string) {
@@ -116,7 +118,18 @@ reset();
 s().setActiveProject(base.id, 'simulator');
 const stepsBefore = undoSteps(base.id);
 const storageOps = [{ op: 'set_storage', enabled: true }];
-// Con los permisos de hoy (precios ⇒ protegida, «confirm»): queda pendiente con el diff ya calculado, sin escribir.
+// Invertida en F3b: con la política por defecto (perfil «edición en vivo») un lote con precios se aplica al momento, con
+// diff y un paso de deshacer, sin tarjeta de confirmación.
+const liveDefault = await run('edit_proposal', { proposalId: base.id, title: 'Ponle baterías', ops: storageOps });
+assertCommonShape(liveDefault, 'edit_proposal en vivo');
+assert.equal(liveDefault.status, 'applied', JSON.stringify(liveDefault.error ?? liveDefault));
+assert.equal(projectOf(base.id).specs.hasBattery, true, 'en vivo: escrito al momento');
+assert.equal(s().pendingAgentActions.length, 0, 'sin tarjeta de confirmación');
+assert.equal(undoSteps(base.id), stepsBefore + 1, 'un solo paso de deshacer');
+s().undo();
+assert.equal(projectOf(base.id).specs.hasBattery, false, 'Ctrl+Z deshace el cambio en vivo');
+// Con el perfil «confirmar» (lo de antes de F3b: precios ⇒ protegida, «confirm»): queda pendiente con el diff ya calculado.
+confirmPrices();
 const pending = await run('edit_proposal', { proposalId: base.id, title: 'Ponle baterías', ops: storageOps });
 assertCommonShape(pending, 'edit_proposal pendiente');
 assert.equal(pending.status, 'pending_confirmation', JSON.stringify(pending.error ?? pending));
@@ -365,7 +378,9 @@ const errorAt = (result: AssistantToolResponse, path: string, pattern: RegExp) =
   assert.ok(result.status === 'error' && result.error?.errors?.some((e) => e.path === path && pattern.test(e.message)), `${path}: ${JSON.stringify(result.error ?? result.status)}`);
 
 // 9a. Una confirmación tardía no aplica un cambio distinto del que el usuario vio: si la oferta o el consumo cambiaron, se rechaza.
+// (La cola sigue existiendo para el perfil «confirmar» y para los agentes externos: F3b.)
 reset();
+confirmPrices();
 const stalePending = await run('edit_proposal', { proposalId: base.id, title: 'Ponle baterías', ops: storageOps });
 assert.equal(stalePending.status, 'pending_confirmation');
 store.setState({ equipmentCatalog: s().equipmentCatalog.map((e) => (e.id === battery.id ? { ...e, supplierPrices: [{ ...e.supplierPrices![0], priceUSD: 3900 }] } : e)) });
@@ -377,6 +392,7 @@ assert.match(staleConfirm.error ?? '', /cambiaron desde la propuesta del cambio/
 assert.equal(projectOf(base.id).specs.hasBattery, false, 'nada aplicado');
 // Un cambio ajeno al lote (el nombre del cliente) no invalida la confirmación.
 reset();
+confirmPrices();
 const freshPending = await run('edit_proposal', { proposalId: base.id, title: 'Ponle baterías', ops: storageOps });
 s().commitProjectEdits(base.id, [{ path: 'client.name', value: 'Otro nombre' }], { source: 'user' });
 assert.equal(s().confirmAgentAction(freshPending.actionId!).success, true, 'un cambio ajeno no bloquea');
@@ -384,6 +400,7 @@ assert.equal(projectOf(base.id).specs.batteries?.[0].unitPriceUSD, 2100);
 
 // 9b. Repetir una llamada ya rechazada devuelve el estado real de la acción, no otro «pendiente».
 reset();
+confirmPrices();
 const rejectCtx = ctx('turn-reject', '1');
 const toReject = await run('edit_proposal', { proposalId: base.id, ops: storageOps }, rejectCtx);
 assert.equal(toReject.status, 'pending_confirmation');
@@ -404,8 +421,15 @@ assert.equal(oneSync.status, 'applied', JSON.stringify(oneSync.error));
 assert.equal(autoSyncs, 1, 'un solo autosync');
 store.setState({ triggerAutoSync: realAutoSync });
 
-// 9d. Deshacer un cambio protegido (precios) o la creación de una propuesta pide confirmación con la política por defecto.
+// 9d. Deshacer un cambio protegido (precios) o la creación de una propuesta pide confirmación con el perfil «confirmar».
+// Invertida en F3b solo para los precios: con la política por defecto (edición en vivo) el margen y su deshacer van en vivo;
+// mandar a la papelera lo creado sigue confirmándose en ambos perfiles (lo prueba también testAssistantLiveEditProfile).
 reset();
+const marginLive = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set_margin_pct', pct: 10 }] });
+assert.equal(marginLive.status, 'applied', 'invertida en F3b: el margen se aplica en vivo');
+assert.equal((await run('undo_change', { proposalId: base.id })).status, 'applied', 'invertida en F3b: y su deshacer también');
+reset();
+confirmPrices();
 const marginPending = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set_margin_pct', pct: 10 }] });
 assert.equal(marginPending.status, 'pending_confirmation');
 assert.equal(s().confirmAgentAction(marginPending.actionId!).success, true);

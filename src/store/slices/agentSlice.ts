@@ -8,15 +8,26 @@ export interface AgentSourcePolicy {
   /** Catalog, prices, deletions and commercial status. `allow` is the explicit "bypass" mode: no confirmation, validations and undo stay. */
   guarded: AgentPolicyLevel;
 }
+/**
+ * Perfil del asistente de la app (F3b, ADR 0010). `live-edit`: lo que ocurre dentro de una propuesta (campos, equipos,
+ * precios, margen, descuentos y extras) se aplica al momento con diff y deshacer; `confirm`: los precios piden confirmación
+ * como antes. Solo lo lee la fuente `app-assistant`; los agentes externos y el asistente de propuestas nunca lo heredan.
+ * Lo decide `decideAgentToolPermission` (src/features/agentTools/permissionProfile.ts).
+ */
+export type AppAssistantProfile = 'live-edit' | 'confirm';
+
 /** `internal` = in-app assistants; `external` = agents connected through the local MCP server. */
 export interface AgentPolicy {
   internal: AgentSourcePolicy;
   external: AgentSourcePolicy;
+  appAssistantProfile: AppAssistantProfile;
 }
+export type AgentPolicySource = 'internal' | 'external';
 
 export const DEFAULT_AGENT_POLICY: AgentPolicy = {
   internal: { read: 'allow', draft: 'allow', guarded: 'confirm' },
   external: { read: 'allow', draft: 'allow', guarded: 'confirm' },
+  appAssistantProfile: 'live-edit',
 };
 
 export function normalizeAgentPolicy(value: Partial<AgentPolicy> | undefined): AgentPolicy {
@@ -25,10 +36,14 @@ export function normalizeAgentPolicy(value: Partial<AgentPolicy> | undefined): A
     draft: raw?.draft === 'confirm' || raw?.draft === 'deny' ? raw.draft : fallback.draft,
     guarded: raw?.guarded === 'allow' || raw?.guarded === 'deny' ? raw.guarded : 'confirm',
   });
-  return { internal: one(value?.internal, DEFAULT_AGENT_POLICY.internal), external: one(value?.external, DEFAULT_AGENT_POLICY.external) };
+  return {
+    internal: one(value?.internal, DEFAULT_AGENT_POLICY.internal), external: one(value?.external, DEFAULT_AGENT_POLICY.external),
+    // Lo guardado antes de F3b no tiene el campo: edición en vivo (decisión nº 4); solo `confirm` explícito la apaga.
+    appAssistantProfile: value?.appAssistantProfile === 'confirm' ? 'confirm' : 'live-edit',
+  };
 }
 
-export const agentPolicyKey = (source: AgentSource): keyof AgentPolicy => (source === 'mcp' ? 'external' : 'internal');
+export const agentPolicyKey = (source: AgentSource): AgentPolicySource => (source === 'mcp' ? 'external' : 'internal');
 
 export interface AgentChange {
   label: string;

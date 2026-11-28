@@ -26,7 +26,10 @@ export const createUISlice: SimulationSlice<UISlice> = (set, get) => ({
     activeView: s.activeQuotationId && s.quotations.some((q) => q.id === s.activeQuotationId) ? 'quotation-editor' : 'quotations-hub',
   })),
   appAssistantEnabled: false,
-  setAppAssistantEnabled: (enabled) => set({ appAssistantEnabled: enabled === true }),
+  appAssistantEnabledChosenByUser: false,
+  appAssistantDefaultsVersion: 0,
+  // Usar el interruptor es una elección: la migración del encendido (appAssistantEnablement.ts) nunca la pisa.
+  setAppAssistantEnabled: (enabled) => set({ appAssistantEnabled: enabled === true, appAssistantEnabledChosenByUser: true }),
   isNewProjectModalOpen: false,
   isUpdateModalOpen: false,
   isAIInvoiceModalOpen: false,

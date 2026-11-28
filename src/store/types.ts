@@ -303,6 +303,10 @@ export interface UISlice {
   openQuotationLibrary: (section?: 'templates' | 'signatures') => void;
   closeQuotationLibrary: () => void;
   appAssistantEnabled: boolean;
+  /** El usuario usó el interruptor (F3b): su elección manda sobre la migración del encendido (`appAssistantEnablement.ts`). */
+  appAssistantEnabledChosenByUser: boolean;
+  /** Marca de la migración del encendido: 0 = no ha corrido en esta instalación. */
+  appAssistantDefaultsVersion: number;
   setAppAssistantEnabled: (enabled: boolean) => void;
   isNewProjectModalOpen: boolean;
   isUpdateModalOpen: boolean;

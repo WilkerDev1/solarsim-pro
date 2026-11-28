@@ -1,8 +1,8 @@
 import React from 'react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
-import type { AgentPolicy, AgentSourcePolicy } from '../../../../store/slices/agentSlice';
+import type { AgentPolicy, AgentPolicySource, AgentSourcePolicy } from '../../../../store/slices/agentSlice';
 
-const SOURCES: { key: keyof AgentPolicy; title: string; description: string }[] = [
+const SOURCES: { key: AgentPolicySource; title: string; description: string }[] = [
   { key: 'internal', title: 'Asistentes de la aplicación', description: 'Asistente de propuestas y asistente general.' },
   { key: 'external', title: 'Agentes externos (MCP)', description: 'Claude Code, Codex u otros clientes conectados al servidor MCP local.' },
 ];

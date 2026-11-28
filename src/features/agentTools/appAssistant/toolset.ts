@@ -6,8 +6,10 @@
  * manda tal cual, nunca como un texto aparte.
  *
  * Todavía no lo usa ningún bucle: el asistente flotante actual sigue con `executeForAssistant` y `listAgentTools` hasta F4.
- * Permisos: los de hoy, sin cambios (política por fuente y rol; los precios piden confirmación salvo el modo sin
- * confirmación); el perfil «edición en vivo» es de F3b.
+ * Permisos: los de siempre (política por fuente y rol; un lote con precios es protegido entero) más el perfil «edición en
+ * vivo» (F3b, ADR 0010): `edit_proposal` y el deshacer de sus cambios se quedan dentro de una propuesta (`scope: 'proposal'`),
+ * así desde el asistente de la app se aplican al momento con diff y deshacer; la misma llamada desde otra superficie, o lo
+ * compartido (estado, decisión comercial, clientes, papelera…), sigue la decisión de siempre (`permissionProfile.ts`).
  */
 import type { AgentToolCall, AgentToolDefinition, AgentToolOutcome } from '../../../../shared/agentTools/types';
 import type { AgentCard } from '../../../../shared/agentCards';
@@ -21,7 +23,8 @@ import { operationsTouchPricing } from './pricingOps';
 import { visibleAssistantProjects } from '../../assistant/tools';
 import { executeAgentTool, runNativeTool } from '../registry';
 import { store, type AgentToolContext, type NativeHandler } from '../nativeTools';
-import { APP_ASSISTANT_HANDLERS, undoNeedsConfirmation, type ToolPayload } from './handlers';
+import { APP_ASSISTANT_HANDLERS, undoNeedsConfirmation, undoStaysInProposal, type ToolPayload } from './handlers';
+import type { AgentToolScope } from '../permissionProfile';
 import { appAssistantToolDefinitions } from './definitions';
 
 export { APP_ASSISTANT_TOOLSET, appAssistantToolDefinitions } from './definitions';
@@ -86,13 +89,15 @@ async function runOwn(handler: NativeHandler, definition: AgentToolDefinition, a
   // Precios ⇒ protegida entera (como touchesPricing hoy); deshacer un cambio protegido o una creación, también.
   const guarded = (name === 'edit_proposal' && operationsTouchPricing(args.ops)) || (name === 'undo_change' && undoNeedsConfirmation(args));
   const effective: AgentToolDefinition = guarded ? { ...definition, kind: 'guarded' } : definition;
+  // Dentro de una propuesta y con deshacer: el perfil «edición en vivo» decide (solo para el asistente de la app).
+  const scope: AgentToolScope = name === 'edit_proposal' || (name === 'undo_change' && undoStaysInProposal(args)) ? 'proposal' : 'shared';
   let preview: ToolPayload | undefined;
   const capture: NativeHandler = async (a, c) => {
     const result = await handler(a, c);
     preview = result.data as ToolPayload | undefined;
     return result;
   };
-  const outcome: AgentToolOutcome = await runNativeTool(capture, effective, args, ctx);
+  const outcome: AgentToolOutcome = await runNativeTool(capture, effective, args, ctx, { scope });
   const proposalId = typeof args.proposalId === 'string' ? args.proposalId : undefined;
   switch (outcome.status) {
     case 'error': return response(name, 'error', preview?.error ? preview : undefined, { error: { code: outcome.code, message: outcome.message }, ...(proposalId ? { proposalId } : {}) });
