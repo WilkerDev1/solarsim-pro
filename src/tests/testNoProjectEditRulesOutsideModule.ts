@@ -16,11 +16,16 @@ import path from 'node:path';
  *     Quedan fuera, por no ser ediciones, la restauración de instantáneas (`restore: true`, deshacer/rehacer, historial,
  *     reconciliación con el servidor), la construcción de proyectos (nuevo, duplicado, importación, borrador de IA) y las
  *     escrituras que no tocan esos campos (estado, carpeta, enlace, personalización, anexos, diseño).
- * No ve las reglas reescritas con otros nombres; el comportamiento lo cubre `testProjectEdit`.
+ *  5. La transacción (F2a2): `applyProjectEditPlan` (las reglas aplicadas a un lote) solo la llaman el módulo y la
+ *     transacción (`projectEditTransaction.ts`), y `commitProjectEdits`, el escritor del store que usa `set()` directamente
+ *     (revisión de F2, B7), solo escribe lo que devuelve `applyProjectEdits`.
+ * No ve las reglas reescritas con otros nombres; el comportamiento lo cubren `testProjectEdit` y `testProjectEditTransaction`.
  */
 const root = process.cwd();
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'release', '.wrangler', 'tests']);
 const MODULE = 'src/domain/projectEdit.ts';
+const TRANSACTION = 'src/domain/projectEditTransaction.ts';
+const STORE_WRITER = 'src/store/slices/projectSlice.ts';
 const ENGINE = 'src/engine/solarEngine.ts';
 /** Borrador de IA: dimensiona o lee el rendimiento específico de un borrador; no aplica una edición a un proyecto abierto. */
 const DRAFT_PIPELINE = new Set([
@@ -33,7 +38,7 @@ const LEGACY_DRAFT_PIPELINE = new Set([
   'src/components/common/ai-invoice/hooks/useAIInvoiceScanner.ts',
   'src/components/common/ai-invoice/components/ProposalConsumptionReview.tsx',
 ]);
-const WRITERS = /\b(?:updateSpecs|updateRates|updateClient|updateFinancials|updateMonthlyConsumption|updateAllMonthlyConsumption|setMonthlyConsumption|applySupplierPriceToProject|editActiveProject)\b/;
+const WRITERS = /\b(?:updateSpecs|updateRates|updateClient|updateFinancials|updateRatesAndSpecs|updateMonthlyConsumption|updateAllMonthlyConsumption|setMonthlyConsumption|applySupplierPriceToProject|editActiveProject|commitProjectEdits)\b/;
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -79,7 +84,7 @@ function callBodies(source: string, name: string): string[] {
   return bodies;
 }
 const WRITES_PROJECT_FIELD = /(?:^|[\s{,(])(?:client|specs|rates)\s*(?::|,|\})/;
-const THROUGH_MODULE = /\b(?:applyProjectEdit|applyDocumentClientEdit)\s*\(/;
+const THROUGH_MODULE = /\b(?:applyProjectEdit|applyProjectEdits|applyDocumentClientEdit)\s*\(/;
 const directWrite = (body: string) => !/\brestore\s*:\s*true\b/.test(body) && !THROUGH_MODULE.test(body) && WRITES_PROJECT_FIELD.test(body);
 
 const files = walk(path.join(root, 'src')).map((file) => ({ file: rel(file), source: stripComments(readFileSync(file, 'utf8')) }));
@@ -88,12 +93,14 @@ const sizing: string[] = [];
 const recommendation: string[] = [];
 const effects: string[] = [];
 const direct: string[] = [];
+const plans: string[] = [];
 for (const { file, source } of files) {
   if (file !== MODULE && /\bwithRecommendedPanels\b/.test(source)) sizing.push(file);
   if (![MODULE, ENGINE].includes(file) && !DRAFT_PIPELINE.has(file) && !LEGACY_DRAFT_PIPELINE.has(file) && /\bcalculateRecommendedPanelCount\b/.test(source)) recommendation.push(file);
   if ((file.startsWith('src/store/slices/') || file.startsWith('src/features/agentTools/'))
     && ['updateActiveProject', 'updateProjectById'].some((name) => callBodies(source, name).some(directWrite))) direct.push(file);
   if (file.startsWith('src/components/simulator/') && effectBodies(source).some((body) => WRITERS.test(body))) effects.push(file);
+  if (![MODULE, TRANSACTION].includes(file) && /\bapplyProjectEditPlan\s*\(/.test(source)) plans.push(file);
 }
 
 assert.deepEqual(sizing, [], `withRecommendedPanels solo vive en ${MODULE}:\n${sizing.join('\n')}`);
@@ -101,6 +108,16 @@ assert.deepEqual(recommendation, [], `calculateRecommendedPanelCount fuera del m
 assert.deepEqual(effects, [], `Un efecto del simulador escribe en el proyecto (mirar no escribe; usa applyProjectEdit desde una acción del usuario):\n${effects.join('\n')}`);
 
 assert.deepEqual(direct, [], `Escritura directa de client/specs/rates fuera de applyProjectEdit (usa el módulo; ADR 0004):\n${direct.join('\n')}`);
+assert.deepEqual(plans, [], `applyProjectEditPlan fuera del módulo y de la transacción (usa applyProjectEdits o commitProjectEdits):\n${plans.join('\n')}`);
+
+// Regla 5: commitProjectEdits escribe con set() directamente; lo que escribe tiene que salir de applyProjectEdits.
+const storeWriter = files.find((file) => file.file === STORE_WRITER)?.source ?? '';
+const commitStart = storeWriter.search(/\bcommitProjectEdits\s*:/);
+assert.ok(commitStart >= 0, `${STORE_WRITER} debe definir commitProjectEdits (actualiza la guarda si se mueve)`);
+const commitBody = storeWriter.slice(commitStart, storeWriter.indexOf('\n  },\n', commitStart));
+assert.ok(/\bapplyProjectEdits\s*\(/.test(commitBody), 'commitProjectEdits aplica el lote con applyProjectEdits (reglas del módulo)');
+assert.ok(!/\b(?:withTariffChange|reconcileWithCatalog|withRecommendedPanels|normalizeEquipmentEdit)\b/.test(commitBody), 'commitProjectEdits no repite reglas de edición');
+assert.ok(files.some((file) => file.file === TRANSACTION), `${TRANSACTION} debe existir (actualiza la guarda si se mueve)`);
 
 // La guarda detecta lo que dice detectar.
 assert.equal(callBodies('x(updateActiveProject((p) => { return { client, customization }; }))', 'updateActiveProject').some(directWrite), true);

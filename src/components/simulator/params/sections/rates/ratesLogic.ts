@@ -11,8 +11,8 @@ import { DEFAULT_MONTHLY_CONSUMPTION_KWH, resolveDopRate } from '../../logic/doc
 
 type TariffMatrix = Parameters<typeof getReferenceEnergyRateUSD>[0];
 
-export const DAYTIME_MIN = 15;
-export const DAYTIME_MAX = 95;
+/** Rango del consumo diurno: vive en el registro de campos (el mismo que valida la transacción). */
+export { DAYTIME_MIN, DAYTIME_MAX } from '../../../../../domain/projectFields';
 
 export function averageMonthlyConsumption(project: Pick<ProjectSimulation, 'monthlyConsumption'>): number {
   const months = project.monthlyConsumption;

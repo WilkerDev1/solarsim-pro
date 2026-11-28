@@ -27,6 +27,8 @@ interface ParameterSidebarProps {
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
   updateRates: (rates: Partial<UtilityRates>) => void;
   updateFinancials: (financials: Partial<FinancialParams>) => void;
+  /** Tarifas y specs de una misma acción (distribuidora o tarifa con su perfil) en un solo lote de la transacción. */
+  updateRatesAndSpecs?: (rates: Partial<UtilityRates>, specs?: Partial<SystemSpecs> | null) => void;
 }
 
 export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
@@ -43,6 +45,7 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
   updateSpecs,
   updateRates,
   updateFinancials,
+  updateRatesAndSpecs,
 }) => {
   const [isIdUnlocked, setIsIdUnlocked] = useState(false);
 
@@ -81,7 +84,7 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
           />
         );
       case 'rates':
-        return <RatesParamsSection project={project} updateRates={updateRates} updateSpecs={updateSpecs} />;
+        return <RatesParamsSection project={project} updateRates={updateRates} updateSpecs={updateSpecs} updateRatesAndSpecs={updateRatesAndSpecs} />;
       case 'equipment':
         return <EquipmentParamsSection project={project} summary={summary} updateSpecs={updateSpecs} />;
       case 'costs':

@@ -1,4 +1,5 @@
 import type { UndoHistory, UndoRecordOptions } from './undo/projectUndoJournal';
+import type { ApplyProjectEditsOptions, ProjectEditSource, ProjectEditsResult, ProjectFieldEdit } from '../domain/projectEditTransaction';
 import { StateCreator } from 'zustand';
 import {
   ProjectSimulation,
@@ -87,6 +88,26 @@ export type AppView = 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' 
 /** Pestañas del modal de Ajustes. `agents` agrupa permisos, actividad y conexión MCP. */
 export type SettingsTab = 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features' | 'agents';
 
+export interface CommitProjectEditsOptions extends ApplyProjectEditsOptions {
+  source: ProjectEditSource;
+  turnId?: string;
+  /** Agrupa en un paso de deshacer con el registro anterior de la misma clave, fuente y turno (600 ms). */
+  coalesceKey?: string;
+  /** Repetir la clave (por propuesta) no vuelve a aplicar el lote. */
+  idempotencyKey?: string;
+}
+
+export type CommitProjectEditsResult =
+  | (Extract<ProjectEditsResult, { ok: true }> & {
+    /** Se escribió en el store (falso si el lote no cambiaba nada o era repetido). */
+    written: boolean;
+    /** Quedó un paso en el diario de deshacer (solo la propuesta activa lo registra). */
+    undoRecorded: boolean;
+    /** Respuesta guardada de una `idempotencyKey` ya usada: no se aplicó de nuevo. */
+    duplicate?: boolean;
+  })
+  | Extract<ProjectEditsResult, { ok: false }>;
+
 export interface ProjectSlice {
   projects: ProjectSimulation[];
   activeProjectId: string;
@@ -113,6 +134,13 @@ export interface ProjectSlice {
   /** Edits any proposal by id (agents); refuses trashed proposals. Returns false when nothing changed. */
   /** `restore: true` writes the sections verbatim (undo of a snapshot): no equipment normalization against the current groups. */
   updateProjectById: (id: string, edit: (project: ProjectSimulation) => Partial<ProjectSimulation>, options?: { restore?: boolean }) => boolean;
+  /**
+   * Transacción de edición (F2a2; ADR 0004): aplica un lote de ediciones por ruta con `applyProjectEdits` (todo o nada) y
+   * lo escribe con UNA escritura del store, un sello `updatedAt`, un `triggerAutoSync(false)` y un paso del diario de
+   * deshacer (si es la propuesta activa) con las rutas, derivadas incluidas. Un lote sin efecto no escribe. Repetir una
+   * `idempotencyKey` devuelve el resultado anterior (`duplicate: true`) sin aplicar de nuevo.
+   */
+  commitProjectEdits: (projectId: string, edits: readonly ProjectFieldEdit[], options: CommitProjectEditsOptions) => CommitProjectEditsResult;
   /** Returns the new proposal id. `activate: false` keeps the user on the current proposal (agents). */
   duplicateProject: (id: string, options?: { activate?: boolean }) => string | undefined;
   moveToTrash: (id: string) => void;

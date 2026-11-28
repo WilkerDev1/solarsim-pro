@@ -11,13 +11,14 @@ import { companyDocumentCustomization, reusableDocumentTemplate } from '../../ut
 import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
-import { SimulationSlice, ProjectSlice, SimulationStore } from '../types';
+import { SimulationSlice, ProjectSlice, SimulationStore, type CommitProjectEditsResult } from '../types';
+import { applyProjectEdits, editBatchFingerprint } from '../../domain/projectEditTransaction';
 import { ProjectSimulation, SystemSpecs } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../engine/financeEngine';
 import { projectMutationMetadata } from '../sync/projectMutation';
-import { DEFAULT_EDIT_COALESCE_KEY, activateJournal, recordUndo, undoAvailability } from '../undo/projectUndoJournal';
+import { DEFAULT_EDIT_COALESCE_KEY, activateJournal, recordUndo, undoAvailability, type UndoRecordOptions } from '../undo/projectUndoJournal';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 import { canEditDocument } from '../../components/pdf/editor/documentEditorState';
 import { normalizeDocumentLayout } from '../../../shared/documentLayout';
@@ -80,9 +81,23 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
    * con el estado ANTERIOR, así el primer cambio también se deshace; luego se registra el nuevo, agrupado con la clave por
    * defecto. Va en el mismo `set` que la edición: una escritura del store, como antes.
    */
-  const undoAfterEdit = (state: SimulationStore, before: ProjectSimulation, after: ProjectSimulation) => {
-    const undoHistory = recordUndo(activateJournal(state.undoHistory, before), after, { source: 'user', coalesceKey: DEFAULT_EDIT_COALESCE_KEY, now: Date.now() });
+  const undoAfterEdit = (state: SimulationStore, before: ProjectSimulation, after: ProjectSimulation, options: UndoRecordOptions = { source: 'user', coalesceKey: DEFAULT_EDIT_COALESCE_KEY }) => {
+    const undoHistory = recordUndo(activateJournal(state.undoHistory, before), after, { ...options, now: Date.now() });
     return undoHistory === state.undoHistory ? {} : { undoHistory, ...undoAvailability(undoHistory, state.activeProjectId) };
+  };
+
+  /**
+   * Resultados de `commitProjectEdits` por `propuesta + idempotencyKey` (F2a2): repetir la clave no vuelve a aplicar. En
+   * memoria y acotado (como el diario de deshacer, no se persiste); la huella del lote detecta una clave reutilizada.
+   */
+  const committedEdits = new Map<string, { fingerprint: string; result: CommitProjectEditsResult }>();
+  const MAX_COMMITTED_EDITS = 200;
+  const rememberCommit = (key: string | undefined, fingerprint: string, result: CommitProjectEditsResult) => {
+    if (!key) return result;
+    committedEdits.delete(key);
+    committedEdits.set(key, { fingerprint, result });
+    while (committedEdits.size > MAX_COMMITTED_EDITS) committedEdits.delete(committedEdits.keys().next().value!);
+    return result;
   };
 
   /** Applies an edit to the active project, stamps mutation metadata, then auto-syncs and records undo. */
@@ -213,6 +228,41 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     });
     get().triggerAutoSync(false);
     return true;
+  },
+
+  commitProjectEdits: (projectId, edits, options) => {
+    const reject = (message: string): CommitProjectEditsResult => ({ ok: false, errors: [{ path: '', message }], warnings: [] });
+    const key = options.idempotencyKey ? `${projectId}\u0000${options.idempotencyKey}` : undefined;
+    const fingerprint = editBatchFingerprint(edits);
+    const previous = key ? committedEdits.get(key) : undefined;
+    if (previous) {
+      if (previous.fingerprint !== fingerprint) return reject('Esta clave de idempotencia ya se usó con otro lote de cambios; usa una clave nueva.');
+      return previous.result.ok ? { ...previous.result, written: false, undoRecorded: false, duplicate: true } : previous.result;
+    }
+    const state = get();
+    const before = state.projects.find((p) => p.id === projectId);
+    if (!before) return reject('La propuesta no existe o ya no está disponible.');
+    // La papelera es de solo lectura, como en updateActiveProject.
+    if (before.isDeleted || before.deletedAt) return reject('La propuesta está en la papelera: restáurala para editarla.');
+    // ADR 0004: las reglas viven en el dominio (applyProjectEdits → applyProjectEditPlan); aquí solo se persiste, sincroniza y deshace.
+    const result = applyProjectEdits(before, edits, {
+      equipmentCatalog: state.equipmentCatalog, tariffMatrix: state.tariffMatrix,
+      calculationMode: energyCalculationMode(effectiveFeatureSettings(state)),
+    }, { validation: options.validation, metrics: options.metrics });
+    if (!result.ok) return result;
+    if (result.changes.length === 0) return rememberCommit(key, fingerprint, { ...result, project: before, written: false, undoRecorded: false });
+    const active = projectId === state.activeProjectId;
+    const after: ProjectSimulation = { ...result.project, ...projectMutationMetadata(before, state.syncSettings), updatedAt: new Date().toISOString() };
+    // Una escritura: la propuesta y su paso de deshacer (rutas de la transacción, derivadas incluidas) en el mismo `set`.
+    set((current) => ({
+      projects: current.projects.map((p) => (p.id === projectId ? after : p)),
+      ...(active ? undoAfterEdit(current, before, after, {
+        source: options.source, coalesceKey: options.coalesceKey, turnId: options.turnId,
+        fields: result.changes.map(({ path, before: from, after: to, derived }) => ({ path, before: from, after: to, derived })),
+      }) : {}),
+    }));
+    get().triggerAutoSync(false);
+    return rememberCommit(key, fingerprint, { ...result, project: after, written: true, undoRecorded: active });
   },
 
   createNewProject: (payload) => {
