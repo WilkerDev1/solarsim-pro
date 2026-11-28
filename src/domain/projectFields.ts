@@ -249,7 +249,7 @@ export const PROJECT_FIELDS: readonly ProjectFieldDefinition[] = [
   bool('rates.legacyAnnualSettlement', 'Liquidar excedente anual', 'rates', 'control', { optional: true, anchor: 'pd-rates-legacy-settlement', requires: [NEEDS_LEGACY] }),
   derived('rates.legacyAnnualSettlementDOPPerKWh', 'Precio de la liquidación del régimen anterior', 'rates', 'number', { note: 'Lo siembra reconcileLegacySettlement al activar la liquidación.' }),
   num('rates.annualCreditSettlementDOPPerKWh', 'Liquidación anual (RD$/kWh)', 'rates', 'control', { min: 0, max: MAX_SETTLEMENT_DOP_PER_KWH, optional: true, anchor: 'pd-rates-settlement' }),
-  choice('rates.fixedChargeTierBasis', 'Rango cargo fijo', 'rates', 'control', FIXED_CHARGE_TIER_BASES, { optional: true, anchorNote: 'ParamRow sin htmlFor (selector compacto); ancla pendiente para F5a.' }),
+  choice('rates.fixedChargeTierBasis', 'Rango cargo fijo', 'rates', 'control', FIXED_CHARGE_TIER_BASES, { optional: true, anchor: 'pd-rates-fixed-tier' }),
   num('rates.annualEnergyInflationPct', 'Inflación de la energía', 'rates', 'hidden', rule('annualEnergyInflationPct')),
   num('rates.usdExchangeRate', 'Tasa RD$/US$ de la tarifa', 'rates', 'hidden', { ...rule('dopExchangeRate'), note: 'La tasa efectiva es specs.dopExchangeRate.' }),
   choice('rates.currency', 'Moneda', 'rates', 'hidden', ['USD', 'DOP'], { note: 'Sin efecto en el cálculo.' }),

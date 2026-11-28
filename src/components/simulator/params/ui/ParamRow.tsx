@@ -20,7 +20,8 @@ export const ParamRow: React.FC<ParamRowProps> = ({ label, htmlFor, labelId, hin
     <span id={labelId} className={labelClass}>{label}</span>
   );
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_172px] items-center gap-2.5">
+    // `data-dock-anchor`: el id del control (o de su etiqueta); lo que usa el resaltado en vivo del asistente (F5a, fieldAnchors).
+    <div data-dock-anchor={htmlFor ?? labelId} className="grid grid-cols-[minmax(0,1fr)_172px] items-center gap-2.5">
       {hint ? <div className="flex min-w-0 items-center gap-1">{labelNode}{hint}</div> : labelNode}
       <div className="min-w-0">{children}</div>
     </div>

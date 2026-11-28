@@ -1,7 +1,10 @@
 /** Estado puro del dock de parámetros: secciones abiertas, persistencia por usuario y contadores. */
 
-export const DOCK_SECTION_KEYS = ['client', 'rates', 'equipment', 'costs', 'financials'] as const;
-export type DockSectionKey = (typeof DOCK_SECTION_KEYS)[number];
+import { DOCK_SECTION_KEYS, type DockSectionKey } from '../../../../domain/fieldAnchors';
+
+// Las secciones viven en el dominio (`fieldAnchors.ts`, F5a): las anclas de los campos las nombran.
+export { DOCK_SECTION_KEYS };
+export type { DockSectionKey };
 export type OpenSections = Record<DockSectionKey, boolean>;
 
 export type DockStorage = Pick<Storage, 'getItem' | 'setItem'>;

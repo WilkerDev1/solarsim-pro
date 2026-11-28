@@ -52,6 +52,7 @@ export const DiscountsList: React.FC<DiscountsListProps> = ({ discounts, listPri
           return (
             <ItemCard
               key={disc.id || index}
+              anchor={`dock-financials-discount-${index}`}
               title={disc.description}
               onTitleChange={(description) => onUpdate(disc.id, { description })}
               titleLabel={`Motivo del descuento ${index + 1}`}

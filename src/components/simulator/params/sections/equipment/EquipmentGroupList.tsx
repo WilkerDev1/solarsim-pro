@@ -139,6 +139,7 @@ export const EquipmentGroupList: React.FC<EquipmentGroupListProps> = ({ kind, mo
       {views.map((view, index) => (
         <ItemCard
           key={view.key}
+          anchor={`dock-equipment-${kind}-${index}`}
           title={index > 0 ? `Modelo #${index + 1}` : undefined}
           onRemove={index > 0 ? () => actions.remove(index) : undefined}
           removeLabel={`Eliminar ${config.noun} #${index + 1}`}

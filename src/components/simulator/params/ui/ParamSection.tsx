@@ -13,11 +13,21 @@ export interface ParamSectionProps {
   badge?: React.ReactNode;
   /** Texto accesible completo del badge. */
   badgeLabel?: string;
+  /**
+   * «Cambió aquí»: lo que cambió el asistente en esta sección y no se ve en un control (plegada, sin control visible o sin id
+   * por campo). Un punto discreto con el detalle en su tooltip; no abre la sección ni mueve el foco (F5a).
+   */
+  changeHint?: string;
   children?: React.ReactNode;
 }
 
-export const ParamSection: React.FC<ParamSectionProps> = ({ id, title, icon, open, onToggle, badge, badgeLabel, children }) => (
-  <section className="border-t border-pd-border" aria-labelledby={`${id}-title`}>
+export const ParamSection: React.FC<ParamSectionProps> = ({ id, title, icon, open, onToggle, badge, badgeLabel, changeHint, children }) => (
+  <section
+    data-dock-anchor={id}
+    data-assistant-changed={changeHint ? 'section' : undefined}
+    className="border-t border-pd-border"
+    aria-labelledby={`${id}-title`}
+  >
     <h2 className="m-0">
       <button
         type="button"
@@ -37,6 +47,9 @@ export const ParamSection: React.FC<ParamSectionProps> = ({ id, title, icon, ope
           <span className="truncate">{title}</span>
         </span>
         <span className="flex flex-none items-center gap-2">
+          {changeHint && (
+            <span role="img" aria-label={changeHint} title={changeHint} data-assistant-dot className="h-2 w-2 flex-none rounded-full bg-pd-accent" />
+          )}
           {badge != null && (
             <span aria-label={badgeLabel} className="rounded bg-pd-field px-1.5 py-0.5 font-mono text-[11px] font-semibold text-pd-strong">
               {badge}
