@@ -12,6 +12,7 @@ import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_SIMULATION_SETTINGS } from '../store/defaultSimulationSettings';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { executeAgentTool } from '../features/agentTools/registry';
+import { executeAssistantToolset } from '../features/agentTools/appAssistant/toolset';
 import { assistantOwner } from '../features/assistant/tools';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
 import { buildAITariffContext } from '../utils/aiTariffContext';
@@ -160,14 +161,22 @@ assert.equal(customManual.specs.batteries?.[0].count, 3);
 assert.deepEqual(pick(customAssistant), { province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS1', marginFactor: 1.4, pricingMode: 'cost_matrix', pricePerWattUSD: 1.5, hasBattery: false, laborUSDPerKWp: 170 });
 assert.deepEqual(pick(customFloating), pick(customAssistant));
 
-// 7. Sin datos. «Nueva simulación» crea con el consumo estimado de fábrica (F2b). `create_proposal` sin argumentos sigue
-// siendo un error de argumentos: los obligatorios los declara `shared/agentTools/definitions.ts`, que F2b no puede tocar (la
-// 2.11.0 es solo de cliente); F3a define la herramienta nueva con todo opcional. Sin consumo, en cambio, ya crea (invertida).
+// 7. Sin datos. «Nueva simulación» crea con el consumo estimado de fábrica (F2b). invertida en F3a: «crea una propuesta» sin
+// datos crea en el asistente de la app, con la `create_proposal` propia del cliente (todo opcional, fábrica única;
+// `src/features/agentTools/appAssistant/`). La compartida de `shared/agentTools/definitions.ts` (MCP local y agentes
+// externos) no cambia en la 2.11.0, que es solo de cliente: sin argumentos sigue siendo un error de argumentos.
 reset();
 const ctx = () => ({ source: 'app-assistant' as const, owner: assistantOwner() });
+store.setState({ agentPolicy: { ...DEFAULT_AGENT_POLICY, internal: { read: 'allow', draft: 'allow', guarded: 'confirm' } } });
+const noArgsApp = await executeAssistantToolset({ name: 'create_proposal', args: {} }, { ...ctx(), turnId: 'f3a', callId: '0' });
+assert.equal(noArgsApp.status, 'applied', 'invertida en F3a: «crea una propuesta» sin datos crea con los valores de la fábrica');
+const noArgsProject = s().projects.find((p) => p.id === noArgsApp.proposalId)!;
+assert.deepEqual(noArgsProject.monthlyConsumption, flat(1000));
+assert.equal(noArgsProject.specs.saleMarginMultiplier, 1.4);
+store.setState({ projects: s().projects.filter((p) => p.id !== noArgsApp.proposalId) });
 const noArgs = await executeAgentTool({ name: 'create_proposal', args: {} }, ctx());
 assert.equal(noArgs.status, 'error');
-assert.equal((noArgs as { code: string }).code, 'invalid_arguments', 'pendiente de F3a: «crea una propuesta» sin datos (el esquema compartido exige estos campos)');
+assert.equal((noArgs as { code: string }).code, 'invalid_arguments', 'la compartida (MCP local y agentes externos) conserva sus obligatorios');
 assert.match((noArgs as { message: string }).message, /clientName: es obligatorio.*distributor: es obligatorio.*tariffCode: es obligatorio.*panels: es obligatorio.*inverters: es obligatorio/);
 const noConsumption = await executeAgentTool({ name: 'create_proposal', args: { clientName: 'X', distributor: 'EDESUR', tariffCode: 'BTS1',
   panels: [{ catalogItemId: panel.id, count: 1 }], inverters: [{ catalogItemId: inverter.id, count: 1 }] } }, ctx());
