@@ -2,14 +2,12 @@
 // (`specs.sizingBasis = 'peak_month'`, ADR 0009). Si nace con una base y guarda otra, activar después el autodimensionado
 // hace saltar la cantidad de paneles. Lo guardado sin base (el comportamiento de siempre) no cambia.
 import assert from 'node:assert/strict';
-import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_SIMULATION_SETTINGS } from '../store/defaultSimulationSettings';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
-import { buildProjectFromDraft } from '../store/slices/aiSlice';
+import { buildProjectFromDraft } from '../domain/proposalDraft';
 import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
@@ -18,7 +16,6 @@ import { resolveAssumptions } from '../../shared/assumptions';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { recommendPanelCount, annualSpecificYieldKWhPerKWp } from '../domain/sizing';
 import { sizeDraftPanelsWithBasis } from '../utils/proposalDraftProject';
-import { ProposalConsumptionReview } from '../components/common/ai-invoice/components/ProposalConsumptionReview';
 import type { ExtractedInvoiceData, ProjectSimulation } from '../types';
 
 const store = useSimulationStore;
@@ -95,15 +92,4 @@ const updated = buildProjectFromDraft(s(), { selectedPanelModel: panel.displayNa
 if ('error' in updated) throw new Error(updated.error);
 assert.equal(panelCount(updated.project), calculateRecommendedPanelCount('Santiago', months, 590, resolveAssumptions(legacy).targetCoveragePct, resolveAssumptions(legacy).systemLossesPct, legacy.client.customMonthlyHSP).recommendedPanelCount);
 
-// 5. La revisión del modal sugiere con la misma base (meta anual con el mes pico).
-const draft = { province: 'Santiago', monthlyConsumptionKWh: months, observedMonthlyConsumptionKWh: months, targetCoveragePct: 95, panels: [{ id: 'a', brandModel: 'P', powerW: 550, count: 1 }] } as never;
-const target = (basis: 'average' | 'peak_month') => {
-  const sizing = recommendPanelCount({ province: 'Santiago', monthlyConsumption: months, panelPowerW: 550, coveragePct: 95, lossesPct: undefined, basis });
-  return (sizing.targetAnnualKWh / sizing.annualSpecificYieldKWhPerKWp).toFixed(2);
-};
-assert.notEqual(target('peak_month'), target('average'));
-const html = (basis?: 'average' | 'peak_month') => renderToStaticMarkup(React.createElement(ProposalConsumptionReview, { draft, context: { province: 'Santiago' }, production: null, update: () => {}, sizingBasis: basis } as never));
-assert.match(html('peak_month'), new RegExp(`Objetivo: <strong>${target('peak_month')} kWp`), 'la revisión de un borrador nuevo dimensiona con el mes pico');
-assert.match(html(), new RegExp(`Objetivo: <strong>${target('average')} kWp`), 'sin base, el consumo tal cual (como antes)');
-
-console.log('PASS: el borrador del asistente nace dimensionado con la base que guarda; lo guardado sin base, como antes.');
+console.log('PASS: el borrador de IA nace dimensionado con la base que guarda; lo guardado sin base, como antes.');

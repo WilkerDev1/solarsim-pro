@@ -1,11 +1,11 @@
 // Política de salida estructurada sobre el puerto LlmClient (F1b), con ScriptedLlm: sin SDK, sin red, sin clave.
-// Recoge, caso por caso, lo que hacía `requestGeminiStructured`/`requestGeminiJson` de shared/geminiTransport
-// (esas suites siguen cubriendo el camino REST legado hasta F6): modelo de reserva, recuperación de MAX_TOKENS,
+// Recoge, caso por caso, lo que hacía el transporte REST antiguo (`requestGeminiStructured`/`requestGeminiJson`)
+// (el transporte REST se retiró en F6; esta suite es ahora la que cubre): modelo de reserva, recuperación de MAX_TOKENS,
 // un reintento de JSON mal formado, plazo global, límite de 20 MiB inline y cancelación con su razón.
 import assert from 'node:assert/strict';
 import { LlmError } from '../services/llm/errors';
 import { MAX_INLINE_FILE_BASE64, requestStructured, type StructuredPolicyOptions } from '../services/llm/structuredPolicy';
-import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../shared/geminiTransport';
+import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../services/llm/models';
 import type { LlmStructuredRequest } from '../services/llm/types';
 import { clientFromTransport } from './support/clientFromTransport';
 import { ScriptedLlm, type ScriptedStep } from './support/scriptedLlm';
@@ -277,7 +277,7 @@ const sent = (llm: ScriptedLlm) => llm.calls.map((call) => call.request as LlmSt
 }
 
 // 10. Respuestas vacías o sin finishReason, con el adaptador real del SDK sobre un transporte sintético: lo mismo que
-// hacía requestGeminiStructured (shared/geminiTransport) en esos casos. Las suites de ScriptedLlm no las ven porque el
+// hacía requestGeminiStructured (el transporte REST antiguo) en esos casos. Las suites de ScriptedLlm no las ven porque el
 // doble no distingue «texto vacío» de «JSON inválido».
 {
   const NO_DATA = /Gemini no devolvió datos para analizar\. Revisa el archivo o las instrucciones\./;

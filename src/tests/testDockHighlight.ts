@@ -11,7 +11,7 @@ import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { EMPTY_UNDO_HISTORY } from '../store/undo/projectUndoJournal';
-import { executeForAssistant, executeAgentTool } from '../features/agentTools/registry';
+import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import {
   EMPTY_HIGHLIGHTS, HIGHLIGHT_TTL_MS, activeMarks, addHighlights, dockHighlightView, nextExpiry, pruneExpired,
@@ -20,6 +20,8 @@ import { dockHighlightStore } from '../store/dockHighlightStore';
 import { assistantEditForQa } from '../features/assistantFeedback/devActions';
 import { syncChangedMarks, presentInDock, collapsedInDock, type MarkRoot } from '../components/simulator/sidebar/dockHighlightDom';
 import { anchorForPath, type DockSectionKey } from '../domain/fieldAnchors';
+/** Resultado de la herramienta tal como lo leen estas suites (la unión del registro se estrecha por `status`; aquí ya se comprueba `activityId`). */
+const applyTool = (call: Parameters<typeof executeAgentTool>[0], ctx: Parameters<typeof executeAgentTool>[1]) => executeAgentTool(call, ctx) as Promise<{ status: string; activityId?: string; data?: any }>;
 
 const ALL_OPEN: Record<DockSectionKey, boolean> = { client: true, rates: true, equipment: true, costs: true, financials: true };
 const T0 = 1_000_000;
@@ -198,7 +200,7 @@ unsubscribe();
 open();
 const ctxApp = { source: 'app-assistant' as const, owner: assistantOwner() };
 const coverage = (value: number) => ({ name: 'propose_project_update', args: { id: project.id, title: `Cobertura ${value}`, edits: [{ section: 'rates', field: 'targetCoveragePct', valueJson: String(value) }] } });
-const viaApp = await executeForAssistant(coverage(85), ctxApp);
+const viaApp = await applyTool(coverage(85), ctxApp);
 assert.ok(viaApp.activityId, 'el borrador del asistente se aplica en vivo');
 assert.deepEqual(live(), ['pd-rates-coverage'], 'por el camino actual del asistente flotante también se destaca');
 assert.equal(store.getState().undoHistory.journals[project.id].undo.at(-1)?.source, 'assistant', 'y el paso de deshacer queda con origen «asistente»');
@@ -208,7 +210,7 @@ const tariffEdits = [
   { section: 'rates', field: 'distributor', valueJson: '"EDENORTE"' },
   { section: 'rates', field: 'tariffCode', valueJson: '"BTS1"' },
 ];
-const viaLegacy = await executeForAssistant({ name: 'propose_project_update', args: { id: project.id, title: 'Tarifa', edits: tariffEdits } }, ctxApp);
+const viaLegacy = await applyTool({ name: 'propose_project_update', args: { id: project.id, title: 'Tarifa', edits: tariffEdits } }, ctxApp);
 assert.ok(viaLegacy.activityId);
 assert.equal(store.getState().getActiveProject().rates.energyCostPerKWh, project.rates.energyCostPerKWh, 'camino antiguo: conserva el precio de energía (no pasó por la transacción)');
 assert.deepEqual(live(), ['pd-rates-distributor', 'pd-rates-tariff'], 'el camino antiguo del asistente también destaca lo que cambió');

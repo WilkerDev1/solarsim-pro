@@ -103,11 +103,11 @@ export function turnUndoTargets(turnId: string, agentActivity: TurnDetailsLive['
  * también, salvo acoplado, donde se reserva la columna vacía para que el contenido no salte de ancho al abrir y cerrar el modal.
  */
 export function assistantPanelBlock(
-  state: { isSettingsModalOpen: boolean; isAIInvoiceModalOpen: boolean; isAIDatasheetModalOpen: boolean; isAIPriceCatalogModalOpen: boolean; isNewProjectModalOpen: boolean; activeConflict: unknown; isTrashActive: boolean },
+  state: { isSettingsModalOpen: boolean; isAIDatasheetModalOpen: boolean; isAIPriceCatalogModalOpen: boolean; isNewProjectModalOpen: boolean; activeConflict: unknown; isTrashActive: boolean },
   docked: boolean,
 ): 'reserve' | 'hide' | null {
   if (state.isTrashActive) return 'hide';
-  const modal = state.isSettingsModalOpen || state.isAIInvoiceModalOpen || state.isAIDatasheetModalOpen || state.isAIPriceCatalogModalOpen || state.isNewProjectModalOpen || !!state.activeConflict;
+  const modal = state.isSettingsModalOpen || state.isAIDatasheetModalOpen || state.isAIPriceCatalogModalOpen || state.isNewProjectModalOpen || !!state.activeConflict;
   if (!modal) return null;
   return docked ? 'reserve' : 'hide';
 }

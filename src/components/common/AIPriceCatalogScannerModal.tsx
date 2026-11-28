@@ -2,7 +2,7 @@ import { isWriterRole } from '../../../shared/permissions';
 import { PriceCatalogUploadStep } from "./PriceCatalogUploadStep";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
-import { DEFAULT_GEMINI_MODEL } from "../../../shared/geminiTransport";
+import { DEFAULT_GEMINI_MODEL } from "../../services/llm/models";
 import { useShallow } from 'zustand/react/shallow';
 import {
   GeminiPriceCatalogService,

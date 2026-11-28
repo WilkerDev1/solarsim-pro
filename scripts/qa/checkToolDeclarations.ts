@@ -23,7 +23,7 @@
 import { AGENT_TOOL_DEFINITIONS } from '../../shared/agentTools/definitions';
 import { appAssistantToolDefinitions } from '../../src/features/agentTools/appAssistant/definitions';
 import type { AgentSource, AgentToolDefinition } from '../../shared/agentTools/types';
-import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../shared/geminiTransport';
+import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../src/services/llm/models';
 import { createGeminiLlmClient } from '../../src/services/llm/geminiAdapter';
 import { isLlmError } from '../../src/services/llm/errors';
 import type { LlmClient, LlmToolDeclaration, LlmToolMode } from '../../src/services/llm/types';

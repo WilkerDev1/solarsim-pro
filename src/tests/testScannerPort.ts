@@ -7,7 +7,7 @@ import path from 'node:path';
 import { parseDatasheetWithGemini, DATASHEET_RESPONSE_SCHEMA } from '../services/geminiDatasheetService';
 import { GeminiPriceCatalogService, PRICE_CATALOG_RESPONSE_SCHEMA } from '../services/geminiPriceCatalogService';
 import { GeminiTariffService, TARIFF_RESPONSE_SCHEMA } from '../services/geminiTariffService';
-import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../shared/geminiTransport';
+import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../services/llm/models';
 import { LlmError } from '../services/llm/errors';
 import type { LlmStructuredRequest } from '../services/llm/types';
 import type { SolarEquipmentItem } from '../types/equipment';
@@ -235,7 +235,6 @@ for (const file of ['src/services/llm/scannerClient.ts', 'src/services/llm/listM
   assert.match(readFileSync(file, 'utf8'), /import\(\s*['"]\.\/geminiAdapter['"]\s*\)/, `${file} carga el adaptador bajo demanda`);
 for (const service of ['geminiTariffService', 'geminiDatasheetService', 'geminiPriceCatalogService']) {
   const source = readFileSync(`src/services/${service}.ts`, 'utf8');
-  assert(!/shared\/geminiTransport/.test(source), `${service} ya no importa shared/geminiTransport`);
   assert(/createScannerClient/.test(source) && /requestStructured/.test(source), `${service} usa la política sobre el puerto`);
 }
 

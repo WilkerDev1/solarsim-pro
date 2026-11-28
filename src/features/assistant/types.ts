@@ -10,8 +10,6 @@ export interface AssistantAction {
   kind: 'project' | 'equipment';
   /** Real target of a native plan (the legacy `kind` only distinguishes project/equipment). */
   targetType?: 'project' | 'equipment' | 'client';
-  /** Confirmation copy that matches what the plan really changes; the card falls back to the legacy text. */
-  impact?: string;
   targetId: string;
   title: string;
   edits: AssistantEdit[];
@@ -24,23 +22,6 @@ export interface AssistantCard {
   title: string;
   detail: string;
 }
-/** Long search result shown as a compact list under the answer; `collapsed` folds it behind a one-line summary. */
-export interface AssistantResultListData {
-  kind: AssistantCard['kind'];
-  items: AssistantCard[];
-  collapsed: boolean;
-}
-export interface AssistantMessage {
-  role: 'user' | 'assistant';
-  text: string;
-  cards?: AssistantCard[];
-  lists?: AssistantResultListData[];
-  actions?: AssistantAction[];
-  /** Changes already applied under the drafts-free policy; each one can be undone. */
-  applied?: { activityId: string; title: string }[];
-  /** Rich cards beyond project/equipment (audit tables, clients, attachments…), rendered by cards/registry. */
-  agentCards?: import('../../../shared/agentCards').AgentCard[];
-}
 export interface AssistantToolCall {
   name: string;
   args: Record<string, unknown>;
@@ -49,6 +30,4 @@ export interface AssistantToolResult {
   data: unknown;
   cards?: AssistantCard[];
   action?: AssistantAction;
-  activityId?: string;
-  agentCards?: import('../../../shared/agentCards').AgentCard[];
 }

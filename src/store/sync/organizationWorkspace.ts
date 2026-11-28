@@ -449,7 +449,6 @@ export function changeWorkspace(
     organizationTariffOutdated: null,
     featurePolicyRequest: null,
     isShareModalOpen: false,
-    isAIInvoiceModalOpen: false,
     isAIDatasheetModalOpen: false,
     isAIPriceCatalogModalOpen: false,
     isNewProjectModalOpen: false,

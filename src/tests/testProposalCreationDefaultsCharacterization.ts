@@ -2,7 +2,7 @@
 // (ADR 0009); las aserciones marcadas «invertida en F2b» fijan ahora los valores que decidió el dueño, iguales por todos los
 // caminos (la fábrica, `src/domain/newProposal.ts`, tiene su propia suite: `testProposalFactory`).
 //   · «Nueva simulación»  → `createNewProject` (parte del caso de referencia del Centro Médico)
-//   · asistente de propuestas → `applyExtractedInvoice(draft, true)` (parte de `createAIProposalBase`)
+//   · borrador de IA          → `buildProjectFromDraft(draft, true)` (parte de `createAIProposalBase`; antes lo aplicaba el modal retirado en F6)
 //   · asistente flotante   → `create_proposal` por el registro de herramientas (fuente `app-assistant`)
 //   · duplicar             → `duplicateProject` (copia lo que ya tiene la original)
 import assert from 'node:assert/strict';
@@ -12,6 +12,7 @@ import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_SIMULATION_SETTINGS } from '../store/defaultSimulationSettings';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { executeAgentTool } from '../features/agentTools/registry';
+import { applyDraftForTest } from './support/applyDraft';
 import { executeAssistantToolset } from '../features/agentTools/appAssistant/toolset';
 import { assistantOwner } from '../features/assistant/tools';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
@@ -67,7 +68,7 @@ s().createNewProject('Solo nombre');
 const manual = s().getActiveProject();
 s().createNewProject({ name: 'Con objeto', company: 'ACME' });
 const manualObject = s().getActiveProject();
-s().applyExtractedInvoice(draftOf('Asistente de propuestas'), true);
+applyDraftForTest(draftOf('Asistente de propuestas'));
 const proposalAssistant = s().getActiveProject();
 const floating = await flotante('Flotante');
 const copyId = s().duplicateProject(original.id, { activate: false })!;
@@ -145,7 +146,7 @@ reset({ ...DEFAULT_SIMULATION_SETTINGS, defaultTargetMarginPct: 40, defaultPrici
   defaultDistributor: 'EDENORTE', defaultTariffCode: 'BTS1', defaultHasBattery: true, defaultPanelPowerW: 700, defaultBatteryDOD: 70 });
 s().createNewProject('Con ajustes');
 const customManual = s().getActiveProject();
-s().applyExtractedInvoice(draftOf('Asistente con ajustes'), true);
+applyDraftForTest(draftOf('Asistente con ajustes'));
 const customAssistant = s().getActiveProject();
 const customFloating = await flotante('Flotante con ajustes');
 const pick = (p: ProjectSimulation) => ({ province: p.client.province, distributor: p.client.distributor, tariffCode: p.client.tariffCode, marginFactor: p.specs.saleMarginMultiplier,
@@ -186,13 +187,13 @@ assert.ok(((noConsumption as { data: { warnings: string[] } }).data.warnings).so
 assert.deepEqual(s().projects.find((p) => p.id === (noConsumption as { data: { proposalId: string } }).data.proposalId)?.monthlyConsumption, flat(1000));
 const countBefore = s().projects.length;
 // Un borrador sin equipos ni consumo (ni promedio) no se puede aplicar: el aviso queda en `saveFeedbackMessage`, sin tocar los proyectos.
-s().applyExtractedInvoice({ clientName: 'Sin datos', distributor: 'EDESUR', tariffCode: 'BTS1', monthlyConsumptionKWh: [] } as never, true);
-assert.equal(s().projects.length, countBefore, 'el asistente de propuestas tampoco crea sin doce consumos');
+applyDraftForTest({ clientName: 'Sin datos', distributor: 'EDESUR', tariffCode: 'BTS1', monthlyConsumptionKWh: [] } as never);
+assert.equal(s().projects.length, countBefore, 'el borrador de IA tampoco crea sin doce consumos');
 assert.equal(s().saveFeedbackMessage, 'Completa los doce consumos mensuales antes de aplicar.');
 // Sorpresa fijada: con equipos, un borrador con `monthlyConsumptionKWh` vacío SÍ crea, porque el normalizador reestima los doce meses del promedio.
 store.setState({ saveFeedbackMessage: null });
-s().applyExtractedInvoice({ ...draftOf('Sin doce meses'), monthlyConsumptionKWh: [] }, true);
+applyDraftForTest({ ...draftOf('Sin doce meses'), monthlyConsumptionKWh: [] });
 assert.equal(s().projects.length, countBefore + 1);
 assert.deepEqual(s().getActiveProject().monthlyConsumption, flat(700));
 
-console.log('PASS: proposal creation defaults characterization: manual, proposal assistant, floating create_proposal and duplicate.');
+console.log('PASS: proposal creation defaults characterization: manual, AI draft pipeline, floating create_proposal and duplicate.');

@@ -1,11 +1,13 @@
-// Catálogo de modelos de Ajustes → IA. Sin SDK: lo reexporta geminiInvoiceService para electron/ai (hasta F6),
-// así que no puede importar el adaptador.
+// Modelos de Gemini que usa la app y el catálogo de Ajustes → IA. Sin SDK: lo importan Ajustes, el almacén (migración del
+// modelo guardado), el bucle del asistente y los escáneres, así que no puede importar el adaptador.
 import type { GeminiModelInfo } from '../../types/aiInvoice';
-import { DEFAULT_GEMINI_MODEL } from '../../../shared/geminiTransport';
 
-// El bucle nuevo toma de aquí los nombres de modelo (no del transporte antiguo): cuando F6 borre shared/geminiTransport,
-// las constantes se mueven solo en este sitio.
-export { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../../shared/geminiTransport';
+/** Modelo base (https://ai.google.dev/gemini-api/docs/models/gemini-4-hydrogen). */
+export const DEFAULT_GEMINI_MODEL = 'gemini-4-hydrogen';
+/** Un único respaldo ante fallos transitorios del modelo base: el Flash estable de la generación anterior. */
+export const FALLBACK_GEMINI_MODEL = 'gemini-3.8-flash';
+/** Predeterminados de fábrica anteriores; se guardaban con cada instalación aunque nadie los eligiera. */
+export const INHERITED_DEFAULT_GEMINI_MODELS: readonly string[] = ['gemini-2.0-flash', 'gemini-3.5-flash-lite', 'gemini-3.7-flash', 'gemini-3.8-flash'];
 import type { LlmModel } from './types';
 
 // Presets are documented endpoints (https://ai.google.dev/gemini-api/docs/models); quotas depend on the account, not this list.
@@ -26,18 +28,4 @@ export function geminiModelInfos(models: readonly LlmModel[]): GeminiModelInfo[]
       description: m.description,
       isRecommended: DEFAULT_POPULAR_MODELS.some((p) => p.id === m.id && p.isRecommended),
     }));
-}
-
-/** Misma lista desde el JSON REST de `GET /models` (la usa el listado por IPC de electron/ai hasta F6). */
-export function mapGeminiModels(data: any): GeminiModelInfo[] {
-  const models: LlmModel[] = (Array.isArray(data?.models) ? data.models : [])
-    .filter((m: any) => typeof m?.name === 'string')
-    .map((m: any) => ({
-      id: m.name.replace(/^models\//, ''),
-      name: m.name,
-      displayName: m.displayName,
-      description: m.description,
-      supportedActions: Array.isArray(m.supportedGenerationMethods) ? m.supportedGenerationMethods : [],
-    }));
-  return geminiModelInfos(models);
 }

@@ -28,11 +28,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternalUrl: (url: string): Promise<boolean> => ipcRenderer.invoke('open-external-url', url),
   installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) =>
     ipcRenderer.invoke('install-linux-package', packageType, version),
-  parseInvoiceWithAI: (payload: any) =>
-    ipcRenderer.invoke('parse-invoice-with-ai', payload),
-  cancelAIRequest: (requestId: string) => ipcRenderer.invoke('cancel-ai-request', requestId),
-  listGeminiModels: (apiKey: string) =>
-    ipcRenderer.invoke('list-gemini-models', apiKey),
   onUpdateStatus: (callback: (info: any) => void) => {
     const subscription = (_event: any, value: any) => callback(value);
     ipcRenderer.on('update-status', subscription);

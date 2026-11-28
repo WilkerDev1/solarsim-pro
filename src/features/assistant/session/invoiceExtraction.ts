@@ -6,8 +6,7 @@
  *
  * La petición va por la política de salida estructurada de los escáneres (`requestStructured`, F1b): un reintento ante JSON
  * inválido, tope de 20 MiB inline, plazo global y modelo de reserva DENTRO de esta subllamada (es una petición aparte, sin
- * el historial ni las firmas del turno: no afecta a la regla de respaldo del bucle). El esquema es propio y pequeño; el
- * modal antiguo sigue leyendo facturas por `electron/ai` hasta F6.
+ * el historial ni las firmas del turno: no afecta a la regla de respaldo del bucle). El esquema es propio y pequeño.
  */
 import type { LlmClient } from '../../../services/llm/types';
 import { requestStructured } from '../../../services/llm/structuredPolicy';

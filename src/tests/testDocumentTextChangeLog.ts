@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import {
   announceActivities, announceAppliedChanges, condenseText, proposalSubject, subjectHeadline, textChangeRows, textChangeSummary,
 } from '../features/agentTools/documentTextLog';
-import { restoreComposerText } from '../features/assistant/chatUi';
 import { aiMenuStackClass } from '../components/layout/aiMenuStack';
 
 // 1. Resumen: una línea, sin saltos, recortado y con marca para vacío.
@@ -41,11 +40,6 @@ const log = [{ id: 'x', ...other }, { id: 'y', title: 'z', changes: rows }];
 assert.equal(announceActivities(['x'], log), announceAppliedChanges([other]));
 assert.equal(announceActivities(['y'], log), '');
 assert.equal(announceActivities([], log), '');
-
-// 5. Compositor: se restaura el texto enviado solo si el campo sigue vacío.
-assert.equal(restoreComposerText('', 'hola'), 'hola');
-assert.equal(restoreComposerText('   ', 'hola'), 'hola');
-assert.equal(restoreComposerText('otro', 'hola'), 'otro');
 
 // 6. Menú de IA: el dock sube sobre Ajustes (z-40, posterior en el DOM) solo con el menú abierto.
 assert.match(aiMenuStackClass(true), /z-\[60\]/);

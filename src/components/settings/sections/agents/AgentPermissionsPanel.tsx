@@ -4,7 +4,7 @@ import type { AgentPolicy, AgentPolicySource, AgentSourcePolicy } from '../../..
 import { InfoTip } from '../../../simulator/params/ui/InfoTip';
 
 const SOURCES: { key: AgentPolicySource; title: string; description: string }[] = [
-  { key: 'internal', title: 'Asistentes de la aplicación', description: 'Asistente de propuestas y asistente general.' },
+  { key: 'internal', title: 'Asistentes de la aplicación', description: 'El asistente del panel flotante (y la actividad que dejó el asistente de propuestas anterior).' },
   { key: 'external', title: 'Agentes externos (MCP)', description: 'Claude Code, Codex u otros clientes conectados al servidor MCP local.' },
 ];
 

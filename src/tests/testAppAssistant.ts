@@ -8,9 +8,7 @@ import {
   applyAssistantAction,
 } from '../features/assistant/tools';
 import { AssistantEditsError, validateAssistantEdits } from '../features/assistant/validation';
-import { runAssistant } from '../features/assistant/service';
 import { featureScope } from '../../shared/applicationFeatures';
-import type { GeminiTransport } from '../../shared/geminiTransport';
 const state = useSimulationStore;
 const project = {
   ...structuredClone(BENCHMARK_PROJECT),
@@ -260,81 +258,8 @@ assert.deepEqual(
     ?.supplierPrices,
   pnl.supplierPrices
 );
-const mock: GeminiTransport = async (_url, body: any) => {
-  const previous = body.contents.at(-1);
-  if (previous.parts[0].functionResponse) {
-    assert.equal(previous.parts[0].functionResponse.id, 'qa-call-id');
-    assert.equal(
-      body.contents.at(-2).parts[0].thoughtSignature,
-      'qa-signature'
-    );
-    return {
-      candidates: [
-        {
-          finishReason: 'STOP',
-          content: { parts: [{ text: 'Aquí está la propuesta.' }] },
-        },
-      ],
-    };
-  }
-  return {
-    candidates: [
-      {
-        finishReason: 'STOP',
-        content: {
-          role: 'model',
-          parts: [
-            {
-              thoughtSignature: 'qa-signature',
-              functionCall: {
-                id: 'qa-call-id',
-                name: 'search_projects',
-                args: { query: '' },
-              },
-            },
-          ],
-        },
-      },
-    ],
-  };
-};
-const reply = await runAssistant({
-  apiKey: 'synthetic-key',
-  model: 'gemini-synthetic',
-  prompt: 'Buscar propuestas',
-  history: [],
-  signal: new AbortController().signal,
-  execute: (c) => executeAssistantTool(c, owner),
-  transport: mock,
-});
-assert.equal(reply.cards?.length, 1);
-assert.equal(reply.text, 'Aquí está la propuesta.');
+// (el bucle del chat —ids y firmas de pensamiento de las llamadas, truncado por MAX_TOKENS sin tocar nada— lo cubren testAssistantLoop y testAssistantSession)
 assert.equal(state.getState().projects.length, 1);
-const before = JSON.stringify(state.getState().projects);
-const truncated: GeminiTransport = async () => ({
-  candidates: [
-    {
-      finishReason: 'MAX_TOKENS',
-      content: {
-        parts: [{ functionCall: { name: 'propose_project_update', args: {} } }],
-      },
-    },
-  ],
-});
-await assert.rejects(
-  () =>
-    runAssistant({
-      apiKey: 'synthetic-key',
-      model: 'gemini-synthetic',
-      prompt: 'Cambiar',
-      history: [],
-      signal: new AbortController().signal,
-      execute: (c) => executeAssistantTool(c, owner),
-      transport: truncated,
-    }),
-  /límite/
-);
-assert.equal(JSON.stringify(state.getState().projects), before);
 const foreign = { ...project, id: 'foreign', organizationId: 'foreign-org' };
 state.setState({ projects: [state.getState().getActiveProject(), foreign] });
 assert.equal(
@@ -433,5 +358,5 @@ assert.throws(
   /experimental/
 );
 console.log(
-  'App assistant: scoped queries, grounded groups, confirmation, stale/replay rejection, read permissions, tool loop and truncation passed (synthetic only).'
+  'App assistant: scoped queries, grounded groups, confirmation, stale/replay rejection, read permissions, passed (synthetic only).'
 );

@@ -3,7 +3,7 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
-import { executeAgentTool, executeForAssistant } from '../features/agentTools/registry';
+import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { findAgentTool } from '../../shared/agentTools/definitions';
 import { featureScope } from '../../shared/applicationFeatures';
@@ -162,9 +162,11 @@ assert.equal(badOffer.status, 'error');
 
 // 8. In-app assistant: guarded native plans render as confirmation cards and confirm through the queue.
 store.setState({ activeView: 'simulator' });
-const uiResult = await executeForAssistant({ name: 'set_proposal_status', args: { id: existing.id, status: 'Archived' } }, { source: 'app-assistant', owner: assistantOwner() });
-assert(uiResult.action && Array.isArray(uiResult.action.edits) && uiResult.action.edits.length > 0, 'card has displayable changes');
-assert.equal(store.getState().confirmAgentAction(uiResult.action.id).success, true);
+const uiResult = await executeAgentTool({ name: 'set_proposal_status', args: { id: existing.id, status: 'Archived' } }, { source: 'app-assistant', owner: assistantOwner() });
+assert.equal(uiResult.status, 'pending_confirmation');
+const uiPending = store.getState().pendingAgentActions.find((a) => a.id === (uiResult as { actionId: string }).actionId);
+assert(uiPending && uiPending.changes.length > 0, 'the queued plan has displayable changes');
+assert.equal(store.getState().confirmAgentAction(uiPending.id).success, true);
 assert.equal(store.getState().projects.find((p) => p.id === existing.id)?.status, 'Archived');
 
 // 9. A queued duplicate is refused if the member became a reader before confirming.

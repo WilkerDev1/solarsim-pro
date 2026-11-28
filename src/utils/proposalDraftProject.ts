@@ -142,8 +142,8 @@ function asksPanelSizing(raw:Record<string,any>):boolean {
  * Cantidad de paneles de un borrador con grupos que pidió dimensionar, con la base de la propuesta (ADR 0009). El
  * normalizador compartido (`shared/aiProposal`, fuera del alcance de una versión solo de cliente) dimensiona con el consumo
  * real; con la base `peak_month` (las propuestas nuevas) aquí se rehace con el mes pico, para que nazca con la base que guarda
- * y activar el autodimensionado no cambie la cantidad. Con la base heredada, el borrador tal cual. La comparten la vista
- * previa del modal y la aplicación (`buildProjectFromDraft`). Pura.
+ * y activar el autodimensionado no cambie la cantidad. Con la base heredada, el borrador tal cual. La usa `buildProjectFromDraft`
+ * (create_proposal). Pura.
  */
 export function sizeDraftPanelsWithBasis(raw:Record<string,any>,data:ExtractedInvoiceData,ctx:{province:string;lossesPct?:number;customMonthlyHSP?:number[];basis:SizingBasis}):ExtractedInvoiceData {
   const group=data.panels?.length===1?data.panels[0]:undefined;
@@ -165,13 +165,4 @@ export function createAIProposalBase(template:ProjectSimulation,defaults:Default
     identity:{id:template.id,now:template.createdAt,sequence:{projectId:template.client.projectId,quoteNumber:template.client.quoteNumber || ''}},
     client:{province},
   });
-}
-
-/** Document totals are references for dialogue, never inputs that override engine results. */
-export function proposalReconciliationIssues(data:ExtractedInvoiceData,summary:import('../types').FinancialSummaryResult){
- const matrix=summary.costMatrix;
- return ([['subtotalUSD','compra antes de ITBIS',matrix.precioNetoUSD],['taxUSD','ITBIS de costos',matrix.itbisUSD],['totalCostUSD','costo total',matrix.totalNetoUSD],['saleUSD','precio de lista',matrix.listPorcentajeVentaUSD]] as const).flatMap(([key,label,value])=>{
-  const source=data.commercial?.sourceTotals?.[key];
-  return typeof source==='number'&&Number.isFinite(source)&&typeof value==='number'&&Number.isFinite(value)&&Math.abs(source-value)>.05?[{code:`document_${key}_difference`,severity:'warning' as const,message:`Revisa ${label}: documento USD ${source.toFixed(2)}, cálculo USD ${value.toFixed(2)}. Es una referencia informativa; podemos aclarar la diferencia sin sustituir fórmulas.`}]:[];
- });
 }

@@ -1,5 +1,5 @@
 // F0 (caracterización, sin cambio de comportamiento): una edición del asistente flotante con equipos y tarifa, por el camino
-// real: `executeForAssistant` (registro de herramientas, fuente `app-assistant`) y la aplicación del plan (`applyPlan`).
+// real: `executeAgentTool` (registro de herramientas, fuente `app-assistant`) y la aplicación del plan (`applyPlan`).
 // Fija cuántas escrituras hace al store, cuántas veces llama a `triggerAutoSync`, cómo cambia `updatedAt` y el resultado del
 // motor que la futura transacción `commitProjectEdits` (F2a2) tendrá que igualar. Si una de estas cifras cambia a propósito,
 // se actualiza aquí en el mismo PR que lo cambia, con su justificación.
@@ -8,10 +8,12 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
-import { executeForAssistant } from '../features/agentTools/registry';
+import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { probeStore, settleUndoDebounce } from './support/storeProbe';
 import { EMPTY_UNDO_HISTORY } from '../store/undo/projectUndoJournal';
+/** Resultado de la herramienta tal como lo leen estas suites (la unión del registro se estrecha por `status`; aquí ya se comprueba `activityId`). */
+const applyTool = (call: Parameters<typeof executeAgentTool>[0], ctx: Parameters<typeof executeAgentTool>[1]) => executeAgentTool(call, ctx) as Promise<{ status: string; activityId?: string; data?: any }>;
 
 const store = useSimulationStore;
 const INITIAL_UPDATED_AT = '2026-01-01T00:00:00.000Z';
@@ -54,9 +56,9 @@ const AFTER = { systemCapacityKWp: 5.9, annualProductionKWh: 9783.6, energyCover
 open();
 const probe = probeStore(store, project.id);
 assert.deepEqual(engine(), BEFORE, 'punto de partida: caso de referencia con 38 paneles de 620 W');
-const planned = await executeForAssistant(call('Equipos y tarifa', edits()), ctx());
-assert.equal((planned.data as { status: string }).status, 'pending_confirmation');
-assert(planned.action, 'el panel muestra el plan con su botón «Aplicar»');
+const planned = await executeAgentTool(call('Equipos y tarifa', edits()), ctx());
+assert.equal(planned.status, 'pending_confirmation');
+assert(planned.status === 'pending_confirmation' && planned.actionId, 'el panel muestra el plan con su botón «Aplicar» (la cola de confirmaciones)');
 assert.deepEqual(probe.writes, [['pendingAgentActions']], 'planificar solo encola: una escritura, ninguna a projects');
 assert.deepEqual(probe.syncCalls, []);
 assert.equal(active().updatedAt, INITIAL_UPDATED_AT, 'planificar no toca updatedAt');
@@ -64,7 +66,7 @@ assert.deepEqual(engine(), BEFORE, 'ni cambia el resultado del motor');
 
 // 2. Confirmar aplica el plan: tres escrituras a `projects` (cliente, specs y tarifa, una por sección), cada una con su sincronización.
 probe.reset();
-const confirmed = store.getState().confirmAgentAction(planned.action.id);
+const confirmed = store.getState().confirmAgentAction((planned as { actionId: string }).actionId);
 assert.equal(confirmed.success, true);
 // F2a1: el diario de deshacer se actualiza en la MISMA escritura que la edición (antes, un temporizador de 600 ms lo escribía
 // después); por eso cada escritura a projects lleva también `undoHistory` (y `canUndo` la primera). El número de escrituras no cambia.
@@ -107,9 +109,8 @@ probe.stop();
 // 3. El mismo lote con el modo sin confirmación («guarded: allow») deja exactamente el mismo proyecto y el mismo resultado del motor.
 open({ ...DEFAULT_AGENT_POLICY, internal: { read: 'allow', draft: 'allow', guarded: 'allow' } });
 const bypassProbe = probeStore(store, project.id);
-const bypassed = await executeForAssistant(call('Equipos y tarifa', edits()), ctx());
-assert(bypassed.activityId, 'se aplica en el acto y queda registrada');
-assert.equal(bypassed.action, undefined, 'sin tarjeta de confirmación');
+const bypassed = await executeAgentTool(call('Equipos y tarifa', edits()), ctx());
+assert(bypassed.status === 'applied' && bypassed.activityId, 'se aplica en el acto y queda registrada');
 assert.deepEqual(bypassProbe.writes, [FIRST_PROJECT_WRITE, PROJECT_WRITE, PROJECT_WRITE, ['agentActivity']], 'sin cola: no hay escritura de estado pendiente');
 assert.deepEqual(bypassProbe.syncCalls, [false, false, false]);
 assert.deepEqual(engine(), AFTER);
@@ -120,7 +121,7 @@ bypassProbe.stop();
 // 4. Una edición que no toca precios es `draft`: con la política por defecto se aplica sin pasar por la cola.
 open();
 const draftProbe = probeStore(store, project.id);
-const live = await executeForAssistant(call('Solo tarifa', edits().filter((e) => e.section !== 'specs')), ctx());
+const live = await applyTool(call('Solo tarifa', edits().filter((e) => e.section !== 'specs')), ctx());
 assert(live.activityId);
 assert.deepEqual(draftProbe.writes, [FIRST_PROJECT_WRITE, PROJECT_WRITE, ['agentActivity']], 'cliente y tarifa: dos escrituras a projects y el registro');
 assert.deepEqual(draftProbe.syncCalls, [false, false]);

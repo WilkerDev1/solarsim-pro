@@ -5,8 +5,8 @@
  * y el resumen compacto y actualizado de la propuesta. Ese contexto vivo es el cuerpo de `functionResponse.response`: el bucle
  * de F4 lo manda tal cual (sin las tarjetas, que son de la interfaz, y con `appContext`), nunca como un texto aparte.
  *
- * Lo usa el bucle del asistente flotante desde F4 (`src/features/assistant/session/`); `executeForAssistant` y
- * `listAgentTools('app-assistant')` quedan solo para el camino antiguo (`service.ts`), que F6 retira.
+ * Lo usa el bucle del asistente flotante desde F4 (`src/features/assistant/session/`); `listAgentTools('app-assistant')` queda
+ * para las copias doradas del contrato y el MCP local.
  * Permisos: los de siempre (política por fuente y rol; un lote con precios es protegido entero) más el perfil «edición en
  * vivo» (F3b, ADR 0010): `edit_proposal` y el deshacer de sus cambios se quedan dentro de una propuesta (`scope: 'proposal'`),
  * así desde el asistente de la app se aplican al momento con diff y deshacer; la misma llamada desde otra superficie, o lo

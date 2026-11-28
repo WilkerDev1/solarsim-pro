@@ -59,12 +59,6 @@ export function toAgentCard(card: AssistantCard): AgentCard {
     : { type: 'equipment', id: card.id, title: card.title, detail: card.detail };
 }
 
-export function toAssistantCard(card: AgentCard): AssistantCard | undefined {
-  if (card.type === 'proposal') return { kind: 'project', id: card.id, title: card.title, detail: card.detail || '' };
-  if (card.type === 'equipment') return { kind: 'equipment', id: card.id, title: card.title, detail: card.detail || '' };
-  return undefined;
-}
-
 /** `edits[].valueJson` (string, model-friendly) → `edits[].value` (parsed) for the planners. */
 function decodeArgs(args: Record<string, unknown>): Record<string, unknown> {
   if (!Array.isArray(args.edits)) return args;
@@ -169,14 +163,6 @@ function undoEntry(entry: AgentActivityEntry) {
     : { success: false, error: 'No se pudo restaurar el estado anterior; usa el historial de versiones.' };
 }
 
-/** Copy for the confirmation card of a native plan: it names what the plan really changes, never the open proposal by default. */
-function nativeImpact(tool: string, targetType: NativePlan['targetType']): string {
-  if (targetType === 'client') return 'Cambiará el directorio de clientes.';
-  if (targetType === 'equipment') return 'Cambiará el catálogo compartido.';
-  if (tool === 'save_document_text_to_company_template') return 'Cambiará la plantilla de documentos de la empresa.';
-  return 'Cambiará una propuesta del espacio de trabajo.';
-}
-
 installAgentRuntime({
   apply(pending: PendingAgentAction) {
     try {
@@ -211,7 +197,8 @@ async function actionStatus(args: Record<string, unknown>, ctx: AgentToolContext
 
 export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContext): Promise<AgentToolOutcome> {
   const definition = findAgentTool(call.name);
-  if (!definition || !definition.surfaces.includes(ctx.source))
+  // `proposal-assistant` (el modal retirado en F6) solo queda como origen de actividad guardada: ya nada ejecuta con esa fuente.
+  if (!definition || ctx.source === 'proposal-assistant' || !definition.surfaces.includes(ctx.source))
     return { status: 'error', code: 'unknown_tool', message: 'Herramienta no permitida.' };
   const policy = store().agentPolicy[agentPolicyKey(ctx.source)];
   if (policy[definition.kind] === 'deny')
@@ -297,28 +284,4 @@ async function executeNative(handler: NativeHandler, definition: AgentToolDefini
   const actionId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   store().queueAgentAction({ id: actionId, ...meta, title: result.plan.title, changes: result.plan.changes, plan: result.plan });
   return { status: 'pending_confirmation', actionId, summary: result.plan.title, cards: [...(result.cards ?? []), pendingCard(actionId, result.plan.title, result.plan.changes)] };
-}
-
-export function getPendingAgentAction(actionId: string): AssistantAction | undefined {
-  return store().pendingAgentActions.find((a) => a.id === actionId)?.plan as AssistantAction | undefined;
-}
-
-/** Legacy shape consumed by the general assistant UI (cards, confirmable plan or applied activity). */
-export async function executeForAssistant(call: AgentToolCall, ctx: AgentToolContext): Promise<AssistantToolResult> {
-  const outcome = await executeAgentTool(call, ctx);
-  if (outcome.status === 'error') throw new Error(outcome.message);
-  const cards = outcome.cards?.map(toAssistantCard).filter((c): c is AssistantCard => !!c);
-  const agentCards = outcome.cards?.filter((c) => !toAssistantCard(c));
-  if (outcome.status === 'pending_confirmation') {
-    const pending = store().pendingAgentActions.find((a) => a.id === outcome.actionId)!;
-    const action: AssistantAction = isNativePlan(pending.plan)
-      // Native plans are shown with their human-readable changes; confirmation always goes through the queue by id.
-      ? { id: pending.id, kind: pending.plan.targetType === 'equipment' ? 'equipment' : 'project', targetType: pending.plan.targetType,
-          impact: pending.plan.impact ?? nativeImpact(pending.tool, pending.plan.targetType), targetId: '', title: pending.title, fingerprint: '', owner: ctx.owner,
-          edits: pending.changes.map((c) => ({ section: 'client' as const, field: c.label, value: c.value })) }
-      : (pending.plan as AssistantAction);
-    return { data: { status: 'pending_confirmation', changes: pending.changes }, cards, action };
-  }
-  if (outcome.status === 'applied') return { data: outcome.data, cards, agentCards, activityId: outcome.activityId };
-  return { data: outcome.data, cards, agentCards };
 }

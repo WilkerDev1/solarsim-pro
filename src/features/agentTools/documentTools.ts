@@ -10,7 +10,7 @@ import { applyDocumentClientEdit } from '../../domain/projectEdit';
 import { withSectionVisible, type DocumentLayout } from '../../../shared/documentLayout';
 import type { DocumentSectionId } from '../../../shared/documentTexts';
 import { assistantProjectId } from '../assistant/assistantScope';
-import { proposalSubject, subjectHeadline, textChangeRows } from './documentTextLog';
+import { proposalSubject, textChangeRows } from './documentTextLog';
 import { findVisibleProject, fingerprint, pickFields, requireEditableProject, store, type NativeHandler } from './nativeTools';
 
 /** Propuesta abierta según el selector canónico: en dashboard/hubs `activeProjectId` solo recuerda la última visitada. */
@@ -40,13 +40,11 @@ function textsPlan(proposalId: string, values: Record<string, string | null>, ti
   const unknown = Object.keys(values).filter((key) => !getDocumentTextDefinition(key));
   if (unknown.length) throw new Error(`Textos del documento desconocidos: ${unknown.join(', ')}. No se aplicó ningún cambio; consulta las claves con list_document_texts.`);
   const patch = documentTextsPatch(values, project, contextFor(project)); // validates before queueing
-  const subject = proposalSubject(project, openProposalId());
   const simulated = { ...project, ...applyDocumentTextPatch({ customization: project.customization || {}, client: project.client }, patch) } as ProjectSimulation;
   return {
     data: { status: 'ready' },
     plan: {
       title, targetType: 'project' as const,
-      impact: subject.outsideOpen ? `${subjectHeadline(subject)}. No es la propuesta abierta.` : `Cambiará la propuesta abierta: ${subject.label}.`,
       changes: textRows(values, project, simulated),
       execute() {
         const current = requireEditableProject(proposalId);
