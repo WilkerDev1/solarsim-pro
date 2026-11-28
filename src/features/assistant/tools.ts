@@ -20,6 +20,7 @@ import { searchEquipmentByRequest } from '../../../shared/equipmentMatch';
 import { effectiveGenericPrice } from '../../store/slices/equipmentPriceSlice';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
+import { legacySectionPatches, writeProposeProjectUpdate } from '../agentTools/proposeProjectUpdateFacade';
 import { resolveGridConnection } from '../../../shared/gridConnection';
 import {
   hasSavingsComparison, noSavingsNote, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, savingsValuationCostPerKWh,
@@ -418,63 +419,8 @@ export function applyAssistantAction(action: AssistantAction, options: { require
       Object.fromEntries(fresh.edits.map((e) => [e.field, e.value]))
     );
   } else {
-    s.recordUndoState(s.getActiveProject());
-    const patch = (section: string) =>
-      Object.fromEntries(
-        fresh.edits
-          .filter((e) => e.section === section)
-          .map((e) => [e.field, e.value])
-      );
-    if (fresh.edits.some((e) => e.section === 'client'))
-      s.updateClient(patch('client'));
-    if (fresh.edits.some((e) => e.section === 'specs')) {
-      const specs = patch('specs');
-      for (const key of ['panels', 'inverters', 'batteries'])
-        if (Array.isArray(specs[key])) {
-          specs[key] = (
-            specs[key] as { id: string; count: number; unitPriceUSD: number }[]
-          ).map((g) => {
-            const e = s.equipmentCatalog.find((e) => e.id === g.id)!;
-            const common = {
-              id: g.id,
-              count: g.count,
-              unitPriceUSD: g.unitPriceUSD,
-              priceSource: 'manual',
-              brandModel: e.displayName,
-              weightKilos: e.weightKg,
-            };
-            if (key === 'panels')
-              return {
-                ...common,
-                powerW: e.powerW,
-                efficiencyPct: e.efficiencyPct,
-                tempCoeff: e.tempCoeff,
-                annualDegradation: e.annualDegradation,
-              };
-            if (key === 'inverters')
-              return {
-                ...common,
-                powerKW: e.powerKW,
-                efficiencyPct: e.maxEfficiencyPct,
-              };
-            return {
-              ...common,
-              capacityKWh: e.capacityKWh,
-              dodPct: e.dodPct,
-              efficiencyPct: e.batteryEfficiencyPct,
-            };
-          });
-          if (key === 'batteries')
-            specs.hasBattery = (specs[key] as unknown[]).length > 0;
-          if (key === 'panels') specs.autoCalculatePanels = false;
-        }
-      s.updateSpecs(specs);
-    }
-    if (fresh.edits.some((e) => e.section === 'rates'))
-      s.updateRates(patch('rates'));
-    if (fresh.edits.some((e) => e.section === 'financials'))
-      s.updateFinancials(patch('financials'));
-    const consumption = fresh.edits.find((e) => e.section === 'consumption');
-    if (consumption) s.setMonthlyConsumption(consumption.value as number[]);
+    // F3c: fachada. Los mismos parches por sección de siempre; la transacción los escribe en una sola escritura solo si deja
+    // exactamente la misma propuesta (ver proposeProjectUpdateFacade.ts).
+    writeProposeProjectUpdate(legacySectionPatches(fresh.edits, s.equipmentCatalog));
   }
 }

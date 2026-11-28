@@ -21,6 +21,7 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 - [Cotización desde una propuesta](QUOTATION_FROM_PROPOSAL.md): diálogo de conversión con sus cinco bloques, de dónde salen los importes y cómo cuadran con la propuesta, documentos que pasan, listas enlazadas y propuesta de origen en el editor.
 - [Subsistema IA](AI_SCANNERS_SPECIFICATION.md) y [tarifas en el flujo IA](AI_TARIFF_CONTEXT.md).
 - [Agentes y herramientas de IA](AGENT_TOOLS.md): registro común, permisos, actividad y deshacer, precios automáticos.
+- [Contrato congelado con los agentes externos](AGENT_CONTRACT_FREEZE.md): qué no cambia hasta F7 (`AGENT_RULES_ES`, las 12 herramientas remotas, `propose_project_update`, los kinds), cómo se vigila y cómo se descongela; instrucciones del asistente en tres capas.
 - [Servidor MCP local](MCP_LOCAL.md): conexión de Claude Code y Codex, token, guardas y modelo de amenazas.
 - [Servidor MCP remoto](MCP_REMOTE.md): servicio `mcp-remote` sobre la API para ChatGPT, Claude.ai y agentes en la nube; tokens personales, OAuth 2.1, herramientas, amenazas y despliegue en el CT dedicado.
 - [Visor de propuestas (Worker)](../workers/share-viewer/README.md).
