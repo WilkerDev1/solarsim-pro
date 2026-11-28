@@ -56,7 +56,8 @@
 .quotation-editor * {
   box-sizing: border-box;
 }
-.quotation-editor :is(button, input, select, textarea) {
+/* La tabla de costos del visor (`.pv-costs`) trae sus propios estilos del simulador: el reinicio no la toca. */
+.quotation-editor :is(button, input, select, textarea):not(.pv-costs *) {
   font: inherit;
   color: inherit;
 }
@@ -64,10 +65,7 @@
   outline: 2px solid var(--qe-green);
   outline-offset: 2px;
 }
-.quotation-editor h1,
-.quotation-editor h2,
-.quotation-editor h3,
-.quotation-editor p {
+.quotation-editor :is(h1, h2, h3, p):not(.pv-costs *) {
   margin: 0;
 }
 
@@ -1354,6 +1352,11 @@
   color: var(--qe-error-text);
   font-size: 9px;
   font-weight: 700;
+}
+.qe-mail-file-note {
+  flex-shrink: 0;
+  color: var(--qe-muted);
+  font-size: 11.5px;
 }
 .qe-mail-file-tag {
   flex-shrink: 0;

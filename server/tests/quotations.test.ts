@@ -801,6 +801,117 @@ test("client links follow the proposal push rules", async () => {
   ]);
 });
 
+const attachment = (
+  id: string,
+  extra: Partial<QuotationContent["attachments"][number]> = {},
+): QuotationContent["attachments"][number] => ({
+  id,
+  fileName: `${id}.pdf`,
+  fileSize: 10,
+  pageCount: 1,
+  title: id,
+  uploadedAt: "2026-11-27T00:00:00.000Z",
+  mode: "include",
+  origin: "manual",
+  ...extra,
+});
+/** What a 2.10.0/2.10.1 client sends: its older validator drops the fields it does not know. */
+const asOlderClient = (
+  value: QuotationContent,
+  status: QuotationContent["status"],
+): QuotationContent => {
+  const { dismissedSourceDocuments: _unknown, ...rest } = value;
+  return {
+    ...rest,
+    status,
+    attachments: value.attachments.map(
+      ({ alsoSeparate: _unknownToo, ...kept }) => kept,
+    ),
+  };
+};
+
+test("an older client changes the status of a locked quotation that holds fields it does not know", async () => {
+  const withFields = (status: QuotationContent["status"]) =>
+    content({
+      status,
+      sourceProjectId: "p-older-client",
+      dismissedSourceDocuments: ["doc-quitado"],
+      attachments: [attachment("a1", { alsoSeparate: true }), attachment("a2")],
+    });
+  const kept = (quotation: any) => {
+    assert.deepEqual(quotation.dismissedSourceDocuments, ["doc-quitado"]);
+    assert.equal(quotation.attachments[0].alsoSeparate, true);
+    assert.equal(quotation.attachments[1].alsoSeparate, undefined);
+  };
+  for (const [id, next] of [
+    ["q-older-accept", "accepted"],
+    ["q-older-void", "void"],
+    ["q-older-reopen", "draft"],
+  ] as const) {
+    const issued = await create(editor, id, withFields("issued"));
+    kept(issued);
+    const changed = await put(
+      editor,
+      id,
+      issued.version,
+      asOlderClient(withFields("issued"), next),
+    );
+    assert.equal(changed.status, 200, `${id}: ${JSON.stringify(changed.body)}`);
+    assert.equal(changed.body.quotation.status, next);
+    kept(changed.body.quotation);
+    const listed = (await list(editor)).body.quotations.find(
+      (q: any) => q.id === id,
+    );
+    kept(listed);
+  }
+  // Any other difference is still an edit of a locked quotation.
+  const issued = await create(editor, "q-older-edit", withFields("issued"));
+  const edited = await put(editor, "q-older-edit", issued.version, {
+    ...asOlderClient(withFields("issued"), "accepted"),
+    notes: "Otra nota",
+  });
+  assert.equal(edited.status, 400);
+  assert.equal(edited.body.code, "quotation_locked");
+  // Sending a field the stored content lacks is not a "missing" field either.
+  const plain = await create(
+    editor,
+    "q-older-extra",
+    content({ status: "issued", attachments: [attachment("a1")] }),
+  );
+  const extra = await put(
+    editor,
+    "q-older-extra",
+    plain.version,
+    content({
+      status: "accepted",
+      attachments: [attachment("a1", { alsoSeparate: true })],
+    }),
+  );
+  assert.equal(extra.status, 400);
+  assert.equal(extra.body.code, "quotation_locked");
+  // Transitions are checked as before.
+  const current = (await list(editor)).body.quotations.find(
+    (q: any) => q.id === "q-older-accept",
+  );
+  const accepted = await put(
+    editor,
+    "q-older-accept",
+    current.version,
+    asOlderClient(withFields("accepted"), "issued"),
+  );
+  assert.equal(accepted.status, 400);
+  assert.equal(accepted.body.code, "invalid_transition");
+});
+
+test("GET declares the local-only fields this API stores", async () => {
+  const listed = await list(reader);
+  assert.equal(listed.status, 200);
+  assert.deepEqual(listed.body.localOnlyFieldsStored, [
+    "alsoSeparate",
+    "dismissedSourceDocuments",
+  ]);
+});
+
 test("GET ?since returns only what changed plus deletions; an invalid cursor is 400", async () => {
   await create(editor, "q-since-same");
   await create(editor, "q-since-edit");

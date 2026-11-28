@@ -140,6 +140,15 @@ assert.deepEqual(merged.skipped.map((s) => [s.id, s.reason]), [
 ]);
 assert.match(skippedAttachmentsMessage(merged.skipped)!, /sin 5 adjuntos: «Ficha rota» \(está dañado\)/);
 assert.equal(skippedAttachmentsMessage([]), null);
+// Los dos destinos (`include` + `alsoSeparate`) se fusionan igual que «Dentro del PDF» solo; «aparte» no cambia la fusión.
+{
+  const both = await mergeQuotationAttachments(main, [
+    item(attachment('ambos', { alsoSeparate: true }), three),
+    item(attachment('aparte', { mode: 'related' }), three),
+  ]);
+  assert.equal(both.merged, 1);
+  assert.equal((await PDFDocument.load(both.bytes)).getPageCount(), 2 + 3, 'el de los dos destinos entra entero; el que solo va aparte, no');
+}
 const withConverter = await mergeQuotationAttachments(main, [item(attachment('webp'), buffer(Buffer.from('RIFF\0\0\0\0WEBPVP8 ')))], { toEmbeddable: async () => buffer(PNG_BYTES) });
 assert.equal(withConverter.merged, 1, 'WebP convertido a PNG se incluye');
 assert.equal((await mergeQuotationAttachments(main, [])).skipped.length, 0);

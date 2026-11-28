@@ -159,7 +159,7 @@ const withAttachments = { ...content, attachments: [
   { id: 'a2', fileName: 'ficha.pdf', fileSize: 0, pageCount: 0, title: 'Ficha técnica — Panel', uploadedAt: '2026-11-23T00:00:00Z', mode: 'related' as const, origin: 'catalog' as const, assetId: 'x' },
 ] };
 const attachmentsHtml = renderToStaticMarkup(React.createElement(AttachmentsTab, { quotationId: 'q-1', content: withAttachments, readOnly: false, edit: () => null, catalog: [] }));
-for (const text of ['Agregar documentos', 'Desde el equipo', 'Fichas del catálogo', 'Documentos de esta cotización', '2 · 1 se incluyen en el PDF', 'Plano de la instalación', '3 páginas', '2.3 MB', 'Catálogo de equipos', 'Páginas por confirmar', 'Incluir en el PDF', 'Solo relacionado']) {
+for (const text of ['Agregar documentos', 'Desde el equipo', 'Fichas del catálogo', 'Documentos de esta cotización', '1 en el PDF · 1 aparte', 'Plano de la instalación', '3 páginas', '2.3 MB', 'Catálogo de equipos', 'Páginas por confirmar', 'Dentro del PDF', 'Archivo aparte en el correo']) {
   assert.ok(attachmentsHtml.includes(text), `adjuntos: ${text}`);
 }
 assert.ok(attachmentsHtml.includes('aria-label="Subir adjunto 2"') && attachmentsHtml.includes('aria-label="Quitar adjunto 1"'), 'reordenar y quitar con nombre accesible');

@@ -242,7 +242,7 @@ export interface AISlice {
 /** Pestaña del editor de cotización. */
 export type QuotationEditorTab = 'content' | 'design' | 'attachments';
 /** Pestaña del visor de la propuesta de origen dentro del editor. */
-export type ProposalViewerTab = 'summary' | 'document' | 'parameters';
+export type ProposalViewerTab = 'summary' | 'document' | 'parameters' | 'costs';
 export interface QuotationEditorEntry { tab: QuotationEditorTab; viewer: ProposalViewerTab | null }
 export interface QuotationReturn extends QuotationEditorEntry { quotationId: string; projectId: string }
 

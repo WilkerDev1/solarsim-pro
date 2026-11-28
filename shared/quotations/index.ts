@@ -15,8 +15,13 @@ export {
 export { quotationFromProposal, type ProposalAttachmentOrigin, type ProposalQuotationSource, type QuotationFromProposalOptions } from './fromProposal.js';
 export { validateQuotationDesign } from './validation.js';
 export {
+  attachmentDestinationLabel, attachmentDestinationSummary, attachmentDestinations, goesInsidePdf, goesSeparate, toggledDestinations,
+  withAttachmentDestinations, type AttachmentDestination, type AttachmentDestinations,
+} from './attachmentDestinations.js';
+export {
   QUOTATION_LIBRARY_LIMITS, addDaysIso, applyTemplateToNewContent, checkSignatureImage, defaultQuotationSignature, defaultQuotationTemplate,
   designFromTemplate, freezePrintedDesign, selectedQuotationSignature, templateFromQuotation, validateQuotationSignature, validateQuotationTemplate,
   type LibraryValidation, type QuotationLibraryMeta, type QuotationSignature, type QuotationSignatureContent, type QuotationSignatureKind,
   type QuotationTemplate, type QuotationTemplateContent, type QuotationTemplateDesign,
 } from './library.js';
+export { LOCAL_ONLY_FIELDS, withoutLocalOnlyMissingIn, type LocalOnlyField } from './localOnlyFields.js';

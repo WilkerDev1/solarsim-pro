@@ -74,7 +74,7 @@ const projectSnapshot = (id: string) => JSON.stringify(store.getState().projects
 /** Estado serializable del store (sin funciones), para comparar antes y después de mirar. */
 const stateSnapshot = () => JSON.stringify(store.getState(), (_key, value) => (typeof value === 'function' ? undefined : value));
 
-// --- (1) Conversión de los documentos: la regla de F7, como «Solo relacionado» y con su propuesta --------------------
+// --- (1) Conversión de los documentos: la regla de F7, como «Archivo aparte en el correo» y con su propuesta --------------------
 {
   const project = proposal('p-1', p1Annexes);
   const before = JSON.stringify(project);
@@ -185,7 +185,7 @@ reset();
   const linked = actions.linkProposal('p-1');
   assert.deepEqual(linked, { error: null, added: 2, overflow: 0 });
   assert.equal(projectSnapshot('p-1'), before, 'enlazar no modifica la propuesta');
-  assert.equal(linkedDocumentsNotice(linked.added, linked.overflow), 'Se agregaron 2 documentos de la propuesta en Adjuntos, como «Solo relacionado».');
+  assert.equal(linkedDocumentsNotice(linked.added, linked.overflow), 'Se agregaron 2 documentos de la propuesta en Adjuntos, como «Archivo aparte en el correo».');
   assert.equal(linkedDocumentsNotice(0, 0), null);
   assert.deepEqual(sourceDocuments(quotationById(id)).map((a) => a.id), ['plano', 'ficha-panel']);
   assert.equal(actions.removeProposalDocument('plano'), null);
@@ -226,26 +226,26 @@ reset();
   const id = created.ok ? created.id : '';
   const html = render(React.createElement(QuotationEditorView, { initialTab: 'attachments' }));
   assert.match(html, /De la propuesta (?:<!-- -->)?Centro Médico Hispánico/);
-  assert.match(html, /2 · 0 se incluyen en el PDF/);
+  assert.match(html, />2 aparte</);
   assert.match(html, /Otros documentos/);
   assert.match(html, /aria-label="Quitar documento de la propuesta 1"/);
   assert.match(html, /1 anexo de la propuesta no se puede enlazar/, 'el anexo solo local se dice con discreción');
   assert.doesNotMatch(html, /Actualizar desde la propuesta \(/, 'nada pendiente: sin contador');
   assert.match(html, /disabled=""[^>]*><svg[^>]*lucide-refresh-cw[^]*?Actualizar desde la propuesta/, 'sin pendientes el botón queda desactivado');
-  // Sin sesión y sin copia local: «Incluir en el PDF» desactivado con ⓘ; nunca rompe.
-  assert.match(html, /<button type="button" aria-pressed="false" disabled="">Incluir en el PDF<\/button>/);
+  // Sin sesión y sin copia local: «Dentro del PDF» desactivado con ⓘ; nunca rompe.
+  assert.match(html, /<button type="button" class="qe-destination" aria-pressed="false" disabled=""[^>]*><span[^>]*>(?:<svg[^]*?<\/svg>)?<\/span>Dentro del PDF<\/button>/);
   assert.match(html, /Por qué no se puede incluir el documento de la propuesta 1/);
   // Con sesión: se puede incluir.
   store.setState({ syncSettings: { ...store.getState().syncSettings, currentUser: editor as never, authToken: 'tok' } });
   const online = render(React.createElement(QuotationEditorView, { initialTab: 'attachments' }));
   assert.doesNotMatch(online, /Por qué no se puede incluir/);
-  assert.match(online, /<button type="button" aria-pressed="false">Incluir en el PDF<\/button>/);
+  assert.match(online, /<button type="button" class="qe-destination" aria-pressed="false"(?! disabled)[^>]*><span[^>]*>(?:<svg[^]*?<\/svg>)?<\/span>Dentro del PDF<\/button>/);
   // LECTOR: el grupo se ve, no se edita.
   store.setState({ syncSettings: { ...store.getState().syncSettings, currentUser: reader as never } });
   const readOnly = render(React.createElement(QuotationEditorView, { initialTab: 'attachments' }));
   assert.match(readOnly, /De la propuesta/);
   assert.doesNotMatch(readOnly, /Actualizar desde la propuesta|Quitar documento de la propuesta/);
-  assert.doesNotMatch(readOnly, /aria-pressed="(?:true|false)">(?:Incluir en el PDF|Solo relacionado)</, 'todos los botones de uso desactivados');
+  assert.doesNotMatch(readOnly, /class="qe-destination" aria-pressed="(?:true|false)"(?! disabled="")/, 'todos los destinos desactivados');
   store.setState({ syncSettings: { ...store.getState().syncSettings, currentUser: null, authToken: null } });
   // Bloqueada (emitida): igual que LECTOR.
   store.setState({ quotations: store.getState().quotations.map((q) => (q.id === id ? { ...q, status: 'issued' as const } : q)) });
@@ -263,7 +263,7 @@ reset();
   const group = { name: 'Centro Médico', available: true, pending: 2, omitted: 0, refresh: () => ({ error: null, added: 0, overflow: 0 }), remove: () => null };
   const html = renderToStaticMarkup(React.createElement(AttachmentsTab, { quotationId: 'q', content, readOnly: false, edit: () => null, catalog: [], sourceGroup: group }));
   assert.match(html, /Actualizar desde la propuesta<!-- --> \(2\)|Actualizar desde la propuesta \(2\)/);
-  assert.match(html, /<button type="button" aria-pressed="true">Incluir en el PDF<\/button>/, 'ya incluido: se puede volver a relacionado');
+  assert.match(html, /<button type="button" class="qe-destination" aria-pressed="true"(?! disabled)[^>]*><span[^>]*>(?:<svg[^]*?<\/svg>)?<\/span>Dentro del PDF<\/button>/, 'ya incluido: se puede desmarcar');
   assert.match(html, /si no llega al exportar, el PDF sale sin él|Si no llega al exportar, el PDF sale sin él/);
   assert.match(html, /aria-label="Quitar adjunto 1"/, 'los propios conservan su numeración');
   const prompt = renderToStaticMarkup(React.createElement(UnlinkSourcePrompt, { count: 2, onAnswer: () => undefined }));
@@ -282,7 +282,7 @@ reset();
   let writes = 0;
   const unsubscribe = store.subscribe(() => { writes++; });
   const htmlFor: Record<string, string> = {};
-  for (const tab of ['summary', 'document', 'parameters'] as const) htmlFor[tab] = renderToStaticMarkup(React.createElement(QuotationEditorView, { initialViewer: tab }));
+  for (const tab of ['summary', 'document', 'parameters', 'costs'] as const) htmlFor[tab] = renderToStaticMarkup(React.createElement(QuotationEditorView, { initialViewer: tab }));
   // «Documento» se carga en diferido (las páginas pesan): el editor muestra un aviso breve y el módulo dibuja las páginas.
   const viewed = store.getState().projects.find((p) => p.id === 'p-1')!;
   const pagesHtml = renderToStaticMarkup(React.createElement(ProposalViewerDocument, { project: viewed, summary: calculateProjectFinancialSummary(viewed) }));
@@ -291,7 +291,7 @@ reset();
   assert.equal(stateSnapshot(), before, 'el store queda idéntico (propuestas, cotizaciones, cambios y sincronización)');
   assert.equal(store.getState().activeProjectId, 'p-3', 'la propuesta activa no cambia');
   for (const html of Object.values(htmlFor)) {
-    for (const text of ['Propuesta de origen · solo lectura', 'Centro Médico Hispánico', 'Resumen', 'Documento', 'Parámetros', 'Abrir propuesta', 'Cerrar el visor de la propuesta']) assert.ok(html.includes(text), text);
+    for (const text of ['Propuesta de origen · solo lectura', 'Centro Médico Hispánico', 'Resumen', 'Documento', 'Parámetros', 'Costos', 'Abrir propuesta', 'Cerrar el visor de la propuesta']) assert.ok(html.includes(text), text);
     assert.match(html, /class="qe-body"[^>]*data-viewer=""/);
     assert.match(html, /role="separator"/, 'panel redimensionable');
     assert.match(html, /class="qe-preview" hidden=""/, 'el visor sustituye a la vista previa');
@@ -302,6 +302,13 @@ reset();
   assert.match(pagesHtml, /pdf-page/, 'Documento dibuja las páginas del PDF de la propuesta');
   assert.doesNotMatch(pagesHtml, /data-pdf-chrome/, 'sin cromo de edición');
   for (const text of ['Consumo anual', 'Medición neta', 'Modo de precio', 'Tasa de descuento']) assert.ok(htmlFor.parameters.includes(text), text);
+  // «Costos»: la misma tabla interna de costos del simulador (matriz de costos), en solo lectura salvo la moneda.
+  for (const text of ['Costos proyectos', 'Uso Interno Confidencial', 'Factor Venta', 'Precio Neto', 'Total Neto (Costo Total)', 'Precio kilos costo', 'Métricas de Margen', 'Ganancia Proyectada', 'Precio Unit. USD', 'Precio Total RD', 'ITBIS USD']) assert.ok(htmlFor.costs.includes(text), `costos: ${text}`);
+  const viewedSummary = calculateProjectFinancialSummary(viewed);
+  assert.ok(viewedSummary.costMatrix.items.length > 0, 'la propuesta de prueba tiene filas en la matriz');
+  for (const item of viewedSummary.costMatrix.items) assert.ok(htmlFor.costs.includes(item.name.replace(/&/g, '&amp;')), `fila ${item.name}`);
+  assert.ok(htmlFor.costs.includes(viewedSummary.costMatrix.gananciaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })), 'ganancia de la propuesta vista');
+  assert.match(htmlFor.costs, /aria-pressed="true"[^>]*>[^<]*Dual/, 'la moneda empieza en Dual y se marca con aria-pressed');
   assert.match(htmlFor.summary, /aria-selected="true"[^>]*>.*?Resumen/);
   // Sin visor: vista previa normal.
   const closed = renderToStaticMarkup(React.createElement(QuotationEditorView));
@@ -316,7 +323,7 @@ reset();
   const pagesDir = 'src/components/pdf/pages';
   const files = [
     'src/components/quotations/editor/ProposalViewer.tsx', 'src/components/quotations/editor/ProposalViewerDocument.tsx',
-    'src/components/pdf/ProposalDocumentPages.tsx', 'src/components/hub/proposalSummaryData.ts', 'src/features/quotations/proposalDocuments.ts',
+    'src/components/pdf/ProposalDocumentPages.tsx', 'src/components/hub/proposalSummaryData.ts', 'src/components/simulator/tabs/CostMatrixTable.tsx', 'src/features/quotations/proposalDocuments.ts',
     ...readdirSync(path.join(root, pagesDir), { recursive: true }).map(String).filter((f) => /\.tsx?$/.test(f)).map((f) => `${pagesDir}/${f}`),
   ];
   // Únicas lecturas del store permitidas (texto exacto).

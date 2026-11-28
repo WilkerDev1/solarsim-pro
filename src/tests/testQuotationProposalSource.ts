@@ -540,7 +540,7 @@ for (const mode of ['cost_matrix', 'direct_watt'] as const) {
   assert(gone.build.notices.some((n) => /directorio/.test(n)));
 }
 
-// --- Documentos: referencias reutilizables como «Solo relacionado»; sin referencia, se omiten -------------------------
+// --- Documentos: referencias reutilizables como «Archivo aparte en el correo»; sin referencia, se omiten -------------------------
 {
   const pdf = (patch: Partial<AttachedPDFDocument>): AttachedPDFDocument => ({
     id: 'a', fileName: 'a.pdf', fileSize: 1000, pageCount: 2, title: 'A', uploadedAt: '2026-11-01T10:00:00.000Z', enabled: true, addToTableOfContents: true, ...patch,

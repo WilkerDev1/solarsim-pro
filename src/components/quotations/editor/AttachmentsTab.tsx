@@ -1,9 +1,11 @@
 import React, { useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Download, FileStack, FileSymlink, RefreshCw, Trash2, Upload } from 'lucide-react';
-import { QUOTATION_LIMITS } from '../../../../shared/quotations';
+import { ArrowDown, ArrowUp, Check, Download, FileStack, FileSymlink, RefreshCw, Trash2, Upload } from 'lucide-react';
+import {
+  QUOTATION_LIMITS, attachmentDestinationSummary, attachmentDestinations, toggledDestinations, type AttachmentDestination,
+} from '../../../../shared/quotations';
 import type { QuotationAttachment, QuotationContent } from '../../../types/quotation';
 import type { SolarEquipmentItem } from '../../../types/equipment';
-import { addAttachments, moveAttachmentAmong, removeAttachment, sourceDocuments, updateAttachment } from '../../../domain/quotationEdit';
+import { addAttachments, moveAttachmentAmong, removeAttachment, setAttachmentDestinations, sourceDocuments, updateAttachment } from '../../../domain/quotationEdit';
 import { attachmentAvailability } from '../../../features/quotations/proposalDocuments';
 import { useLocalAttachmentPresence } from '../../../features/quotations/attachmentPresence';
 import type { SourceDocumentsResult } from '../../../features/quotations/editorActions';
@@ -51,7 +53,16 @@ const ORIGIN_LABELS: Record<QuotationAttachment['origin'], string> = {
 
 const kindLabel = (attachment: QuotationAttachment) => (/\.(png|jpe?g|webp)$/i.test(attachment.fileName) ? 'IMG' : 'PDF');
 
-/** Pestaña «Adjuntos»: documentos que se fusionan al PDF (`include`) o solo quedan enlazados (`related`). */
+/** Los dos destinos de un adjunto, combinables (`shared/quotations/attachmentDestinations.ts`). */
+const DESTINATIONS: { id: AttachmentDestination; label: string; hint: string }[] = [
+  { id: 'pdf', label: 'Dentro del PDF', hint: 'Se añade completo al final del PDF de la cotización.' },
+  { id: 'email', label: 'Archivo aparte en el correo', hint: 'Va como archivo suelto junto al PDF: lo descargas aquí y lo adjuntas a mano.' },
+];
+const DESTINATIONS_HELP = `${DESTINATIONS.map((d) => `${d.label}: ${d.hint.charAt(0).toLowerCase()}${d.hint.slice(1)}`).join(' ')} Puedes marcar los dos; al menos uno.`;
+/** Al intentar desmarcar el único destino. */
+export const LAST_DESTINATION_NOTICE = 'Debe quedar al menos un destino. Si no quieres enviarlo, quita el adjunto.';
+
+/** Pestaña «Adjuntos»: cada documento va dentro del PDF, como archivo aparte en el correo, o en los dos. */
 export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, content, readOnly, edit, catalog, online = false, sourceGroup }) => {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -66,8 +77,8 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
   const groupIds = grouped.map((a) => a.id);
   const others = attachments.filter((a) => !groupIds.includes(a.id));
   const otherIds = others.map((a) => a.id);
-  const included = others.filter((a) => a.mode === 'include').length;
-  const groupIncluded = grouped.filter((a) => a.mode === 'include').length;
+  // Aviso «al menos un destino» junto al adjunto que lo provocó (estado local).
+  const [lastNotice, setLastNotice] = useState<string | null>(null);
   const localBytes = useLocalAttachmentPresence(groupIds);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
   const datasheets = catalogDatasheetCandidates(content, catalog, new Date().toISOString());
@@ -121,10 +132,20 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
       });
   };
 
+  /** Conmuta un destino; desmarcar el único no se permite y se dice en una línea junto al adjunto. */
+  const toggle = (attachment: QuotationAttachment, which: AttachmentDestination) => {
+    if (readOnly) return;
+    const next = toggledDestinations(attachment, which);
+    if (!next.pdf && !next.email) return setLastNotice(attachment.id);
+    setLastNotice(null);
+    setError(edit((c) => setAttachmentDestinations(c, attachment.id, next)));
+  };
+
   const row = (attachment: QuotationAttachment, index: number, list: readonly QuotationAttachment[], memberIds: readonly string[], noun: string) => {
     const name = `${noun} ${index + 1}`;
     // Solo los de la propuesta pueden no tener sus bytes aquí (vienen como referencia); el resto se subió o está en el catálogo.
     const availability = memberIds === groupIds ? attachmentAvailability(attachment, { online, local: localBytes.has(attachment.id) }) : { includable: true as const };
+    const destinations = attachmentDestinations(attachment);
     return (
       <li key={attachment.id} className="qe-attachment">
         <div className="qe-attachment-top">
@@ -152,14 +173,30 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
         </p>
         {issueOf(attachment.id) && <p className="qe-field-error" role="note">{issueOf(attachment.id)}</p>}
         <div className="qe-attachment-use">
-          <div className="qe-segmented" role="group" aria-label={`Uso del ${name}`}>
-            <button type="button" aria-pressed={attachment.mode === 'include'} disabled={readOnly || (!availability.includable && attachment.mode !== 'include')} onClick={() => setError(edit((c) => updateAttachment(c, attachment.id, { mode: 'include' })))}>Incluir en el PDF</button>
-            <button type="button" aria-pressed={attachment.mode === 'related'} disabled={readOnly} onClick={() => setError(edit((c) => updateAttachment(c, attachment.id, { mode: 'related' })))}>Solo relacionado</button>
+          <span className="qe-attachment-use-label" aria-hidden="true">Destino</span>
+          <div className="qe-destinations" role="group" aria-label={`Destino del ${name}`}>
+            {DESTINATIONS.map((destination) => {
+              const on = destinations[destination.id];
+              const blocked = destination.id === 'pdf' && !on && !availability.includable;
+              return (
+                <button
+                  key={destination.id}
+                  type="button"
+                  className="qe-destination"
+                  aria-pressed={on}
+                  disabled={readOnly || blocked}
+                  title={destination.hint}
+                  onClick={() => toggle(attachment, destination.id)}
+                ><span className="qe-destination-box" aria-hidden="true">{on && <Check className="h-3 w-3" strokeWidth={3} />}</span>{destination.label}</button>
+              );
+            })}
           </div>
+          <InfoTip label={`Qué hace cada destino del ${name}`} text={DESTINATIONS_HELP} />
           {!availability.includable && (
-            <InfoTip label={`Por qué no se puede incluir el ${name}`} text={attachment.mode === 'include' ? `${availability.reason} Si no llega al exportar, el PDF sale sin él y se avisa.` : availability.reason} />
+            <InfoTip label={`Por qué no se puede incluir el ${name}`} text={destinations.pdf ? `${availability.reason} Si no llega al exportar, el PDF sale sin él y se avisa.` : availability.reason} />
           )}
         </div>
+        {lastNotice === attachment.id && <p className="qe-field-hint" role="status">{LAST_DESTINATION_NOTICE}</p>}
       </li>
     );
   };
@@ -202,7 +239,7 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
         <section className="qe-card qe-source-docs" aria-labelledby="qe-source-docs-title">
           <div className="qe-card-head">
             <h2 id="qe-source-docs-title"><FileSymlink className="h-4 w-4" aria-hidden="true" />De la propuesta {sourceGroup.name}</h2>
-            <span className="qe-muted">{grouped.length ? `${grouped.length} · ${groupIncluded} se incluyen en el PDF` : 'Ninguno'}</span>
+            <span className="qe-muted">{attachmentDestinationSummary(grouped)}</span>
           </div>
           {!readOnly && sourceGroup.available && (
             <div className="qe-actions qe-source-docs-actions">
@@ -211,7 +248,7 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
               </button>
               <InfoTip
                 label="Qué trae «Actualizar desde la propuesta»"
-                text="Añade los documentos de la propuesta que aún no están aquí, como «Solo relacionado». Los que quitaste no vuelven, y la propuesta no se modifica."
+                text="Añade los documentos de la propuesta que aún no están aquí, como «Archivo aparte en el correo». Los que quitaste no vuelven, y la propuesta no se modifica."
               />
             </div>
           )}
@@ -230,9 +267,9 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ quotationId, con
       <section className="qe-card" aria-labelledby="qe-attachments-title">
         <div className="qe-card-head">
           <h2 id="qe-attachments-title">{sourceGroup ? 'Otros documentos' : 'Documentos de esta cotización'}</h2>
-          <span className="qe-muted">{others.length ? `${others.length} · ${included} se incluyen en el PDF` : 'Ninguno'}</span>
+          <span className="qe-muted">{attachmentDestinationSummary(others)}</span>
         </div>
-        {!others.length && <p className="qe-muted">Las fichas técnicas, planos o fotos que agregues se añaden al final del PDF o quedan solo como relacionados.</p>}
+        {!others.length && <p className="qe-muted">Las fichas técnicas, planos o fotos que agregues pueden ir dentro del PDF, como archivo aparte en el correo, o en los dos.</p>}
         <ul className="qe-attachments">{others.map((attachment, index) => row(attachment, index, others, otherIds, 'adjunto'))}</ul>
         {full && <p className="qe-field-hint">Se alcanzó el máximo de {QUOTATION_LIMITS.maxAttachments} adjuntos.</p>}
       </section>
