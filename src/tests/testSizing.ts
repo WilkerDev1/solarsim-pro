@@ -3,8 +3,9 @@
 import assert from 'node:assert/strict';
 import {
   SIZING_ASSUMPTIONS, chooseCatalogEquipment, designConsumption, nightProfileBatteryRequirementKWh, recommendBatteryCount,
-  recommendInverterCount, recommendPanelCount, resolveSizingBasis, suggestedGroupPanelCount,
+  recommendInverterCount, recommendPanelCount, resolveSizingBasis, suggestedGroupPanelCount, annualSpecificYieldKWhPerKWp,
 } from '../domain/sizing';
+import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { applyProjectEdits } from '../domain/projectEditTransaction';
@@ -145,5 +146,22 @@ assert.equal(chooseCatalogEquipment([], 'panel', {}).item, undefined);
 // Rendimiento 1.500 kWh/kWp, meta 15.000 kWh, otro grupo de 4 × 500 W (2 kWp = 3.000 kWh) ⇒ faltan 12.000 kWh ⇒ 8 kWp ⇒ 16 de 500 W.
 assert.equal(suggestedGroupPanelCount({ targetAnnualKWh: 15000, annualSpecificYieldKWhPerKWp: 1500, groups: [{ powerW: 500, count: 4 }, { powerW: 500, count: 1 }], index: 1 }), 16);
 assert.equal(suggestedGroupPanelCount({ targetAnnualKWh: 1000, annualSpecificYieldKWhPerKWp: 1500, groups: [{ powerW: 500, count: 4 }, { powerW: 500, count: 1 }], index: 1 }), 0, 'los demás grupos ya cubren la meta');
+
+// ── Revisión de F2b ─────────────────────────────────────────────────────────────────────────
+// Desempate del mes pico declarado como supuesto (hallazgo 5): con meses iguales manda el de mayor consumo DIARIO (menos
+// días), que con doce meses iguales es febrero. Por eso el consumo estimado de fábrica (12 × 1.000) pide la batería de
+// 1.000 / 28 × 0,75 = 26,79 kWh útiles y no la de enero (1.000 / 31 × 0,75 = 24,19 kWh).
+assert.equal(SIZING_ASSUMPTIONS.peakMonthTieBreak, 'highest_daily');
+const flat = designConsumption(Array(12).fill(1000), 'peak_month');
+assert.equal(flat.peakMonthIndex, 1, 'empate total: febrero (28 días)');
+assert.equal(designConsumption([900, 1000, 950, 1000, 0, 0, 0, 0, 0, 0, 0, 0], 'average').peakMonthIndex, 1, 'febrero y abril empatan en 1.000: gana febrero (1.000/28 > 1.000/30)');
+const tied = recommendBatteryCount({ unit: { capacityKWh: 16.08, dodPct: 90, efficiencyPct: 90 }, monthlyConsumption: Array(12).fill(1000) });
+close(tied.requiredKWh, 1000 / 28 * 0.75, 'requerido con el desempate declarado');
+assert.equal(tied.count, 3, '3 × 13,0248 = 39,07 kWh útiles ≥ 26,79 (con enero bastarían 2)');
+assert.ok(tied.assumptions.some((a) => a.key === 'peakMonthTieBreak'), 'el resultado cita el desempate');
+// El rendimiento específico (kWh/kWp·año) sale del dimensionado del dominio, no de una llamada suelta al motor.
+for (const [province, losses] of [['Santiago', 14], ['Santo Domingo / Distrito Nacional', undefined]] as const)
+  assert.equal(annualSpecificYieldKWhPerKWp(province, losses), calculateRecommendedPanelCount(province, Array(12).fill(0), 620, 95, losses).annualSpecificYieldKWhPerKWp);
+assert.equal(annualSpecificYieldKWhPerKWp('Santiago', 14, Array(12).fill(5)), calculateRecommendedPanelCount('Santiago', Array(12).fill(0), 620, 95, 14, Array(12).fill(5)).annualSpecificYieldKWhPerKWp);
 
 console.log('PASS: dimensionado puro: base del mes pico, inversor por DC/AC 1,20, baterías por el 75 % del día pico y elección de equipo sin precios inventados.');

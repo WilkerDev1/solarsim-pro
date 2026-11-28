@@ -2,7 +2,7 @@ import type { DefaultSimulationSettings } from '../store/types';
 import type { ProjectSimulation, SystemSpecs } from '../types';
 import type { ExtractedInvoiceData } from '../types/aiInvoice';
 import type { GlobalTariffMatrix } from '../types/tariffs';
-import { calculateRecommendedPanelCount } from '../engine/solarEngine';
+import { recommendPanelCount, resolveSizingBasis, type SizingBasis } from '../domain/sizing';
 import { resolveAITariffSelection } from './aiTariffContext';
 import { getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTariffs';
 import { tariffMatrixKey } from '../../shared/tariffRules';
@@ -43,7 +43,9 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
   const isGrounded=Array.isArray(data.panels)||Array.isArray(data.inverters)||Array.isArray(data.batteries);
     const panelW=data.selectedPanelWatts ?? readEquipment(base.specs).panels[0]?.powerW ?? 0;
     const coverage=resolveAssumption('targetCoveragePct',data.targetCoveragePct,resolveAssumptions(base).targetCoveragePct);
-    const count=data.recommendedPanelCount || calculateRecommendedPanelCount(province,data.monthlyConsumptionKWh,panelW,coverage,losses,base.client.customMonthlyHSP).recommendedPanelCount;
+    // Con la base de dimensionado de la propuesta (ADR 0009): la que guarda es la que usa al nacer. Sin base (lo guardado antes
+    // de F2b), el consumo tal cual, como siempre.
+    const count=data.recommendedPanelCount || recommendPanelCount({province,monthlyConsumption:data.monthlyConsumptionKWh,panelPowerW:panelW,coveragePct:coverage,lossesPct:losses,customMonthlyHSP:base.client.customMonthlyHSP,basis:resolveSizingBasis(base.specs)}).count;
     const dcKWp=(data.panels || []).reduce((sum,g)=>sum+g.powerW*g.count/1000,0);
     let specs:SystemSpecs={...base.specs,autoCalculatePanels:false,dopExchangeRate:resolveAssumption('dopExchangeRate',data.dopExchangeRate,base.rates.usdExchangeRate,base.specs.dopExchangeRate),
       ...(data.hasBattery!==undefined?{hasBattery:data.hasBattery}:{}),
@@ -128,6 +130,27 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
     // Un borrador nuevo no hereda el cargo de la plantilla base: parte sin él.
     const rates=reconcileGridUseCharge(startRates,draftRates,{distributor:data.distributor,gridUseChargeDOPPerKWh:data.gridUseChargeDOPPerKWh});
   return {...base,specs:enforceAutomatedPricing(specs),rates,client:{...base.client,province},monthlyConsumption:[...data.monthlyConsumptionKWh],financials:{...base.financials,...(data.commercial?.pricePerWattUSD!==undefined?{pricePerWattUSD:data.commercial.pricePerWattUSD}:{}),...(data.commercial?.customItems!==undefined?{customItems:structuredClone(data.commercial.customItems)}:{}),...(data.commercial?.customDiscounts!==undefined?{customDiscounts:structuredClone(data.commercial.customDiscounts)}:{})}};
+}
+
+/** ¿El borrador pide dimensionar los paneles? Un solo modelo con cantidad 0: la condición del normalizador compartido. */
+function asksPanelSizing(raw:Record<string,any>):boolean {
+  const rows=Array.isArray(raw.panels)?raw.panels:(raw.selectedPanelId || raw.matchedPanelId)?[{quantity:raw.selectedPanelCount ?? raw.matchedPanelCount ?? raw.recommendedPanelCount}]:[];
+  return rows.length===1&&(rows[0]?.quantity ?? rows[0]?.count)===0;
+}
+
+/**
+ * Cantidad de paneles de un borrador con grupos que pidió dimensionar, con la base de la propuesta (ADR 0009). El
+ * normalizador compartido (`shared/aiProposal`, fuera del alcance de una versión solo de cliente) dimensiona con el consumo
+ * real; con la base `peak_month` (las propuestas nuevas) aquí se rehace con el mes pico, para que nazca con la base que guarda
+ * y activar el autodimensionado no cambie la cantidad. Con la base heredada, el borrador tal cual. La comparten la vista
+ * previa del modal y la aplicación (`buildProjectFromDraft`). Pura.
+ */
+export function sizeDraftPanelsWithBasis(raw:Record<string,any>,data:ExtractedInvoiceData,ctx:{province:string;lossesPct?:number;customMonthlyHSP?:number[];basis:SizingBasis}):ExtractedInvoiceData {
+  const group=data.panels?.length===1?data.panels[0]:undefined;
+  if(ctx.basis!=='peak_month'||!group||!(group.count>0)||!(group.powerW>0)||data.consumptionSource==='theoretical'||data.monthlyConsumptionKWh?.length!==12||!asksPanelSizing(raw)) return data;
+  const count=recommendPanelCount({province:data.province || ctx.province,monthlyConsumption:data.monthlyConsumptionKWh,panelPowerW:group.powerW,coveragePct:resolveAssumption('targetCoveragePct',data.targetCoveragePct),lossesPct:ctx.lossesPct,customMonthlyHSP:ctx.customMonthlyHSP,basis:ctx.basis}).count;
+  if(count===group.count) return data;
+  return {...data,panels:[{...group,count}],recommendedPanelCount:count,recommendedCapacityKWp:group.powerW*count/1000};
 }
 
 /**

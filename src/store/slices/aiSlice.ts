@@ -1,6 +1,7 @@
 import { createProjectId } from '../../utils/projectId';
 import { isReaderRole } from '../../../shared/permissions';
-import { prepareProposalDraftProject, createAIProposalBase } from '../../utils/proposalDraftProject';
+import { prepareProposalDraftProject, createAIProposalBase, sizeDraftPanelsWithBasis } from '../../utils/proposalDraftProject';
+import { annualSpecificYieldKWhPerKWp, resolveSizingBasis } from '../../domain/sizing';
 import { newProposalIdentity } from '../../domain/newProposal';
 import { normalizeIncomingSpecs, normalizeProjectEquipment } from '../../domain/projectEdit';
 import { companyDocumentCustomization } from '../../utils/companyDocumentTemplate';
@@ -10,7 +11,7 @@ import { SimulationSlice, AISlice, SimulationStore } from '../types';
 import type { ProjectSimulation, ExtractedInvoiceData } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { generateNextProjectSequence } from '../initialData';
-import { calculateRecommendedPanelCount, getMonthlySolarProductionFactors } from '../../engine/solarEngine';
+import { getMonthlySolarProductionFactors } from '../../engine/solarEngine';
 import { normalizeProposalDraft } from '../../../shared/aiProposal';
 import { resolveAssumption, resolveAssumptions } from '../../../shared/assumptions';
 import { DEFAULT_GEMINI_MODEL, INHERITED_DEFAULT_GEMINI_MODELS } from '../../../shared/geminiTransport';
@@ -26,6 +27,15 @@ const normalizeProvinceName = (raw?: string): string => {
     || (query.includes('punta cana') || query.includes('higuey') ? 'La Altagracia (Punta Cana / Higüey)' : getProvinceHSP(raw).name);
 };
 
+/**
+ * Opciones con que la fábrica única arma la base de un borrador nuevo desde el estado: catálogo, matriz de tarifas y precio
+ * genérico (si la función de precios está activa). Una sola fuente para la vista previa del modal y para aplicar (ADR 0009).
+ */
+export function aiProposalFactoryOptions(state:Pick<SimulationStore,'tariffMatrix'|'equipmentCatalog'|'syncSettings'|'genericPrices'|'pricePending'>) {
+  return {tariffMatrix:state.tariffMatrix,catalog:state.equipmentCatalog,
+    genericPriceFor:(id:string)=>(priceFeatureActive(state)?effectiveGenericPrice(state,id):null)};
+}
+
 /** Pure: validates the draft against today's inventory and builds the proposal without touching the store. */
 export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoiceData,createNewProject=false):{project:ProjectSimulation;previous?:ProjectSimulation}|{error:string} {
     const current=state.projects.find(p=>p.id===state.activeProjectId);
@@ -35,14 +45,15 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
     const province=normalizeProvinceName(input.province || input.municipality || (!createNewProject?current?.client.province:state.defaultSimulationSettings.defaultProvince));
     const defaults=state.defaultSimulationSettings;
     // F2b (ADR 0009): una propuesta nueva parte de la fábrica única (elige y cotiza equipos con el catálogo vigente).
-    const base:ProjectSimulation=createNewProject?createAIProposalBase(BENCHMARK_PROJECT,defaults,province,{tariffMatrix:state.tariffMatrix,catalog:state.equipmentCatalog,
-      genericPriceFor:(id)=>(priceFeatureActive(state)?effectiveGenericPrice(state,id):null)}):current!;
+    const base:ProjectSimulation=createNewProject?createAIProposalBase(BENCHMARK_PROJECT,defaults,province,aiProposalFactoryOptions(state)):current!;
     const losses=resolveAssumptions(base).systemLossesPct;
     // Revalidate against today's inventory before committing any change. Legacy callers retain their API.
-    const data=isGrounded?normalizeProposalDraft(input,state.equipmentCatalog,{province,systemLosses:losses,
-      annualSpecificYieldKWhPerKWp:calculateRecommendedPanelCount(province,Array(12).fill(0),620,95,losses,base.client.customMonthlyHSP).annualSpecificYieldKWhPerKWp,
+    // Un borrador que pide dimensionar los paneles nace con la base de dimensionado de la propuesta (ADR 0009).
+    const data=isGrounded?sizeDraftPanelsWithBasis(input as unknown as Record<string,unknown>,normalizeProposalDraft(input,state.equipmentCatalog,{province,systemLosses:losses,
+      annualSpecificYieldKWhPerKWp:annualSpecificYieldKWhPerKWp(province,losses,base.client.customMonthlyHSP),
       monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses,base.client.customMonthlyHSP),
-      tariffReference:buildAITariffContext(state.tariffMatrix),genericPrices:effectiveGenericPriceMap(state)}):input;
+      tariffReference:buildAITariffContext(state.tariffMatrix),genericPrices:effectiveGenericPriceMap(state)}),
+      {province,lossesPct:losses,customMonthlyHSP:base.client.customMonthlyHSP,basis:resolveSizingBasis(base.specs)}):input;
     if(isGrounded && data.requiresReview) return {error:data.validationIssues?.find(i=>i.severity==='error')?.message || 'Revisa los datos pendientes antes de aplicar.'};
     if(data.monthlyConsumptionKWh.length!==12 || data.monthlyConsumptionKWh.some(n=>!Number.isFinite(n) || n<0)) return {error:'Completa los doce consumos mensuales antes de aplicar.'};
     const now=new Date().toISOString();

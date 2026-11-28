@@ -4,7 +4,8 @@
  * dice cuáles usó (`assumptions`), para que la interfaz, el asistente y el PDF los puedan citar.
  *
  * El motor sigue siendo el que recomienda la cantidad de paneles (`calculateRecommendedPanelCount`); este módulo decide con
- * qué consumo se le pide (la base de dimensionado) y es su único llamador fuera del motor (guarda del ADR 0004). La energía
+ * qué consumo se le pide (la base de dimensionado) y es su único llamador fuera del motor (guarda del ADR 0004): el resto
+ * dimensiona con `recommendPanelCount` y lee el rendimiento específico con `annualSpecificYieldKWhPerKWp`. La energía
  * útil del banco sale solo de `batteryBank` (ADR 0002): aquí se busca la cantidad, nunca se copia la fórmula.
  */
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
@@ -30,6 +31,12 @@ export const SIZING_ASSUMPTIONS = {
   newProposalBasis: 'peak_month' as SizingBasis,
   /** Base de lo guardado sin el campo: el consumo real del año, como siempre. */
   legacyBasis: 'average' as SizingBasis,
+  /**
+   * Desempate del «mes pico» cuando varios meses tienen el mismo consumo: el de mayor consumo DIARIO (el mes con menos días).
+   * Con doce meses iguales (el consumo estimado de fábrica) es febrero, el más exigente para la batería (1.000 / 28 días).
+   * Supuesto del equipo de desarrollo: se confirma con el dueño junto con la regla del 75 %.
+   */
+  peakMonthTieBreak: 'highest_daily' as const,
   /**
    * Relación DC/AC objetivo (kWp de paneles por kW de inversor). 1,20 es un supuesto de diseño del equipo de desarrollo, no
    * una decisión del dueño: se cambia aquí o por parámetro (`targetRatio`).
@@ -72,7 +79,7 @@ export interface DesignConsumption {
   /** Los doce meses con que se dimensiona. */
   monthly: number[];
   annualKWh: number;
-  /** Mes de mayor consumo (0 = enero) y su consumo; ante empate, el de mayor consumo diario (menos días). */
+  /** Mes de mayor consumo (0 = enero) y su consumo; ante empate, `SIZING_ASSUMPTIONS.peakMonthTieBreak`. */
   peakMonthIndex: number;
   peakMonthKWh: number;
 }
@@ -98,7 +105,8 @@ export interface PanelSizingInput {
   panelPowerW: number;
   /** Cobertura ya resuelta (`resolveAssumption('targetCoveragePct', …)`). */
   coveragePct: number;
-  lossesPct: number;
+  /** Sin dato, el valor resuelto del motor (ADR 0003). */
+  lossesPct: number | undefined;
   customMonthlyHSP?: number[];
   basis: SizingBasis;
 }
@@ -142,6 +150,14 @@ export interface InverterSizing {
   dcAcRatio: number;
   targetRatio: number;
   assumptions: SizingAssumptionUsed[];
+}
+
+/**
+ * Rendimiento específico anual (kWh por kWp instalado) de la provincia, con pérdidas y HSP propios. Depende solo del sitio,
+ * no del consumo ni del panel: es el dato que el borrador de IA y sus pantallas leen para dimensionar o estimar producción.
+ */
+export function annualSpecificYieldKWhPerKWp(province: string, lossesPct?: number, customMonthlyHSP?: number[]): number {
+  return calculateRecommendedPanelCount(province, Array(12).fill(0), 620, undefined, lossesPct, customMonthlyHSP).annualSpecificYieldKWhPerKWp;
 }
 
 /** Inversores de `unitPowerKW` para `dcKWp` de paneles con la relación DC/AC objetivo (mínimo uno si hay paneles). */
@@ -196,6 +212,7 @@ export function recommendBatteryCount(input: { unit: BatteryUnit; monthlyConsump
   const assumptions: SizingAssumptionUsed[] = rule === 'night_profile'
     ? [{ key: 'nightProfileMargin', label: 'Noche real del perfil horario + margen', value: SIZING_ASSUMPTIONS.battery.nightProfileMargin }]
     : [{ key: 'peakDailyFraction', label: 'Energía útil sobre el consumo diario del mes pico', value: SIZING_ASSUMPTIONS.battery.peakDailyFraction }];
+  assumptions.push({ key: 'peakMonthTieBreak', label: 'Mes pico ante empate: el de mayor consumo diario', value: SIZING_ASSUMPTIONS.peakMonthTieBreak });
   const requiredKWh = rule === 'night_profile'
     ? nightProfileBatteryRequirementKWh({ monthlyConsumption: input.monthlyConsumption, daytimeLoadRatioPct: input.daytimeLoadRatioPct ?? 0 })
     : peakDailyKWh(input.monthlyConsumption) * SIZING_ASSUMPTIONS.battery.peakDailyFraction;
@@ -291,7 +308,3 @@ export function suggestedGroupPanelCount(input: { targetAnnualKWh: number; annua
   return chosen?.powerW && remainingKWh > 0 ? Math.ceil(remainingKWh / (input.annualSpecificYieldKWhPerKWp * chosen.powerW / 1000)) : 0;
 }
 
-/** Recomendación del motor para la revisión del borrador (sin base: el consumo tal cual), para la guarda del ADR 0004. */
-export function draftPanelRecommendation(province: string, monthlyConsumption: readonly number[], panelPowerW: number, coveragePct?: number, lossesPct?: number, customMonthlyHSP?: number[]) {
-  return calculateRecommendedPanelCount(province, [...monthlyConsumption], panelPowerW, coveragePct, lossesPct, customMonthlyHSP);
-}

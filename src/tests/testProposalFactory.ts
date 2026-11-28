@@ -10,7 +10,8 @@ import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_SIMULATION_SETTINGS, DEFAULT_TARGET_MARGIN_PCT } from '../store/defaultSimulationSettings';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { executeAgentTool } from '../features/agentTools/registry';
-import { buildProjectFromDraft } from '../store/slices/aiSlice';
+import { aiProposalFactoryOptions, buildProjectFromDraft } from '../store/slices/aiSlice';
+import { readFileSync } from 'node:fs';
 import { assistantOwner } from '../features/assistant/tools';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
 import { buildAITariffContext } from '../utils/aiTariffContext';
@@ -154,5 +155,19 @@ s().commitProjectEdits(marked.id, [{ path: 'monthlyConsumption[2]', value: 850 }
 assert.equal(isConsumptionEstimated(s().getActiveProject()), false, 'un mes real basta');
 s().undo();
 assert.equal(isConsumptionEstimated(s().getActiveProject()), true, 'deshacer vuelve al consumo estimado');
+
+// 8. Revisión (hallazgo 7): la vista previa del modal y la aplicación arman la base con las MISMAS opciones de la fábrica
+// (catálogo, matriz y precio genérico), de un solo helper.
+reset();
+const factoryOptions = aiProposalFactoryOptions(s());
+assert.equal(factoryOptions.catalog, s().equipmentCatalog);
+assert.equal(factoryOptions.tariffMatrix, s().tariffMatrix);
+assert.equal(typeof factoryOptions.genericPriceFor, 'function', 'con el precio genérico de la tienda');
+for (const file of ['src/store/slices/aiSlice.ts', 'src/components/common/ai-invoice/hooks/useAIInvoiceScanner.ts']) {
+  const source = readFileSync(file, 'utf8');
+  const calls = source.match(/createAIProposalBase\([^;]*/g) ?? [];
+  assert.ok(calls.length > 0, `${file} crea la base del borrador`);
+  for (const call of calls) assert.match(call, /aiProposalFactoryOptions\(/, `${file}: createAIProposalBase con aiProposalFactoryOptions(...)`);
+}
 
 console.log('PASS: fábrica única: las tres vías nacen con 1.000 kWh/mes estimados, factor 1,40, 170 USD/kWp, tarifa de la distribuidora y sin datos del ejemplo.');
