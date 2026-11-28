@@ -11,13 +11,13 @@
     "test": "tsx tests/publicationIntegrity.test.ts && tsx tests/shareSnapshot.test.ts && tsx tests/sharedHistory.test.ts && tsx tests/webProposalDiscount.test.ts && tsx tests/legacyItbisFallback.test.ts && tsx tests/documentTexts.test.ts && tsx tests/energyFlowDiagram.test.ts && tsx tests/offGridEnergyFlow.test.ts && tsx tests/offGridSupplyAlternative.test.ts && tsx tests/equipmentReaders.test.ts && tsx tests/clientIdentity.test.ts && tsx tests/resolvedAssumptions.test.ts && tsx tests/hiddenQuotationItems.test.ts && tsx tests/legacyRegulatoryNote.test.ts && tsx tests/netMeteringRegime.test.ts && tsx tests/darkTheme.test.ts && tsx tests/returnIndicators.test.ts && tsx tests/zeroExportViewer.test.ts"
   },
   "dependencies": {
-    "hono": "^4.13.12"
+    "hono": "^4.13.22"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260819.1",
+    "@cloudflare/workers-types": "^5.20261124.2",
     "tsx": "^4.23.15",
     "typescript": "^5.5.4",
-    "wrangler": "^4.124.0"
+    "wrangler": "^4.168.0"
   },
   "overrides": {
     "miniflare": {
