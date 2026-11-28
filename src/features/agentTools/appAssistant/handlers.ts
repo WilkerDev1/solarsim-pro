@@ -22,7 +22,7 @@ import { createNewProposal } from '../../../domain/newProposal';
 import { createProjectId } from '../../../utils/projectId';
 import { generateNextProjectSequence } from '../../../store/initialData';
 import { companyDocumentCustomization } from '../../../utils/companyDocumentTemplate';
-import { RD_PROVINCES } from '../../../data/rdProvinces';
+import { PROVINCE_ALIASES, RD_PROVINCES } from '../../../data/rdProvinces';
 import type { UtilityDistributor } from '../../../types/tariffs';
 import type { AgentActivityEntry, AgentChange } from '../../../store/slices/agentSlice';
 import type { ProjectSimulation } from '../../../types';
@@ -187,13 +187,17 @@ const normalizeText = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]
 /** Nombres con que se reconoce una provincia: el completo y sus partes («Santo Domingo / Distrito Nacional», «Monseñor Nouel (Bonao)»). */
 const provinceAliases = (name: string) => unique([name, ...name.split(/[/()]/)].map(normalizeText).filter(Boolean));
 /**
- * Provincia por coincidencia exacta (del nombre o de una de sus partes) o por un prefijo único de al menos tres letras.
+ * Provincia por coincidencia exacta (del nombre, de una de sus partes o de un municipio conocido de PROVINCE_ALIASES) o por un
+ * prefijo único de al menos tres letras.
  * Nunca por un fragmento cualquiera: si hay varias candidatas, o ninguna, el error las lista.
  */
 export function resolveProvince(raw: string): { name: string } | { error: string } {
   const query = normalizeText(raw);
   const exact = RD_PROVINCES.filter((p) => provinceAliases(p.name).includes(query));
   if (exact.length === 1) return { name: exact[0].name };
+  // Municipios frecuentes («Santo Domingo Este», «Boca Chica», «Bávaro»…): solo coincidencia exacta con el alias.
+  const municipality = exact.length ? undefined : RD_PROVINCES.find((p) => p.name === PROVINCE_ALIASES[query]);
+  if (municipality) return { name: municipality.name };
   const prefixed = query.length >= 3 ? RD_PROVINCES.filter((p) => provinceAliases(p.name).some((alias) => alias.startsWith(query))) : [];
   if (!exact.length && prefixed.length === 1) return { name: prefixed[0].name };
   const candidates = exact.length ? exact : prefixed.length ? prefixed : RD_PROVINCES.filter((p) => query && normalizeText(p.name).includes(query));
