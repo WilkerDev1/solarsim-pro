@@ -1,5 +1,5 @@
 import { canWrite, isWriterRole } from '../../../shared/permissions';
-import { proposalActionBlock, proposalCompleteness } from '../../domain/proposalCompleteness';
+import { proposalActionBlock, proposalResults, shownMetric } from '../../domain/proposalCompleteness';
 import { IncompleteNotice, PENDING_VALUE, ResultsPending } from '../simulator/ProposalStatusHints';
 import { useMemo, useState } from "react";
 import { ArrowLeft, MapPin, Share2, FileText, FilePlus2 } from "lucide-react";
@@ -66,9 +66,11 @@ export const ProjectHubView = () => {
     );
   const devices = proposalDevices(project);
   // F2b (ADR 0009): incompleta ⇒ cifras vacías con su motivo (nunca en cero) y sin compartir ni convertir a cotización.
-  const completeness = proposalCompleteness(project);
+  // `results.summary === null` ⇒ cifras «—» y bloques «pendiente» (decisión pura del dominio).
+  const results = proposalResults(project, mode, summary);
+  const completeness = results;
   const blockedReason = proposalActionBlock(project).reason;
-  const pending = completeness.incomplete;
+  const pending = !results.summary;
   const ownerKey = `${workspaceScope}|${sessionGeneration}|${project.id}`;
   return (
     <div className="project-summary">
@@ -155,7 +157,7 @@ export const ProjectHubView = () => {
         <div>
           <span>Retorno simple estimado</span>
           <strong>
-            {pending ? PENDING_VALUE : paybackLabel(summary, savings)}
+            {shownMetric(completeness, paybackLabel(summary, savings))}
           </strong>
         </div>
       </div>

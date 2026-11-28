@@ -232,10 +232,18 @@ const listProps = (kind: EquipmentKind, mode: 'catalog' | 'manual', specs: Parti
 
 // --- Sección completa: modo, pérdidas, grupos, batería y franja DC / AC / DC-AC ---
 {
-  const project = { specs: { ...multi(), isDetailed: false, autoCalculatePanels: false, systemLosses: 25 }, rates: { targetCoveragePct: 95 } } as never;
+  // Propuesta completa (consumo, precio de la energía y precio en cada equipo): las cifras se muestran (ADR 0009).
+  const base = multi();
+  const priced = <T extends { unitPriceUSD?: number }>(groups?: T[]) => groups?.map((g) => ({ ...g, unitPriceUSD: 100 }));
+  const project = { specs: { ...base, panels: priced(base.panels), inverters: priced(base.inverters), batteries: priced(base.batteries), isDetailed: false, autoCalculatePanels: false, systemLosses: 25 },
+    rates: { targetCoveragePct: 95, energyCostPerKWh: 0.2 }, monthlyConsumption: Array(12).fill(1000) } as never;
   const summary = { batteryUsableKWh: 16, batteryBackupAutonomyHours: 5.5 } as never;
   const section = (p: unknown) => render(h(EquipmentParamsSection, { project: p as never, summary, updateSpecs: noop }));
   const catalogMarkup = section(project);
+  // Incompleta (sin consumo): lo que calcula el motor es «—», nunca un relleno.
+  const incompleteMarkup = section({ ...(project as object), monthlyConsumption: [] });
+  assert.doesNotMatch(incompleteMarkup, /~5\.5 h/);
+  assert.match(incompleteMarkup, /Autonomía/);
   assert.match(catalogMarkup, /role="radiogroup"[^>]*aria-label="Modo de equipamiento"/);
   assert.match(catalogMarkup, /Catálogo/);
   assert.match(catalogMarkup, /Pérdidas del sistema/);

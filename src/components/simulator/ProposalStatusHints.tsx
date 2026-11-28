@@ -44,5 +44,5 @@ export const EstimatedConsumptionHint: React.FC = () => (
   </span>
 );
 
-/** «—» en lugar de una cifra mientras la propuesta esté incompleta. */
-export const PENDING_VALUE = '—';
+/** «—» en lugar de una cifra mientras la propuesta esté incompleta (del dominio: `shownMetric`). */
+export { PENDING_VALUE } from '../../domain/proposalCompleteness';

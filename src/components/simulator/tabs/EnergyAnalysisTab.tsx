@@ -1,7 +1,8 @@
 import { GRID_USE_CHARGE_ESTIMATE_NOTICE } from '../../../../shared/netMetering';
 import type { ProposalCompleteness } from '../../../domain/proposalCompleteness';
 import { isConsumptionEstimated } from '../../../domain/newProposal';
-import { EstimatedConsumptionHint, PENDING_VALUE, ResultsPending } from '../ProposalStatusHints';
+import { EstimatedConsumptionHint, ResultsPending } from '../ProposalStatusHints';
+import { shownMetric } from '../../../domain/proposalCompleteness';
 import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React, { useState } from 'react';
 import { describePanelConfiguration, readEquipment } from '../../../../shared/equipment';
@@ -60,7 +61,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
 }) => {
   const pending = !!completeness?.incomplete;
   /** Una cifra calculada, o «—» mientras la propuesta esté incompleta. */
-  const shown = (text: string) => (pending ? PENDING_VALUE : text);
+  const shown = (text: string) => (completeness ? shownMetric(completeness, text) : text);
   const projectionEnabled = useSelfConsumptionProjection();
   const panelsLabel = describePanelConfiguration(readEquipment(project.specs));
   const showSelfConsumption = projectionEnabled && project.specs.showSelfConsumptionBreakdown !== false;

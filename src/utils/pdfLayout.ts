@@ -68,3 +68,22 @@ export function buildPdfLayout(
 
   return { pageNumbers, activePagesCount: page, footerTotalPages: nextPage - 1, tocItems };
 }
+
+/** Páginas del documento que no imprimen cifras del motor: el índice y los textos de la empresa (ADR 0009). */
+export const SECTIONS_WITHOUT_FIGURES: readonly PDFSectionId[] = ['tableOfContents', 'aboutUs', 'benefits', 'techIntro'];
+
+/**
+ * Páginas que se dibujan del documento de una propuesta (vista del PDF y visor de la cotización). Completa: las visibles, en
+ * su orden, como siempre. Incompleta: solo las visibles sin cifras, y `pending` para que la vista ponga en su lugar los
+ * motivos («Resultados pendientes»): las demás imprimirían rellenos del motor (ADR 0009).
+ */
+export function proposalDocumentSections(
+  order: readonly PDFSectionId[],
+  visibility: Partial<Record<PDFSectionId, boolean>>,
+  incomplete: boolean,
+): { sections: PDFSectionId[]; pending: boolean } {
+  const visible = order.filter((id) => visibility[id]);
+  return incomplete
+    ? { sections: visible.filter((id) => SECTIONS_WITHOUT_FIGURES.includes(id)), pending: true }
+    : { sections: visible, pending: false };
+}

@@ -1,5 +1,6 @@
 import React, { useRef, useState, useMemo } from 'react';
-import { proposalActionBlock } from '../../domain/proposalCompleteness';
+import { proposalActionBlock, proposalResults } from '../../domain/proposalCompleteness';
+import { ResultsPending } from '../simulator/ProposalStatusHints';
 import { flushSync } from 'react-dom';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -10,7 +11,7 @@ import { exportProposalPdf } from './export/exportProposalPdf';
 import { ProposalAnnexSync } from './annexes/ProposalAnnexSync';
 import { confirmMissingAnnexes } from './annexes/confirmMissingAnnexes';
 import { PDFSectionId } from '../../constants/pdfSections';
-import { buildPdfLayout, normalizeSectionOrder } from '../../utils/pdfLayout';
+import { buildPdfLayout, normalizeSectionOrder, proposalDocumentSections } from '../../utils/pdfLayout';
 import { formatProposalDate } from '../../utils/formatDateUtils';
 import { DocumentEditorProvider } from './editor/DocumentEditorContext';
 import { DocumentEditorToolbar } from './editor/DocumentEditorToolbar';
@@ -63,8 +64,10 @@ export const PDFProposalView: React.FC = () => {
   // Live Inline Editing Mode
   const [isEditMode, setIsEditMode] = useState(false);
 
-  // F2b (ADR 0009): una propuesta incompleta no se exporta ni se imprime (sus cifras serían rellenos del motor).
+  // F2b (ADR 0009): una propuesta incompleta no se exporta ni se imprime, y sus páginas con cifras no se dibujan (serían
+  // rellenos del motor): quedan las de textos y, en lugar de las demás, los motivos.
   const blockedReason = proposalActionBlock(project).reason;
+  const results = proposalResults(project, 'legacy', summary);
 
   const handlePrint = () => {
     if (blockedReason) return;
@@ -223,9 +226,21 @@ export const PDFProposalView: React.FC = () => {
           actions={editorActions}
         >
           <DocumentEditorToolbar isEditMode={editing} setIsEditMode={setIsEditMode} readOnlyReason={readOnlyReason} />
-          <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
-            {effectiveSectionOrder.map((sectionId) => (sectionVisibility[sectionId] ? renderSection(sectionId) : null))}
-          </div>
+          {(() => {
+            const docPages = proposalDocumentSections(effectiveSectionOrder, sectionVisibility, !results.summary);
+            return (
+              <>
+                {docPages.pending && (
+                  <div className="w-[850px] bg-white dark:bg-zinc-900 rounded-xl">
+                    <ResultsPending completeness={results} title="Documento pendiente: las páginas con cifras se muestran al completar la propuesta" />
+                  </div>
+                )}
+                <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
+                  {docPages.sections.map((sectionId) => renderSection(sectionId))}
+                </div>
+              </>
+            );
+          })()}
         </DocumentEditorProvider>
       </main>
     </div>

@@ -5,7 +5,9 @@
  * - consumo: doce meses finitos ≥ 0 con algo de consumo;
  * - un panel y un inversor con potencia y cantidad;
  * - tarifa o precio de la energía (con red): un precio del kWh > 0 o la fila de la tarifa guardada;
- * - precio en cada equipo en uso (matriz de costos; en precio directo $/W los costos unitarios no fijan el precio).
+ * - precio en cada equipo en uso (matriz de costos; en precio directo $/W los costos unitarios no fijan el precio). Un 0
+ *   escrito a mano (`priceSource: 'manual'`: equipo que aporta el cliente, cortesía) es un precio dado; un 0 sin esa
+ *   procedencia (lo heredado, lo que dejó un catálogo sin precio, una oferta a 0) cuenta como «sin precio».
  * Mientras esté incompleta, los resultados se muestran vacíos con su motivo (nunca en cero) y no se exporta el PDF, no se
  * comparte ni se convierte a cotización. Una propuesta completa no cambia en nada: `proposalResults` da el resumen del motor tal cual.
  */
@@ -32,6 +34,9 @@ export interface ProposalCompleteness {
 }
 
 const positive = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
+/** Precio dado: positivo, o un 0 escrito a mano. */
+const priced = (group: { unitPriceUSD?: number; priceSource?: string }) =>
+  positive(group.unitPriceUSD) || (group.unitPriceUSD === 0 && group.priceSource === 'manual');
 const LIST_LABEL = { panels: 'paneles', inverters: 'inversores', batteries: 'baterías' } as const;
 
 /** Mínimos para calcular. Ver el encabezado del módulo. */
@@ -63,7 +68,7 @@ export function proposalCompleteness(project: ProjectSimulation): ProposalComple
     const unpriced: { path: string; name: string }[] = [];
     for (const list of ['panels', 'inverters', 'batteries'] as const) {
       equipment[list].forEach((group, index) => {
-        if (positive(group.count) && !positive(group.unitPriceUSD)) unpriced.push({ path: `specs.${list}[${index}].unitPriceUSD`, name: group.brandModel?.trim() || LIST_LABEL[list] });
+        if (positive(group.count) && !priced(group)) unpriced.push({ path: `specs.${list}[${index}].unitPriceUSD`, name: group.brandModel?.trim() || LIST_LABEL[list] });
       });
     }
     if (unpriced.length) {
@@ -81,10 +86,28 @@ export interface ProposalResults extends ProposalCompleteness {
   summary: FinancialSummaryResult | null;
 }
 
-/** Resultados para mostrar: los del motor si está completa; si no, ninguno, con los motivos. */
-export function proposalResults(project: ProjectSimulation, calculationMode: EnergyCalculationMode = 'legacy'): ProposalResults {
+/**
+ * Resultados para mostrar: los del motor si está completa; si no, ninguno, con los motivos. Es la decisión que usa la
+ * interfaz (simulador, resumen, documento, visor de la cotización): `summary === null` ⇒ «Resultados pendientes».
+ * `computed`: el resumen que la vista ya tiene (el del store), para no calcularlo dos veces.
+ */
+export function proposalResults(project: ProjectSimulation, calculationMode: EnergyCalculationMode = 'legacy', computed?: FinancialSummaryResult): ProposalResults {
   const completeness = proposalCompleteness(project);
-  return { ...completeness, summary: completeness.incomplete ? null : calculateProjectFinancialSummary(project, calculationMode) };
+  return { ...completeness, summary: completeness.incomplete ? null : computed ?? calculateProjectFinancialSummary(project, calculationMode) };
+}
+
+/** «—» en lugar de una cifra mientras la propuesta esté incompleta. */
+export const PENDING_VALUE = '—';
+
+/** Una cifra calculada, o «—» mientras la propuesta esté incompleta (franjas del dock, tablas, tarjetas). */
+export const shownMetric = (completeness: ProposalCompleteness, text: string): string => (completeness.incomplete ? PENDING_VALUE : text);
+
+/**
+ * Precio de contrato que suma en los totales de ventas (cliente, panel de ventas): el del motor, o 0 si está incompleta
+ * (su contrato es un relleno: solo la mano de obra, equipos a 0…). La propuesta sigue contando en los conteos por decisión.
+ */
+export function contractPriceForTotals(project: ProjectSimulation, calculationMode: EnergyCalculationMode = 'legacy'): number {
+  return proposalCompleteness(project).incomplete ? 0 : calculateProjectFinancialSummary(project, calculationMode).contractPriceUSD;
 }
 
 /** Texto corto de los motivos, para un tooltip o un aviso. */

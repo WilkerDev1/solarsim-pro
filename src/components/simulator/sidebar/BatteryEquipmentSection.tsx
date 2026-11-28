@@ -9,6 +9,7 @@ import { CommitNumberField, Field, ParamRow, StatStrip, ToggleGroup } from '../p
 import { AdvancedDisclosure } from '../params/sections/equipment/AdvancedDisclosure';
 import { EquipmentGroupList } from '../params/sections/equipment/EquipmentGroupList';
 import { storeGenericPriceFor } from '../params/logic/storeGenericPrice';
+import { proposalCompleteness, shownMetric } from '../../../domain/proposalCompleteness';
 
 interface BatteryEquipmentSectionProps {
   project: ProjectSimulation;
@@ -32,10 +33,12 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
   const totalKWh = calculateTotalBatteryCapacityKWh(specs);
   const totalUnits = calculateTotalBatteryCount(specs);
 
+  // F2b (ADR 0009): incompleta => lo que calcula el motor es «—»; la capacidad nominal sale de los equipos y se muestra.
+  const completeness = proposalCompleteness(project);
   const stats = [
-    { label: 'Energía útil', value: `${summary.batteryUsableKWh} kWh` },
+    { label: 'Energía útil', value: shownMetric(completeness, `${summary.batteryUsableKWh} kWh`) },
     ...(batteryCount > 1 ? [{ label: 'Capacidad total', value: `${totalKWh.toFixed(1)} kWh · ${totalUnits} un.` }] : []),
-    { label: 'Autonomía', value: `~${summary.batteryBackupAutonomyHours} h` },
+    { label: 'Autonomía', value: shownMetric(completeness, `~${summary.batteryBackupAutonomyHours} h`) },
   ];
 
   return (

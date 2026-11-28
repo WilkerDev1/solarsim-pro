@@ -4,7 +4,10 @@
 import assert from 'node:assert/strict';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
-import { proposalActionBlock, proposalCompleteness, proposalResults } from '../domain/proposalCompleteness';
+import { contractPriceForTotals, PENDING_VALUE, proposalActionBlock, proposalCompleteness, proposalResults, shownMetric } from '../domain/proposalCompleteness';
+import { proposalDocumentSections } from '../utils/pdfLayout';
+import { DEFAULT_PDF_SECTION_ORDER } from '../constants/pdfSections';
+import { readFileSync } from 'node:fs';
 import { editEquipmentGroup } from '../utils/equipmentGroups';
 import { useSimulationStore as store } from '../store/useSimulationStore';
 import { createQuotationFromProposal } from '../features/quotations/proposalConversion';
@@ -77,5 +80,49 @@ assert.match(store.getState().saveFeedbackMessage ?? '', /incompleta/i);
 store.setState({ activeProjectId: 'complete-ok', saveFeedbackMessage: null });
 store.getState().openShareModal();
 assert.equal(store.getState().isShareModalOpen, true, 'una completa se comparte como siempre');
+
+// ── Revisión de F2b ─────────────────────────────────────────────────────────────────────────
+// 5. Un 0 tecleado a mano es un precio dado (equipo que aporta el cliente, cortesía): no es «sin precio» (hallazgo 3). Un 0
+// sin procedencia manual (lo heredado, lo que dejó un catálogo sin precio) sigue faltando.
+const manualZero = without((p) => { p.specs = { ...p.specs, ...editEquipmentGroup(p.specs, 'battery', { type: 'update', index: 0, patch: { unitPriceUSD: 0, priceSource: 'manual' } }) }; });
+assert.deepEqual(codes(manualZero), [], 'precio 0 escrito a mano: precio dado');
+assert.deepEqual(codes(without((p) => { p.specs = { ...p.specs, ...editEquipmentGroup(p.specs, 'battery', { type: 'update', index: 0, patch: { unitPriceUSD: 0, priceSource: 'supplier' } }) }; })), ['missing_equipment_price'], 'una oferta a 0 no es un precio');
+assert.deepEqual(codes(without((p) => { p.specs = { ...p.specs, ...editEquipmentGroup(p.specs, 'battery', { type: 'update', index: 0, patch: { unitPriceUSD: undefined, priceSource: 'manual' } }) }; })), ['missing_equipment_price'], 'manual sin cifra sigue faltando');
+
+// 6. Las decisiones de mostrar son funciones puras y las usa la interfaz (hallazgo 8).
+const computed = calculateProjectFinancialSummary(complete);
+assert.equal(proposalResults(complete, 'legacy', computed).summary, computed, 'con el resumen ya calculado, ese mismo objeto');
+assert.equal(proposalResults(incomplete, 'legacy', computed).summary, null, 'incompleta: ninguno, aunque el motor haya calculado');
+assert.equal(shownMetric(proposalCompleteness(complete), '12,5 kWp'), '12,5 kWp');
+assert.equal(shownMetric(proposalCompleteness(incomplete), '12,5 kWp'), PENDING_VALUE);
+assert.equal(PENDING_VALUE, '—');
+// Totales de ventas: una incompleta no suma su contrato de relleno (hallazgo 6).
+assert.equal(contractPriceForTotals(complete), computed.contractPriceUSD);
+assert.equal(contractPriceForTotals(incomplete), 0);
+// Documento (vista del PDF y visor de la cotización, hallazgo 2): incompleta ⇒ solo las páginas sin cifras, más el motivo.
+const visibility = Object.fromEntries(DEFAULT_PDF_SECTION_ORDER.map((id) => [id, true])) as Record<(typeof DEFAULT_PDF_SECTION_ORDER)[number], boolean>;
+assert.deepEqual(proposalDocumentSections(DEFAULT_PDF_SECTION_ORDER, visibility, false), { sections: DEFAULT_PDF_SECTION_ORDER, pending: false }, 'completa: el documento de siempre');
+const pendingDoc = proposalDocumentSections(DEFAULT_PDF_SECTION_ORDER, visibility, true);
+assert.equal(pendingDoc.pending, true);
+assert.deepEqual(pendingDoc.sections, ['tableOfContents', 'aboutUs', 'benefits', 'techIntro'], 'sin portada, resumen, descripción, energía, cotización, retorno, flujo ni costos');
+assert.deepEqual(proposalDocumentSections(DEFAULT_PDF_SECTION_ORDER, { ...visibility, aboutUs: false }, true).sections, ['tableOfContents', 'benefits', 'techIntro'], 'respeta las ocultas');
+// La interfaz decide con esas funciones (no con condicionales propios que ninguna prueba ve).
+const uses: Record<string, string[]> = {
+  'src/components/simulator/SimulatorView.tsx': ['proposalResults('],
+  'src/components/simulator/tabs/EnergyAnalysisTab.tsx': ['shownMetric('],
+  'src/components/hub/ProjectHubView.tsx': ['proposalResults(', 'shownMetric('],
+  'src/components/pdf/PDFProposalView.tsx': ['proposalResults(', 'proposalDocumentSections('],
+  'src/components/quotations/editor/ProposalViewer.tsx': ['proposalResults('],
+  'src/components/quotations/editor/ProposalViewerDocument.tsx': ['proposalDocumentSections('],
+  'src/components/simulator/sidebar/PricingParamsSection.tsx': ['shownMetric('],
+  'src/components/simulator/params/sections/pricing/DirectPrice.tsx': ['shownMetric('],
+  'src/components/simulator/sidebar/BatteryEquipmentSection.tsx': ['shownMetric('],
+  'src/components/clients/ClientDetailPanel.tsx': ['contractPriceForTotals('],
+  'src/features/proposals/ProposalSalesSummary.tsx': ['contractPriceForTotals('],
+};
+for (const [file, needles] of Object.entries(uses)) {
+  const source = readFileSync(file, 'utf8');
+  for (const needle of needles) assert.ok(source.includes(needle), `${file} decide qué mostrar con ${needle.slice(0, -1)} (ADR 0009)`);
+}
 
 console.log('PASS: propuesta incompleta: motivos en español, resultados vacíos (no en cero) y PDF, compartir y cotización bloqueados; una completa no cambia.');
