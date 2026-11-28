@@ -11,7 +11,6 @@ import {
   UpdateInfo,
   DocumentCustomization,
   DocumentLayoutSettings,
-  ExtractedInvoiceData,
   SyncSettings,
   UserProfile,
   UserRole,

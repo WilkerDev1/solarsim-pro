@@ -9,7 +9,6 @@ import {
 } from '../features/assistant/tools';
 import { AssistantEditsError, validateAssistantEdits } from '../features/assistant/validation';
 import { featureScope } from '../../shared/applicationFeatures';
-import { type GeminiTransport } from './support/restFixture';
 const state = useSimulationStore;
 const project = {
   ...structuredClone(BENCHMARK_PROJECT),

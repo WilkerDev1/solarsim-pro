@@ -1,15 +1,11 @@
 import { applyDocumentTextPatch, documentTextsPatch } from '../../shared/documentTexts';
-import { aiDocumentTextCatalog, draftDocumentTextValues, type AIDocumentTextEntry, type DraftDocumentText } from '../../shared/documentTexts/aiDraft';
+import { draftDocumentTextValues, type DraftDocumentText } from '../../shared/documentTexts/aiDraft';
 import { energyCalculationMode } from '../../shared/applicationFeatures';
 import { effectiveFeatureSettings, type FeaturePolicyState } from '../features/application/featurePolicy';
 import { applyDocumentClientEdit } from '../domain/projectEdit';
-import { buildDocumentTextContext, documentTextContextFor } from './documentTextContext';
+import { buildDocumentTextContext } from './documentTextContext';
 import { formatProposalDate } from './formatDateUtils';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
-import { companyDocumentCustomization } from './companyDocumentTemplate';
-import { createAIProposalBase } from './proposalDraftProject';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
-import type { SimulationStore } from '../store/types';
 import type { CompanyProfile, ProjectSimulation } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 

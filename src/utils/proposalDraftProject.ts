@@ -142,8 +142,8 @@ function asksPanelSizing(raw:Record<string,any>):boolean {
  * Cantidad de paneles de un borrador con grupos que pidió dimensionar, con la base de la propuesta (ADR 0009). El
  * normalizador compartido (`shared/aiProposal`, fuera del alcance de una versión solo de cliente) dimensiona con el consumo
  * real; con la base `peak_month` (las propuestas nuevas) aquí se rehace con el mes pico, para que nazca con la base que guarda
- * y activar el autodimensionado no cambie la cantidad. Con la base heredada, el borrador tal cual. La comparten la vista
- * previa del modal y la aplicación (`buildProjectFromDraft`). Pura.
+ * y activar el autodimensionado no cambie la cantidad. Con la base heredada, el borrador tal cual. La usa `buildProjectFromDraft`
+ * (create_proposal). Pura.
  */
 export function sizeDraftPanelsWithBasis(raw:Record<string,any>,data:ExtractedInvoiceData,ctx:{province:string;lossesPct?:number;customMonthlyHSP?:number[];basis:SizingBasis}):ExtractedInvoiceData {
   const group=data.panels?.length===1?data.panels[0]:undefined;

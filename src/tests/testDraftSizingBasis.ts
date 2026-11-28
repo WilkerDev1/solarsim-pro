@@ -2,8 +2,6 @@
 // (`specs.sizingBasis = 'peak_month'`, ADR 0009). Si nace con una base y guarda otra, activar después el autodimensionado
 // hace saltar la cantidad de paneles. Lo guardado sin base (el comportamiento de siempre) no cambia.
 import assert from 'node:assert/strict';
-import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';

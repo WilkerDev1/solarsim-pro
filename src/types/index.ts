@@ -1,6 +1,6 @@
 import type { NetMeteringRegime } from '../../shared/netMetering';
 import type { BillingTariff, EnergyRateSource, FixedChargeTierBasis } from '../../shared/tariffBilling';
-import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
+import type { ExtractedInvoiceData } from './aiInvoice';
 import type { LegacyEquipmentFields } from '../../shared/equipment';
 import type { GridConnectionMode } from '../../shared/gridConnection';
 import type { SupplyAlternative } from '../../shared/offGridSupply';
