@@ -4,10 +4,13 @@
  * recibe una referencia (`extractionId`), no los doce consumos. La normalización es determinista y no inventa nada: un mes que
  * no aparece no se rellena; con menos de doce meses se usa el promedio de los leídos y se avisa.
  *
- * Es lo que existe hoy en beta: los escáneres sobre el puerto (F1b) no están fusionados y el modal antiguo lee facturas por
- * `electron/ai`. Si F1b fija una política común de esquemas y límites de salida, esta lectura se puede pasar a ella.
+ * La petición va por la política de salida estructurada de los escáneres (`requestStructured`, F1b): un reintento ante JSON
+ * inválido, tope de 20 MiB inline, plazo global y modelo de reserva DENTRO de esta subllamada (es una petición aparte, sin
+ * el historial ni las firmas del turno: no afecta a la regla de respaldo del bucle). El esquema es propio y pequeño; el
+ * modal antiguo sigue leyendo facturas por `electron/ai` hasta F6.
  */
 import type { LlmClient } from '../../../services/llm/types';
+import { requestStructured } from '../../../services/llm/structuredPolicy';
 import type { InvoiceExtraction } from '../../agentTools/appAssistant/ports';
 import { toBase64, type ChatFile } from '../chatFiles';
 
@@ -90,18 +93,24 @@ export interface InvoiceExtractionInput {
 
 /** Lee la factura con una subllamada estructurada; lanza si se cancela o si el modelo no responde con el esquema. */
 export async function extractInvoiceWithLlm({ client, model, file, signal }: InvoiceExtractionInput): Promise<InvoiceExtraction> {
-  const { data } = await client.structured<RawExtraction>({
-    model,
-    systemInstruction: INVOICE_EXTRACTION_INSTRUCTION,
-    schema: INVOICE_EXTRACTION_SCHEMA,
-    contents: [{
-      role: 'user',
-      parts: [
-        { type: 'text', text: `Factura «${file.name}». Extrae titular, suministro, distribuidora, tarifa y los consumos por mes.` },
-        { type: 'inlineData', mimeType: file.mimeType, data: toBase64(file.bytes) },
-      ],
-    }],
-  }, { signal, timeoutMs: INVOICE_EXTRACTION_TIMEOUT_MS });
+  const { data } = await requestStructured<RawExtraction & Record<string, unknown>>({
+    client,
+    signal,
+    timeoutMs: INVOICE_EXTRACTION_TIMEOUT_MS,
+    invalidMessage: 'Gemini no devolvió una lectura válida de la factura. No se usó ningún dato.',
+    request: {
+      model,
+      systemInstruction: INVOICE_EXTRACTION_INSTRUCTION,
+      schema: INVOICE_EXTRACTION_SCHEMA,
+      contents: [{
+        role: 'user',
+        parts: [
+          { type: 'text', text: `Factura «${file.name}». Extrae titular, suministro, distribuidora, tarifa y los consumos por mes.` },
+          { type: 'inlineData', mimeType: file.mimeType, data: toBase64(file.bytes) },
+        ],
+      }],
+    },
+  });
   if (signal?.aborted) throw new Error('Solicitud cancelada.');
   return normalizeInvoiceExtraction(data);
 }
