@@ -128,12 +128,25 @@ Precio automático: como `propose_project_update`, un lote que toca precios deja
 
 Esquemas: `testAssistantToolset` limita la profundidad (raíz → lista → objeto) a 3, cada declaración a 8.000 bytes y el conjunto a 30.000. La comprobación manual contra la API real es `scripts/qa/checkToolDeclarations.ts --toolset app-assistant --prompts` ([QA](QA.md#ensayos-fuera-de-npm-test)).
 
+## Instrucciones, fachada y eventos del turno (F3c)
+
+Todo puro y probado, pero **sin usar todavía** por el flotante actual (sigue con `ASSISTANT_SYSTEM_PROMPT` y `executeForAssistant` hasta F4). Lo que ven los agentes externos queda congelado: [contrato congelado](AGENT_CONTRACT_FREEZE.md).
+
+| Pieza | Ubicación | Función |
+| --- | --- | --- |
+| Instrucciones en tres capas | `appAssistant/instructions.ts` | `buildSystemInstruction(superficie, {tools})`: capa 1 `AGENT_RULES_ES` tal cual; capa 2 guía generada de las declaraciones (por tipo, en el orden del conjunto) y del registro de campos, con los equivalentes de lo que nombra la capa 1 (`propose_project_update` → `edit_proposal`); capa 3 conducta de la app. La superficie `mcp` recibe solo la capa 1. Sin nada vivo: prefijo estable para la caché |
+| Supuestos | `appAssistant/assumptions.ts` | Lista cerrada de fuentes (`settings` Ajustes, `factory` `NEW_PROPOSAL_DEFAULTS`, `sizing` `SIZING_ASSUMPTIONS`, `proposal` ruta del registro); `validateDeclaredAssumption` comprueba la clave y, si la fuente es una constante, el valor; `assumptionFromSizing` clasifica lo que cita `sizing.ts` |
+| Eventos del turno | `appAssistant/turnEvents.ts` | Tipos `text_delta`, `tool_call_started`, `tool_call_finished` (con su diff), `confirmation_pending`, `assumption_declared`, `recoverable_error` y `turn_finished` (con resumen: qué cambió, qué se supuso, qué espera confirmación, qué falta y qué sigue); `reduceTurnEvent` puro y reproducible; `toolResponseEvents` pasa una `AssistantToolResponse` a eventos. Los consumen F4 (bucle) y F5 (panel) |
+| Fachada | `proposeProjectUpdateFacade.ts` | `propose_project_update` con la misma definición y resultado; delega en `commitProjectEdits` solo si deja la misma propuesta que el camino antiguo ([detalle](AGENT_CONTRACT_FREEZE.md#fachada-de-propose_project_update)) |
+
+Un supuesto fuera de la lista no entra en el turno: queda como error recuperable `assumption_rejected` para que el bucle lo devuelva al modelo. Tras `turn_finished`, o un error con `recoverable: false`, el estado del turno ya no cambia; una llamada que seguía en curso queda `interrupted`.
+
 ## Privacidad
 
 Texto, archivos adjuntos y resultados de herramientas se envían a Google Gemini; la configuración de autenticación nunca se envía. Los adjuntos del catálogo no se mandan al modelo automáticamente. La conversación es transitoria: cambiar de proyecto, espacio o sesión la descarta.
 
 ## Verificación
 
-- Suites: `testAIDocumentTexts`, `testAgentDocumentTools`, `testAgentAttachmentTools`, `testAgentClientTools`, `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testProjectEdit`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testLegacyProposalAssistantApply`, `testAutomatedPricingPolicy`, `testAppAssistant`, `testAssistantToolRound`, `testAssistantToolset` (conjunto del asistente de la app, F3a) y `testAssistantLiveEditProfile` (perfil «edición en vivo» y encendido del asistente, F3b).
+- Suites: `testAIDocumentTexts`, `testAgentDocumentTools`, `testAgentAttachmentTools`, `testAgentClientTools`, `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testProjectEdit`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testLegacyProposalAssistantApply`, `testAutomatedPricingPolicy`, `testAppAssistant`, `testAssistantToolRound`, `testAssistantToolset` (conjunto del asistente de la app, F3a), `testAssistantLiveEditProfile` (perfil «edición en vivo» y encendido del asistente, F3b), `testAssistantInstructions`, `testAssistantTurnEvents`, `testProposeProjectUpdateFacade` y `testFrozenAgentContract` (instrucciones en capas, eventos del turno, fachada y contrato congelado, F3c).
 - Todas usan transporte sintético; ninguna escribe en producción ni llama a Gemini real.
 - La fixture `scripts/qa/fixtures/appAssistant.html` cubre consultas, auditoría, cambio aplicado con deshacer y confirmación.

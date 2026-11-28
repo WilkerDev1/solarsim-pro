@@ -77,7 +77,8 @@ assert.equal(active().syncStatus, 'local_only');
 const steps = store.getState().undoHistory.journals[project.id].undo;
 assert.equal(steps.length, 1);
 assert.equal(steps[0].source, 'user', 'la misma fuente que dejaba el camino antiguo');
-assert.deepEqual(steps[0].paths.map((p) => p.path).sort(), ['client', 'financials', 'rates']);
+// (el teléfono del cliente es espejo del documento: las reglas también tocan `customization`, igual que en el camino antiguo)
+assert.deepEqual(steps[0].paths.map((p) => p.path).sort(), ['client', 'customization', 'financials', 'rates']);
 assert.ok(steps[0].fields?.some((f) => f.path === 'rates.targetCoveragePct' && f.after === 80 && !f.derived));
 // La actividad del agente se deshace como siempre (restaura las seis secciones de antes).
 const entry = store.getState().agentActivity[0];

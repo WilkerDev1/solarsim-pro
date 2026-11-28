@@ -57,7 +57,7 @@ const real = {
   remoteTools: remoteToolsJson(),
   proposeProjectUpdate: JSON.stringify(findAgentTool('propose_project_update')),
   remoteNames: REMOTE_TOOL_NAMES,
-  kinds: [...AGENT_TOOL_DEFINITIONS, ...appAssistantToolDefinitions()].map((d) => d.kind),
+  kinds: [...AGENT_TOOL_DEFINITIONS, ...appAssistantToolDefinitions()].map((d): string => d.kind),
 };
 checkFrozenContract(real);
 
@@ -78,11 +78,11 @@ const breaks = (patch: Partial<typeof real>, pattern: RegExp) =>
 breaks({ rules: `${AGENT_RULES_ES} ` }, /AGENT_RULES_ES cambió/);
 breaks({ rules: AGENT_RULES_ES.replace('nunca inventes un precio', 'no inventes un precio') }, /AGENT_RULES_ES cambió/);
 breaks({ remoteInstructions: REMOTE_INSTRUCTIONS.replace('remoto', 'Remoto') }, /REMOTE_INSTRUCTIONS cambió/);
-breaks({ remoteTools: real.remoteTools.replace('"Máximo 12', '"Máximo 13') }, /12 herramientas del MCP remoto cambió/);
+breaks({ remoteTools: real.remoteTools.replace('Máximo 12', 'Máximo 13') }, /12 herramientas del MCP remoto cambió/);
 breaks({ remoteTools: real.remoteTools.replace('"required": [\n        "id"', '"required": [\n        "projectId"') }, /12 herramientas del MCP remoto cambió/);
 breaks({ remoteNames: [...REMOTE_TOOL_NAMES, 'propose_project_update'] }, /lista de herramientas del MCP remoto/);
 breaks({ proposeProjectUpdate: JSON.stringify({ ...findAgentTool('propose_project_update')!, description: 'Obsoleta.' }) }, /propose_project_update cambió/);
 breaks({ kinds: ['read', 'live'] }, /Tipo de herramienta nuevo «live»/);
-assert.notEqual(real.remoteTools.replace('"Máximo 12', '"Máximo 13'), real.remoteTools, 'la alteración de prueba sí cambia el texto');
+assert.notEqual(real.remoteTools.replace('Máximo 12', 'Máximo 13'), real.remoteTools, 'la alteración de prueba sí cambia el texto');
 
 console.log('PASS: contrato congelado con los agentes externos: AGENT_RULES_ES, REMOTE_INSTRUCTIONS, las 12 herramientas remotas, propose_project_update y los kinds.');

@@ -1,9 +1,11 @@
 // F0: copias doradas del contrato de herramientas y de las instrucciones que leen los modelos y los clientes MCP.
 //  · AGENT_RULES_ES: instrucciones del MCP local y prefijo de las del remoto y del prompt del asistente.
-//  · ASSISTANT_SYSTEM_PROMPT: prompt del asistente flotante (lo reescribe F3).
+//  · ASSISTANT_SYSTEM_PROMPT: prompt del asistente flotante antiguo (F3c dejó las instrucciones nuevas en tres capas,
+//    `buildSystemInstruction`, con su propia instantánea; F4 cambia el flotante a ellas y retira este prompt).
 //  · lista de herramientas por superficie (mcp, app-assistant, proposal-assistant) con su kind.
 //  · tools/list completo del MCP local (nombre, título, descripción, kind, categoría y esquemas).
-// Las 12 herramientas del MCP remoto y REMOTE_INSTRUCTIONS están en `mcp-remote/tests/contractGolden.test.ts` (solo allí se pueden importar).
+// Las 12 herramientas del MCP remoto y REMOTE_INSTRUCTIONS están en `mcp-remote/tests/contractGolden.test.ts`; además, el
+// contrato congelado (huellas que no regenera UPDATE_GOLDEN) lo vigila testFrozenAgentContract, que importa el código remoto.
 import assert from 'node:assert/strict';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
