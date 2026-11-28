@@ -90,8 +90,9 @@ async function runOwn(handler: NativeHandler, definition: AgentToolDefinition, a
   const guarded = (name === 'edit_proposal' && operationsTouchPricing(args.ops)) || (name === 'undo_change' && undoNeedsConfirmation(args));
   const effective: AgentToolDefinition = guarded ? { ...definition, kind: 'guarded' } : definition;
   // Dentro de una propuesta y con deshacer: el perfil «edición en vivo» decide (solo para el asistente de la app).
-  // Un costo de equipo escrito a mano no sale de la transacción: se confirma también en la app (operationsSetManualPrice).
-  const scope: AgentToolScope = (name === 'edit_proposal' && !operationsSetManualPrice(args.ops)) || (name === 'undo_change' && undoStaysInProposal(args)) ? 'proposal' : 'shared';
+  // Un costo de equipo escrito a mano, o un equipo con precio renombrado o redimensionado, no sale de la transacción: se
+  // confirma también en la app (operationsSetManualPrice).
+  const scope: AgentToolScope = (name === 'edit_proposal' && !operationsSetManualPrice(args.ops, proposalOf(name, args))) || (name === 'undo_change' && undoStaysInProposal(args)) ? 'proposal' : 'shared';
   let preview: ToolPayload | undefined;
   const capture: NativeHandler = async (a, c) => {
     const result = await handler(a, c);
@@ -147,7 +148,7 @@ function withActionStatus(cached: AssistantToolResponse): AssistantToolResponse 
   const message = {
     rejected: 'El usuario rechazó este cambio: no lo repitas sin que lo pida de nuevo.',
     expired: 'La confirmación de este cambio caducó: prepáralo de nuevo si el usuario aún lo quiere.',
-    failed: `El cambio no se pudo aplicar al confirmarlo: ${action?.error ?? 'error desconocido'}.`,
+    failed: `El cambio no se pudo aplicar al confirmarlo: ${(action?.error ?? 'error desconocido').replace(/[.\s]+$/, '')}.`,
     missing: 'Ese cambio ya no está en la cola de confirmación.',
   }[status as 'rejected' | 'expired' | 'failed' | 'missing'] ?? 'Ese cambio ya no está pendiente.';
   return { ...cached, status: 'error', error: { code: `action_${status}`, message } };
