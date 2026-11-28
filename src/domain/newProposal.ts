@@ -11,7 +11,7 @@
  * - la tarifa de referencia de la distribuidora elegida aplicada a ese consumo, con su fila;
  * - nada del caso de referencia: ni coordenadas, ni datos del cliente, ni equipos ni baterías heredados.
  * Equipos: los elige `chooseCatalogEquipment` (oferta preferida → la más barata en stock → precio genérico señalado → sin
- * precio, nunca inventado, pero siempre un modelo del catálogo si lo hay: el de los ajustes o el más cercano a su potencia) y los dimensiona `sizing.ts` (paneles con la base del mes pico, inversor por DC/AC, baterías por la
+ * precio, nunca inventado, pero un panel y un inversor del catálogo si lo hay: el de los ajustes o el más cercano a su potencia) y los dimensiona `sizing.ts` (paneles con la base del mes pico, inversor por DC/AC, baterías por la
  * regla activa). Una propuesta sin precio en algún equipo nace INCOMPLETA (`proposalCompleteness`), no con un precio prestado.
  *
  * Política de precio por fuente (revisión de F2, M10): «Nueva simulación» respeta el modo de Ajustes (matriz o $/W); el
@@ -147,7 +147,7 @@ const validMonths = (months: readonly number[] | undefined): months is readonly 
  * modelo con su identidad, sus campos y su precio, como el selector del dock. La lista se siembra explícita: una lista vacía
  * haría que la migración inventara el grupo del formato heredado (con su precio por defecto).
  */
-function primaryGroup(specs: SystemSpecs, kind: EquipmentKind, input: NewProposalInput, preferredName: string | undefined, preferredMagnitude: number, manual: Record<string, unknown>): SystemSpecs {
+function primaryGroup(specs: SystemSpecs, kind: EquipmentKind, input: NewProposalInput, preferredName: string | undefined, preferredMagnitude: number | undefined, manual: Record<string, unknown>): SystemSpecs {
   const seeded = { ...specs, [LIST_KEY[kind]]: [{ id: `primary-${kind}`, count: 1, ...manual }] } as SystemSpecs;
   const choice = chooseCatalogEquipment(input.catalog ?? [], kind, { preferredName, preferredMagnitude, genericFor: input.genericPriceFor });
   if (!choice.item) return seeded;
@@ -202,7 +202,9 @@ export function createNewProposal(input: NewProposalInput): ProjectSimulation {
   // La batería de Ajustes (nunca la del caso de referencia) va siempre en su grupo, oculta si «Incluir batería» está apagado:
   // así encenderla no hace que `readEquipment` derive el grupo heredado con su precio por defecto (un precio inventado).
   const capacity = defs.defaultBatteryCapacityKWh || DEFAULT_BATTERY_CAPACITY_KWH;
-  specs = primaryGroup(specs, 'battery', input, undefined, capacity, { brandModel: `Batería ${capacity} kWh`, capacityKWh: capacity, dodPct: defs.defaultBatteryDOD || DEFAULT_BATTERY_DOD_PCT });
+  // Sin potencia preferida: sin precio en el catálogo, la batería sigue siendo la de Ajustes (su DOD y eficiencia, que el
+  // modelo del catálogo cambiaría, y con ellos la cantidad que pide la regla activa).
+  specs = primaryGroup(specs, 'battery', input, undefined, undefined, { brandModel: `Batería ${capacity} kWh`, capacityKWh: capacity, dodPct: defs.defaultBatteryDOD || DEFAULT_BATTERY_DOD_PCT });
 
   // ── Dimensionado (supuestos en sizing.ts) ──
   const panel = readEquipment(specs).panels[0];

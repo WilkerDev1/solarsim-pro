@@ -79,9 +79,9 @@ for (const field of ['company', 'address', 'contactPhone', 'contactEmail', 'cont
 for (const field of ['nic', 'nis', 'rnc', 'contractNumber', 'meterNumber', 'circuit'] as const) assert.equal(pure.client[field], undefined, `sin ${field} del ejemplo`);
 assert.equal(pure.specs.hasBattery, false);
 assert.deepEqual(readEquipment(pure.specs).batteries, [], 'sin batería en uso');
-// La batería (no la del caso de referencia) queda en su grupo, oculta y sin precio: encenderla no inventa uno. Es el modelo del
-// catálogo con la capacidad de los ajustes (QA de F2b: antes «Batería 16.08 kWh», que el dock emparejaba por capacidad).
-assert.deepEqual(pure.specs.batteries?.map((g) => [g.brandModel, g.capacityKWh, g.dodPct, g.unitPriceUSD, g.catalogItemId]), [['Batería Hinaess 16 KwH-48 vdc.', 16.08, 90, undefined, 'eq-bat-hinaess-16k']], 'sin baterías heredadas');
+// La batería de Ajustes (no la del caso de referencia) queda en su grupo, oculta y sin precio: encenderla no inventa uno. Sin
+// precio en el catálogo sigue siendo la de Ajustes (su DOD y eficiencia deciden la cantidad); el nombre es la capacidad por unidad.
+assert.deepEqual(pure.specs.batteries?.map((g) => [g.brandModel, g.capacityKWh, g.dodPct, g.unitPriceUSD, g.catalogItemId]), [['Batería 16.08 kWh', 16.08, 90, undefined, undefined]], 'sin baterías heredadas');
 // Sin catálogo, el modelo de los ajustes, con su nombre por unidad.
 const noCatalog = createNewProposal({ source: 'menu', defaults: DEFAULT_SIMULATION_SETTINGS, tariffMatrix: DEFAULT_RD_TARIFF_MATRIX, catalog: [],
   identity: { id: 'p-nocat', now: '2026-11-28T12:00:00.000Z', sequence: { projectId: 'SP-2026-009', quoteNumber: 'C-0009' } } });
@@ -122,8 +122,8 @@ const bare = readEquipment({ ...unpriced.specs, hasBattery: true });
 const byId = (id: string) => DEFAULT_EQUIPMENT_CATALOG.find((e) => e.id === id)!;
 assert.deepEqual([bare.panels[0].catalogItemId, bare.panels[0].brandModel, bare.panels[0].powerW], ['eq-mod-cs-620', byId('eq-mod-cs-620').displayName, 620]);
 assert.deepEqual([bare.inverters[0].catalogItemId, bare.inverters[0].brandModel], ['eq-inv-luxpower-8k', byId('eq-inv-luxpower-8k').displayName], 'el inversor de los ajustes, por nombre');
-assert.deepEqual([bare.batteries[0].catalogItemId, bare.batteries[0].brandModel, bare.batteries[0].capacityKWh], ['eq-bat-hinaess-16k', byId('eq-bat-hinaess-16k').displayName, 16.08], 'la batería del catálogo con la capacidad de los ajustes');
-for (const [kind, group, magnitude] of [['panel', bare.panels[0], bare.panels[0].powerW], ['inverter', bare.inverters[0], bare.inverters[0].powerKW], ['battery', bare.batteries[0], bare.batteries[0].capacityKWh]] as const) {
+assert.equal(bare.batteries[0].unitPriceUSD, undefined, 'batería: sin precio inventado');
+for (const [kind, group, magnitude] of [['panel', bare.panels[0], bare.panels[0].powerW], ['inverter', bare.inverters[0], bare.inverters[0].powerKW]] as const) {
   assert.equal(group.unitPriceUSD, undefined, `${kind}: sin precio inventado`);
   // Lo que resuelve el dock (chip, «+ prov.», «Mejor proveedor») es el mismo equipo que se cotiza.
   assert.equal(resolveProjectEquipment(DEFAULT_EQUIPMENT_CATALOG, kind, group.brandModel, magnitude)?.id, group.catalogItemId, `${kind}: el dock resuelve el mismo modelo`);
