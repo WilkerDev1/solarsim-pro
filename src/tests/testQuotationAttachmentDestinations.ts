@@ -144,7 +144,9 @@ const asOldApi = (content: QuotationContent): QuotationContent => ({
 // --- (4) Store real contra una API sintética (2.10.1 que descarta el campo, y una nueva que lo guarda) ---------------
 const { useSimulationStore: store } = await import('../store/useSimulationStore');
 const { installLockingApi } = await import('./quotationLockingApi');
+type LockingApiOptions = import('./quotationLockingApi').LockingApiOptions;
 const { forgetQuotationApiSupport } = await import('../store/sync/quotationContent');
+const { QuotationSyncService } = await import('../services/quotationSyncService');
 const { quotationEditorActions } = await import('../features/quotations/editorActions');
 const user = { id: 'owner', name: 'QA', email: 'qa@example.invalid', role: 'EDITOR' as const, organizationId: 'org' };
 const api = () => store.getState();
@@ -156,9 +158,10 @@ const validators = {
   new: (raw: unknown) => validateQuotationContent(raw),
 };
 
-async function setup(apiVersion: 'old' | 'new', serverUrl = `https://${apiVersion}-destinos.invalid`) {
+async function setup(apiVersion: 'old' | 'new', serverUrl = `https://${apiVersion}-destinos.invalid`, options: LockingApiOptions = {}) {
   // Con el bloqueo de la API real: `quotation_locked` e `invalid_transition` (quotationLockingApi.ts).
-  const locking = installLockingApi(validators[apiVersion]);
+  // La nueva declara en el GET los campos que guarda (`localOnlyFieldsStored`), salvo que la prueba diga otra cosa.
+  const locking = installLockingApi(validators[apiVersion], { declares: apiVersion === 'new', ...options });
   const { rows, puts } = locking;
   api().setSyncSettings({ serverUrl, currentUser: user, authToken: 'synthetic', autoSyncEnabled: false, lastSyncTimestamp: null });
   store.setState({ quotations: [], quotationChanges: {}, quotationDeletionQueue: [], quotationSyncCursor: null, quotationSyncFeedback: null, projects: [] });
@@ -263,18 +266,20 @@ async function redeployScenario() {
   assert.equal((await api().syncQuotationsWithServer()).success, true);
   assert.equal(storedSeparate(rows, id, 'a1'), undefined);
   assert.equal(separateOf(id, 'a1'), true);
-  locking.setValidate(validators.new);
+  locking.setValidate(validators.new, true);
   const before = responses.length;
   assert.ok(api().setQuotationStatus(id, 'accepted').ok);
   assert.equal((await api().syncQuotationsWithServer()).success, true, 'A: aceptar tras redesplegar');
   assert.deepEqual(responses.slice(before), ['ok'], 'A: sin 400');
   assert.equal(api().quotationChanges[id], undefined);
-  assert.equal(separateOf(id, 'a1'), true, 'A: lo local sigue aquí');
+  // Un «aparte» marcado contra la API anterior nunca llegó al servidor: al detectar la nueva, manda lo guardado (se
+  // pierde; solo importa si se vuelve atrás la API).
+  assert.equal(separateOf(id, 'a1'), undefined, 'A: la API nueva manda');
 }
 
 /** Escenario D: solo API nueva; un 2.10.x edita (borra el campo) y emite; este equipo la acepta. */
-async function oldClientScenario(restart: boolean) {
-  const { rows, responses, id, actions } = await setup('new', `https://d${restart ? '-restart' : ''}-destinos.invalid`);
+async function oldClientScenario(restart: boolean, declares = true) {
+  const { rows, responses, id, actions } = await setup('new', `https://d${restart ? '-restart' : ''}${declares ? '' : '-undeclared'}-destinos.invalid`, { declares });
   assert.equal(actions.edit((c) => setAttachmentDestinations(c, 'a1', { pdf: true, email: true })), null);
   assert.equal((await api().syncQuotationsWithServer()).success, true);
   assert.equal(storedSeparate(rows, id, 'a1'), true);
@@ -282,13 +287,40 @@ async function oldClientScenario(restart: boolean) {
   if (restart) forgetQuotationApiSupport();
   store.setState({ quotationSyncCursor: null });
   assert.equal((await api().syncQuotationsWithServer()).success, true);
-  assert.equal(separateOf(id, 'a1'), restart ? true : undefined, restart ? 'D: sin memoria se conserva lo local' : 'D: API que lo guarda: manda el servidor');
+  // La API que declara lo que guarda se reconoce también tras reiniciar; sin declaración ni memoria, se conserva lo local.
+  const keepsLocal = restart && !declares;
+  assert.equal(separateOf(id, 'a1'), keepsLocal ? true : undefined, keepsLocal ? 'D: sin declaración ni memoria se conserva lo local' : 'D: API que lo guarda: manda el servidor');
   const before = responses.length;
   assert.ok(api().setQuotationStatus(id, 'accepted').ok);
   assert.equal((await api().syncQuotationsWithServer()).success, true, 'D: aceptar no se atasca');
   assert.deepEqual(responses.slice(before), ['ok'], 'D: sin 400');
   assert.equal(rows.get(id)!.status, 'accepted');
   assert.equal(api().quotationChanges[id], undefined);
+}
+
+/**
+ * Flota mixta con la API nueva: este equipo marca los dos destinos y emite; un 2.10.x (su validador descarta
+ * `alsoSeparate`) acepta. La API lo trata como cambio de estado puro y conserva el campo; nadie queda en 400.
+ */
+async function olderClientWritesScenario() {
+  const { rows, responses, id, actions } = await setup('new', 'https://mixed-destinos.invalid');
+  assert.equal(actions.edit((c) => setAttachmentDestinations(c, 'a1', { pdf: true, email: true })), null);
+  assert.ok(api().setQuotationStatus(id, 'issued').ok);
+  assert.equal((await api().syncQuotationsWithServer()).success, true);
+  const row = rows.get(id)!;
+  const transport = QuotationSyncService.transport('https://mixed-destinos.invalid', () => 'synthetic');
+  const older = await QuotationSyncService.put(transport, id, { ...asOldApi(validateQuotationContent(row).ok ? (validateQuotationContent(row) as { value: QuotationContent }).value : (row as never)), status: 'accepted' }, row.version);
+  assert.ok(older.ok, 'el cliente anterior acepta sin 400');
+  assert.equal(older.ok && older.quotation.attachments[0].alsoSeparate, true, 'el recibo conserva el campo');
+  assert.equal(storedSeparate(rows, id, 'a1'), true);
+  // Otra diferencia real sigue bloqueada.
+  const edited = await QuotationSyncService.put(transport, id, { ...asOldApi(validateQuotationContent(rows.get(id)!).ok ? (validateQuotationContent(rows.get(id)!) as { value: QuotationContent }).value : (row as never)), notes: 'otra', status: 'void' }, rows.get(id)!.version);
+  assert.equal(!edited.ok && edited.code, 'quotation_locked');
+  store.setState({ quotationSyncCursor: null });
+  assert.equal((await api().syncQuotationsWithServer()).success, true);
+  assert.equal(local(id).status, 'accepted');
+  assert.equal(separateOf(id, 'a1'), true);
+  void responses;
 }
 
 /** Escenario E: tras «Conservar la mía» con la base sin el campo, reabrir la emitida (→ borrador) no da 400. */
@@ -305,7 +337,7 @@ async function reopenScenario(apiVersion: 'old' | 'new') {
   api().resolveQuotationConflict(id, 'keep_local');
   const before = responses.length;
   assert.equal((await api().syncQuotationsWithServer()).success, true, `E ${apiVersion}: reabrir`);
-  assert.deepEqual(responses.slice(before), ['ok'], `E ${apiVersion}: sin 400`);
+  assert.ok(responses.slice(before).length && responses.slice(before).every((r) => r === 'ok'), `E ${apiVersion}: sin 400 (${responses.slice(before)})`);
   assert.equal(rows.get(id)!.status, 'draft');
   assert.equal(api().quotationChanges[id], undefined);
   // Ya en borrador, la siguiente edición publica el destino local (la API nueva lo guarda).
@@ -360,6 +392,8 @@ async function rejectedAcceptServerScenario() {
 await redeployScenario();
 await oldClientScenario(false);
 await oldClientScenario(true);
+await oldClientScenario(true, false);
+await olderClientWritesScenario();
 await reopenScenario('old');
 await reopenScenario('new');
 await unmarkedElsewhereScenario();
