@@ -14,8 +14,7 @@ Simulador técnico-económico de escritorio para diseñar y cotizar sistemas fot
 - **Catálogo:** paneles, inversores y baterías con precios por proveedor, compartido por organización.
 - **Trabajo en equipo:** organizaciones con roles ADMIN, EDITOR y LECTOR, sincronización con control de versiones e historial. Sin conexión el trabajo se guarda en el equipo y se sincroniza después.
 - **Asistente IA:** lectura de facturas, fichas técnicas y listas de precios con Google Gemini (clave del usuario).
-  - El asistente de propuestas prepara un borrador que se revisa antes de aplicarlo.
-  - El asistente general (experimental) y los agentes externos conectados por MCP pueden editar propuestas según la política de permisos. Cada acción queda en la actividad, y la mayoría se puede deshacer; las excepciones están en [docs/AGENT_TOOLS.md](docs/AGENT_TOOLS.md).
+  - El asistente de la app (panel flotante o acoplado, encendido por defecto) crea y ajusta propuestas, lee facturas, y deja cada cambio con su tarjeta y su deshacer. Junto con los agentes externos conectados por MCP, edita propuestas según la política de permisos. Cada acción queda en la actividad, y la mayoría se puede deshacer; las excepciones están en [docs/AGENT_TOOLS.md](docs/AGENT_TOOLS.md).
 
 ## Descarga
 
