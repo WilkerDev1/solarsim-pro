@@ -147,7 +147,7 @@ function withActionStatus(cached: AssistantToolResponse): AssistantToolResponse 
   const message = {
     rejected: 'El usuario rechazó este cambio: no lo repitas sin que lo pida de nuevo.',
     expired: 'La confirmación de este cambio caducó: prepáralo de nuevo si el usuario aún lo quiere.',
-    failed: `El cambio no se pudo aplicar al confirmarlo: ${action?.error ?? 'error desconocido'}.`,
+    failed: `El cambio no se pudo aplicar al confirmarlo: ${(action?.error ?? 'error desconocido').replace(/[.\s]+$/, '')}.`,
     missing: 'Ese cambio ya no está en la cola de confirmación.',
   }[status as 'rejected' | 'expired' | 'failed' | 'missing'] ?? 'Ese cambio ya no está pendiente.';
   return { ...cached, status: 'error', error: { code: `action_${status}`, message } };

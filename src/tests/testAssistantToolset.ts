@@ -381,7 +381,8 @@ const errorAt = (result: AssistantToolResponse, path: string, pattern: RegExp) =
 // (La cola sigue existiendo para el perfil «confirmar» y para los agentes externos: F3b.)
 reset();
 confirmPrices();
-const stalePending = await run('edit_proposal', { proposalId: base.id, title: 'Ponle baterías', ops: storageOps });
+const staleCtx = ctx('turn-stale', 'stale-1');
+const stalePending = await run('edit_proposal', { proposalId: base.id, title: 'Ponle baterías', ops: storageOps }, staleCtx);
 assert.equal(stalePending.status, 'pending_confirmation');
 store.setState({ equipmentCatalog: s().equipmentCatalog.map((e) => (e.id === battery.id ? { ...e, supplierPrices: [{ ...e.supplierPrices![0], priceUSD: 3900 }] } : e)) });
 const userEdit = s().commitProjectEdits(base.id, [{ path: 'monthlyConsumption', value: Array(12).fill(3000) }], { source: 'user' });
@@ -390,6 +391,11 @@ const staleConfirm = s().confirmAgentAction(stalePending.actionId!);
 assert.equal(staleConfirm.success, false, 'los datos cambiaron: no se aplica');
 assert.match(staleConfirm.error ?? '', /cambiaron desde la propuesta del cambio/);
 assert.equal(projectOf(base.id).specs.hasBattery, false, 'nada aplicado');
+// El reintento dice el fallo real, con un solo punto final.
+const staleRetry = await run('edit_proposal', { proposalId: base.id, title: 'Ponle baterías', ops: storageOps }, staleCtx);
+assert.equal(staleRetry.error?.code, 'action_failed');
+assert.doesNotMatch(staleRetry.error?.message ?? '', /\.\.$/, staleRetry.error?.message);
+assert.match(staleRetry.error?.message ?? '', /\.$/);
 // Un cambio ajeno al lote (el nombre del cliente) no invalida la confirmación.
 reset();
 confirmPrices();
@@ -523,6 +529,19 @@ const bonao = await run('create_proposal', { province: 'bonao' });
 assert.equal(projectOf(bonao.proposalId!).client.province, 'Monseñor Nouel (Bonao)');
 const santiago = await run('create_proposal', { province: 'Santiago' });
 assert.equal(projectOf(santiago.proposalId!).client.province, 'Santiago', 'exacta antes que prefijo');
+// Municipios frecuentes (los alias de rdProvinces.ts), por coincidencia exacta normalizada; nunca por subcadena.
+for (const [municipality, expected] of [
+  ['Santo Domingo Este', 'Santo Domingo / Distrito Nacional'],
+  ['Boca Chica', 'Santo Domingo / Distrito Nacional'],
+  ['Bávaro', 'La Altagracia (Punta Cana / Higüey)'],
+  ['JARABACOA', 'La Vega'],
+] as const) {
+  const created = await run('create_proposal', { province: municipality });
+  assert.equal(created.status, 'applied', `${municipality}: ${JSON.stringify(created.error)}`);
+  assert.equal(projectOf(created.proposalId!).client.province, expected, municipality);
+}
+errorAt(await run('create_proposal', { province: 'Boca' }), 'province', /provincia/);
+errorAt(await run('create_proposal', { province: 'Jarabacoa Arriba' }), 'province', /provincia/);
 
 // 9k. Baterías en el catálogo pero sin oferta ni genérico: lo dice tal cual y elige un modelo del catálogo sin precio.
 reset({ catalog: structuredClone(DEFAULT_EQUIPMENT_CATALOG) });
