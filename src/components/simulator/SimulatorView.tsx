@@ -13,6 +13,8 @@ import { createDockWriters, DOCK_COMMIT_OPTIONS } from './params/logic/dockEdits
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
 import { QuotationEquipmentsTab } from './tabs/QuotationEquipmentsTab';
 import { FinancialReturnTab } from './tabs/FinancialReturnTab';
+import { IncompleteNotice, ResultsPending } from './ProposalStatusHints';
+import { proposalCompleteness } from '../../domain/proposalCompleteness';
 import { confirmAction } from '../common/confirmAction';
 
 export const SimulatorView: React.FC = () => {
@@ -42,6 +44,8 @@ export const SimulatorView: React.FC = () => {
 
   const project = getActiveProject();
   const summary = getFinancialSummary();
+  // F2b (ADR 0009): sin los mínimos para calcular, los resultados se muestran vacíos con su motivo, nunca en cero.
+  const completeness = useMemo(() => proposalCompleteness(project), [project]);
   // F2a2: el dock escribe por la transacción de edición (un lote = una escritura, un autosync y un paso de deshacer).
   // Atado al id de la propuesta que se ve: una respuesta tardía (radiación NASA) cae en la propuesta donde se pidió.
   const projectId = project.id;
@@ -302,10 +306,12 @@ export const SimulatorView: React.FC = () => {
 
         {/* Scrollable Container for Tab Contents */}
         <div className="flex-1 overflow-y-auto p-6 gap-6 flex flex-col min-h-0">
+          <IncompleteNotice completeness={completeness} />
           {activeMainTab === 'energia' && (
             <EnergyAnalysisTab
               project={project}
               summary={summary}
+              completeness={completeness}
               openAIInvoiceModal={openAIInvoiceModal}
               updateMonthlyConsumption={updateMonthlyConsumption}
               updateAllMonthlyConsumption={updateAllMonthlyConsumption}
@@ -314,7 +320,8 @@ export const SimulatorView: React.FC = () => {
             />
           )}
 
-          {activeMainTab === 'cotizacion' && (
+          {activeMainTab === 'cotizacion' && completeness.incomplete && <ResultsPending completeness={completeness} title="Cotización pendiente" />}
+          {activeMainTab === 'cotizacion' && !completeness.incomplete && (
             <QuotationEquipmentsTab
               project={project}
               summary={summary}
@@ -323,7 +330,8 @@ export const SimulatorView: React.FC = () => {
             />
           )}
 
-          {activeMainTab === 'retorno' && (
+          {activeMainTab === 'retorno' && completeness.incomplete && <ResultsPending completeness={completeness} title="Retorno pendiente" />}
+          {activeMainTab === 'retorno' && !completeness.incomplete && (
             <FinancialReturnTab
               project={project}
               summary={summary}

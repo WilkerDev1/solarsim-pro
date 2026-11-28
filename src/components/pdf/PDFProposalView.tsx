@@ -1,4 +1,5 @@
 import React, { useRef, useState, useMemo } from 'react';
+import { proposalActionBlock } from '../../domain/proposalCompleteness';
 import { flushSync } from 'react-dom';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -62,14 +63,18 @@ export const PDFProposalView: React.FC = () => {
   // Live Inline Editing Mode
   const [isEditMode, setIsEditMode] = useState(false);
 
+  // F2b (ADR 0009): una propuesta incompleta no se exporta ni se imprime (sus cifras serían rellenos del motor).
+  const blockedReason = proposalActionBlock(project).reason;
+
   const handlePrint = () => {
+    if (blockedReason) return;
     // Lo pendiente del dock (p. ej. la opacidad de la marca de agua) se guarda antes de imprimir.
     flushPendingDesignEdits();
     requestAnimationFrame(() => window.print());
   };
 
   const handleExportPDF = async () => {
-    if (!pdfRef.current) return;
+    if (!pdfRef.current || blockedReason) return;
     flushPendingDesignEdits();
     // Modo 'export': el editor se desmonta y la hoja queda sin cromo antes de la captura.
     flushSync(() => setIsExporting(true));
@@ -147,6 +152,7 @@ export const PDFProposalView: React.FC = () => {
         setSidebarTab={setSidebarTab}
         isExporting={isExporting}
         handleExportPDF={handleExportPDF}
+        blockedReason={blockedReason}
         handlePrint={handlePrint}
         onOpenShareModal={openShareModal}
         onRefresh={() => {

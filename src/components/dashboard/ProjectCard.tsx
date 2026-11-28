@@ -1,4 +1,6 @@
 import { supplyPresentation, supplySummaryText } from '../../../shared/offGridSupply';
+import { incompleteReasonsText, proposalCompleteness } from '../../domain/proposalCompleteness';
+import { InfoTip } from '../simulator/params/ui';
 import {
   ProposalGroupControls,
   useProposalLinkDrop,
@@ -34,6 +36,8 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
   const family = proposalFamily(project, allProjects),
     drop = useProposalLinkDrop(project);
   const capacity = calculateTotalDCCapacityKWp(project.specs);
+  // F2b (ADR 0009): una propuesta sin los mínimos para calcular se marca, discreta, con el motivo en un ⓘ.
+  const incomplete = proposalCompleteness(project);
   return (
     <article
       data-proposal-drop-target
@@ -79,6 +83,12 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
       </h3>
       <ProposalClientBadge project={project} />
       <LegacyRegimeBadge project={project} className="mt-2" />
+      {incomplete.incomplete && (
+        <p data-proposal-incomplete className="mt-2 flex items-center gap-1 text-xs font-semibold text-slate-600 dark:text-zinc-300">
+          Incompleta
+          <InfoTip label="Qué falta" text={incompleteReasonsText(incomplete)} />
+        </p>
+      )}
       <p className="mt-2 flex items-start gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
         <MapPin className="h-3.5 w-3.5 shrink-0" />
         {project.client.province || project.client.location || "Sin ubicación"}
