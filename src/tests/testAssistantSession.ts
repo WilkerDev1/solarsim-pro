@@ -390,12 +390,116 @@ assert.equal(formatChangeValue([{ brandModel: 'A' }, { brandModel: 'B' }]), '2 e
 assert.equal(formatChangeValue({ brandModel: 'Panel 620 W' }), 'Panel 620 W');
 assert.ok(formatChangeValue('x'.repeat(200)).length <= 80);
 
+// ── 9b. Apagar el asistente a mitad de turno lo detiene: sin escrituras, sin navegación, turno cerrado y sin huérfanos ────
+// (Hallazgo de la revisión de F4: antes el panel se desmontaba y el turno se abortaba; ahora la sesión sobrevive al panel.)
+reset();
+{
+  // a) Se apaga mientras el modelo responde: el ejecutor no escribe ni navega aunque la suscripción no haya llegado.
+  const llm = new ScriptedLlm([
+    () => {
+      store.setState({ appAssistantEnabled: false });
+      return { functionCalls: [
+        { id: 'off-edit', name: 'edit_proposal', args: { proposalId: base.id, ops: [{ op: 'set_margin_pct', pct: 31 }] } },
+        { id: 'off-create', name: 'create_proposal', args: {} },
+      ] };
+    },
+  ]);
+  const session = newSession(llm);
+  const projectsBefore = s().projects.length;
+  const marginBefore = JSON.stringify(s().projects.find((p) => p.id === base.id));
+  await session.send('Pon el margen al 31 % y crea otra propuesta');
+  llm.assertDone();
+  assert.equal(llm.calls.length, 1, 'apagado: no vuelve a llamar al modelo');
+  assert.equal(s().projects.length, projectsBefore, 'apagado: no crea propuestas');
+  assert.equal(JSON.stringify(s().projects.find((p) => p.id === base.id)), marginBefore, 'apagado: no edita');
+  assert.equal(s().activeView, 'dashboard', 'apagado: no navega');
+  const reply = lastAssistant(session);
+  assert.equal(reply.outcome, 'cancelled');
+  assert.equal(session.getState().busy, false);
+  assert.ok(Object.values(reply.turn.tools).every((call) => call.status !== 'applied'), 'ninguna llamada aplicada');
+  assert.match(reply.notice ?? '', /asistente se desactivó/, 'el cierre dice por qué se detuvo');
+  assertHistoryClosed(session, 'apagado en el ejecutor');
+}
+reset();
+{
+  // b) La suscripción al store (syncEnabled) cancela el turno en cuanto se apaga, aunque no haya llamadas.
+  const llm = new ScriptedLlm();
+  const session = newSession(llm);
+  llm.push(() => {
+    store.setState({ appAssistantEnabled: false });
+    session.syncEnabled();
+    return { functionCalls: [{ id: 'sub-create', name: 'create_proposal', args: {} }] };
+  });
+  const projectsBefore = s().projects.length;
+  await session.send('Crea una propuesta');
+  assert.equal(llm.calls.length, 1);
+  assert.equal(s().projects.length, projectsBefore, 'suscripción: no crea');
+  assert.equal(s().activeView, 'dashboard');
+  assert.equal(lastAssistant(session).outcome, 'cancelled');
+  assertHistoryClosed(session, 'apagado por suscripción');
+  // Con el asistente encendido de nuevo, el turno siguiente funciona sobre ese historial.
+  store.setState({ appAssistantEnabled: true });
+  session.syncEnabled();
+  llm.push({ text: 'De vuelta.' });
+  await session.send('¿Sigues?');
+  assert.equal(lastAssistant(session).outcome, 'finished');
+  assertHistoryClosed(session, 'tras volver a encender');
+  llm.assertDone();
+}
+
+// ── 9c. Cliente y modelo son del turno: un turno viejo (tras «Nueva conversación») no pisa los del turno nuevo ───────────
+reset();
+{
+  const llmA = new ScriptedLlm();
+  const llmB = new ScriptedLlm();
+  const llmExtra = new ScriptedLlm();
+  const clients = [llmA, llmB];
+  const session = newSession(llmA, { createClient: () => clients.shift() ?? llmExtra });
+  let releaseA!: () => void;
+  const gateA = new Promise<void>((resolve) => { releaseA = resolve; });
+  let turnB: Promise<void> | undefined;
+  let fileId = '';
+  llmA.push(async () => {
+    session.reset();
+    store.setState({ geminiModel: 'gemini-3.8-flash' });
+    await session.addFiles([pdf('b.pdf')]);
+    fileId = session.getState().files[0].id;
+    turnB = session.send('Lee la factura');
+    await gateA;
+    return { text: 'Turno viejo.' };
+  });
+  llmB.push(
+    async () => {
+      // El turno viejo termina (y pasa por su finally) mientras el nuevo está en curso.
+      releaseA();
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { functionCalls: [{ id: 'b-read', name: 'extract_invoice', args: { fileId } }] };
+    },
+    (call) => {
+      assert.equal(call.method, 'structured', 'la lectura va por el cliente del turno nuevo');
+      assert.equal(req(call).model, 'gemini-3.8-flash', 'con el modelo del turno nuevo');
+      return { data: { clientName: 'Cliente B', issues: [] } };
+    },
+    { text: 'Leída.' },
+  );
+  await session.send('Turno A');
+  await turnB;
+  assert.equal(llmExtra.calls.length, 0, 'no se crea un cliente ajeno al turno');
+  llmA.assertDone();
+  llmB.assertDone();
+  assert.equal(lastAssistant(session).outcome, 'finished');
+  assert.deepEqual(session.getState().messages.map((m) => m.role), ['user', 'assistant']);
+}
+
 // ── 10. Frontera: la sesión y el bucle no usan el transporte ni el bucle antiguos; el panel pinta la sesión nueva ─────────
 const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8');
 for (const file of ['../features/assistant/session/agentLoop.ts', '../features/assistant/session/assistantSession.ts', '../features/assistant/session/invoiceExtraction.ts']) {
   const text = read(file);
   assert.ok(!/requestGeminiJson|GeminiTransport|geminiResponseText|electronAPI|executeForAssistant|from '\.\.\/service'|useAppAssistant|@google\/genai/.test(text), `${file}: sin el camino antiguo ni el SDK directo`);
+  assert.ok(!/shared\/geminiTransport/.test(text), `${file}: ni siquiera las constantes del transporte antiguo (F6 lo borra): van por services/llm/models`);
 }
+assert.ok(/subscribe\(\(\) => \{[^}]*syncOwner\(\)[^}]*syncEnabled\(\)/.test(read('../features/assistant/session/assistantSession.ts')), 'la sesión única sigue al interruptor del asistente');
 const panel = read('../features/assistant/components/AppAssistant.tsx');
 assert.ok(/from '\.\.\/session\/assistantSession'/.test(panel) && !/from '\.\.\/(useAppAssistant|service)'/.test(panel), 'el panel flotante pinta la sesión nueva');
 

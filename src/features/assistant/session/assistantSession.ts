@@ -17,7 +17,7 @@
  * El texto en streaming vive aquí, no en el store de la simulación: un fragmento no dispara los selectores del simulador.
  */
 import { useSimulationStore } from '../../../store/useSimulationStore';
-import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../../../shared/geminiTransport';
+import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../../services/llm/models';
 import { assistantTurnContext } from '../../../../shared/agentTools/rules';
 import type { LlmClient, LlmContent, LlmPart, LlmToolDeclaration } from '../../../services/llm/types';
 import { listAssistantToolset, executeAssistantToolset, type AssistantToolResponse } from '../../agentTools/appAssistant/toolset';
@@ -103,6 +103,8 @@ export interface AssistantSession {
   reset(): void;
   /** Descarta la sesión si cambió el espacio de trabajo o la sesión de la cuenta. */
   syncOwner(): void;
+  /** Si el asistente se apagó en Ajustes, detiene el turno en curso (sin escrituras ni navegación posteriores). */
+  syncEnabled(): void;
   setDraft(text: string): void;
   setPanelOpen(open: boolean): void;
   setExpanded(expanded: boolean): void;
@@ -123,6 +125,7 @@ export interface AssistantSession {
 export const MAX_HISTORY_TURNS = 12;
 /** Bytes de adjuntos que viajan en línea con el mensaje; por encima, solo la referencia (el modelo usa extract_invoice). */
 export const INLINE_ATTACHMENT_BUDGET = 6 * 1024 * 1024;
+export const DISABLED_NOTICE = 'Detenido: el asistente se desactivó en Ajustes.';
 export const CONTINUE_PROMPT = 'Continúa con lo que faltaba del turno anterior.';
 
 /**
@@ -207,9 +210,9 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
   const listeners = new Set<() => void>();
   const sessionFiles = new Set<string>();
   let controller: AbortController | undefined;
-  // Cliente y modelo del turno en curso (los usa el puerto de lectura de facturas).
-  let turnClient: LlmClient | undefined;
-  let turnModel = DEFAULT_GEMINI_MODEL;
+  // Cliente y modelo del turno en curso (los usa el puerto de lectura de facturas). Es un objeto POR TURNO: un turno viejo
+  // (tras «Nueva conversación») solo puede borrar o cambiar el suyo, nunca el del turno que corre ahora.
+  let activeTurn: { client: LlmClient; model: string } | undefined;
   let generation = 0;
 
   const set = (patch: Partial<AssistantSessionState>) => {
@@ -223,6 +226,7 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
   const clearAll = () => {
     controller?.abort('reset');
     generation++;
+    activeTurn = undefined;
     forgetChatFiles([...sessionFiles]);
     sessionFiles.clear();
     history = [];
@@ -234,6 +238,11 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     if (owner === state.owner) return;
     clearAll();
     set({ owner });
+  };
+
+  const assistantEnabled = () => store().appAssistantEnabled === true;
+  const syncEnabled = () => {
+    if (!assistantEnabled() && state.busy) controller?.abort('disabled');
   };
 
   const references = (turn: TurnState): AssumptionReferences => {
@@ -274,12 +283,13 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     // Lo que el turno aplicó o dejó incompleto, para el resumen (`missing`) y para decidir si se ofrece reintentar.
     const incomplete = new Map<string, string[]>();
     let toolCount = 0;
+    let turnRef: { client: LlmClient; model: string } | undefined;
     try {
       const client = await (deps.createClient ?? defaultCreateClient)(apiKey);
       if (abort.signal.aborted || stale()) throw new DOMException('cancelled', 'AbortError');
-      turnClient = client;
       const model = s.geminiModel?.trim() || DEFAULT_GEMINI_MODEL;
-      turnModel = model;
+      turnRef = { client, model };
+      activeTurn = turnRef;
       const fallbackModel = model === DEFAULT_GEMINI_MODEL ? FALLBACK_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
       // Fijos para todo el turno.
       const tools = listAssistantToolset();
@@ -309,7 +319,7 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
         thinking: thinkingFor,
         closingText: (outcome, error) => localTurnSummaryText(assistant.turn, outcome, toolCount, error),
         onEvent: (event) => {
-          if (event.type === 'round_started') { turnModel = event.model; update((m) => ({ ...m, liveText: '' })); }
+          if (event.type === 'round_started') { if (turnRef) turnRef.model = event.model; update((m) => ({ ...m, liveText: '' })); }
           else if (event.type === 'text') update((m) => ({ ...m, liveText: m.liveText + event.text }));
           else if (event.type === 'thought') update((m) => ({ ...m, thinking: `${m.thinking ?? ''}${event.text}`.slice(-240) }));
           else if (event.type === 'round_finished') {
@@ -321,12 +331,22 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
         execute: async (call, signal) => {
           toolCount++;
           reduce({ type: 'tool_call_started', callId: call.callId, name: call.name, args: call.args });
+          // Apagado en Ajustes a mitad de turno: nada se ejecuta y el turno se cierra (no depende solo de la suscripción).
+          if (!assistantEnabled()) {
+            abort.abort('disabled');
+            const off: AssistantToolResponse = {
+              status: 'error', tool: call.name, changes: [], results: { before: null, after: null }, warnings: [], proposal: null,
+              error: { code: 'assistant_disabled', message: 'El asistente se desactivó en Ajustes: no se ejecutó.' },
+            };
+            reduce(toolResponseEvents(call.callId, off, { args: call.args }));
+            return off as unknown as Record<string, unknown>;
+          }
           let response: AssistantToolResponse = await executeAssistantToolset({ name: call.name, args: call.args }, {
             source: 'app-assistant', owner, signal, turnId, callId: call.callId,
           });
           // create_proposal aplicada: la sesión abre el simulador en la propuesta nueva y el resultado lo dice.
           const data = response.data as { openSimulator?: boolean; next?: string } | undefined;
-          if (call.name === 'create_proposal' && response.status === 'applied' && response.proposalId && data?.openSimulator && !signal.aborted && !stale()) {
+          if (call.name === 'create_proposal' && response.status === 'applied' && response.proposalId && data?.openSimulator && !signal.aborted && !stale() && assistantEnabled()) {
             navigateToProposal({ proposalId: response.proposalId, view: 'simulator' });
             const { next: _next, ...rest } = data;
             response = {
@@ -360,7 +380,9 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
       const appliedSomething = Object.values(assistant.turn.tools).some((call) => call.status === 'applied' || call.status === 'pending_confirmation');
       const notice = result.outcome === 'finished'
         ? (assistant.turn.text.trim() ? undefined : localTurnSummaryText(assistant.turn, 'finished', toolCount))
-        : localTurnSummaryText(assistant.turn, result.outcome, toolCount, result.error);
+        : result.outcome === 'cancelled' && abort.signal.reason === 'disabled'
+          ? localTurnSummaryText(assistant.turn, 'cancelled', toolCount).replace(/^Detenido\./, DISABLED_NOTICE)
+          : localTurnSummaryText(assistant.turn, result.outcome, toolCount, result.error);
       update((m) => ({
         ...m, liveText: '', thinking: undefined, outcome: result.outcome,
         ...(notice ? { notice } : {}),
@@ -373,12 +395,13 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
       if (stale()) return;
       const cancelled = abort.signal.aborted;
       const loopError: LoopError = { code: cancelled ? 'cancelled' : 'failed', message: error instanceof Error ? error.message : 'No se pudo completar la consulta.' };
+      const disabled = abort.signal.reason === 'disabled';
       if (cancelled) reduce({ type: 'turn_finished', summary: {} });
       else reduce({ type: 'recoverable_error', code: loopError.code, message: loopError.message, recoverable: false });
-      update((m) => ({ ...m, liveText: '', thinking: undefined, outcome: cancelled ? 'cancelled' : 'failed', ...(cancelled ? { notice: 'Detenido.' } : { error: loopError, retryText: text }) }));
+      update((m) => ({ ...m, liveText: '', thinking: undefined, outcome: cancelled ? 'cancelled' : 'failed', ...(cancelled ? { notice: disabled ? DISABLED_NOTICE : 'Detenido.' } : { error: loopError, retryText: text }) }));
     } finally {
       if (controller === abort) controller = undefined;
-      turnClient = undefined;
+      if (activeTurn === turnRef) activeTurn = undefined;
       if (!stale()) set({ busy: false });
     }
   }
@@ -401,6 +424,7 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     cancel() { if (state.busy) controller?.abort('stop'); },
     reset: clearAll,
     syncOwner,
+    syncEnabled,
     setDraft: (draft) => { if (draft !== state.draft) set({ draft }); },
     setPanelOpen: (panelOpen) => { if (panelOpen !== state.panelOpen) set({ panelOpen }); },
     setExpanded: (expanded) => { if (expanded !== state.expanded) set({ expanded }); },
@@ -456,9 +480,10 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
           const file = getChatFile(fileId);
           if (!file) throw new Error('Ese archivo ya no está en el chat: vuelve a adjuntarlo.');
           const apiKey = store().geminiApiKey?.trim();
-          const client = turnClient ?? (apiKey ? await (deps.createClient ?? defaultCreateClient)(apiKey) : undefined);
+          const turn = activeTurn;
+          const client = turn?.client ?? (apiKey ? await (deps.createClient ?? defaultCreateClient)(apiKey) : undefined);
           if (!client) throw new Error('Configura una API Key de Google Gemini en Ajustes → IA.');
-          return extractInvoiceWithLlm({ client, model: turnModel, file, signal });
+          return extractInvoiceWithLlm({ client, model: turn?.model ?? (store().geminiModel?.trim() || DEFAULT_GEMINI_MODEL), file, signal });
         },
       });
     },
@@ -473,7 +498,7 @@ export function assistantSession(): AssistantSession {
   if (!singleton) {
     singleton = createAssistantSession();
     singleton.connectPorts();
-    useSimulationStore.subscribe(() => singleton!.syncOwner());
+    useSimulationStore.subscribe(() => { singleton!.syncOwner(); singleton!.syncEnabled(); });
   }
   return singleton;
 }
