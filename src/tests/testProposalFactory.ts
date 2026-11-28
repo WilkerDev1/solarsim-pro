@@ -12,6 +12,7 @@ import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { executeAgentTool } from '../features/agentTools/registry';
 import { aiProposalFactoryOptions, buildProjectFromDraft } from '../store/slices/aiSlice';
 import { readFileSync } from 'node:fs';
+import { targetMarginDraftValue, targetMarginOnBlur } from '../utils/saleMargin';
 import { assistantOwner } from '../features/assistant/tools';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
 import { buildAITariffContext } from '../utils/aiTariffContext';
@@ -47,6 +48,19 @@ assert.equal(NEW_PROPOSAL_DEFAULTS.monthlyConsumptionKWh, 1000);
 assert.equal(NEW_PROPOSAL_DEFAULTS.laborUSDPerKWp, 170);
 assert.equal(DEFAULT_TARGET_MARGIN_PCT, 40, 'el valor de fábrica del margen objetivo equivale al factor 1,40');
 assert.equal(DEFAULT_SIMULATION_SETTINGS.defaultTargetMarginPct, 40);
+// El campo de Ajustes se puede vaciar mientras se edita (QA de F2b: volvía a 40 al instante). Mientras se teclea solo se escribe
+// un número válido; al salir, vacío ⇒ el de fábrica. 0 es un margen válido (antes `|| 40` lo convertía en 40).
+assert.equal(targetMarginDraftValue(''), null, 'vacío: no se escribe nada mientras se edita');
+assert.equal(targetMarginDraftValue('  '), null);
+assert.equal(targetMarginDraftValue('3'), 3);
+assert.equal(targetMarginDraftValue('30'), 30);
+assert.equal(targetMarginDraftValue('0'), 0, '0 % es un margen');
+assert.equal(targetMarginDraftValue('150'), 100, 'limitado a 0–100');
+assert.equal(targetMarginDraftValue('-5'), 0);
+assert.equal(targetMarginDraftValue('abc'), null);
+assert.equal(targetMarginOnBlur(''), DEFAULT_TARGET_MARGIN_PCT, 'al salir vacío: el de fábrica');
+assert.equal(targetMarginOnBlur('30'), 30);
+assert.ok(readFileSync('src/components/settings/sections/SimulationPreferencesSection.tsx', 'utf8').includes('targetMarginOnBlur('), 'Ajustes usa el borrador');
 
 // 2. La fábrica pura: sin datos nace con el consumo estimado, marcado como tal, y sin nada del caso de referencia.
 const pure = createNewProposal({
