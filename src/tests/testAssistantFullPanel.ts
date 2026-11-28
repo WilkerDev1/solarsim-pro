@@ -268,6 +268,9 @@ for (const entry of ['dock-menu', 'new-project', 'invoice'] as const) {
   }
   assert.match(read('../components/layout/PrimaryIconDock.tsx'), /openAssistant\('dock-menu'/);
   assert.match(read('../components/common/NewProjectModal.tsx'), /openAssistant\('new-project'/);
+  // La tarjeta de «Nueva simulación» se alcanza con teclado y la anuncian los lectores de pantalla.
+  assert.match(read('../components/common/NewProjectModal.tsx'), /role="button"\s+tabIndex=\{0\}/, 'tarjeta del asistente: role=button y tabIndex=0');
+  assert.match(read('../components/common/NewProjectModal.tsx'), /e\.key === 'Enter' \|\| e\.key === ' '/, 'tarjeta del asistente: Enter y Espacio');
   assert.match(read('../components/simulator/tabs/EnergyAnalysisTab.tsx'), /openAssistant\('invoice'/);
   assert.ok(!existsSync(new URL('../components/common/ai-invoice', import.meta.url)), 'el modal antiguo se borró en F6');
   assert.ok(!/ai-invoice|AIInvoice/.test(read('../App.tsx')), 'App no monta el modal antiguo');
