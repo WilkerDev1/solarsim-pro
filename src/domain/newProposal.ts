@@ -152,9 +152,11 @@ function primaryGroup(specs: SystemSpecs, kind: EquipmentKind, input: NewProposa
   const choice = chooseCatalogEquipment(input.catalog ?? [], kind, { preferredName, preferredMagnitude, genericFor: input.genericPriceFor });
   if (!choice.item) return seeded;
   const patch = groupSelectPatch(kind, seeded, 0, choice.item, input.genericPriceFor?.(choice.item.id));
-  // Los parámetros de panel del sistema vienen del modelo; la degradación de Ajustes manda (ADR 0003): la del modelo vive en su grupo.
+  // Los parámetros de panel del sistema vienen del modelo; la degradación de Ajustes manda (ADR 0003, release 2.7.1): ni el
+  // sistema ni el grupo llevan la del modelo, que en modo simple le ganaría a la configurada. Elegir el modelo en el dock sí la pone.
   const { annualDegradation: _modelDegradation, ...system } = patch as Partial<SystemSpecs>;
-  return { ...seeded, ...system };
+  const born = { ...seeded, ...system } as SystemSpecs;
+  return kind === 'panel' ? { ...born, panels: born.panels?.map(({ annualDegradation: _groupDegradation, ...group }) => group) } : born;
 }
 
 /** Crea la propuesta nueva. Ver el encabezado del módulo. */

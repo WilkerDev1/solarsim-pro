@@ -22,7 +22,7 @@ import { resolveProjectEquipment } from '../utils/equipmentMatchingUtils';
 import { createNewProposal, isConsumptionEstimated, NEW_PROPOSAL_DEFAULTS } from '../domain/newProposal';
 import { SIZING_ASSUMPTIONS, recommendInverterCount } from '../domain/sizing';
 import { proposalCompleteness } from '../domain/proposalCompleteness';
-import { calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { calculateProjectFinancialSummary, resolveAnnualDegradationPct } from '../engine/financeEngine';
 import type { ProjectSimulation } from '../types';
 
 const store = useSimulationStore;
@@ -131,6 +131,14 @@ for (const [kind, group, magnitude] of [['panel', bare.panels[0], bare.panels[0]
 const gap = proposalCompleteness(unpriced);
 assert.equal(gap.incomplete, true);
 assert.ok(gap.reasons.some((r) => r.code === 'missing_equipment_price'), JSON.stringify(gap));
+// La degradación configurada manda también con un modelo del catálogo, con precio o sin él (release 2.7.1, ADR 0003): el
+// grupo no lleva la del modelo, que en modo simple le ganaría.
+for (const equipment of [catalog, DEFAULT_EQUIPMENT_CATALOG]) {
+  const degraded = createNewProposal({ source: 'menu', defaults: { ...DEFAULT_SIMULATION_SETTINGS, defaultAnnualDegradation: 0.7 }, tariffMatrix: DEFAULT_RD_TARIFF_MATRIX, catalog: equipment,
+    identity: { id: 'p-deg', now: '2026-11-28T12:00:00.000Z', sequence: { projectId: 'SP-2026-010', quoteNumber: 'C-0010' } } });
+  assert.ok(degraded.specs.panels![0].catalogItemId, 'es un modelo del catálogo');
+  assert.equal(resolveAnnualDegradationPct(degraded.specs), 0.7, 'la degradación configurada');
+}
 assert.match(gap.reasons.find((r) => r.code === 'missing_equipment_price')!.message, /Falta el precio de Módulos CANADIAN SOLAR TOPHIKU6 CS6\.1-72TD \(620W\)/);
 
 // 4. Las tres vías dan los mismos valores por defecto.
