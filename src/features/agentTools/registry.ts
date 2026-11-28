@@ -120,6 +120,8 @@ function runNativePlan(plan: NativePlan, meta: PlanMeta) {
   const activityId = store().recordAgentActivity({
     ...meta, targetType: plan.targetType, targetId: execution.targetId, title: plan.title, changes: execution.changes ?? plan.changes, undo: execution.undo,
     ...(execution.subject ? { subject: execution.subject } : {}),
+    ...(execution.activity?.turnId ? { turnId: execution.activity.turnId } : {}),
+    ...(execution.activity?.editKey ? { editKey: execution.activity.editKey } : {}),
   });
   return { activityId, execution };
 }
@@ -248,6 +250,14 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   store().queueAgentAction({ id: action.id, ...meta, title: action.title, changes, plan: action });
   return { status: 'pending_confirmation', actionId: action.id, summary: action.title, cards: [...(cards ?? []), pendingCard(action.id, action.title, changes)] };
 }
+
+/**
+ * Ejecuta una herramienta nativa con las MISMAS reglas de permisos que las compartidas (política por fuente, rol actual,
+ * confirmación, bypass y sus excepciones). La usan las herramientas propias del asistente de la app (F3a,
+ * `appAssistant/toolset.ts`), que no están en `shared/agentTools/definitions.ts`.
+ */
+export const runNativeTool = (handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext) =>
+  executeNative(handler, definition, args, ctx);
 
 async function executeNative(handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolOutcome> {
   if (ctx.owner !== assistantOwner()) return { status: 'error', code: 'stale_owner', message: 'El espacio o la sesión cambió.' };

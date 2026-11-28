@@ -199,6 +199,45 @@ export const RD_PROVINCES: ProvinceHSP[] = [
   },
 ];
 
+/**
+ * Municipios, nombres alternativos y abreviaturas frecuentes → nombre de la provincia en RD_PROVINCES.
+ * Las claves están normalizadas (minúsculas, sin tildes).
+ */
+export const PROVINCE_ALIASES: Readonly<Record<string, string>> = {
+  'distrito nacional': 'Santo Domingo / Distrito Nacional',
+  'santo domingo': 'Santo Domingo / Distrito Nacional',
+  'santo domingo este': 'Santo Domingo / Distrito Nacional',
+  'santo domingo oeste': 'Santo Domingo / Distrito Nacional',
+  'santo domingo norte': 'Santo Domingo / Distrito Nacional',
+  'boca chica': 'Santo Domingo / Distrito Nacional',
+  'punta cana': 'La Altagracia (Punta Cana / Higüey)',
+  'higuey': 'La Altagracia (Punta Cana / Higüey)',
+  'bavaro': 'La Altagracia (Punta Cana / Higüey)',
+  'cap cana': 'La Altagracia (Punta Cana / Higüey)',
+  'san francisco': 'Duarte (San Francisco de Macorís)',
+  'sfm': 'Duarte (San Francisco de Macorís)',
+  'bani': 'Peravia (Baní)',
+  'moca': 'Espaillat (Moca)',
+  'bonao': 'Monseñor Nouel (Bonao)',
+  'cotui': 'Sánchez Ramírez (Cotuí)',
+  'mao': 'Valverde (Mao)',
+  'nagua': 'María Trinidad Sánchez (Nagua)',
+  'salcedo': 'Hermanas Mirabal (Salcedo)',
+  'comendador': 'Elías Piña (Comendador)',
+  'neyba': 'Baoruco (Neyba)',
+  'neiba': 'Baoruco (Neyba)',
+  'bahoruco': 'Baoruco (Neyba)',
+  'jimani': 'Independencia (Jimaní)',
+  'ocoa': 'San José de Ocoa',
+  'las terrenas': 'Samaná',
+  'sosua': 'Puerto Plata',
+  'cabarete': 'Puerto Plata',
+  'jarabacoa': 'La Vega',
+  'constanza': 'La Vega',
+  'bajos de haina': 'San Cristóbal',
+  'haina': 'San Cristóbal',
+};
+
 function normalizeText(text: string): string {
   return text
     .toLowerCase()
@@ -225,40 +264,7 @@ export function getProvinceHSP(provinceName: string): ProvinceHSP {
   if (found) return found;
 
   // 2. Mapeo inteligente de alias, municipios principales o abreviaturas comunes
-  const aliases: Record<string, string> = {
-    'distrito nacional': 'Santo Domingo / Distrito Nacional',
-    'santo domingo': 'Santo Domingo / Distrito Nacional',
-    'santo domingo este': 'Santo Domingo / Distrito Nacional',
-    'santo domingo oeste': 'Santo Domingo / Distrito Nacional',
-    'santo domingo norte': 'Santo Domingo / Distrito Nacional',
-    'boca chica': 'Santo Domingo / Distrito Nacional',
-    'punta cana': 'La Altagracia (Punta Cana / Higüey)',
-    'higuey': 'La Altagracia (Punta Cana / Higüey)',
-    'bavaro': 'La Altagracia (Punta Cana / Higüey)',
-    'cap cana': 'La Altagracia (Punta Cana / Higüey)',
-    'san francisco': 'Duarte (San Francisco de Macorís)',
-    'sfm': 'Duarte (San Francisco de Macorís)',
-    'bani': 'Peravia (Baní)',
-    'moca': 'Espaillat (Moca)',
-    'bonao': 'Monseñor Nouel (Bonao)',
-    'cotui': 'Sánchez Ramírez (Cotuí)',
-    'mao': 'Valverde (Mao)',
-    'nagua': 'María Trinidad Sánchez (Nagua)',
-    'salcedo': 'Hermanas Mirabal (Salcedo)',
-    'comendador': 'Elías Piña (Comendador)',
-    'neyba': 'Baoruco (Neyba)',
-    'neiba': 'Baoruco (Neyba)',
-    'bahoruco': 'Baoruco (Neyba)',
-    'jimani': 'Independencia (Jimaní)',
-    'ocoa': 'San José de Ocoa',
-    'las terrenas': 'Samaná',
-    'sosua': 'Puerto Plata',
-    'cabarete': 'Puerto Plata',
-    'jarabacoa': 'La Vega',
-    'constanza': 'La Vega',
-    'bajos de haina': 'San Cristóbal',
-    'haina': 'San Cristóbal',
-  };
+  const aliases = PROVINCE_ALIASES;
 
   for (const [aliasKey, targetProvince] of Object.entries(aliases)) {
     if (normQuery.includes(aliasKey) || aliasKey.includes(normQuery)) {

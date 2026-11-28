@@ -13,6 +13,9 @@ export interface AgentToolContext {
   owner: string;
   clientLabel?: string;
   signal?: AbortSignal;
+  /** Turno del asistente y número de llamada (F3a): idempotencia y «deshacer todo el turno». */
+  turnId?: string;
+  callId?: string;
 }
 
 export interface NativeExecution {
@@ -23,6 +26,8 @@ export interface NativeExecution {
   /** Cambios tal como quedaron al aplicar (antes → después reales); sustituyen a los de la preparación en el registro. */
   changes?: AgentChange[];
   subject?: AgentActivityEntry['subject'];
+  /** Turno y clave del paso en el diario de deshacer (F3a), para que `undo_change` encuentre el cambio. */
+  activity?: Pick<AgentActivityEntry, 'turnId' | 'editKey'>;
 }
 
 /** A mutation prepared by a tool. `execute` revalidates everything because confirmation may happen minutes later. */
