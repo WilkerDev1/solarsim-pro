@@ -53,7 +53,7 @@ Una edición de propuesta que toque precios (margen, mano de obra, costos unitar
 | `propose_project_update` con precios | No la declara desde F4 (usa `edit_proposal`); el camino antiguo, sin uso, confirmaba | Confirmación |
 | Catálogo, ofertas, precios genéricos, estado y decisión comercial, papelera (también deshacer una creación), borrados, plantilla de empresa | Confirmación | Confirmación |
 
-«Bloquear» o «Pedir confirmación» en la política del dispositivo mandan sobre el perfil; los permisos de la cuenta, la papelera, los conflictos, lo que oculta la organización y la regla de no inventar precios se revalidan al aplicar y al deshacer. Desde F4 el bucle del flotante declara el conjunto nuevo; Ajustes aún no muestra el selector del perfil (F5b).
+«Bloquear» o «Pedir confirmación» en la política del dispositivo mandan sobre el perfil; los permisos de la cuenta, la papelera, los conflictos, lo que oculta la organización y la regla de no inventar precios se revalidan al aplicar y al deshacer. Desde F4 el bucle del flotante declara el conjunto nuevo; desde F5b, Ajustes → Agentes muestra el selector del perfil con su ⓘ.
 
 - La política es **por dispositivo** y distingue dos orígenes: asistentes de la app y agentes externos. Se configura en Ajustes → **Agentes e IA**.
 - Ningún agente supera la cuenta: los lectores solo consultan, y las propuestas en papelera o en conflicto no cambian. Cada ejecución, cada confirmación de una acción en cola y cada deshacer revalidan los permisos actuales (si la política pasó a «denegar» mientras esperaba, la confirmación se rechaza).
