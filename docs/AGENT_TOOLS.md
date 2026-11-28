@@ -84,12 +84,43 @@ Toda propuesta creada o editada por agentes cotiza en modo **Simple (Catálogo I
 | `link_proposal_to_client` | draft | `clientId: null` desenlaza; no cambia los datos impresos. Con deshacer |
 | `delete_client` | guarded | Desenlaza sus propuestas |
 
+## Conjunto del asistente de la app (F3a)
+
+Herramientas nuevas del asistente único, entregadas registradas, ejecutables y probadas, pero **sin usar todavía**: el flotante actual sigue con `listAgentTools('app-assistant')` y `executeForAssistant` hasta que el bucle nuevo (F4) declare este conjunto. Viven en el cliente, `src/features/agentTools/appAssistant/`, y no en `shared/`: las 12 herramientas del MCP remoto, `AGENT_RULES_ES` y el MCP local quedan idénticos byte a byte (copias doradas de F0), así la 2.11.0 es solo de cliente.
+
+| Pieza | Ubicación | Función |
+| --- | --- | --- |
+| Declaraciones | `appAssistant/definitions.ts` (puro) | Las siete propias y `APP_ASSISTANT_TOOLSET`, la lista única y ordenada que verá el asistente; `appAssistantToolDefinitions()` toma la propia si existe y si no la compartida, sin copiarla |
+| Ejecución | `appAssistant/toolset.ts` | `executeAssistantToolset(call, {source, owner, turnId, callId})`: valida, aplica la política de hoy con `runNativeTool` (la misma de `executeAgentTool`), idempotencia por turno y llamada, y devuelve la forma común |
+| Herramientas | `appAssistant/handlers.ts` | Planes revalidados al ejecutarse sobre `commitProjectEdits` |
+| Operaciones y dimensionado | `src/domain/proposalOperations.ts` (puro) | `operationsToEdits`: operaciones tipadas → un lote por ruta; `proposeSystemSizing` |
+| Contexto vivo | `src/domain/proposalSnapshot.ts` (puro) | `engineResults` (métricas o motivos de «incompleta»), `proposalStateSummary`, `proposalWarnings`, `editableFieldPaths` (del registro de campos) |
+| Puertos | `appAssistant/ports.ts` | `extractInvoice` y `openProposal`, que conecta F4; extracciones en memoria por referencia |
+
+**Lista declarada** (19, entre las 10 y 20 activas que recomienda Google): `get_proposal_state`, `create_proposal`, `extract_invoice`, `size_system`, `edit_proposal`, `undo_change`, `open_proposal` (propias) y `search_projects`, `search_equipment`, `get_tariffs`, `list_supplier_offers`, `list_document_texts`, `set_document_texts`, `set_document_layout`, `list_proposal_attachments`, `search_clients`, `link_proposal_to_client`, `set_proposal_status`, `set_commercial_status` (compartidas, sin cambios). Una herramienta fuera de la lista responde `unknown_tool`. `create_proposal` y `open_proposal` tienen versión propia que sustituye a la compartida solo aquí; la compartida (MCP local, agentes externos) conserva sus obligatorios y `propose_project_update` sigue igual para ellos.
+
+**Forma común** (`AssistantToolResponse`, el cuerpo de `functionResponse.response`; el contexto vivo viaja dentro, nunca como texto aparte): `status` (`ok`, `applied`, `pending_confirmation`, `error`), `changes` (ruta, etiqueta, antes, después, derivado), `results.before`/`results.after` (`{complete: true, metrics}` o `{complete: false, reasons}`: una propuesta incompleta nunca lleva cifras), `warnings`, `proposal` (resumen compacto y actualizado) y, según el caso, `data`, `cards`, `error` (código, mensaje y errores por ruta), `activityId`, `actionId` y `duplicate`.
+
+| Herramienta | Tipo | Notas |
+| --- | --- | --- |
+| `get_proposal_state` | read | Resumen, avisos, completitud y rutas editables generadas del registro de campos |
+| `create_proposal` | draft | Todo opcional: la fábrica única (fuente `assistant`, matriz de costos); acepta `extractionId`. No navega: `data.openSimulator` indica que hay que abrirla. Mismo turno y llamada ⇒ la misma propuesta |
+| `extract_invoice` | read | Contrato listo; la lectura con visión es el puerto `extractInvoice` (F4). Devuelve `extractionId`, resumen e `issues`; sin puerto, `not_available` |
+| `size_system` | read | Paneles, inversor (DC/AC) y baterías con `sizing.ts`, sin escribir; devuelve `ops` para `edit_proposal` y la vista previa (diff y resultados) |
+| `edit_proposal` | draft | `ops[]` en una capa: `set` por ruta del registro, `select_equipment`, `add_equipment`, `remove_equipment`, `set_storage` («ponle baterías»: incluye, elige del catálogo, dimensiona y resuelve el precio), `set_tariff`, `set_net_metering`, `set_radiation`, `set_consumption`, `set_margin_pct`, `apply_official_tariff`, `best_supplier`, `suggest_direct_price`, ítems y descuentos por id. Un lote de `commitProjectEdits` (estricto, `turnId`, clave de idempotencia `turnId:callId`): una escritura y un paso de deshacer. Errores por ruta en español |
+| `undo_change` | draft | Un cambio (`activityId`), un turno (`turnId`) o el último del asistente en esa propuesta; del más reciente al más antiguo. Abierta y en la cima del diario de deshacer: por el diario (pasa a rehacer, como Ctrl+Z); si no, por la actividad, que rechaza si alguien cambió lo mismo después |
+| `open_proposal` | read | Puerto `openProposal` (F4/F5b); sin puerto, `not_available` y no navega |
+
+Permisos: los de hoy, sin el perfil «edición en vivo» (F3b). Un `edit_proposal` que toca precios, equipos, margen, extras o descuentos se trata entero como `guarded` (igual que `touchesPricing` en `propose_project_update`), así con la política por defecto queda pendiente con el diff ya calculado y se aplica al confirmar. Lo que la organización oculta (el régimen de medición neta con `netMeteringRegimeSelector` apagado) se rechaza con su motivo. `get_project` (compartida) devuelve, para una propuesta incompleta, `summary` y `energy` en `null` e `incomplete.reasons` ([ADR 0009](adr/0009-fabrica-unica-dimensionado-y-propuesta-incompleta.md)).
+
+Esquemas: `testAssistantToolset` limita la profundidad (raíz → lista → objeto) a 3, cada declaración a 8.000 bytes y el conjunto a 30.000. La comprobación manual contra la API real es `scripts/qa/checkToolDeclarations.ts --toolset app-assistant --prompts` ([QA](QA.md#ensayos-fuera-de-npm-test)).
+
 ## Privacidad
 
 Texto, archivos adjuntos y resultados de herramientas se envían a Google Gemini; la configuración de autenticación nunca se envía. Los adjuntos del catálogo no se mandan al modelo automáticamente. La conversación es transitoria: cambiar de proyecto, espacio o sesión la descarta.
 
 ## Verificación
 
-- Suites: `testAIDocumentTexts`, `testAgentDocumentTools`, `testAgentAttachmentTools`, `testAgentClientTools`, `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testProjectEdit`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testLegacyProposalAssistantApply`, `testAutomatedPricingPolicy`, `testAppAssistant` y `testAssistantToolRound`.
+- Suites: `testAIDocumentTexts`, `testAgentDocumentTools`, `testAgentAttachmentTools`, `testAgentClientTools`, `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testProjectEdit`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testLegacyProposalAssistantApply`, `testAutomatedPricingPolicy`, `testAppAssistant`, `testAssistantToolRound` y `testAssistantToolset` (conjunto del asistente de la app, F3a).
 - Todas usan transporte sintético; ninguna escribe en producción ni llama a Gemini real.
 - La fixture `scripts/qa/fixtures/appAssistant.html` cubre consultas, auditoría, cambio aplicado con deshacer y confirmación.

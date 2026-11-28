@@ -24,6 +24,7 @@ import {
 import { APP_ASSISTANT_OWN_TOOLS } from '../features/agentTools/appAssistant/definitions';
 import { resetAssistantToolPorts, setAssistantToolPorts } from '../features/agentTools/appAssistant/ports';
 import type { ProjectSimulation } from '../types';
+import type { SolarEquipmentItem } from '../types/equipment';
 
 const store = useSimulationStore;
 const s = () => store.getState();
@@ -43,7 +44,7 @@ const base: ProjectSimulation = {
 };
 const other: ProjectSimulation = { ...structuredClone(BENCHMARK_PROJECT), id: 'f3a-other', syncStatus: 'local_only' };
 
-const reset = (options: { catalog?: typeof catalog } = {}) => store.setState({
+const reset = (options: { catalog?: SolarEquipmentItem[] } = {}) => store.setState({
   appAssistantEnabled: true, workspaceScope: 'local', projects: [structuredClone(base), structuredClone(other)], activeProjectId: '', activeView: 'dashboard',
   equipmentCatalog: structuredClone(options.catalog ?? catalog), deletedEquipmentIds: [], equipmentConflicts: {}, sessionGeneration: 0,
   defaultSimulationSettings: DEFAULT_SIMULATION_SETTINGS, localFeatureSettings: { ...DEFAULT_FEATURE_SETTINGS },
@@ -104,11 +105,11 @@ const depth = (schema: JsonSchema): number => {
 };
 for (const d of declared) {
   assert.ok(depth(d.inputSchema) <= 3, `${d.name}: profundidad del esquema ${depth(d.inputSchema)} > 3`);
-  assert.ok(JSON.stringify(d).length <= 12_000, `${d.name}: declaración de ${JSON.stringify(d).length} bytes (> 12.000)`);
+  assert.ok(JSON.stringify(d).length <= 8_000, `${d.name}: declaración de ${JSON.stringify(d).length} bytes (> 8.000)`);
   assert.equal(d.inputSchema.type, 'object', `${d.name}: el esquema raíz es un objeto`);
 }
 const totalBytes = JSON.stringify(declared).length;
-assert.ok(totalBytes <= 48_000, `declaraciones del asistente: ${totalBytes} bytes (> 48.000)`);
+assert.ok(totalBytes <= 30_000, `declaraciones del asistente: ${totalBytes} bytes (> 30.000)`);
 
 // ── 2. «Ponle baterías» en UNA llamada de edit_proposal ─────────────────────────────────────────────────────────────────
 reset();
@@ -174,6 +175,38 @@ assert.equal(projectOf(base.id).rates.targetCoveragePct, base.rates.targetCovera
 const badJson = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set', path: 'rates.targetCoveragePct' }] });
 assert.equal(badJson.status, 'error');
 assert.ok(badJson.error?.errors?.some((e) => e.path === 'ops[0].valueJson'), JSON.stringify(badJson.error));
+
+// Varias operaciones tipadas en UN lote: equipo del catálogo con su precio, extra, descuento, tarifa y consumo.
+reset();
+allowAll();
+const multi = await run('edit_proposal', { proposalId: base.id, ops: [
+  { op: 'select_equipment', equipment: 'panel', catalogItemId: panel.id, count: 20 },
+  { op: 'upsert_item', description: 'Transporte', quantity: 1, unitPriceUSD: 150 },
+  { op: 'upsert_discount', description: 'Cortesía', value: 5, discountType: 'percentage' },
+  { op: 'set_tariff', distributor: 'EDESUR' },
+  { op: 'set_consumption', averageMonthlyKWh: 1500 },
+] });
+assert.equal(multi.status, 'applied', JSON.stringify(multi.error));
+const multiProject = projectOf(base.id);
+assert.equal(multiProject.specs.panels?.[0].catalogItemId, panel.id);
+assert.equal(multiProject.specs.panels?.[0].count, 20);
+assert.equal(multiProject.specs.panels?.[0].unitPriceUSD, 95, 'precio de la oferta, no inventado');
+assert.ok(multiProject.financials.customItems?.some((item) => item.description === 'Transporte' && item.unitPriceUSD === 150));
+assert.ok(multiProject.financials.customDiscounts?.some((d) => d.description === 'Cortesía' && d.type === 'percentage' && d.value === 5));
+assert.equal(multiProject.rates.distributor, 'EDESUR');
+assert.deepEqual(multiProject.monthlyConsumption, Array(12).fill(1500));
+assert.equal(s().agentActivity.filter((a) => a.targetId === base.id && a.tool === 'edit_proposal').length, 1, 'un solo cambio en la actividad');
+const itemId = multiProject.financials.customItems!.find((item) => item.description === 'Transporte')!.id;
+const removed = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'remove_item', id: itemId }] });
+assert.equal(removed.status, 'applied', JSON.stringify(removed.error));
+assert.equal(projectOf(base.id).financials.customItems?.some((item) => item.id === itemId), false);
+const noPrice = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'upsert_item', description: 'Sin precio', quantity: 1 }] });
+assert.equal(noPrice.status, 'error');
+assert.ok(noPrice.error?.errors?.some((e) => e.path === 'ops[0].unitPriceUSD' && /no lo inventes/.test(e.message)), 'un extra nuevo nunca nace con un precio inventado');
+const wrongType = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'select_equipment', equipment: 'inverter', catalogItemId: panel.id }] });
+assert.equal(wrongType.status, 'error');
+assert.ok(wrongType.error?.errors?.some((e) => e.path === 'ops[0].catalogItemId'));
+store.setState({ projects: s().projects.map((p) => (p.id === base.id ? { ...p, rates: { ...p.rates, netMeteringRegime: 'legacy_retention' } } : p)) });
 
 // Lo que la organización oculta (régimen de medición neta) se rechaza y se explica.
 store.setState({ localFeatureSettings: { ...DEFAULT_FEATURE_SETTINGS, netMeteringRegimeSelector: false } });

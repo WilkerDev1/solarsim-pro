@@ -11,6 +11,7 @@ import {
 } from '../../../shared/applicationFeatures';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
 import { readEquipment, type EquipmentKind } from '../../../shared/equipment';
+import { proposalCompleteness } from '../../domain/proposalCompleteness';
 import { editableAssistantFields, validateAssistantEdits } from './validation';
 import { preserveHiddenInQuotation } from '../../../shared/quotationItems';
 import type { CustomQuotationItem } from '../../types';
@@ -213,7 +214,10 @@ export function executeAssistantTool(
       comparable ? row : { ...row, ...Object.fromEntries(fields.map((field) => [field, null])) };
     // `withoutMoney` es superficial: el desglose anidado de la factura (`tariffBill`, con importes) se vacía entero.
     const monthlyMoney = ['savingsUSD', 'originalBillUSD', 'netBillUSD', 'gridUseChargeUSD', 'tariffBill'];
-    const summary = calculateProjectFinancialSummary(p, mode);
+    // ADR 0009 (pendiente cerrado en F3a): una propuesta incompleta no devuelve cifras del motor (serían rellenos: equipos a
+    // 0, consumo supuesto…), sino sus motivos; `summary` y `energy` van en null.
+    const completeness = proposalCompleteness(p);
+    const summary = completeness.incomplete ? null : calculateProjectFinancialSummary(p, mode);
     return {
       data: {
         id: p.id,
@@ -229,7 +233,8 @@ export function executeAssistantTool(
         financials: p.financials,
         monthlyConsumption: p.monthlyConsumption,
         calculationMode: mode,
-        energy: calculateMonthlySolarProduction(
+        ...(completeness.incomplete ? { incomplete: { reasons: completeness.reasons } } : {}),
+        energy: summary === null ? null : calculateMonthlySolarProduction(
           p.client.province,
           p.specs,
           p.monthlyConsumption,
@@ -244,7 +249,7 @@ export function executeAssistantTool(
           // Misma valoración que el resumen: facturación neta en SIE-007-2026 (bloques o precio único).
           engineBlockBilling(resolveAssumptions(p), p.rates, savingsValuationCostPerKWh(p.rates))
         ).map((month) => withoutMoney(month, monthlyMoney)),
-        summary: comparable ? summary : {
+        summary: summary === null || comparable ? summary : {
           ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct', 'annualCreditSettlementUSD']),
           monthlyBreakdown: summary.monthlyBreakdown.map((month) => withoutMoney(month, monthlyMoney)),
         },

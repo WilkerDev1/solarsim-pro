@@ -49,6 +49,10 @@ export interface AgentActivityEntry {
   /** Propuesta afectada (cambios de textos del documento), con la marca de «no era la abierta» al aplicarlos. */
   subject?: { proposalId: string; label: string; outsideOpen: boolean };
   status: 'applied' | 'undone';
+  /** Turno del asistente que hizo el cambio (F3a): «deshacer todo el turno». */
+  turnId?: string;
+  /** Clave del paso en el diario de deshacer de la propuesta (`coalesceKey` del registro), si quedó uno. */
+  editKey?: string;
   /**
    * `fields` (default): restore the touched sections if they still match the fingerprint taken right after the change;
    * `fields` lists them so absent values survive JSON persistence.

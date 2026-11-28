@@ -312,6 +312,14 @@ function diffProjects(before: ProjectSimulation, after: ProjectSimulation, reque
   });
 }
 
+/**
+ * Diff por ruta del registro entre dos estados de una propuesta (F3a), con las mismas reglas que el de la transacción. Para
+ * los cambios que no salen de un lote (deshacer, herramientas de documentos o de estado): ninguno es «derivado».
+ */
+export function diffProjectFields(before: ProjectSimulation, after: ProjectSimulation): ProjectFieldChange[] {
+  return diffProjects(before, after, []).map((change) => ({ ...change, derived: false }));
+}
+
 export function projectEditMetrics(project: ProjectSimulation, mode: EnergyCalculationMode = 'legacy'): ProjectEditMetrics {
   const s = calculateProjectFinancialSummary(project, mode);
   return {
