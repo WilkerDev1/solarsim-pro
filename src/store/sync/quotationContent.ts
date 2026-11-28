@@ -122,8 +122,8 @@ export interface LocalOnlyRelax { dismissed?: boolean; separate?: boolean }
 /**
  * Lo que se sabe de la API de un servidor: guarda `dismissedSourceDocuments` / `alsoSeparate` (la nueva) porque un
  * recibo de un PUT que los llevaba los devolvió. Con la API detectada como nueva, un servidor sin el campo es un valor
- * real (otro equipo lo quitó): no se relaja ni se conserva lo local. Solo en memoria, por `serverUrl`: tras reiniciar se
- * vuelve a detectar con el siguiente PUT que lleve el campo (mientras tanto, el comportamiento de la API anterior).
+ * real (otro equipo lo quitó): no se relaja ni se conserva lo local. En memoria, por `serverUrl`: la API nueva lo declara
+ * en cada descarga (`declareQuotationApiSupport`); con una que no lo declara, se detecta por el recibo de un PUT.
  */
 export interface LocalOnlySupport { dismissed: boolean; separate: boolean }
 const NO_SUPPORT: LocalOnlySupport = { dismissed: false, separate: false };
@@ -131,7 +131,17 @@ const supportByServer = new Map<string, LocalOnlySupport>();
 export const quotationApiSupport = (serverUrl: string | undefined): LocalOnlySupport => supportByServer.get(serverUrl ?? '') ?? NO_SUPPORT;
 /** Olvida lo detectado (como un reinicio). Para pruebas. */
 export function forgetQuotationApiSupport(): void { supportByServer.clear(); }
-/** Recibo de un PUT: si llevaba un campo «solo local» y el servidor lo devuelve, esa API lo guarda. */
+/**
+ * Lo que la API declara en `GET /api/quotations` (`localOnlyFieldsStored`), leído en cada pasada antes de instalar nada:
+ * así lo sabe también tras reiniciar. Sin la declaración (API anterior) se queda lo detectado por recibos.
+ */
+export function declareQuotationApiSupport(serverUrl: string | undefined, fields: readonly string[] | undefined): void {
+  if (!fields) return;
+  const known = quotationApiSupport(serverUrl);
+  const next = { dismissed: known.dismissed || fields.includes('dismissedSourceDocuments'), separate: known.separate || fields.includes('alsoSeparate') };
+  if (next.dismissed !== known.dismissed || next.separate !== known.separate) supportByServer.set(serverUrl ?? '', next);
+}
+/** Respaldo: recibo de un PUT que llevaba un campo «solo local» y el servidor lo devuelve: esa API lo guarda. */
 export function noteQuotationReceipt(serverUrl: string | undefined, sent: QuotationContent, saved: QuotationContent): void {
   const known = quotationApiSupport(serverUrl);
   const savedAttachments = new Map((saved.attachments ?? []).map((a) => [a.id, a]));
@@ -296,7 +306,12 @@ export function planQuotationPush(base: QuotationContent | undefined, local: Quo
   // stays locked, an image uploaded later never reopens it: a status change keeps the confirmed images.
   if (isQuotationContentLocked(current.status)) {
     const forced = withLocalOnlyOf(isQuotationContentLocked(target.status) ? withImagesOf(target, current) : target, localOnlyOfContent(current));
-    if (contentEqual({ ...forced, status: current.status }, current)) target = forced;
+    if (contentEqual({ ...forced, status: current.status }, current)) {
+      // Reabrir con valores locales distintos (p. ej. tras «Conservar la mía»): primero se reabre con lo del servidor y,
+      // ya en borrador, se publican los locales (una API anterior los vuelve a descartar; una nueva los guarda).
+      if (target.status === 'draft' && !contentEqual(forced, target)) return [forced, target];
+      target = forced;
+    }
   }
   if (contentEqual(current, target)) return [];
   // Solo añade lo que la API anterior no guarda (`dismissedSourceDocuments`): nada que publicar, o sería un bucle de PUT.

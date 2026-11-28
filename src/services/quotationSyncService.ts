@@ -14,7 +14,11 @@ const defaultFactory: QuotationTransportFactory = (serverUrl, token) => (path, i
 let factory: QuotationTransportFactory = defaultFactory;
 
 export type QuotationListResult =
-  | { supported: true; quotations: QuotationRecord[]; deletedIds: string[]; serverTimestamp: string | null }
+  | {
+    supported: true; quotations: QuotationRecord[]; deletedIds: string[]; serverTimestamp: string | null;
+    /** Campos «solo locales» que la API declara guardar (`localOnlyFieldsStored`); ausente en una API anterior. */
+    localOnlyFieldsStored?: string[];
+  }
   /** The API predates quotations (404). */
   | { supported: false };
 
@@ -58,6 +62,9 @@ export const QuotationSyncService = {
       quotations: data.quotations.map(record).filter((q: QuotationRecord | null): q is QuotationRecord => !!q),
       deletedIds: Array.isArray(data.deletedIds) ? data.deletedIds.filter((id: unknown): id is string => typeof id === 'string') : [],
       serverTimestamp: typeof data.serverTimestamp === 'string' && Number.isFinite(Date.parse(data.serverTimestamp)) ? data.serverTimestamp : null,
+      ...(Array.isArray(data.localOnlyFieldsStored)
+        ? { localOnlyFieldsStored: data.localOnlyFieldsStored.filter((field: unknown): field is string => typeof field === 'string') }
+        : {}),
     };
   },
   /** `content` must already be publishable (no inline images). */

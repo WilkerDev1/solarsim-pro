@@ -9,7 +9,7 @@ import { QuotationSyncService, type QuotationWriteResult } from '../../services/
 import { workspaceScope } from '../sync/organizationWorkspace';
 import { reuseArray, reuseIfEqual, reuseRecord } from '../sync/structuralSharing';
 import {
-  canonicalQuotationContent, confirmedLocalOnlyOf, keepLocalImages, keepLocalOnlyFields, localOnlyKey, nextLocalQuotationNumber, noteQuotationReceipt,
+  canonicalQuotationContent, confirmedLocalOnlyOf, declareQuotationApiSupport, keepLocalImages, keepLocalOnlyFields, localOnlyKey, nextLocalQuotationNumber, noteQuotationReceipt,
   planQuotationPush, quotationApiSupport, quotationContent, sameQuotationContent, serverTruth, withLocalOnlyOf, type LocalOnlySupport,
 } from '../sync/quotationContent';
 import { localIsoDate } from '../../utils/localDate';
@@ -77,13 +77,26 @@ const installReceipt = (s: ReceiptState, id: string, revision: string, saved: Qu
 };
 
 /**
+ * Registro que vuelve a mostrarse tras una eliminación rechazada: la copia del servidor, o la local guardada en la orden
+ * (que conserva su `confirmedLocalOnly`: no es una copia del servidor).
+ */
+function restoredRecord(shown: QuotationRecord, local: QuotationRecord | undefined, support: LocalOnlySupport): QuotationRecord {
+  const record = serverRecord(shown, local, { support });
+  if (shown !== local) return record;
+  const { confirmedLocalOnly: _derived, ...rest } = record;
+  return local.confirmedLocalOnly ? { ...rest, confirmedLocalOnly: local.confirmedLocalOnly } : rest;
+}
+
+/**
  * Contenido del reintento único tras un 400 `quotation_locked`: solo si el PUT era un cambio de estado de una bloqueada
  * sin otras ediciones (difiere de la copia del servidor solo en los campos «solo locales»). La copia del servidor sale de
- * la descarga de esta pasada o, si no vino (descarga incremental), de la base sin esos campos. `null`: no se reintenta.
+ * la descarga de esta pasada o, si no vino (descarga incremental), de la base sin `dismissedSourceDocuments` (los
+ * registros anteriores a `confirmedLocalOnly` solo pueden tener ese; `alsoSeparate` siempre tiene copia confirmada).
+ * `null`: no se reintenta.
  */
 function lockedRetry(server: QuotationRecord | undefined, base: QuotationContent | undefined, sent: QuotationContent, baseVersion: number): QuotationContent | null {
   const copy = server && server.version === baseVersion ? canonicalQuotationContent(server)
-    : base ? canonicalQuotationContent(withLocalOnlyOf(base, { separateIds: new Set() })) : null;
+    : base ? canonicalQuotationContent(withLocalOnlyOf(base, { separateIds: new Set(base.attachments.filter((a) => a.alsoSeparate).map((a) => a.id)) })) : null;
   if (!copy || !isQuotationContentLocked(copy.status)) return null;
   const separateIds = new Set(copy.attachments.filter((a) => a.alsoSeparate).map((a) => a.id));
   const { status: _sent, ...rest } = canonicalQuotationContent(withLocalOnlyOf(sent, { dismissedSourceDocuments: copy.dismissedSourceDocuments, separateIds }));
@@ -392,6 +405,8 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
           const listed = await QuotationSyncService.list(transport, since);
           // A response that arrives after a workspace change belongs to another workspace: it is discarded.
           if (!current()) return SESSION_CHANGED;
+          // La API nueva declara qué campos «solo locales» guarda: se sabe antes de instalar nada de esta pasada.
+          if (listed.supported) declareQuotationApiSupport(initial.syncSettings.serverUrl, listed.localOnlyFieldsStored);
           if (!listed.supported) {
             const pending = Object.values(get().quotationChanges).some((c) => own(c.ownerId)) || get().quotationDeletionQueue.some((c) => own(c.ownerId));
             const message = 'El servidor aún no admite cotizaciones.';
@@ -455,7 +470,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               const shown = remote.get(command.id) ?? command.quotation;
               set((s) => ({
                 quotations: shown && !s.quotations.some((q) => q.id === command.id)
-                  ? [...s.quotations, serverRecord(shown, command.quotation, { support: support() })]
+                  ? [...s.quotations, restoredRecord(shown, command.quotation, support())]
                   : s.quotations,
                 quotationDeletionQueue: s.quotationDeletionQueue.map((c) =>
                   c.id === command.id ? { ...c, rejected: { status: result.status, error: result.error } } : c),
