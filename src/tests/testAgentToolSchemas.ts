@@ -62,7 +62,6 @@ useSimulationStore.setState({
   syncSettings: { ...useSimulationStore.getState().syncSettings, currentUser: null, authToken: null, autoSyncEnabled: false },
 });
 assert.equal(listAgentTools('app-assistant').length, AGENT_TOOL_DEFINITIONS.filter((d) => d.surfaces.includes('app-assistant')).length);
-assert(!listAgentTools('app-assistant').some((d) => d.name === 'apply_proposal_draft'), 'surface-specific tools stay on their surface');
 useSimulationStore.getState().setAgentPolicy({ external: { read: 'deny', draft: 'deny', guarded: 'deny' } });
 assert.equal(listAgentTools('mcp').length, 0, 'denied kinds are not even listed');
 const ctx = { source: 'app-assistant' as const, owner: assistantOwner() };

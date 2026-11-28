@@ -1,3 +1,6 @@
+// LEGADO: se elimina en F6 junto con el modal ai-invoice (workspace).
+// Antes testAIWorkspaceInputs: solo ejerce la clave de sesión del espacio de trabajo del modal del asistente de propuestas.
+// Renombrada en F0 (red de seguridad del asistente único) sin cambiar una sola aserción.
 import assert from 'node:assert/strict';
 import {proposalFileType, aiWorkspaceKey} from '../components/common/ai-invoice/workspace';
 import {useSimulationStore} from '../store/useSimulationStore';

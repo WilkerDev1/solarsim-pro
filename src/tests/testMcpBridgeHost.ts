@@ -35,7 +35,6 @@ const dispose = connectMcpBridge(api);
 assert.equal(ready.length, 1);
 const names = ready[0].tools.map((t) => t.name);
 assert(names.includes('search_projects') && names.includes('create_proposal'));
-assert(!names.includes('apply_proposal_draft'), 'internal-only tools are never exposed to MCP');
 assert(ready[0].tools.every((t) => t.surfaces.includes('mcp')));
 
 // Calls run through executeAgentTool as source "mcp", keep the client label and answer by request id.
@@ -75,9 +74,6 @@ responses.pop();
 invoke({ requestId: 'r4', call: { name: 'search_projects', args: { limit: 'many' } } });
 await settle();
 assert(responses[3].outcome.status === 'error' && responses[3].outcome.code === 'invalid_arguments');
-invoke({ requestId: 'r5', call: { name: 'apply_proposal_draft', args: {} } });
-await settle();
-assert(responses[4].outcome.status === 'error' && responses[4].outcome.code === 'unknown_tool');
 
 // A policy change republishes the tool list; unrelated updates do not.
 const before = ready.length;

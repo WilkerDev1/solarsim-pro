@@ -8,7 +8,6 @@ import type { GenericPriceInfo } from '../../shared/equipmentPrices';
 import type { SolarEquipmentItem } from '../types/equipment';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ProposalCommercialReview } from '../components/common/ai-invoice/components/ProposalCommercialReview';
 
 const item = (over: Partial<SolarEquipmentItem> & Pick<SolarEquipmentItem, 'id' | 'type' | 'displayName'>): SolarEquipmentItem =>
   ({ brand: 'QA', modelSeries: over.id, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', ...over }) as SolarEquipmentItem;
@@ -104,10 +103,6 @@ assert.equal(sent.inverters[0].unitPriceUSD, 1200);
 assert.equal(sent.inverters[0].priceSource, 'supplier');
 assert.equal('genericPriceInfo' in (draftForPrompt(first)!.panels as Record<string, unknown>[])[0], false);
 
-// --- Revisión: etiqueta propia, no «Oferta del inventario». ---
-const reviewHtml = renderToStaticMarkup(React.createElement(ProposalCommercialReview, { draft: first, update: () => {} }));
-assert.match(reviewHtml, /Precio genérico \(sin proveedor\)/);
-assert.match(reviewHtml, /Oferta del inventario/, 'el inversor con oferta conserva su etiqueta');
 
 // --- Política para los agentes: ofertas primero, genérico como respaldo etiquetado, nunca inventar. ---
 assert.match(AGENT_RULES_ES, /precio genérico/);

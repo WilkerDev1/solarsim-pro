@@ -1,3 +1,6 @@
+// LEGADO: se elimina en F6 junto con la herramienta apply_proposal_draft y la fuente proposal-assistant.
+// Antes testProposalAssistantApply: solo ejerce la aplicación del borrador por el registro con la fuente del asistente de propuestas.
+// Renombrada en F0 (red de seguridad del asistente único) sin cambiar una sola aserción.
 import assert from 'node:assert/strict';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';

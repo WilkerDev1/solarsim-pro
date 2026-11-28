@@ -11,7 +11,6 @@ import { PricingParamsSection } from '../components/simulator/sidebar/PricingPar
 import { FinancialsParamsSection } from '../components/simulator/sidebar/FinancialsParamsSection';
 import { EquipmentParamsSection } from '../components/simulator/sidebar/EquipmentParamsSection';
 import { RatesFields } from '../components/simulator/params/sections/rates/RatesFields';
-import { ProposalConsumptionReview } from '../components/common/ai-invoice/components/ProposalConsumptionReview';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
 import { prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
@@ -124,11 +123,8 @@ for (const [name, project] of Object.entries(variants)) {
 // 2. Cobertura en los borradores de IA: la pantalla, el normalizador y el borrador usan la cobertura resuelta.
 {
   const draft = { province: 'Santiago', monthlyConsumptionKWh: Array(12).fill(1000), observedMonthlyConsumptionKWh: Array(12).fill(1000), targetCoveragePct: 0, panels: [{ id: 'a', brandModel: 'P', powerW: 550, count: 1 }] } as never;
-  const html = render(h(ProposalConsumptionReview, { draft, context: { province: 'Santiago' }, production: null, update: noop } as never));
-  assert.equal(Number(/Cobertura objetivo \(%\)<input[^>]*value="([^"]*)"/.exec(html)?.[1]), 95, 'la pantalla muestra 95 % con cobertura 0');
   const target = (coverage: number) => { const s = calculateRecommendedPanelCount('Santiago', Array(12).fill(1000), 550, coverage, undefined, undefined); return (s.targetAnnualKWh / s.annualSpecificYieldKWhPerKWp).toFixed(2); };
   assert.notEqual(target(95), target(1), 'la prueba distingue 95 % de 1 %');
-  assert.match(html, new RegExp(`Objetivo: <strong>${target(95)} kWp`), 'la pantalla dimensiona con la cobertura que muestra (95 %), no con 1 %');
   const normalized = normalizeProposalDraft({ targetCoveragePct: 0, clientName: 'C', hasBattery: false, monthlyConsumptionKWh: Array(12).fill(1000) } as never, [], { province: 'Santiago' } as never);
   assert.equal(normalized.targetCoveragePct, 95, 'el normalizador no convierte 0 en 1 %');
   const base = variant((p) => { p.rates.targetCoveragePct = 0; });

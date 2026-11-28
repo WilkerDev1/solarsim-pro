@@ -3,6 +3,7 @@ import {normalizeProposalDraft,requestedModelMatches,buildProposalRequest} from 
 import {processExtractedInvoice} from '../utils/aiProposalNormalization';
 import {buildAITariffContext} from '../utils/aiTariffContext';
 import {useSimulationStore} from '../store/useSimulationStore';
+import {buildProjectFromDraft} from '../store/slices/aiSlice';
 import {calculateMonthlySolarProduction,getMonthlySolarProductionFactors} from '../engine/solarEngine';
 import {calculateCostMatrixSummary,calculateProjectFinancialSummary} from '../engine/financeEngine';
 import {createAIProposalBase,prepareProposalDraftProject,proposalReconciliationIssues} from '../utils/proposalDraftProject';
@@ -60,9 +61,10 @@ console.log('Conversation, generic model names, document costs/FX, theoretical p
 
 const previous=useSimulationStore.getState();
 useSimulationStore.setState({projects:[],activeProjectId:'',equipmentCatalog:catalog,syncSettings:{...previous.syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
-useSimulationStore.getState().applyExtractedInvoice(normalized,true);
-const committed=useSimulationStore.getState().projects[0];
-assert(committed,'theoretical draft survives store revalidation and is actually created');
+// El proyecto se construye con buildProjectFromDraft (sobrevive a F6); que applyExtractedInvoice lo escriba en el store se prueba en testLegacyProposalAssistantApplyExtractedInvoice.
+const built=buildProjectFromDraft(useSimulationStore.getState(),normalized,true);
+assert('project' in built,'theoretical draft survives store revalidation and is actually built');
+const committed=built.project;
 assert.equal(committed.aiSource?.consumptionSource,'theoretical');
 assert.deepEqual(committed.monthlyConsumption,normalized.monthlyConsumptionKWh);
 assert.equal(calculateProjectFinancialSummary(committed,'legacy').costMatrix.listPorcentajeVentaUSD,78407.42);

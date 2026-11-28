@@ -1,0 +1,456 @@
+{
+  "mcp": [
+    {
+      "name": "search_projects",
+      "kind": "read"
+    },
+    {
+      "name": "get_project",
+      "kind": "read"
+    },
+    {
+      "name": "get_simulation",
+      "kind": "read"
+    },
+    {
+      "name": "search_equipment",
+      "kind": "read"
+    },
+    {
+      "name": "get_equipment",
+      "kind": "read"
+    },
+    {
+      "name": "get_tariffs",
+      "kind": "read"
+    },
+    {
+      "name": "propose_project_update",
+      "kind": "draft"
+    },
+    {
+      "name": "propose_equipment_update",
+      "kind": "guarded"
+    },
+    {
+      "name": "get_agent_action_status",
+      "kind": "read"
+    },
+    {
+      "name": "create_proposal",
+      "kind": "draft"
+    },
+    {
+      "name": "duplicate_proposal",
+      "kind": "draft"
+    },
+    {
+      "name": "open_proposal",
+      "kind": "read"
+    },
+    {
+      "name": "set_proposal_status",
+      "kind": "guarded"
+    },
+    {
+      "name": "set_commercial_status",
+      "kind": "guarded"
+    },
+    {
+      "name": "add_commercial_report",
+      "kind": "guarded"
+    },
+    {
+      "name": "move_proposal_to_trash",
+      "kind": "guarded"
+    },
+    {
+      "name": "list_document_texts",
+      "kind": "read"
+    },
+    {
+      "name": "set_document_text",
+      "kind": "draft"
+    },
+    {
+      "name": "set_document_texts",
+      "kind": "draft"
+    },
+    {
+      "name": "reset_document_text",
+      "kind": "draft"
+    },
+    {
+      "name": "set_document_layout",
+      "kind": "draft"
+    },
+    {
+      "name": "save_document_text_to_company_template",
+      "kind": "guarded"
+    },
+    {
+      "name": "list_proposal_attachments",
+      "kind": "read"
+    },
+    {
+      "name": "sync_catalog_datasheets",
+      "kind": "draft"
+    },
+    {
+      "name": "set_attachment_enabled",
+      "kind": "draft"
+    },
+    {
+      "name": "attach_file_to_proposal",
+      "kind": "draft"
+    },
+    {
+      "name": "remove_proposal_attachment",
+      "kind": "guarded"
+    },
+    {
+      "name": "search_clients",
+      "kind": "read"
+    },
+    {
+      "name": "get_client",
+      "kind": "read"
+    },
+    {
+      "name": "create_client",
+      "kind": "draft"
+    },
+    {
+      "name": "update_client",
+      "kind": "draft"
+    },
+    {
+      "name": "link_proposal_to_client",
+      "kind": "draft"
+    },
+    {
+      "name": "delete_client",
+      "kind": "guarded"
+    },
+    {
+      "name": "audit_catalog",
+      "kind": "read"
+    },
+    {
+      "name": "list_supplier_offers",
+      "kind": "read"
+    },
+    {
+      "name": "get_price_history",
+      "kind": "read"
+    },
+    {
+      "name": "update_supplier_price",
+      "kind": "guarded"
+    }
+  ],
+  "app-assistant": [
+    {
+      "name": "search_projects",
+      "kind": "read"
+    },
+    {
+      "name": "get_project",
+      "kind": "read"
+    },
+    {
+      "name": "get_simulation",
+      "kind": "read"
+    },
+    {
+      "name": "search_equipment",
+      "kind": "read"
+    },
+    {
+      "name": "get_equipment",
+      "kind": "read"
+    },
+    {
+      "name": "get_tariffs",
+      "kind": "read"
+    },
+    {
+      "name": "propose_project_update",
+      "kind": "draft"
+    },
+    {
+      "name": "propose_equipment_update",
+      "kind": "guarded"
+    },
+    {
+      "name": "get_agent_action_status",
+      "kind": "read"
+    },
+    {
+      "name": "create_proposal",
+      "kind": "draft"
+    },
+    {
+      "name": "duplicate_proposal",
+      "kind": "draft"
+    },
+    {
+      "name": "open_proposal",
+      "kind": "read"
+    },
+    {
+      "name": "set_proposal_status",
+      "kind": "guarded"
+    },
+    {
+      "name": "set_commercial_status",
+      "kind": "guarded"
+    },
+    {
+      "name": "add_commercial_report",
+      "kind": "guarded"
+    },
+    {
+      "name": "move_proposal_to_trash",
+      "kind": "guarded"
+    },
+    {
+      "name": "list_document_texts",
+      "kind": "read"
+    },
+    {
+      "name": "set_document_text",
+      "kind": "draft"
+    },
+    {
+      "name": "set_document_texts",
+      "kind": "draft"
+    },
+    {
+      "name": "reset_document_text",
+      "kind": "draft"
+    },
+    {
+      "name": "set_document_layout",
+      "kind": "draft"
+    },
+    {
+      "name": "save_document_text_to_company_template",
+      "kind": "guarded"
+    },
+    {
+      "name": "list_proposal_attachments",
+      "kind": "read"
+    },
+    {
+      "name": "sync_catalog_datasheets",
+      "kind": "draft"
+    },
+    {
+      "name": "set_attachment_enabled",
+      "kind": "draft"
+    },
+    {
+      "name": "attach_file_to_proposal",
+      "kind": "draft"
+    },
+    {
+      "name": "remove_proposal_attachment",
+      "kind": "guarded"
+    },
+    {
+      "name": "search_clients",
+      "kind": "read"
+    },
+    {
+      "name": "get_client",
+      "kind": "read"
+    },
+    {
+      "name": "create_client",
+      "kind": "draft"
+    },
+    {
+      "name": "update_client",
+      "kind": "draft"
+    },
+    {
+      "name": "link_proposal_to_client",
+      "kind": "draft"
+    },
+    {
+      "name": "delete_client",
+      "kind": "guarded"
+    },
+    {
+      "name": "audit_catalog",
+      "kind": "read"
+    },
+    {
+      "name": "list_supplier_offers",
+      "kind": "read"
+    },
+    {
+      "name": "get_price_history",
+      "kind": "read"
+    },
+    {
+      "name": "update_supplier_price",
+      "kind": "guarded"
+    }
+  ],
+  "proposal-assistant": [
+    {
+      "name": "search_projects",
+      "kind": "read"
+    },
+    {
+      "name": "get_project",
+      "kind": "read"
+    },
+    {
+      "name": "get_simulation",
+      "kind": "read"
+    },
+    {
+      "name": "search_equipment",
+      "kind": "read"
+    },
+    {
+      "name": "get_equipment",
+      "kind": "read"
+    },
+    {
+      "name": "get_tariffs",
+      "kind": "read"
+    },
+    {
+      "name": "propose_project_update",
+      "kind": "draft"
+    },
+    {
+      "name": "propose_equipment_update",
+      "kind": "guarded"
+    },
+    {
+      "name": "get_agent_action_status",
+      "kind": "read"
+    },
+    {
+      "name": "create_proposal",
+      "kind": "draft"
+    },
+    {
+      "name": "duplicate_proposal",
+      "kind": "draft"
+    },
+    {
+      "name": "open_proposal",
+      "kind": "read"
+    },
+    {
+      "name": "set_proposal_status",
+      "kind": "guarded"
+    },
+    {
+      "name": "set_commercial_status",
+      "kind": "guarded"
+    },
+    {
+      "name": "add_commercial_report",
+      "kind": "guarded"
+    },
+    {
+      "name": "move_proposal_to_trash",
+      "kind": "guarded"
+    },
+    {
+      "name": "list_document_texts",
+      "kind": "read"
+    },
+    {
+      "name": "set_document_text",
+      "kind": "draft"
+    },
+    {
+      "name": "set_document_texts",
+      "kind": "draft"
+    },
+    {
+      "name": "reset_document_text",
+      "kind": "draft"
+    },
+    {
+      "name": "set_document_layout",
+      "kind": "draft"
+    },
+    {
+      "name": "save_document_text_to_company_template",
+      "kind": "guarded"
+    },
+    {
+      "name": "list_proposal_attachments",
+      "kind": "read"
+    },
+    {
+      "name": "sync_catalog_datasheets",
+      "kind": "draft"
+    },
+    {
+      "name": "set_attachment_enabled",
+      "kind": "draft"
+    },
+    {
+      "name": "attach_file_to_proposal",
+      "kind": "draft"
+    },
+    {
+      "name": "remove_proposal_attachment",
+      "kind": "guarded"
+    },
+    {
+      "name": "search_clients",
+      "kind": "read"
+    },
+    {
+      "name": "get_client",
+      "kind": "read"
+    },
+    {
+      "name": "create_client",
+      "kind": "draft"
+    },
+    {
+      "name": "update_client",
+      "kind": "draft"
+    },
+    {
+      "name": "link_proposal_to_client",
+      "kind": "draft"
+    },
+    {
+      "name": "delete_client",
+      "kind": "guarded"
+    },
+    {
+      "name": "apply_proposal_draft",
+      "kind": "draft"
+    },
+    {
+      "name": "audit_catalog",
+      "kind": "read"
+    },
+    {
+      "name": "list_supplier_offers",
+      "kind": "read"
+    },
+    {
+      "name": "get_price_history",
+      "kind": "read"
+    },
+    {
+      "name": "update_supplier_price",
+      "kind": "guarded"
+    }
+  ]
+}

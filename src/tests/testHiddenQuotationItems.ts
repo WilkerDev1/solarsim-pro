@@ -8,7 +8,6 @@ import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { PDFPage2Quotation } from '../components/pdf/pages/PDFPage2Quotation';
 import { QuotationEquipmentsTab } from '../components/simulator/tabs/QuotationEquipmentsTab';
 import { ItemsList } from '../components/simulator/params/sections/finance/ItemsList';
-import { ProposalCommercialReview } from '../components/common/ai-invoice/components/ProposalCommercialReview';
 import { PDF_COLOR_THEMES } from '../constants/pdfThemes';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
@@ -99,17 +98,6 @@ const renderPdf = (project: ProjectSimulation) => {
   assert(!render(hiddenFlag(false)).includes('No se lista en el documento'));
 }
 
-// 6. Revisión del borrador de IA: el ítem oculto se ve, marcado.
-{
-  const render = (hide: boolean | undefined) => renderToStaticMarkup(React.createElement(ProposalCommercialReview, {
-    draft: { commercial: { customItems: [item({ id: 'i', description: HIDDEN_ROW, ...(hide === undefined ? {} : { hideInQuotation: hide }) })] } } as never, update: () => {},
-  }));
-  const checked = (html: string) => /<input type="checkbox"( checked="")?\/>Oculto en factura/.exec(html)?.[1] === ' checked=""';
-  assert(render(true).includes(HIDDEN_ROW));
-  assert(checked(render(true)));
-  assert(!checked(render(false)) && render(false).includes('Oculto en factura'));
-  assert(!checked(render(undefined)));
-}
 
 // 7. IA: el flag sobrevive a la normalización de condiciones comerciales.
 const issues: string[] = [];

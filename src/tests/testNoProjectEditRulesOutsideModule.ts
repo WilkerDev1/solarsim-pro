@@ -26,6 +26,9 @@ const ENGINE = 'src/engine/solarEngine.ts';
 const DRAFT_PIPELINE = new Set([
   'src/store/slices/aiSlice.ts',
   'src/utils/proposalDraftProject.ts',
+]);
+/** LEGADO (F6 los elimina junto con el modal ai-invoice): cuando falte uno, la guarda falla y pide quitar esta constante (así no quedan rutas muertas). */
+const LEGACY_DRAFT_PIPELINE = new Set([
   'src/utils/aiProposalNormalization.ts',
   'src/components/common/ai-invoice/hooks/useAIInvoiceScanner.ts',
   'src/components/common/ai-invoice/components/ProposalConsumptionReview.tsx',
@@ -87,7 +90,7 @@ const effects: string[] = [];
 const direct: string[] = [];
 for (const { file, source } of files) {
   if (file !== MODULE && /\bwithRecommendedPanels\b/.test(source)) sizing.push(file);
-  if (![MODULE, ENGINE].includes(file) && !DRAFT_PIPELINE.has(file) && /\bcalculateRecommendedPanelCount\b/.test(source)) recommendation.push(file);
+  if (![MODULE, ENGINE].includes(file) && !DRAFT_PIPELINE.has(file) && !LEGACY_DRAFT_PIPELINE.has(file) && /\bcalculateRecommendedPanelCount\b/.test(source)) recommendation.push(file);
   if ((file.startsWith('src/store/slices/') || file.startsWith('src/features/agentTools/'))
     && ['updateActiveProject', 'updateProjectById'].some((name) => callBodies(source, name).some(directWrite))) direct.push(file);
   if (file.startsWith('src/components/simulator/') && effectBodies(source).some((body) => WRITERS.test(body))) effects.push(file);
@@ -109,4 +112,5 @@ assert.deepEqual(effectBodies('React.useEffect(() => { updateSpecs({}); }, [a]);
 assert.ok(files.some((file) => file.file === MODULE), `${MODULE} debe existir (actualiza la guarda si se mueve)`);
 assert.ok(files.some((file) => file.file === ENGINE) && DRAFT_PIPELINE.size > 0);
 for (const draft of DRAFT_PIPELINE) assert.ok(files.some((file) => file.file === draft), `${draft} ya no existe: quítalo de DRAFT_PIPELINE`);
+for (const legacy of LEGACY_DRAFT_PIPELINE) assert.ok(files.some((file) => file.file === legacy), `${legacy} ya no existe (F6 lo eliminó): quítalo de LEGACY_DRAFT_PIPELINE`);
 console.log('PASS: las reglas de edición de proyecto viven en domain/projectEdit y ningún efecto del simulador escribe.');

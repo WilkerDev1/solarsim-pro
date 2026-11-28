@@ -1,0 +1,2 @@
+# Copias doradas: se comparan byte a byte y las regenera UPDATE_GOLDEN=1, no Prettier.
+tests/golden/

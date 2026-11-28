@@ -1,0 +1,1562 @@
+[
+  {
+    "name": "search_projects",
+    "title": "Buscar propuestas",
+    "kind": "read",
+    "category": "proposals",
+    "card": "proposal",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Busca propuestas del espacio actual por nombre, código o provincia. Máximo 12, de la modificada más recientemente a la más antigua (updatedAt; createdAt indica cuándo se creó). Query vacío: las más recientes; úsalo para «la última propuesta».",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Texto a buscar; vacío lista los primeros resultados."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_project",
+    "title": "Consultar propuesta",
+    "kind": "read",
+    "category": "proposals",
+    "card": "proposal",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Consulta datos y resultados calculados de una propuesta por id (por defecto la abierta).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_simulation",
+    "title": "Consultar simulación",
+    "kind": "read",
+    "category": "proposals",
+    "card": "proposal",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Consulta la simulación actual o indicada; los resultados provienen del motor real.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "search_equipment",
+    "title": "Buscar equipos",
+    "kind": "read",
+    "category": "catalog",
+    "card": "equipment",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Busca catálogo por marca/modelo. type limita a paneles, inversores o baterías («muéstrame los paneles» = type panel, query vacío). unavailableOnly indica sin oferta confirmada in_stock, no implica agotado.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Texto a buscar; vacío lista los primeros resultados."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "panel",
+            "inverter",
+            "battery"
+          ]
+        },
+        "unavailableOnly": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_equipment",
+    "title": "Consultar equipo",
+    "kind": "read",
+    "category": "catalog",
+    "card": "equipment",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Consulta un equipo con ofertas y referencias de adjuntos.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del equipo del catálogo."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_tariffs",
+    "title": "Consultar tarifas",
+    "kind": "read",
+    "category": "reference",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Consulta las referencias de tarifa y su procedencia (bloques y cargo fijo, también por rango de consumo en BTS1) y el cargo por uso de la red SIE-007-2026 (RD$/kWh inyectado) por distribuidora, con su origen: leído de una resolución o de fábrica.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "propose_project_update",
+    "title": "Editar propuesta",
+    "kind": "draft",
+    "category": "proposals",
+    "card": "pending-action",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Prepara cambios en la propuesta abierta. Grupos panels/inverters/batteries requieren [{id del catálogo,count,unitPriceUSD confirmado}]; no inventes precios. customItems/customDiscounts son listas completas con ids y descripción; en customItems conserva hideInQuotation (cobrado pero oculto en la factura) tal como lo devuelve get_project. rates.gridConnection: \"grid_export\" | \"zero_export\" | \"off_grid\". Solo con off_grid, rates.supplyAlternative fija contra qué se compara el ahorro: \"utility_tariff\" (tarifa, por defecto), \"generator\" (requiere rates.generatorCostPerKWh en USD/kWh, > 0; pregúntalo, no lo inventes; null lo borra) o \"no_comparison\" (sin ahorro, payback ni TIR/VAN). rates.netMeteringRegime: \"sie007_2026\" (cargo por kWh inyectado) o \"legacy_retention\" (retención % anterior); cámbialo solo si el usuario lo pide. rates.gridUseChargeDOPPerKWh: cargo por uso de la red en RD$/kWh inyectado (0 a 100), solo en sie007_2026; toma el valor de get_tariffs o del usuario, no lo inventes. Campos: {\"client\":[\"name\",\"company\",\"location\",\"province\",\"address\",\"distributor\",\"tariffCode\",\"quoteValidityDays\",\"quoteDate\",\"contactPerson\",\"contactPhone\",\"contactEmail\",\"nic\",\"nis\",\"rnc\",\"contractNumber\",\"circuit\",\"meterNumber\",\"voltagePhase\"],\"specs\":[\"panels\",\"inverters\",\"batteries\",\"panelPowerW\",\"panelCount\",\"inverterPowerKW\",\"inverterCount\",\"hasBattery\",\"batteryCapacityKWh\",\"batteryCount\",\"batteryCostUSD\",\"installationServicesDesc\",\"dopExchangeRate\",\"saleMarginMultiplier\",\"panelUnitPriceUSD\",\"inverterUnitPriceUSD\",\"batteryUnitPriceUSD\",\"installationUnitPriceUSD\",\"autoSupplierPricing\",\"panelEfficiency\",\"tempCoeff\",\"systemLosses\",\"annualDegradation\",\"batteryDOD\",\"batteryEfficiencyPct\",\"batteryNightLoadSharePct\",\"batteryLifespanYears\",\"batteryReplacementCostUSD\",\"daytimeSelfConsumptionRatio\",\"daytimeLoadRatio\",\"loadProfilePreset\",\"showSelfConsumptionBreakdown\",\"autoCalculatePanels\"],\"rates\":[\"energyCostPerKWh\",\"distributor\",\"targetCoveragePct\",\"tariffCode\",\"currency\",\"usdExchangeRate\",\"gridExportFeePct\",\"isZeroExport\",\"gridConnection\",\"supplyAlternative\",\"generatorCostPerKWh\",\"annualEnergyInflationPct\",\"netMeteringRegime\",\"gridUseChargeDOPPerKWh\"],\"financials\":[\"customItems\",\"customDiscounts\",\"applyLey5707\",\"applyITBISExemption\",\"discountRatePct\",\"projectLifespanYears\",\"co2FactorKgPerKWh\"],\"consumption\":[\"monthlyConsumption\"]}",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta abierta."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Resumen breve del cambio."
+        },
+        "edits": {
+          "type": "array",
+          "maxItems": 40,
+          "description": "Campos a cambiar. valueJson es el valor serializado en JSON, por ejemplo 95, true, \"Santiago\" o doce consumos.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "section": {
+                "type": "string",
+                "enum": [
+                  "client",
+                  "specs",
+                  "rates",
+                  "financials",
+                  "consumption"
+                ]
+              },
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "valueJson": {
+                "type": "string",
+                "maxLength": 20000
+              }
+            },
+            "required": [
+              "section",
+              "field",
+              "valueJson"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "id",
+        "edits"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "propose_equipment_update",
+    "title": "Editar equipo del catálogo",
+    "kind": "guarded",
+    "category": "catalog",
+    "card": "pending-action",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Prepara cambios de especificaciones del catálogo para confirmar. Preserva id, ofertas y adjuntos. Campos: brand,modelSeries,displayName,powerW,efficiencyPct,tempCoeff,annualDegradation,cellType,bifacialityPct,voc,isc,vmp,imp,powerKW,maxAcPowerKW,maxPvPowerKW,maxEfficiencyPct,mpptEfficiencyPct,voltageMPPT,mpptCount,batteryVoltageRange,capacityKWh,capacityAh,voltageV,chargeVoltageV,dodPct,batteryEfficiencyPct,cycles,chemistry,maxChargeCurrentA,maxDischargeCurrentA,category,dimensions,weightKg",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del equipo del catálogo."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Resumen breve del cambio."
+        },
+        "edits": {
+          "type": "array",
+          "maxItems": 40,
+          "description": "Campos a cambiar. valueJson es el valor serializado en JSON, por ejemplo 95, true, \"Santiago\" o doce consumos.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "section": {
+                "type": "string",
+                "enum": [
+                  "equipment"
+                ]
+              },
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "valueJson": {
+                "type": "string",
+                "maxLength": 20000
+              }
+            },
+            "required": [
+              "section",
+              "field",
+              "valueJson"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "id",
+        "edits"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_agent_action_status",
+    "title": "Estado de una acción pendiente",
+    "kind": "read",
+    "category": "reference",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Consulta si una acción que esperaba confirmación fue aplicada, rechazada o caducó. waitSeconds espera la decisión hasta 20 s.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "actionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID devuelto como pending_confirmation."
+        },
+        "waitSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        }
+      },
+      "required": [
+        "actionId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "create_proposal",
+    "title": "Crear propuesta",
+    "kind": "draft",
+    "category": "proposals",
+    "card": "proposal",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Crea una propuesta nueva en modo Simple (Catálogo IA): equipos reales del catálogo con precio de la oferta preferida o la más barata disponible; sin oferta, el precio genérico del catálogo (avisado como precio genérico, sin proveedor); sin ninguno queda sin precio, nunca inventado. Indica doce consumos mensuales o un promedio. No abre la propuesta; usa open_proposal si el usuario quiere verla.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "clientName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "company": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "province": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Provincia de República Dominicana."
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "distributor": {
+          "type": "string",
+          "enum": [
+            "EDEESTE",
+            "EDESUR",
+            "EDENORTE",
+            "CEPM"
+          ]
+        },
+        "tariffCode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "description": "Código tarifario, p. ej. BTS1, BTS2, MTD."
+        },
+        "monthlyConsumptionKWh": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "description": "Doce consumos de enero a diciembre."
+        },
+        "averageMonthlyKWh": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10000000
+        },
+        "targetCoveragePct": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 300
+        },
+        "panels": {
+          "type": "array",
+          "maxItems": 6,
+          "description": "Grupos de paneles del catálogo.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "catalogItemId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "ID real del catálogo."
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100000
+              }
+            },
+            "required": [
+              "catalogItemId",
+              "count"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "inverters": {
+          "type": "array",
+          "maxItems": 6,
+          "description": "Grupos de inversores del catálogo.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "catalogItemId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "ID real del catálogo."
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100000
+              }
+            },
+            "required": [
+              "catalogItemId",
+              "count"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "batteries": {
+          "type": "array",
+          "maxItems": 6,
+          "description": "Grupos de baterías del catálogo (opcional).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "catalogItemId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "ID real del catálogo."
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100000
+              }
+            },
+            "required": [
+              "catalogItemId",
+              "count"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "marginPct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Recargo sobre costo en %, p. ej. 28."
+        },
+        "installationUnitPriceUSD": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100000,
+          "description": "Mano de obra USD/kWp."
+        },
+        "netMeteringRegime": {
+          "type": "string",
+          "enum": [
+            "legacy_retention",
+            "sie007_2026"
+          ],
+          "description": "Régimen de medición neta. Omítelo: las propuestas nuevas nacen en sie007_2026 (cargo por kWh inyectado); legacy_retention (retención % anterior) solo si el usuario lo pide."
+        },
+        "gridUseChargeDOPPerKWh": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Cargo por uso de la red en RD$/kWh inyectado. Omítelo para usar el de fábrica de la distribuidora (get_tariffs)."
+        }
+      },
+      "required": [
+        "clientName",
+        "distributor",
+        "tariffCode",
+        "panels",
+        "inverters"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "duplicate_proposal",
+    "title": "Duplicar propuesta",
+    "kind": "draft",
+    "category": "proposals",
+    "card": "proposal",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Duplica una propuesta como nueva versión enlazada a la original.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta a duplicar."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "open_proposal",
+    "title": "Abrir propuesta",
+    "kind": "read",
+    "category": "navigation",
+    "card": "proposal",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Abre una propuesta en la aplicación (resumen, simulador o PDF). Solo cuando el usuario lo pide.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "view": {
+          "type": "string",
+          "enum": [
+            "project-hub",
+            "simulator",
+            "pdf-preview"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "set_proposal_status",
+    "title": "Cambiar estado técnico",
+    "kind": "guarded",
+    "category": "proposals",
+    "card": "pending-action",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Cambia el estado Borrador/Final/Archivada. Requiere confirmación en la app.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Draft",
+            "Final",
+            "Archived"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "status"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "set_commercial_status",
+    "title": "Cambiar decisión comercial",
+    "kind": "guarded",
+    "category": "commercial",
+    "card": "pending-action",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Cambia la decisión comercial (pending, approved, rejected, test). Requiere confirmación en la app.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "test"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "status"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "add_commercial_report",
+    "title": "Agregar reporte comercial",
+    "kind": "guarded",
+    "category": "commercial",
+    "card": "pending-action",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Agrega un reporte fechado al seguimiento comercial; opcionalmente actualiza la decisión. Requiere confirmación.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "test"
+          ],
+          "description": "Si se indica, también cambia la decisión actual."
+        }
+      },
+      "required": [
+        "id",
+        "note"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "move_proposal_to_trash",
+    "title": "Enviar a papelera",
+    "kind": "guarded",
+    "category": "proposals",
+    "card": "pending-action",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Envía una propuesta a la papelera (recuperable 30 días). Requiere confirmación.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "list_document_texts",
+    "title": "Consultar textos del documento",
+    "kind": "read",
+    "category": "documents",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Lista los textos editables del PDF de una propuesta (clave, etiqueta, texto actual, si está personalizado y si admite plantilla). Filtra por sección (company, client, cover, aboutUs, benefits, techIntro, projectDescription, quotation, etc.) y/o por query, que busca en clave, etiqueta y texto sin distinguir tildes (p. ej. \"garantía\", \"validez\", \"servicios\").",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "section": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Palabras a buscar en clave, etiqueta o texto."
+        }
+      },
+      "required": [
+        "proposalId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "set_document_text",
+    "title": "Editar texto del documento",
+    "kind": "draft",
+    "category": "documents",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Cambia un texto del PDF por su clave (p. ej. quotation.warranty.panel, quote.validityDays, client.phone, aboutUs.intro). Admite **negrita**, *cursiva* y viñetas \"- \" en textos enriquecidos y placeholders como {clientName}. Consulta las claves con list_document_texts.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "key": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 80
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 8000
+        }
+      },
+      "required": [
+        "proposalId",
+        "key",
+        "text"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "set_document_texts",
+    "title": "Editar textos del documento",
+    "kind": "draft",
+    "category": "documents",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Cambia varios textos del PDF en un solo cambio con un único deshacer (p. ej. las cuatro garantías quotation.warranty.panel|inverter|battery|workmanship). text null restablece el predeterminado. Mismas reglas que set_document_text.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "texts": {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 80
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 8000,
+                "nullable": true
+              }
+            },
+            "required": [
+              "key",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "proposalId",
+        "texts"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "reset_document_text",
+    "title": "Restablecer texto del documento",
+    "kind": "draft",
+    "category": "documents",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Vuelve un texto del PDF a su valor predeterminado (los textos dinámicos vuelven a calcularse).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "key": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 80
+        }
+      },
+      "required": [
+        "proposalId",
+        "key"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "set_document_layout",
+    "title": "Diseño del documento",
+    "kind": "draft",
+    "category": "documents",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Oculta secciones del PDF, cambia el tema de color o la cabecera/pie. Secciones: cover, tableOfContents, executiveSummary, aboutUs, benefits, techIntro, projectDescription, energy, quotation, roi, cashFlow, costMatrix.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "hiddenSections": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "description": "Secciones a ocultar."
+        },
+        "visibleSections": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "description": "Secciones a mostrar (p. ej. costMatrix, oculta por defecto)."
+        },
+        "themeId": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "showHeadersFooters": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "proposalId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "save_document_text_to_company_template",
+    "title": "Guardar textos en la plantilla de la empresa",
+    "kind": "guarded",
+    "category": "documents",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Guarda textos (no los del cliente) como plantilla de la empresa emisora para futuras propuestas. Requiere la propuesta abierta y confirmación.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta abierta."
+        },
+        "keys": {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          }
+        }
+      },
+      "required": [
+        "proposalId",
+        "keys"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "list_proposal_attachments",
+    "title": "Consultar anexos",
+    "kind": "read",
+    "category": "attachments",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Lista los PDF anexados a una propuesta (fichas del catálogo y anexos manuales) con su estado de fusión e índice.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        }
+      },
+      "required": [
+        "proposalId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "sync_catalog_datasheets",
+    "title": "Anexar fichas del catálogo",
+    "kind": "draft",
+    "category": "attachments",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Anexa las fichas técnicas del catálogo de los equipos usados en la propuesta (y retira las de equipos que ya no están).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        }
+      },
+      "required": [
+        "proposalId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "set_attachment_enabled",
+    "title": "Configurar anexo",
+    "kind": "draft",
+    "category": "attachments",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Activa o desactiva la fusión de un anexo al exportar, su presencia en el índice o su título.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "attachmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del anexo."
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "inTableOfContents": {
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "proposalId",
+        "attachmentId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "attach_file_to_proposal",
+    "title": "Anexar PDF",
+    "kind": "draft",
+    "category": "attachments",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Anexa un PDF a la propuesta: un archivo adjuntado en el chat (fileId) o, para agentes externos, el contenido en base64 (máx. 8 MB). Nunca rutas del disco.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "fileId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "fileName": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "contentBase64": {
+          "type": "string",
+          "maxLength": 11200000
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "proposalId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "remove_proposal_attachment",
+    "title": "Quitar anexo",
+    "kind": "guarded",
+    "category": "attachments",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Quita un anexo de la propuesta; una ficha del catálogo queda descartada para no volver a añadirse. Requiere confirmación.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "attachmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del anexo."
+        }
+      },
+      "required": [
+        "proposalId",
+        "attachmentId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "search_clients",
+    "title": "Buscar clientes",
+    "kind": "read",
+    "category": "clients",
+    "card": "client",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Busca en el directorio de clientes por nombre, RNC/cédula, teléfono o correo. Incluye cuántas propuestas tiene enlazadas cada uno.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "persona",
+            "empresa",
+            "all"
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_client",
+    "title": "Consultar cliente",
+    "kind": "read",
+    "category": "clients",
+    "card": "client",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Datos del cliente, propuestas enlazadas y resumen de sus estados (borrador/final/archivada y decisión comercial).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del cliente."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "create_client",
+    "title": "Crear cliente",
+    "kind": "draft",
+    "category": "clients",
+    "card": "client",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Crea un cliente en el directorio. Solo el nombre es obligatorio. Es independiente del nombre impreso en las propuestas.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "persona",
+            "empresa"
+          ]
+        },
+        "taxId": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "RNC o cédula."
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "province": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "update_client",
+    "title": "Editar cliente",
+    "kind": "draft",
+    "category": "clients",
+    "card": "client",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Actualiza datos opcionales de un cliente del directorio.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del cliente."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "persona",
+            "empresa"
+          ]
+        },
+        "taxId": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "RNC o cédula."
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "province": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "link_proposal_to_client",
+    "title": "Enlazar propuesta con cliente",
+    "kind": "draft",
+    "category": "clients",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Enlaza una propuesta con un cliente del directorio (clientId null la desenlaza). No cambia el nombre ni los datos impresos en la propuesta.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "clientId": {
+          "type": "string",
+          "maxLength": 64,
+          "nullable": true
+        }
+      },
+      "required": [
+        "proposalId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "delete_client",
+    "title": "Eliminar cliente",
+    "kind": "guarded",
+    "category": "clients",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Elimina un cliente del directorio y desenlaza sus propuestas (sus datos impresos no cambian). Requiere confirmación.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del cliente."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "audit_catalog",
+    "title": "Auditar inventario",
+    "kind": "read",
+    "category": "catalog",
+    "card": "catalog-audit",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Audita el catálogo: precios ausentes o vencidos, sin ficha o imagen, sin potencia nominal, duplicados, sin stock, precios atípicos y equipos de propuestas que no están en el catálogo. codes limita a esos tipos de hallazgo: «equipos sin precio» = [\"missing_price\"] (sin oferta ni precio genérico); añade \"generic_only\" si también quieren los que solo tienen precio genérico.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "staleDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3650
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "panel",
+            "inverter",
+            "battery"
+          ]
+        },
+        "codes": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "enum": [
+              "missing_price",
+              "generic_only",
+              "stale_price",
+              "missing_datasheet",
+              "missing_image",
+              "missing_nominal",
+              "duplicate_model",
+              "no_stock",
+              "price_outlier",
+              "unmatched_proposal_equipment"
+            ]
+          },
+          "description": "Tipos de hallazgo a incluir; vacío u omitido, todos."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "list_supplier_offers",
+    "title": "Consultar ofertas",
+    "kind": "read",
+    "category": "pricing",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Lista ofertas de proveedores por equipo, proveedor o texto. Máximo 50.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "equipmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del equipo."
+        },
+        "supplier": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_price_history",
+    "title": "Consultar historial de precios",
+    "kind": "read",
+    "category": "pricing",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Historial de precios de un equipo (más recientes primero): registros con fuente (supplier_offer, ai_scan, proposal, manual, agent), tipo (observation = precio visto, generic = fijó el precio genérico), moneda y monto originales, proveedor o propuesta, autor y anulación; más el precio genérico vigente y un resumen por mes del año con variación a 3, 6 y 12 meses. Meses sin registros quedan en null: no los rellenes. Requiere sesión iniciada.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "equipmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del equipo del catálogo."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Registros a devolver (por defecto 50)."
+        }
+      },
+      "required": [
+        "equipmentId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "update_supplier_price",
+    "title": "Actualizar oferta",
+    "kind": "guarded",
+    "category": "pricing",
+    "card": "pending-action",
+    "surfaces": [
+      "app-assistant",
+      "proposal-assistant",
+      "mcp"
+    ],
+    "description": "Cambia el precio USD y/o la disponibilidad de una oferta existente. Requiere confirmación en la app.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "equipmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del equipo."
+        },
+        "offerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la oferta."
+        },
+        "priceUSD": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10000000
+        },
+        "stockStatus": {
+          "type": "string",
+          "enum": [
+            "in_stock",
+            "on_order",
+            "out_of_stock",
+            "consult"
+          ]
+        }
+      },
+      "required": [
+        "equipmentId",
+        "offerId"
+      ],
+      "additionalProperties": false
+    }
+  }
+]
