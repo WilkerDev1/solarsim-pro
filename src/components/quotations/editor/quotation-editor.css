@@ -1353,6 +1353,11 @@
   font-size: 9px;
   font-weight: 700;
 }
+.qe-mail-file-note {
+  flex-shrink: 0;
+  color: var(--qe-muted);
+  font-size: 11.5px;
+}
 .qe-mail-file-tag {
   flex-shrink: 0;
   padding: 1px 6px;

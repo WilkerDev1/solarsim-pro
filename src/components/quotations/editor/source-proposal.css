@@ -82,3 +82,62 @@
   align-items: center;
   gap: 6px;
 }
+/* Destinos combinables de un adjunto: «Dentro del PDF» y «Archivo aparte en el correo» */
+.qe-attachment-use-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--qe-muted);
+  margin-right: 2px;
+}
+.qe-destinations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.qe-destination {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 4px 11px 4px 8px;
+  border: 1px solid var(--qe-field-border);
+  border-radius: 999px;
+  background: var(--qe-panel);
+  color: var(--qe-muted);
+  font-size: 12.5px;
+  font-weight: 550;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+.qe-destination:hover:not(:disabled) {
+  border-color: var(--qe-action);
+  color: var(--qe-text);
+}
+.qe-destination[aria-pressed="true"] {
+  border-color: var(--qe-action);
+  background: var(--qe-selected);
+  color: var(--qe-text);
+}
+.qe-destination:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.qe-destination-box {
+  flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--qe-field-border);
+  border-radius: 4px;
+  background: var(--qe-input);
+  color: #fff;
+}
+.qe-destination[aria-pressed="true"] .qe-destination-box {
+  border-color: var(--qe-action);
+  background: var(--qe-action);
+}

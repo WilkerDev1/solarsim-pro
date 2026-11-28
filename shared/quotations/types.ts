@@ -85,8 +85,16 @@ export interface QuotationAttachment {
   pageCount: number;
   title: string;
   uploadedAt: string;
-  /** 'include' se fusiona al PDF; 'related' solo queda enlazado. */
+  /**
+   * Destino del adjunto (`attachmentDestinations`): 'include' se fusiona al PDF; 'related' va solo como archivo aparte
+   * en el correo. La API 2.10.x solo admite estos dos valores: el destino combinado se expresa con `alsoSeparate`.
+   */
   mode: 'include' | 'related';
+  /**
+   * Solo con `mode: 'include'`: además de ir dentro del PDF, va aparte en el correo. Ausente = solo en el PDF. Una API
+   * anterior lo descarta en silencio y el cliente conserva el local (docs/QUOTATIONS.md#compatibilidad-de-alsoseparate).
+   */
+  alsoSeparate?: true;
   origin: 'manual' | 'catalog' | 'proposal';
   assetId?: string;
   catalogItemId?: string;

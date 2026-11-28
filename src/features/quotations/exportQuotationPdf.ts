@@ -3,6 +3,7 @@
  * exportador que la propuesta (`exportProposalPdf`: html2canvas → jsPDF) y añade al final los adjuntos en modo
  * `include` (`mergeQuotationAttachments`). Un adjunto que no se puede incluir se omite y se devuelve para avisar.
  */
+import { goesInsidePdf } from '../../../shared/quotations/attachmentDestinations';
 import type { QuotationAttachment } from '../../types/quotation';
 import type { SkippedAttachment } from './attachments';
 
@@ -14,9 +15,12 @@ export function quotationPdfFileName(number: string | null | undefined): string 
   return `${safe || DRAFT_FILE_NAME}.pdf`;
 }
 
-/** Páginas de la hoja dentro de `root`, en orden. */
+/**
+ * Páginas de la hoja dentro de `root`, en orden. Las páginas de referencia de los anexos de la vista previa
+ * (`data-quotation-annex-preview`) nunca entran: el PDF lleva el archivo real, fusionado en `finalize`.
+ */
 export function quotationPages(root: ParentNode): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>('[data-quotation-page]'));
+  return Array.from(root.querySelectorAll<HTMLElement>('[data-quotation-page]')).filter((page) => !page.hasAttribute('data-quotation-annex-preview'));
 }
 
 export interface QuotationExportAttachments {
@@ -50,7 +54,7 @@ export async function exportQuotationPdf(
 ): Promise<{ skipped: SkippedAttachment[] }> {
   // Carga diferida: html2canvas, jsPDF y pdf-lib solo se descargan al exportar.
   const { exportProposalPdf } = await import('../../components/pdf/export/exportProposalPdf');
-  const included = (attachments?.list ?? []).filter((a) => a.mode === 'include');
+  const included = (attachments?.list ?? []).filter(goesInsidePdf);
   let skipped: SkippedAttachment[] = [];
   await exportProposalPdf({
     pages,

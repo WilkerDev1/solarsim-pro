@@ -18,6 +18,10 @@ import {
 } from "../../../shared/quotations/status.js";
 import type { QuotationContent } from "../../../shared/quotations/types.js";
 import {
+  LOCAL_ONLY_FIELDS,
+  withoutLocalOnlyMissingIn,
+} from "../../../shared/quotations/localOnlyFields.js";
+import {
   QUOTATION_LIMITS,
   validateQuotationContent,
 } from "../../../shared/quotations/validation.js";
@@ -162,6 +166,8 @@ export function registerQuotationRoutes(
         quotations: rows.rows.filter((r) => !r.deleted_at).map(quotationRecord),
         deletedIds: rows.rows.filter((r) => r.deleted_at).map((r) => r.id),
         serverTimestamp: cursor,
+        // Fields older APIs dropped and this one stores: clients stop keeping their local copies of them.
+        localOnlyFieldsStored: [...LOCAL_ONLY_FIELDS],
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -202,7 +208,7 @@ export function registerQuotationRoutes(
     }
     const input = validateQuotationContent(raw);
     if (!input.ok) return c.json({ error: input.error }, 400);
-    const value = input.value;
+    let value = input.value;
     if (hasInlineImage(value))
       return c.json(
         {
@@ -270,18 +276,27 @@ export function registerQuotationRoutes(
             error: "Cambio de estado no permitido",
             code: "invalid_transition",
           });
+        const stored = storedContent(existing) as QuotationContent;
         if (
           isQuotationContentLocked(saved) &&
-          !isDeepStrictEqual(
-            withoutStatus(storedContent(existing)),
-            withoutStatus(value),
+          !isDeepStrictEqual(withoutStatus(stored), withoutStatus(value))
+        ) {
+          // An older client (2.10.0/2.10.1) drops the fields it does not know (`dismissedSourceDocuments`,
+          // `alsoSeparate`): if that is the only difference, it is a pure status change and the stored content
+          // keeps them (docs/DATABASE_AND_API_SPECIFICATION.md).
+          if (
+            !isDeepStrictEqual(
+              withoutStatus(withoutLocalOnlyMissingIn(stored, value)),
+              withoutStatus(value),
+            )
           )
-        )
-          return fail(400, {
-            error:
-              "La cotización ya no es un borrador: reábrela para editar su contenido.",
-            code: "quotation_locked",
-          });
+            return fail(400, {
+              error:
+                "La cotización ya no es un borrador: reábrela para editar su contenido.",
+              code: "quotation_locked",
+            });
+          value = { ...stored, status: value.status };
+        }
       }
       // Clients created offline stay linkable until they are published; known ones must be own and alive.
       let invalidClient = malformedClient;

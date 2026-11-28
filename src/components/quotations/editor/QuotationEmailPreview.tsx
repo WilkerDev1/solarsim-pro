@@ -141,7 +141,9 @@ export const QuotationEmailPreview: React.FC<{
             <li key={file.id} className="qe-mail-file" title={file.note}>
               <span className="qe-mail-file-kind" aria-hidden="true">{file.kind}</span>
               <span className="qe-mail-file-name">{file.name}</span>
-              {file.separate ? <span className="qe-mail-file-tag">Aparte</span> : <span className="sr-only">: {file.note}</span>}
+              {file.annexes && <span className="qe-mail-file-note">{file.annexes.toLowerCase()}</span>}
+              {file.alsoInPdf && <span className="qe-mail-file-note">también dentro del PDF</span>}
+              {file.separate ? <span className="qe-mail-file-tag">Aparte</span> : !file.annexes && <span className="sr-only">: {file.note}</span>}
             </li>
           ))}
         </ul>
@@ -171,8 +173,7 @@ export const QuotationEmailPreview: React.FC<{
         <p className={feedback.tone === 'error' ? 'qe-field-error qe-preview-hint' : 'qe-field-hint qe-preview-hint'} role={feedback.tone === 'error' ? 'alert' : 'status'}>{feedback.message}</p>
       )}
       <p className="qe-field-hint qe-preview-hint">
-        SolarSim no envía el correo ni adjunta archivos: abre tu aplicación de correo con este texto. Descarga el PDF y adjúntalo
-        {separate ? ', junto con los archivos marcados «Aparte».' : '.'}
+        {`SolarSim no envía el correo ni adjunta archivos: abre tu aplicación de correo con este texto. Descarga el PDF${files[0]?.annexes ? ' (ya lleva dentro sus adjuntos)' : ''} y adjúntalo${separate ? ' junto con los archivos marcados «Aparte», que se descargan en Adjuntos.' : '.'}`}
       </p>
     </div>
   );

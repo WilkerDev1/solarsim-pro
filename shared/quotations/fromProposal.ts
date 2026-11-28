@@ -29,7 +29,7 @@ export interface ProposalQuotationSource {
   notes: string;
   validUntil: string | null;
   /**
-   * Documentos de la propuesta, siempre como «Solo relacionado». `origin` es `'catalog'` para una ficha técnica del
+   * Documentos de la propuesta, siempre como «Archivo aparte en el correo». `origin` es `'catalog'` para una ficha técnica del
    * catálogo (con su `catalogItemId`) y `'proposal'` (por defecto) para el resto; cualquier otro valor queda `'proposal'`.
    */
   attachments: (Omit<QuotationAttachment, 'mode' | 'origin' | 'sourceProjectId'> & { origin?: ProposalAttachmentOrigin })[];

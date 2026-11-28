@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Copy, Eye, FileText, PencilLine, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { ITBIS_RATE } from '../../../../shared/financialRules';
-import { computeQuotationTotals, effectiveQuotationStatus, formatAmount, formatMoney } from '../../../../shared/quotations';
+import { attachmentDestinationLabel, computeQuotationTotals, effectiveQuotationStatus, formatAmount, formatMoney } from '../../../../shared/quotations';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import type { QuotationRecord, QuotationStatus } from '../../../types/quotation';
 import { formatQuotationDate, quotationStatusActions, quotationSyncIssue, quotationTotalDopCents, type QuotationSyncIssue } from '../../../utils/quotationSummary';
@@ -225,7 +225,7 @@ export function QuotationDetailDock({ quotation, today, readOnly, onDuplicated }
                   <li key={attachment.id}>
                     <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                     {attachment.title || attachment.fileName}
-                    <small>{attachment.mode === 'include' ? 'Se incluye' : 'Relacionado'}</small>
+                    <small>{attachmentDestinationLabel(attachment)}</small>
                   </li>
                 ))}
               </ul>
