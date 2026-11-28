@@ -95,9 +95,11 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
     const built=buildProjectFromDraft(state,input,createNewProject);
     if('error' in built) {set({saveFeedbackMessage:built.error});return;}
     const {project,previous}=built;
-    if(previous) state.recordUndoState(previous);
     set({projects:createNewProject?[project,...state.projects]:state.projects.map(p=>p.id===project.id?project:p),activeProjectId:project.id,
       activeView:'simulator',isAIInvoiceModalOpen:false,saveFeedbackMessage:`Propuesta ${project.client.projectId} ${createNewProject?'creada':'actualizada'}.`});
+    // F2a1: una propuesta nueva siembra su propia base; aplicar sobre una existente es un paso propio (antes → borrador).
+    if(previous && !createNewProject) {get().activateUndoJournal(previous);get().recordUndoState(project,{source:'assistant',coalesceKey:undefined});}
+    else get().activateUndoJournal(project);
     if(get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) get().triggerAutoSync(true);
     setTimeout(()=>set({saveFeedbackMessage:null}),4000);
   },

@@ -8,6 +8,7 @@ import { DEFAULT_LOCAL_COMPANY } from "../types";
 import { DEFAULT_EQUIPMENT_CATALOG } from "../data/defaultEquipmentCatalog";
 import { BENCHMARK_PROJECT } from "../engine/referenceCase";
 import { SyncService } from "../services/syncService";
+import { EMPTY_UNDO_HISTORY } from "../store/undo/projectUndoJournal";
 
 const settings = (org: string) => ({
   serverUrl: "https://isolated-workspace.invalid",
@@ -58,7 +59,7 @@ async function run() {
       !store.getState().companies.some((c) => c.name.startsWith("Empresa A")),
     );
     assert.equal(store.getState().projectDeletionQueue.length, 0);
-    assert.equal(store.getState().undoStack.length, 0);
+    assert.deepEqual(store.getState().undoHistory, EMPTY_UNDO_HISTORY, "cambiar de organización vacía todos los diarios de deshacer");
     api.createNewProject({ name: "Cliente B" });
     const bId = store.getState().activeProjectId;
     api.setSyncSettings(settings("company-a"));

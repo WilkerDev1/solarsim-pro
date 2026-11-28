@@ -1,8 +1,8 @@
 // F0 (caracterización, sin cambio de comportamiento): los dos deshacer que hoy conviven.
 //  (a) el de la actividad del agente (`undoAgentActivity`, por huella de las seis secciones del proyecto);
-//  (b) el de Ctrl+Z (`undo`, una única pila que pertenece a la propuesta abierta pero no sabe de qué propuesta es).
-// Aquí se fija lo que OCURRE de verdad, también cuando es un fallo. Cada aserción marcada «se invierte en F2a1» describe un
-// comportamiento erróneo que esa fase corrige; al corregirlo se cambia la aserción en el mismo PR.
+//  (b) el de Ctrl+Z (`undo`): desde F2a1, un diario por propuesta (`undoHistory`, src/store/undo/projectUndoJournal.ts).
+// Aquí se fija lo que OCURRE de verdad. Las aserciones marcadas «invertida en F2a1» fijaban el fallo de la pila global (Ctrl+Z
+// tras crear o duplicar escribía en la propuesta nueva el contenido de la anterior) y ahora fijan la corrección.
 import assert from 'node:assert/strict';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -13,6 +13,7 @@ import { assistantOwner } from '../features/assistant/tools';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
 import { buildAITariffContext } from '../utils/aiTariffContext';
 import { probeStore, settleUndoDebounce } from './support/storeProbe';
+import { EMPTY_UNDO_HISTORY } from '../store/undo/projectUndoJournal';
 
 const store = useSimulationStore;
 const s = () => store.getState();
@@ -25,13 +26,15 @@ const original = { ...structuredClone(BENCHMARK_PROJECT), id: 'undo-a', syncStat
 const reset = () => store.setState({
   appAssistantEnabled: true, workspaceScope: 'local', projects: [structuredClone(original)], activeProjectId: '', activeView: 'simulator',
   equipmentCatalog: structuredClone(catalog), deletedEquipmentIds: [], equipmentConflicts: {}, sessionGeneration: 0,
-  agentPolicy: DEFAULT_AGENT_POLICY, agentActivity: [], pendingAgentActions: [], undoStack: [], redoStack: [], canUndo: false, canRedo: false,
+  agentPolicy: DEFAULT_AGENT_POLICY, agentActivity: [], pendingAgentActions: [], undoHistory: EMPTY_UNDO_HISTORY, canUndo: false, canRedo: false,
   syncSettings: { ...store.getState().syncSettings, currentUser: null, authToken: null, autoSyncEnabled: false },
 });
 const coverageEdit = (value: number) => ({ name: 'propose_project_update', args: { id: original.id, title: `Cobertura ${value}`, edits: [{ section: 'rates', field: 'targetCoveragePct', valueJson: String(value) }] } });
 const ctx = () => ({ source: 'app-assistant' as const, owner: assistantOwner() });
 const coverageOf = (id: string) => s().projects.find((p) => p.id === id)!.rates.targetCoveragePct;
 const nameOf = (id: string) => s().projects.find((p) => p.id === id)!.client.name;
+/** Pasos de Ctrl+Z que tiene el diario de la propuesta (sin contar la base). */
+const undoSteps = (id: string) => s().undoHistory.journals[id]?.undo.length ?? 0;
 
 // ── (a) Deshacer la actividad del agente tras una edición manual intermedia ────────────────────────────────────────────────
 reset();
@@ -54,8 +57,8 @@ assert.equal(s().getActiveProject().client.contactPerson, 'Ing. Manual', 'y la m
 assert.equal(s().agentActivity.find((e) => e.id === agent.activityId)?.status, 'applied', 'la entrada no pasa a «undone»: sigue pendiente de decidir');
 probe.stop();
 
-// Ctrl+Z revierte la edición manual (la pila tiene la base, el estado del agente y el manual) y entonces la huella vuelve a coincidir.
-assert.equal(s().undoStack.length, 3);
+// Ctrl+Z revierte la edición manual (el diario tiene dos pasos sobre la base: el del agente y el manual) y entonces la huella vuelve a coincidir.
+assert.equal(undoSteps(original.id), 2);
 s().undo();
 assert.equal(s().getActiveProject().client.contactPerson, personBefore, 'la edición manual se revierte');
 assert.equal(coverageOf(original.id), 90, 'Ctrl+Z conserva la edición del agente');
@@ -83,34 +86,37 @@ async function openWithHistory() {
   await settleUndoDebounce();
   s().updateRates({ targetCoveragePct: 70 });
   await settleUndoDebounce();
-  assert.equal(s().undoStack.length, 3);
+  assert.equal(undoSteps(original.id), 2);
   assert.equal(coverageOf(original.id), 70);
 }
 
-// Control: abrir otra propuesta con `setActiveProject` reinicia la pila y Ctrl+Z no hace nada. Es lo que crear y duplicar no hacen.
+// Control: abrir otra propuesta con `setActiveProject` activa SU diario (vacío) y Ctrl+Z no hace nada. Desde F2a1 crear y duplicar hacen lo mismo.
 await openWithHistory();
 const other = { ...structuredClone(BENCHMARK_PROJECT), id: 'undo-other', syncStatus: 'local_only' as const };
 store.setState({ projects: [...s().projects, other] });
 s().setActiveProject(other.id, 'simulator');
 assert.equal(s().canUndo, false);
-assert.equal(s().undoStack.length, 1);
+assert.equal(undoSteps(other.id), 0);
 s().undo();
 assert.equal(coverageOf(other.id), BENCHMARK_PROJECT.rates.targetCoveragePct, 'abrir otra propuesta: Ctrl+Z no escribe en ella');
 
-// (b1) «Nueva simulación» (createNewProject): activa la propuesta nueva sin sembrar su base en la pila.
+// (b1) «Nueva simulación» (createNewProject): activa la propuesta nueva y siembra su propia base.
 await openWithHistory();
 s().createNewProject({ name: 'Propuesta nueva' });
 const created = s().getActiveProject();
 assert.notEqual(created.id, original.id);
 assert.equal(created.rates.targetCoveragePct, 95, 'la nueva nace con la cobertura de fábrica');
-assert.equal(s().canUndo, true, 'Ctrl+Z sigue habilitado con la pila de OTRA propuesta (se invierte en F2a1: debe quedar deshabilitado)');
-assert.equal(s().undoStack.length, 3, 'la pila sigue siendo la de A (se invierte en F2a1: la nueva debe empezar con su propia base)');
+assert.equal(s().canUndo, false, 'invertida en F2a1: Ctrl+Z queda deshabilitado en la propuesta nueva');
+assert.equal(undoSteps(created.id), 0, 'invertida en F2a1: la nueva empieza con su propia base');
+assert.equal(undoSteps(original.id), 2, 'el diario de A se conserva aparte');
+const createdCode = created.client.projectId;
 s().undo();
-// FALLO CONFIRMADO: Ctrl+Z reescribe la propuesta nueva con el contenido de A (cliente completo, tarifas y cobertura).
+// Corregido en F2a1 (antes: Ctrl+Z reescribía la propuesta nueva con el contenido de A: cliente completo, tarifas y cobertura).
 assert.equal(s().activeProjectId, created.id, 'sigue activa la propuesta nueva');
-assert.equal(nameOf(created.id), BENCHMARK_PROJECT.client.name, 'se invierte en F2a1: debe seguir llamándose «Propuesta nueva»');
-assert.equal(s().projects.find((p) => p.id === created.id)!.client.projectId, BENCHMARK_PROJECT.client.projectId, 'se invierte en F2a1: hereda el código SP-2024-089 de A');
-assert.equal(coverageOf(created.id), 80, 'se invierte en F2a1: recibe la cobertura anterior de A (80), no la suya (95)');
+assert.equal(nameOf(created.id), 'Propuesta nueva', 'invertida en F2a1: sigue llamándose «Propuesta nueva»');
+assert.equal(s().projects.find((p) => p.id === created.id)!.client.projectId, createdCode, 'invertida en F2a1: conserva su código, no hereda SP-2024-089 de A');
+assert.notEqual(createdCode, BENCHMARK_PROJECT.client.projectId);
+assert.equal(coverageOf(created.id), 95, 'invertida en F2a1: conserva su cobertura (95), no recibe la anterior de A (80)');
 assert.equal(coverageOf(original.id), 70, 'A no se toca');
 
 // (b2) Duplicar: la copia queda activa y el primer Ctrl+Z la sustituye por un estado anterior del original.
@@ -119,14 +125,16 @@ const copyId = s().duplicateProject(original.id)!;
 assert.equal(s().activeProjectId, copyId);
 assert.equal(nameOf(copyId), `${BENCHMARK_PROJECT.client.name} (Copia)`);
 assert.equal(coverageOf(copyId), 70, 'la copia nace con el contenido actual del original');
-assert.equal(s().canUndo, true, 'se invierte en F2a1: Ctrl+Z debe estar deshabilitado en la copia recién creada');
+assert.equal(s().canUndo, false, 'invertida en F2a1: Ctrl+Z deshabilitado en la copia recién creada');
+const copyCode = s().projects.find((p) => p.id === copyId)!.client.projectId;
 s().undo();
-assert.equal(nameOf(copyId), BENCHMARK_PROJECT.client.name, 'se invierte en F2a1: la copia pierde «(Copia)» y su nombre');
-assert.equal(s().projects.find((p) => p.id === copyId)!.client.projectId, BENCHMARK_PROJECT.client.projectId, 'se invierte en F2a1: duplica el código del original');
-assert.equal(coverageOf(copyId), 80, 'se invierte en F2a1: recibe un estado anterior del original');
+assert.equal(nameOf(copyId), `${BENCHMARK_PROJECT.client.name} (Copia)`, 'invertida en F2a1: la copia conserva «(Copia)» y su nombre');
+assert.equal(s().projects.find((p) => p.id === copyId)!.client.projectId, copyCode, 'invertida en F2a1: conserva su código');
+assert.notEqual(copyCode, BENCHMARK_PROJECT.client.projectId, 'distinto del del original');
+assert.equal(coverageOf(copyId), 70, 'invertida en F2a1: no recibe un estado anterior del original');
 assert.equal(coverageOf(original.id), 70, 'el original no se toca');
 
-// (b3) Asistente de propuestas (`applyExtractedInvoice` con propuesta nueva): mismo patrón, sin base propia.
+// (b3) Asistente de propuestas (`applyExtractedInvoice` con propuesta nueva): desde F2a1 también siembra su base.
 await openWithHistory();
 const draft = normalizeProposalDraft({ clientName: 'Desde factura', province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS1', averageMonthlyKWh: 700,
   panels: [{ equipmentId: panel.id, quantity: 12 }], inverters: [{ equipmentId: inverter.id, quantity: 1 }], batteries: [], hasBattery: false,
@@ -135,10 +143,12 @@ catalog, { province: 'Santiago', annualSpecificYieldKWhPerKWp: 1500, tariffRefer
 s().applyExtractedInvoice(draft, true);
 const fromInvoice = s().getActiveProject();
 assert.equal(fromInvoice.client.name, 'Desde factura');
-assert.equal(s().canUndo, true, 'se invierte en F2a1: Ctrl+Z debe estar deshabilitado');
+assert.equal(s().canUndo, false, 'invertida en F2a1: Ctrl+Z deshabilitado');
+const invoiceCoverage = fromInvoice.rates.targetCoveragePct;
 s().undo();
-assert.equal(nameOf(fromInvoice.id), BENCHMARK_PROJECT.client.name, 'se invierte en F2a1: la propuesta de la factura recibe el cliente de A');
-assert.equal(coverageOf(fromInvoice.id), 80, 'se invierte en F2a1');
+assert.equal(nameOf(fromInvoice.id), 'Desde factura', 'invertida en F2a1: la propuesta de la factura conserva su cliente');
+assert.equal(coverageOf(fromInvoice.id), invoiceCoverage, 'invertida en F2a1: y su cobertura');
+assert.notEqual(invoiceCoverage, 80);
 
 // (b4) El agente crea con `create_proposal` sin activar la propuesta (invariante «los agentes no navegan»): no hay Ctrl+Z cruzado.
 await openWithHistory();

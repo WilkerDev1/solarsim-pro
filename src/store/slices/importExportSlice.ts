@@ -262,6 +262,8 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           processedProjects.length === 1 ? 'proyecto importado' : 'proyectos importados'
         } con éxito!`,
       });
+      const imported = get().projects.find((p) => p.id === firstImportedId);
+      if (imported) get().activateUndoJournal(imported); // la importada empieza con su propia base de deshacer
 
       if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
         get().triggerAutoSync(true);
@@ -367,6 +369,8 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       pendingImportConflict: null,
       saveFeedbackMessage: toastMsg,
     });
+    const imported = get().projects.find((p) => p.id === targetActiveId);
+    if (imported) get().activateUndoJournal(imported); // sobrescribir cambia el contenido: el diario anterior se descarta
 
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
       get().triggerAutoSync(true);
