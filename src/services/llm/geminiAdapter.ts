@@ -102,6 +102,8 @@ function fromSdkPart(part: Part): LlmPart {
   const { text, thought, thoughtSignature, functionCall, functionResponse, inlineData, ...others } = part as Part & Record<string, unknown>;
   const signature = typeof thoughtSignature === 'string' && thoughtSignature ? { signature: thoughtSignature } : {};
   if (functionCall?.name) {
+    // Solo id, name y args: es todo lo que el SDK 3.6.1 serializa para la API de Gemini. willContinue y partialArgs
+    // son de Vertex y el SDK LANZA si se le reenvían, así que guardarlos rompería la petición siguiente.
     return { type: 'functionCall', call: { ...(functionCall.id ? { id: functionCall.id } : {}), name: functionCall.name, args: functionCall.args ?? {} }, ...signature, ...rest(others) };
   }
   if (typeof text === 'string' && !functionResponse && !inlineData) {

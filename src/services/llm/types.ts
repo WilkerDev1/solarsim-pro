@@ -13,7 +13,8 @@ export interface LlmFunctionCall {
 
 /**
  * Una parte de un turno. `opaque` guarda los campos de la parte del modelo que la app no interpreta
- * (metadatos nuevos de la API, por ejemplo) para devolverlos tal cual: el historial conserva la parte completa.
+ * (`partMetadata`, por ejemplo) para devolverlos tal cual. Límite: solo sobreviven los campos que conoce el SDK
+ * fijado (filtra los demás al serializar) y de `functionCall` solo viajan id, name y args.
  */
 export type LlmPart =
   | { type: 'text'; text: string; thought?: boolean; signature?: LlmThoughtSignature; opaque?: Record<string, unknown> }
@@ -59,7 +60,11 @@ export interface LlmStructuredRequest extends Omit<LlmRequest, 'tools' | 'toolMo
 
 export interface LlmCallOptions {
   signal?: AbortSignal;
-  /** Plazo del intento en ms (por defecto 60 s); al vencer, `LlmError` de tipo `timeout`. */
+  /**
+   * Plazo TOTAL del intento en ms (por defecto 60 s), no de inactividad: en `stream` cuenta desde la petición hasta
+   * el último evento, incluido el tiempo que quien consume tarda entre eventos. Al vencer, `LlmError` de tipo
+   * `timeout`. Un stream largo (razonamiento alto, salida de 65k tokens) debe pasar un valor explícito.
+   */
   timeoutMs?: number;
 }
 
