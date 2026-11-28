@@ -61,7 +61,7 @@ export function resetEvalStore(options: EvalStoreOptions = {}): void {
     defaultSimulationSettings: DEFAULT_SIMULATION_SETTINGS, localFeatureSettings: { ...DEFAULT_FEATURE_SETTINGS },
     agentPolicy: DEFAULT_AGENT_POLICY, agentActivity: [], pendingAgentActions: [], undoHistory: EMPTY_UNDO_HISTORY, canUndo: false, canRedo: false,
     geminiApiKey: options.apiKey ?? 'synthetic-key', geminiModel: options.model ?? 'gemini-4-hydrogen',
-    isNewProjectModalOpen: false, isSettingsModalOpen: false, isAIInvoiceModalOpen: false,
+    isNewProjectModalOpen: false, isSettingsModalOpen: false,
     syncSettings: { ...store.getState().syncSettings, currentUser: null, authToken: null, autoSyncEnabled: false },
     ...options.patch,
   });
