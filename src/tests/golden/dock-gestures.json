@@ -1,0 +1,5120 @@
+{
+  "distribuidora EDENORTE": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "billingTariff": {
+        "distributor": "EDENORTE",
+        "effectiveDate": "2026-10-01",
+        "energyBlocks": [
+          {
+            "fromKWh": 0,
+            "rateDOP": 9.57,
+            "toKWh": 200
+          },
+          {
+            "fromKWh": 201,
+            "rateDOP": 11.88,
+            "toKWh": 300
+          },
+          {
+            "fromKWh": 301,
+            "rateDOP": 14.22,
+            "toKWh": 700
+          },
+          {
+            "fromKWh": 701,
+            "rateDOP": 14.38,
+            "toKWh": null
+          }
+        ],
+        "fixedChargeDOP": 127.18,
+        "resolutionCode": "SIE-121-2026-TF",
+        "tariffCode": "BTS2"
+      },
+      "currency": "USD",
+      "distributor": "EDENORTE",
+      "energyCostPerKWh": 0.24,
+      "energyRateSource": "reference",
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 35,
+      "daytimeSelfConsumptionRatio": 35,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "residential",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "distribuidora CEPM": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "billingTariff": {
+        "distributor": "CEPM",
+        "effectiveDate": "2026-09-01",
+        "energyBlocks": [
+          {
+            "fromKWh": 0,
+            "rateDOP": 22.9,
+            "toKWh": null
+          }
+        ],
+        "fixedChargeDOP": 250,
+        "resolutionCode": "SIE-147-2026-TF",
+        "tariffCode": "RBT-1"
+      },
+      "currency": "USD",
+      "distributor": "CEPM",
+      "energyCostPerKWh": 0.382,
+      "energyRateSource": "reference",
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "RBT-1",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 35,
+      "daytimeSelfConsumptionRatio": 35,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "residential",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "distribuidora con precio a mano": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "billingTariff": {
+        "distributor": "EDEESTE",
+        "effectiveDate": "2026-10-01",
+        "energyBlocks": [
+          {
+            "fromKWh": 0,
+            "rateDOP": 8.79,
+            "toKWh": 200
+          },
+          {
+            "fromKWh": 201,
+            "rateDOP": 11.1,
+            "toKWh": 300
+          },
+          {
+            "fromKWh": 301,
+            "rateDOP": 13.43,
+            "toKWh": 700
+          },
+          {
+            "fromKWh": 701,
+            "rateDOP": 13.59,
+            "toKWh": null
+          }
+        ],
+        "fixedChargeDOP": 128.2,
+        "resolutionCode": "SIE-121-2026-TF",
+        "tariffCode": "BTS2"
+      },
+      "currency": "USD",
+      "distributor": "EDEESTE",
+      "energyCostPerKWh": 0.227,
+      "energyRateSource": "reference",
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 35,
+      "daytimeSelfConsumptionRatio": 35,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "residential",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "distribuidora con perfil manual": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "customITBISSavedUSD": 1770.46,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "billingTariff": {
+        "distributor": "EDESUR",
+        "effectiveDate": "2026-10-01",
+        "energyBlocks": [
+          {
+            "fromKWh": 0,
+            "rateDOP": 6.05,
+            "toKWh": 200
+          },
+          {
+            "fromKWh": 201,
+            "rateDOP": 8.59,
+            "toKWh": 300
+          },
+          {
+            "fromKWh": 301,
+            "rateDOP": 12.89,
+            "toKWh": 700
+          },
+          {
+            "fromKWh": 701,
+            "rateDOP": 13.09,
+            "toKWh": null
+          }
+        ],
+        "fixedChargeDOP": 128.59,
+        "fixedChargeTiers": [
+          {
+            "chargeDOP": 42.1,
+            "fromKWh": 0,
+            "toKWh": 100
+          },
+          {
+            "chargeDOP": 128.59,
+            "fromKWh": 101,
+            "toKWh": null
+          }
+        ],
+        "resolutionCode": "SIE-121-2026-TF",
+        "tariffCode": "BTS1"
+      },
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.218,
+      "energyRateSource": "reference",
+      "gridExportFeePct": 25,
+      "gridUseChargeDOPPerKWh": 3.78,
+      "netMeteringRegime": "sie007_2026",
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS1",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": false,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 55,
+      "daytimeSelfConsumptionRatio": 55,
+      "dopExchangeRate": 60,
+      "hasBattery": true,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "custom",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 38,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "tarifa BTD": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "billingTariff": {
+        "distributor": "EDESUR",
+        "effectiveDate": "2026-10-01",
+        "energyBlocks": [
+          {
+            "fromKWh": 0,
+            "rateDOP": 9.02,
+            "toKWh": null
+          }
+        ],
+        "fixedChargeDOP": 210.15,
+        "resolutionCode": "SIE-121-2026-TF",
+        "tariffCode": "BTD"
+      },
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.15,
+      "energyRateSource": "reference",
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTD",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 75,
+      "daytimeSelfConsumptionRatio": 75,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "commercial",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "tarifa BTS1": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "billingTariff": {
+        "distributor": "EDESUR",
+        "effectiveDate": "2026-10-01",
+        "energyBlocks": [
+          {
+            "fromKWh": 0,
+            "rateDOP": 6.05,
+            "toKWh": 200
+          },
+          {
+            "fromKWh": 201,
+            "rateDOP": 8.59,
+            "toKWh": 300
+          },
+          {
+            "fromKWh": 301,
+            "rateDOP": 12.89,
+            "toKWh": 700
+          },
+          {
+            "fromKWh": 701,
+            "rateDOP": 13.09,
+            "toKWh": null
+          }
+        ],
+        "fixedChargeDOP": 128.59,
+        "fixedChargeTiers": [
+          {
+            "chargeDOP": 42.1,
+            "fromKWh": 0,
+            "toKWh": 100
+          },
+          {
+            "chargeDOP": 128.59,
+            "fromKWh": 101,
+            "toKWh": null
+          }
+        ],
+        "resolutionCode": "SIE-121-2026-TF",
+        "tariffCode": "BTS1"
+      },
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.218,
+      "energyRateSource": "reference",
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS1",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 35,
+      "daytimeSelfConsumptionRatio": 35,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "residential",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "tarifa con perfil manual": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "customITBISSavedUSD": 1770.46,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "billingTariff": {
+        "distributor": "EDENORTE",
+        "effectiveDate": "2026-10-01",
+        "energyBlocks": [
+          {
+            "fromKWh": 0,
+            "rateDOP": 9.57,
+            "toKWh": 200
+          },
+          {
+            "fromKWh": 201,
+            "rateDOP": 11.88,
+            "toKWh": 300
+          },
+          {
+            "fromKWh": 301,
+            "rateDOP": 14.22,
+            "toKWh": 700
+          },
+          {
+            "fromKWh": 701,
+            "rateDOP": 14.38,
+            "toKWh": null
+          }
+        ],
+        "fixedChargeDOP": 127.18,
+        "resolutionCode": "SIE-121-2026-TF",
+        "tariffCode": "BTS2"
+      },
+      "currency": "USD",
+      "distributor": "EDENORTE",
+      "energyCostPerKWh": 0.24,
+      "energyRateSource": "reference",
+      "gridExportFeePct": 25,
+      "gridUseChargeDOPPerKWh": 4.02,
+      "netMeteringRegime": "sie007_2026",
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": false,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 55,
+      "daytimeSelfConsumptionRatio": 55,
+      "dopExchangeRate": 60,
+      "hasBattery": true,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "custom",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 38,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "tarifa oficial": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "customITBISSavedUSD": 1770.46,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "billingTariff": {
+        "distributor": "EDESUR",
+        "effectiveDate": "2026-10-01",
+        "energyBlocks": [
+          {
+            "fromKWh": 0,
+            "rateDOP": 8.62,
+            "toKWh": 200
+          },
+          {
+            "fromKWh": 201,
+            "rateDOP": 10.93,
+            "toKWh": 300
+          },
+          {
+            "fromKWh": 301,
+            "rateDOP": 13.26,
+            "toKWh": 700
+          },
+          {
+            "fromKWh": 701,
+            "rateDOP": 13.43,
+            "toKWh": null
+          }
+        ],
+        "fixedChargeDOP": 128.96,
+        "resolutionCode": "SIE-121-2026-TF",
+        "tariffCode": "BTS2"
+      },
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.224,
+      "energyRateSource": "reference",
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 38,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "perfil residencial": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 35,
+      "daytimeSelfConsumptionRatio": 35,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "residential",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "perfil comercial": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDENORTE",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "netMeteringRegime": "sie007_2026",
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS1",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": false,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 75,
+      "daytimeSelfConsumptionRatio": 75,
+      "dopExchangeRate": 60,
+      "hasBattery": true,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "commercial",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 38,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "perfil industrial": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 90,
+      "daytimeSelfConsumptionRatio": 90,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "industrial",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "perfil manual": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "custom",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "consumo diurno 60": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 60,
+      "daytimeSelfConsumptionRatio": 60,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "custom",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "provincia": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santiago",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": {},
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "customITBISSavedUSD": 1770.46,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 40,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "margen 30 %": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.3,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "margen 27,35 %": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.274,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "margen rápido 35 %": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.35,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "margen negativo": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "modo directo": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerKWpUSD": 760,
+      "pricePerWattUSD": 0.76,
+      "pricingMode": "direct_watt",
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "modo matriz": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerKWpUSD": 1400,
+      "pricePerWattUSD": 1.4,
+      "pricingMode": "cost_matrix",
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "$/W 1,25": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerKWpUSD": 1250,
+      "pricePerWattUSD": 1.25,
+      "pricingMode": "direct_watt",
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "$/kWp 1330": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerKWpUSD": 1330,
+      "pricePerWattUSD": 1.33,
+      "pricingMode": "direct_watt",
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "sugerir de costos": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerKWpUSD": 1400,
+      "pricePerWattUSD": 1.4,
+      "pricingMode": "direct_watt",
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "mejor proveedor": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "autoSupplierPricing": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "priceSource": "supplier",
+          "selectedSupplierInfo": {
+            "priceUSD": 2400,
+            "supplierName": "Beta",
+            "supplierPriceId": "sp-ib",
+            "updatedAt": "2026-01-01"
+          },
+          "unitPriceUSD": 2400
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "priceSource": "supplier",
+          "selectedSupplierInfo": {
+            "priceUSD": 92,
+            "supplierName": "Gama",
+            "supplierPriceId": "sp-a2",
+            "updatedAt": "2026-01-01"
+          },
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 92,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "mejor proveedor con batería": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDENORTE",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "netMeteringRegime": "sie007_2026",
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS1",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": false,
+      "autoSupplierPricing": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "priceSource": "supplier",
+          "selectedSupplierInfo": {
+            "priceUSD": 2000,
+            "supplierName": "Alfa",
+            "supplierPriceId": "sp-ba",
+            "updatedAt": "2026-01-01"
+          },
+          "unitPriceUSD": 2000
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 55,
+      "daytimeSelfConsumptionRatio": 55,
+      "dopExchangeRate": 60,
+      "hasBattery": true,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "priceSource": "supplier",
+          "selectedSupplierInfo": {
+            "priceUSD": 2400,
+            "supplierName": "Beta",
+            "supplierPriceId": "sp-ib",
+            "updatedAt": "2026-01-01"
+          },
+          "unitPriceUSD": 2400
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "custom",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 38,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "priceSource": "supplier",
+          "selectedSupplierInfo": {
+            "priceUSD": 92,
+            "supplierName": "Gama",
+            "supplierPriceId": "sp-a2",
+            "updatedAt": "2026-01-01"
+          },
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 92,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "precio a mano panel": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "autoSupplierPricing": false,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "priceSource": "manual",
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 120,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "precio a mano inversor": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "autoSupplierPricing": false,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "priceSource": "manual",
+          "unitPriceUSD": 2100
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "catálogo: panel B": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.35,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 22.4,
+      "panels": [
+        {
+          "annualDegradation": 0.35,
+          "brandModel": "Panel B 700W",
+          "catalogItemId": "p-b",
+          "count": 33,
+          "efficiencyPct": 22.4,
+          "id": "primary-panel",
+          "powerW": 700,
+          "priceSource": "supplier",
+          "selectedSupplierInfo": {
+            "priceUSD": 138,
+            "supplierName": "Delta",
+            "supplierPriceId": "sp-b2",
+            "updatedAt": "2026-01-01"
+          },
+          "tempCoeff": -0.3,
+          "unitPriceUSD": 138
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.3
+    }
+  },
+  "catálogo: panel C (agotado)": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.4,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 22,
+      "panels": [
+        {
+          "brandModel": "Panel C 610W",
+          "catalogItemId": "p-c",
+          "count": 38,
+          "id": "primary-panel",
+          "powerW": 610
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.29
+    }
+  },
+  "catálogo: inversor B (genérico)": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor B 5K",
+          "catalogItemId": "i-b",
+          "count": 2,
+          "genericPriceInfo": {
+            "observationId": "obs-ib",
+            "observedAt": "2026-02-01T00:00:00.000Z",
+            "priceUSD": 1180,
+            "source": "manual"
+          },
+          "id": "primary-inverter",
+          "powerKW": 5,
+          "priceSource": "generic",
+          "unitPriceUSD": 1180
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "catálogo: batería A": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDENORTE",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "netMeteringRegime": "sie007_2026",
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS1",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": false,
+      "batteries": [
+        {
+          "brandModel": "Batería A",
+          "capacityKWh": 10,
+          "catalogItemId": "b-a",
+          "count": 3,
+          "dodPct": 90,
+          "efficiencyPct": 95,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "priceSource": "supplier",
+          "selectedSupplierInfo": {
+            "priceUSD": 2000,
+            "supplierName": "Alfa",
+            "supplierPriceId": "sp-ba",
+            "updatedAt": "2026-01-01"
+          },
+          "unitPriceUSD": 2000
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 55,
+      "daytimeSelfConsumptionRatio": 55,
+      "dopExchangeRate": 60,
+      "hasBattery": true,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "custom",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 38,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "catálogo: batería B (genérico)": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDENORTE",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "netMeteringRegime": "sie007_2026",
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS1",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": false,
+      "batteries": [
+        {
+          "brandModel": "Batería B",
+          "capacityKWh": 5,
+          "catalogItemId": "b-b",
+          "count": 3,
+          "dodPct": 90,
+          "efficiencyPct": 90,
+          "genericPriceInfo": {
+            "observationId": "obs-bb",
+            "observedAt": "2026-02-01T00:00:00.000Z",
+            "priceUSD": 900,
+            "source": "manual"
+          },
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "priceSource": "generic",
+          "unitPriceUSD": 900
+        }
+      ],
+      "batteryCostUSD": 0,
+      "daytimeLoadRatio": 55,
+      "daytimeSelfConsumptionRatio": 55,
+      "dopExchangeRate": 60,
+      "hasBattery": true,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "loadProfilePreset": "custom",
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 38,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "catálogo: panel secundario": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": false,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 38,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        },
+        {
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 4,
+          "efficiencyPct": 21.5,
+          "id": "panel-2",
+          "powerW": 550,
+          "priceSource": "supplier",
+          "selectedSupplierInfo": {
+            "priceUSD": 92,
+            "supplierName": "Gama",
+            "supplierPriceId": "sp-a2",
+            "updatedAt": "2026-01-01"
+          },
+          "unitPriceUSD": 92
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "añadir panel": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": false,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 38,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        },
+        {
+          "annualDegradation": 0.35,
+          "brandModel": "Panel B 700W",
+          "catalogItemId": "p-b",
+          "count": 10,
+          "efficiencyPct": 22.4,
+          "id": "panel-1767225600000",
+          "powerW": 700,
+          "priceSource": "supplier",
+          "selectedSupplierInfo": {
+            "priceUSD": 138,
+            "supplierName": "Delta",
+            "supplierPriceId": "sp-b2",
+            "updatedAt": "2026-01-01"
+          },
+          "tempCoeff": -0.3,
+          "unitPriceUSD": 138
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "añadir batería": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        },
+        {
+          "brandModel": "Batería A",
+          "capacityKWh": 10,
+          "catalogItemId": "b-a",
+          "count": 1,
+          "dodPct": 90,
+          "efficiencyPct": 95,
+          "id": "battery-1767225600000",
+          "priceSource": "supplier",
+          "selectedSupplierInfo": {
+            "priceUSD": 2000,
+            "supplierName": "Alfa",
+            "supplierPriceId": "sp-ba",
+            "updatedAt": "2026-01-01"
+          },
+          "unitPriceUSD": 2000
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": true,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "quitar grupo": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": false,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 38,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "cantidad de paneles": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": false,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 40,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "marca a mano": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Mi panel 600W",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "manualModel": true,
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "marca del catálogo a mano": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel B 700W",
+          "catalogItemId": "p-b",
+          "count": 33,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 700,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "potencia a mano": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": false,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 39,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 600,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  },
+  "incluir batería": {
+    "aiSource": null,
+    "client": {
+      "address": "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.",
+      "company": "CENTRO MEDICO HISPANICO SRL",
+      "contactEmail": "contacto@centromedico.do",
+      "contactPhone": "809-555-0199",
+      "coordinates": "18.4861, -69.9312",
+      "customMonthlyHSP": [
+        5,
+        5.2,
+        5.4,
+        5.6,
+        5.5,
+        5.3,
+        5.4,
+        5.5,
+        5.2,
+        5,
+        4.8,
+        4.7
+      ],
+      "distributor": "EDEESTE",
+      "location": "Santo Domingo, RD",
+      "name": "CENTRO MEDICO HISPANICO",
+      "projectId": "SP-2024-089",
+      "province": "Santo Domingo / Distrito Nacional",
+      "quoteNumber": "C-0030",
+      "quoteValidityDays": 7,
+      "tariffCode": "BTS2"
+    },
+    "customization": null,
+    "financials": {
+      "applyITBISExemption": true,
+      "applyLey5707": true,
+      "co2FactorKgPerKWh": 0.481,
+      "discountRatePct": 10,
+      "pricePerWattUSD": 1.135,
+      "projectLifespanYears": 25
+    },
+    "monthlyConsumption": [
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279,
+      3279
+    ],
+    "rates": {
+      "annualEnergyInflationPct": 3.5,
+      "currency": "USD",
+      "distributor": "EDESUR",
+      "energyCostPerKWh": 0.221,
+      "gridExportFeePct": 25,
+      "targetCoveragePct": 95,
+      "tariffCode": "BTS2",
+      "usdExchangeRate": 60
+    },
+    "specs": {
+      "annualDegradation": 0.5,
+      "autoCalculatePanels": true,
+      "batteries": [
+        {
+          "brandModel": "Batería Hinaess 16 KwH-48 vdc.",
+          "capacityKWh": 48,
+          "count": 3,
+          "dodPct": 80,
+          "id": "primary-battery",
+          "lifespanYears": 10,
+          "unitPriceUSD": 1990
+        }
+      ],
+      "batteryCostUSD": 0,
+      "dopExchangeRate": 60,
+      "hasBattery": true,
+      "installationServicesDesc": "Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).",
+      "installationUnitPriceUSD": 170,
+      "inverters": [
+        {
+          "brandModel": "Inversor A 10K",
+          "catalogItemId": "i-a",
+          "count": 2,
+          "id": "primary-inverter",
+          "powerKW": 10,
+          "unitPriceUSD": 2300
+        }
+      ],
+      "isDetailed": true,
+      "panelEfficiency": 21.8,
+      "panels": [
+        {
+          "annualDegradation": 0.5,
+          "brandModel": "Panel A 550W",
+          "catalogItemId": "p-a",
+          "count": 42,
+          "efficiencyPct": 21.8,
+          "id": "primary-panel",
+          "powerW": 550,
+          "tempCoeff": -0.35,
+          "unitPriceUSD": 103.32,
+          "weightKilos": 29.01882
+        }
+      ],
+      "pricePerWattUSD": 1.134971,
+      "saleMarginMultiplier": 1.25,
+      "systemLosses": 14,
+      "tempCoeff": -0.35
+    }
+  }
+}
