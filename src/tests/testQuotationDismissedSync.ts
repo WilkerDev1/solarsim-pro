@@ -3,7 +3,8 @@
 // perdido se recupera sin conflicto y no hay bucle de PUT (docs/QUOTATIONS.md#compatibilidad-de-dismissedsourcedocuments).
 import assert from 'node:assert/strict';
 import { useSimulationStore as store } from '../store/useSimulationStore';
-import { QuotationSyncService } from '../services/quotationSyncService';
+import { installLockingApi } from './quotationLockingApi';
+import { forgetQuotationApiSupport } from '../store/sync/quotationContent';
 import { emptyQuotationContent, validateQuotationContent } from '../../shared/quotations';
 import { quotationEditorActions } from '../features/quotations/editorActions';
 import { keepLocalOnlyFields, planQuotationPush, sameQuotationContent } from '../store/sync/quotationContent';
@@ -20,16 +21,20 @@ import type { QuotationContent, QuotationRecord } from '../types/quotation';
   assert.equal(sameQuotationContent(content({ notes: 'x' }), local), false, 'cualquier otro cambio sigue contando');
   assert.deepEqual(planQuotationPush(server, local), [], 'solo añadir el campo no publica nada');
   assert.equal(planQuotationPush(content({ notes: 'x' }), local).length, 1);
-  // Bloqueada con la base sin el campo: el cambio de estado no la reabre, y el PUT lleva el campo.
+  // Bloqueada con la base sin el campo: el cambio de estado no la reabre, y el PUT no lleva lo que la base no tiene (una
+  // API nueva lo tomaría por una edición de la bloqueada y respondería 400 `quotation_locked`).
   const issuedBase = content({ status: 'issued', client: { ...content().client, name: 'C' }, items: [{ id: 'l1', kind: 'item', description: 'x', quantity: 1, unit: 'UD', unitPriceCents: 100, discountPct: 0, taxable: false }] });
   const accepted = { ...issuedBase, status: 'accepted' as const, dismissedSourceDocuments: ['a1'] };
   const plan = planQuotationPush(issuedBase, accepted);
   assert.deepEqual(plan.map((c) => c.status), ['accepted']);
-  assert.deepEqual(plan[0].dismissedSourceDocuments, ['a1']);
+  assert.equal(plan[0].dismissedSourceDocuments, undefined);
   assert.deepEqual(planQuotationPush(issuedBase, { ...accepted, status: 'void' }).map((c) => c.status), ['void']);
   assert.deepEqual(planQuotationPush(issuedBase, { ...issuedBase, dismissedSourceDocuments: ['a1'] }), [], 'mismo estado y solo el campo: nada');
-  // Con la base que sí lo trae (API nueva), cambiar la lista estando bloqueada sigue siendo una edición.
-  assert.deepEqual(planQuotationPush({ ...issuedBase, dismissedSourceDocuments: ['a2'] }, accepted).map((c) => c.status), ['draft', 'issued', 'accepted']);
+  // Salir de una bloqueada lleva el campo exactamente como lo tiene la base (la copia del servidor): una bloqueada no se
+  // edita, así que una lista local distinta es solo lo conservado aquí; nunca reabre ni da 400 `quotation_locked`.
+  const fromServer = planQuotationPush({ ...issuedBase, dismissedSourceDocuments: ['a2'] }, accepted);
+  assert.deepEqual(fromServer.map((c) => c.status), ['accepted']);
+  assert.deepEqual(fromServer[0].dismissedSourceDocuments, ['a2']);
   const record = (c: QuotationContent): QuotationRecord => ({ ...c, id: 'q', number: 'COT-2026-0001', version: 1, baseVersion: 1, createdById: '', createdBy: '', createdAt: '', updatedAt: '' });
   assert.deepEqual(keepLocalOnlyFields(record(server), record(local)).dismissedSourceDocuments, ['a1'], 'se conserva lo local');
   assert.equal(keepLocalOnlyFields(record(content({ sourceProjectId: 'p2' })), record(local)).dismissedSourceDocuments, undefined, 'otra propuesta enlazada: no');
@@ -44,33 +49,14 @@ const ids = (id: string) => api().quotations.find((q) => q.id === id)!.attachmen
 const local = (id: string) => api().quotations.find((q) => q.id === id)!;
 
 async function setup(apiVersion: 'old' | 'new') {
-  const rows = new Map<string, Record<string, unknown> & { version: number; number?: string }>();
-  const puts: QuotationContent[] = [];
-  let dropNext = false;
-  let clock = Date.parse('2026-11-01T00:00:00Z');
-  const tick = () => new Date(++clock).toISOString();
-  // La API 2.10.0 valida con el `shared/` anterior, que no conoce el campo: lo descarta sin error.
+  // La API 2.10.0 valida con el `shared/` anterior, que no conoce el campo: lo descarta sin error. Las dos aplican el
+  // bloqueo de la API real (`quotation_locked`, `invalid_transition`).
   const validate = (raw: unknown) => {
     const result = validateQuotationContent(raw);
     if (result.ok && apiVersion === 'old') delete result.value.dismissedSourceDocuments;
     return result;
   };
-  QuotationSyncService.setTransportFactory(() => async (path, init = {}) => {
-    const method = init.method || 'GET';
-    if (method === 'GET') return Response.json({ success: true, quotations: [...rows.values()].map((r) => structuredClone(r)), deletedIds: [], serverTimestamp: tick() });
-    const id = decodeURIComponent(path.slice(1).split('?')[0]);
-    const body = JSON.parse(String(init.body));
-    puts.push(body.content);
-    const valid = validate(body.content);
-    if (!valid.ok) return Response.json({ error: valid.error }, { status: 400 });
-    const current = rows.get(id);
-    if ((current?.version ?? 0) !== body.baseVersion) return Response.json({ error: 'cambió', quotation: current ?? null }, { status: 409 });
-    const version = (current?.version ?? 0) + 1;
-    const saved = { ...valid.value, id, number: current?.number ?? 'COT-2026-0001', organizationId: 'org', version, baseVersion: version, createdById: 'owner', createdBy: 'QA', createdAt: tick(), updatedAt: tick() };
-    rows.set(id, saved);
-    if (dropNext) { dropNext = false; throw new Error('respuesta perdida'); }
-    return Response.json({ success: true, quotation: saved });
-  });
+  const { rows, puts, responses, drop, rejectNext } = installLockingApi(validate);
   api().setSyncSettings({ serverUrl: `https://${apiVersion}.invalid`, currentUser: user, authToken: 'synthetic', autoSyncEnabled: false, lastSyncTimestamp: null });
   const annex = (id: string, hash: string) => ({ id, enabled: true, fileName: `${id}.pdf`, title: id, fileSize: 10, pageCount: 1, uploadedAt: '2026-11-01', assetId: `asset:sha256:${hash.repeat(64)}`, origin: 'manual', addToTableOfContents: false });
   const project = { id: 'p1', isDeleted: false, client: { name: 'Propuesta' }, customization: { attachedPdfs: [annex('a1', 'a'), annex('a2', 'b'), annex('a3', 'c')] } };
@@ -84,7 +70,7 @@ async function setup(apiVersion: 'old' | 'new') {
   const actions = quotationEditorActions(api, id);
   assert.equal(actions.linkProposal('p1').added, 3);
   assert.equal((await api().syncQuotationsWithServer()).success, true);
-  return { rows, puts, id, actions, drop: () => { dropNext = true; } };
+  return { rows, puts, responses, id, actions, drop, rejectNext };
 }
 
 async function scenario(apiVersion: 'old' | 'new') {
@@ -176,5 +162,54 @@ for (const apiVersion of ['old', 'new'] as const) {
   await lockedScenario(apiVersion, 'void');
   await acceptServerScenario(apiVersion);
 }
+
+/**
+ * Solo API nueva: lo quitado se guardó; un cliente 2.10.0 edita (borra el campo) y emite; este equipo descarga y la
+ * acepta. Con la API detectada como «guarda el campo» se respeta lo del servidor; tras reiniciar (sin esa memoria) se
+ * conserva lo local, pero el cambio de estado sale con lo del servidor: nunca 400 `quotation_locked`.
+ */
+async function lostByOldClientScenario(restart: boolean) {
+  const { rows, responses, id, actions } = await setup('new');
+  assert.equal(actions.removeProposalDocument('a1'), null);
+  assert.equal((await api().syncQuotationsWithServer()).success, true);
+  const { dismissedSourceDocuments: _erased, ...row } = rows.get(id)!;
+  rows.set(id, { ...row, status: 'issued', notes: 'emitida en 2.10.0', version: rows.get(id)!.version + 1 });
+  if (restart) forgetQuotationApiSupport();
+  store.setState({ quotationSyncCursor: null });
+  assert.equal((await api().syncQuotationsWithServer()).success, true);
+  assert.equal(local(id).status, 'issued');
+  assert.deepEqual(local(id).dismissedSourceDocuments, restart ? ['a1'] : undefined, restart ? 'sin memoria de la API: se conserva lo local' : 'API que guarda el campo: manda el servidor');
+  const before = responses.length;
+  assert.ok(api().setQuotationStatus(id, 'accepted').ok);
+  assert.equal((await api().syncQuotationsWithServer()).success, true, 'aceptar no queda atascado');
+  assert.deepEqual(responses.slice(before), ['ok'], 'un solo PUT, sin 400');
+  assert.equal(rows.get(id)!.status, 'accepted');
+  assert.equal(api().quotationChanges[id], undefined, 'sin cambios pendientes');
+}
+
+/** Registro guardado por una versión anterior (sin la copia confirmada): el 400 `quotation_locked` se reintenta una vez. */
+async function legacyRecordScenario() {
+  const { rows, responses, id, actions } = await setup('new');
+  assert.equal(actions.removeProposalDocument('a1'), null);
+  assert.ok(api().setQuotationStatus(id, 'issued').ok);
+  assert.equal((await api().syncQuotationsWithServer()).success, true);
+  const { dismissedSourceDocuments: _erased, ...row } = rows.get(id)!;
+  rows.set(id, { ...row, version: rows.get(id)!.version + 1 });
+  forgetQuotationApiSupport();
+  store.setState({ quotationSyncCursor: null });
+  await api().syncQuotationsWithServer();
+  assert.deepEqual(local(id).dismissedSourceDocuments, ['a1']);
+  store.setState({ quotations: api().quotations.map((q) => { const { confirmedLocalOnly: _old, ...rest } = q; return rest; }) });
+  const before = responses.length;
+  assert.ok(api().setQuotationStatus(id, 'void').ok);
+  assert.equal((await api().syncQuotationsWithServer()).success, true);
+  assert.deepEqual(responses.slice(before), ['quotation_locked', 'ok'], 'reintento único con la copia del servidor');
+  assert.equal(rows.get(id)!.status, 'void');
+  assert.equal(api().quotationChanges[id], undefined);
+}
+
+await lostByOldClientScenario(false);
+await lostByOldClientScenario(true);
+await legacyRecordScenario();
 
 console.log('Quotation dismissed documents sync tests passed.');

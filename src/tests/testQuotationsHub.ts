@@ -87,7 +87,7 @@ try {
   assert.match(html, /Incluye canalización existente/);
   assert.match(html, /Pago del 70%/);
   assert.match(html, /Ficha técnica — breaker 63 A/);
-  assert.match(html, /Se incluye/);
+  assert.match(html, /En el PDF/);
   assert.match(html, />Duplicar</);
   assert.match(html, />Eliminar</);
   // Un indicador por grupo con su importe en RD$ (la emitida vencida se convierte con su tasa: 18,450 × 60).
