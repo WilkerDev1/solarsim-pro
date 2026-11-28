@@ -25,13 +25,16 @@ export interface ScriptedResponse {
   finishReason?: LlmFinishReason;
   usage?: LlmUsage;
 }
-export type ScriptedStep =
+/** Paso ya resuelto (sin funciones ni errores). */
+type ResolvedStep =
   | ScriptedResponse
-  | { error: unknown }
   /** Trozos de stream tal cual; un `{ error }` lanza en ese punto; si no hay `done` se añade al final. */
   | { stream: Array<LlmStreamEvent | { error: unknown }> }
   /** Salida de `structured` (en generate/stream se ve como el texto JSON). */
-  | { data: unknown }
+  | { data: unknown };
+export type ScriptedStep =
+  | ResolvedStep
+  | { error: unknown }
   | ((call: ScriptedCall) => ScriptedStep | Promise<ScriptedStep>);
 
 const cancelled = (signal?: AbortSignal) => {
@@ -107,7 +110,7 @@ export class ScriptedLlm implements LlmClient {
     this.calls.push(call);
     return call;
   }
-  private async next(call: ScriptedCall): Promise<Exclude<ScriptedStep, (call: ScriptedCall) => unknown>> {
+  private async next(call: ScriptedCall): Promise<ResolvedStep> {
     let step = this.script.shift();
     if (!step) {
       this.extraCalls++;
@@ -115,9 +118,9 @@ export class ScriptedLlm implements LlmClient {
     }
     while (typeof step === 'function') step = await step(call);
     if ('error' in step) throw step.error;
-    return step;
+    return step as ResolvedStep;
   }
-  private responseFrom(model: string, step: Exclude<ScriptedStep, Function | { error: unknown }>): LlmResponse {
+  private responseFrom(model: string, step: ResolvedStep): LlmResponse {
     if ('stream' in step) return foldEvents(model, step.stream.filter((e): e is LlmStreamEvent => !('error' in e)));
     if ('data' in step) return responseOf(model, [{ type: 'text', text: JSON.stringify(step.data) }]);
     return responseOf(model, partsOf(step), step.finishReason, step.usage);
