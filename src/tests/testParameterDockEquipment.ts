@@ -9,6 +9,7 @@ import { editEquipmentGroup, normalizeEquipmentEdit, resolveGroupCatalogItem, se
 import type { ProjectSimulation } from '../types';
 import type { GenericPriceInfo } from '../../shared/equipmentPrices';
 import { unresolvedEquipmentIds } from '../utils/proposalAnnexes';
+import { chipMagnitude } from '../utils/equipmentMatchingUtils';
 import { resolveAnnualDegradationPct } from '../engine/financeEngine';
 import { catalogPanelGroupPatch } from '../utils/catalogGroupPatch';
 import { autoPriceFields, buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
@@ -173,6 +174,12 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   assert.deepEqual([added.catalogItemId, added.unitPriceUSD, added.priceSource, added.genericPriceInfo?.priceUSD], ['p2', 111, 'generic', 111]);
   const estimated = buildNewItem('panel', multi() as LegacyProjectSpecs, catalog, 3);
   assert.equal(estimated.unitPriceUSD, 102, 'sin genérico (o sin sesión) sigue la estimación por W (600 W × 0,17)');
+  // Chip del selector (QA de F2b): la potencia del grupo, no la del modelo emparejado por potencia ±5 W.
+  assert.equal(chipMagnitude(620, 615), 620, 'el chip dice lo que se cotiza');
+  assert.equal(chipMagnitude(undefined, 615), 615, 'sin potencia en el grupo, la del modelo');
+  assert.equal(chipMagnitude(0, 16.08), 16.08);
+  assert.equal(chipMagnitude(undefined, undefined), undefined);
+  assert.ok(readFileSync('src/components/simulator/sidebar/SearchableEquipmentSelect.tsx', 'utf8').includes('chipMagnitude(selectedPower'), 'el selector usa chipMagnitude');
   // A centavos (QA de F2b): 590 W × 0,17 daba 100.30000000000001 en el campo de precio.
   const odd = buildNewItem('panel', multi() as LegacyProjectSpecs, [{ ...catalog[1], powerW: 590 }], 3);
   assert.equal(odd.unitPriceUSD, 100.3, 'estimación por W a centavos');

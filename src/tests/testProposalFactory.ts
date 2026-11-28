@@ -17,6 +17,7 @@ import { normalizeProposalDraft } from '../../shared/aiProposal';
 import { buildAITariffContext } from '../utils/aiTariffContext';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD } from '../data/rdTariffs';
 import { readEquipment } from '../../shared/equipment';
+import { resolveProjectEquipment } from '../utils/equipmentMatchingUtils';
 import { createNewProposal, isConsumptionEstimated, NEW_PROPOSAL_DEFAULTS } from '../domain/newProposal';
 import { SIZING_ASSUMPTIONS, recommendInverterCount } from '../domain/sizing';
 import { proposalCompleteness } from '../domain/proposalCompleteness';
@@ -64,8 +65,15 @@ for (const field of ['company', 'address', 'contactPhone', 'contactEmail', 'cont
 for (const field of ['nic', 'nis', 'rnc', 'contractNumber', 'meterNumber', 'circuit'] as const) assert.equal(pure.client[field], undefined, `sin ${field} del ejemplo`);
 assert.equal(pure.specs.hasBattery, false);
 assert.deepEqual(readEquipment(pure.specs).batteries, [], 'sin batería en uso');
-// La batería de Ajustes (no la del caso de referencia) queda en su grupo, oculta y sin precio: encenderla no inventa uno.
-assert.deepEqual(pure.specs.batteries?.map((g) => [g.brandModel, g.capacityKWh, g.dodPct, g.unitPriceUSD]), [['Batería 16.08 kWh', 16.08, 90, undefined]], 'sin baterías heredadas');
+// La batería (no la del caso de referencia) queda en su grupo, oculta y sin precio: encenderla no inventa uno. Es el modelo del
+// catálogo con la capacidad de los ajustes (QA de F2b: antes «Batería 16.08 kWh», que el dock emparejaba por capacidad).
+assert.deepEqual(pure.specs.batteries?.map((g) => [g.brandModel, g.capacityKWh, g.dodPct, g.unitPriceUSD, g.catalogItemId]), [['Batería Hinaess 16 KwH-48 vdc.', 16.08, 90, undefined, 'eq-bat-hinaess-16k']], 'sin baterías heredadas');
+// Sin catálogo, el modelo de los ajustes, con su nombre por unidad.
+const noCatalog = createNewProposal({ source: 'menu', defaults: DEFAULT_SIMULATION_SETTINGS, tariffMatrix: DEFAULT_RD_TARIFF_MATRIX, catalog: [],
+  identity: { id: 'p-nocat', now: '2026-11-28T12:00:00.000Z', sequence: { projectId: 'SP-2026-009', quoteNumber: 'C-0009' } } });
+assert.deepEqual(noCatalog.specs.batteries?.map((g) => [g.brandModel, g.capacityKWh, g.catalogItemId]), [['Batería 16.08 kWh', 16.08, undefined]]);
+assert.deepEqual(noCatalog.specs.panels?.map((g) => [g.brandModel, g.powerW, g.catalogItemId]), [[DEFAULT_SIMULATION_SETTINGS.defaultPanelModel, 620, undefined]]);
+assert.equal(resolveProjectEquipment([], 'panel', noCatalog.specs.panels![0].brandModel, 620), undefined, 'sin catálogo el dock no muestra ofertas de otro modelo');
 assert.equal(pure.specs.sizingBasis, 'peak_month', 'las propuestas nuevas se dimensionan con el mes pico');
 assert.equal(pure.rates.energyRateSource, 'reference');
 assert.equal(pure.rates.energyCostPerKWh, reference('EDEESTE', 'BTS2', 1000), 'tarifa de referencia de la distribuidora a 1.000 kWh/mes');
@@ -93,9 +101,23 @@ const unpriced = createNewProposal({
   identity: { id: 'p-unpriced', now: '2026-11-28T12:00:00.000Z', sequence: { projectId: 'SP-2026-002', quoteNumber: 'C-0002' } },
 });
 assert.ok(readEquipment(unpriced.specs).panels.every((g) => g.unitPriceUSD === undefined));
+// Sin precio, el equipo es igualmente un modelo del catálogo (QA de F2b): el panel de los ajustes (620 W) no está, así que el de
+// la misma potencia; nombre, potencia, kWp y ofertas del dock son de ese equipo (antes: nombre de los ajustes a 620 W y chip y
+// ofertas de un 615 W emparejado por potencia).
+const bare = readEquipment({ ...unpriced.specs, hasBattery: true });
+const byId = (id: string) => DEFAULT_EQUIPMENT_CATALOG.find((e) => e.id === id)!;
+assert.deepEqual([bare.panels[0].catalogItemId, bare.panels[0].brandModel, bare.panels[0].powerW], ['eq-mod-cs-620', byId('eq-mod-cs-620').displayName, 620]);
+assert.deepEqual([bare.inverters[0].catalogItemId, bare.inverters[0].brandModel], ['eq-inv-luxpower-8k', byId('eq-inv-luxpower-8k').displayName], 'el inversor de los ajustes, por nombre');
+assert.deepEqual([bare.batteries[0].catalogItemId, bare.batteries[0].brandModel, bare.batteries[0].capacityKWh], ['eq-bat-hinaess-16k', byId('eq-bat-hinaess-16k').displayName, 16.08], 'la batería del catálogo con la capacidad de los ajustes');
+for (const [kind, group, magnitude] of [['panel', bare.panels[0], bare.panels[0].powerW], ['inverter', bare.inverters[0], bare.inverters[0].powerKW], ['battery', bare.batteries[0], bare.batteries[0].capacityKWh]] as const) {
+  assert.equal(group.unitPriceUSD, undefined, `${kind}: sin precio inventado`);
+  // Lo que resuelve el dock (chip, «+ prov.», «Mejor proveedor») es el mismo equipo que se cotiza.
+  assert.equal(resolveProjectEquipment(DEFAULT_EQUIPMENT_CATALOG, kind, group.brandModel, magnitude)?.id, group.catalogItemId, `${kind}: el dock resuelve el mismo modelo`);
+}
 const gap = proposalCompleteness(unpriced);
 assert.equal(gap.incomplete, true);
 assert.ok(gap.reasons.some((r) => r.code === 'missing_equipment_price'), JSON.stringify(gap));
+assert.match(gap.reasons.find((r) => r.code === 'missing_equipment_price')!.message, /Falta el precio de Módulos CANADIAN SOLAR TOPHIKU6 CS6\.1-72TD \(620W\)/);
 
 // 4. Las tres vías dan los mismos valores por defecto.
 reset();

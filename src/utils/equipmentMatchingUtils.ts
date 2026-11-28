@@ -49,6 +49,15 @@ export function findCatalogMatchForVariant(
   return best;
 }
 
+/**
+ * Potencia o capacidad del chip del selector de equipo: la del grupo, que es la que calcula el motor (kWp, energía); la del
+ * modelo emparejado solo si el grupo no tiene. El emparejado puede ser otro modelo (por potencia ±5 W): el chip no lo
+ * contradice (QA de F2b: «620 W» cotizado y chip «615 W»).
+ */
+export function chipMagnitude(groupMagnitude: number | undefined, matchedMagnitude: number | undefined): number | undefined {
+  return typeof groupMagnitude === "number" && Number.isFinite(groupMagnitude) && groupMagnitude > 0 ? groupMagnitude : matchedMagnitude;
+}
+
 /** Catalog item behind a project's equipment: exact name, assigned offer, normalized name, HinaESS alias, spec tolerance, then the first of its type. */
 export function resolveProjectEquipment(
   equipmentCatalog: SolarEquipmentItem[],

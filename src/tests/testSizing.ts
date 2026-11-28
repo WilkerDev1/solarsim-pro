@@ -141,6 +141,17 @@ assert.match(genericOnly.price.label, /genérico/i);
 const none = chooseCatalogEquipment([item('d', 620)], 'panel', { preferredName: 'Panel d' });
 assert.deepEqual([none.item?.id, none.price.kind, none.price.priceUSD], ['d', 'none', undefined]);
 assert.equal(chooseCatalogEquipment([], 'panel', {}).item, undefined);
+// Sin precio y sin el modelo pedido en el catálogo (QA de F2b): el del catálogo más cercano a la potencia de los ajustes, sin
+// precio, para que nombre, potencia del chip, kWp y ofertas del dock sean del mismo equipo (antes quedaba el nombre de los
+// ajustes y el dock emparejaba por potencia ±5 W otro modelo: 620 W cotizado, chip y ofertas de 615 W).
+const unpricedCatalog = [item('p590', 590), item('p615', 615), item('p620', 620, { displayName: 'Otro nombre 620' })];
+const nearest = chooseCatalogEquipment(unpricedCatalog, 'panel', { preferredName: 'Panel de ajustes (620W)', preferredMagnitude: 620 });
+assert.deepEqual([nearest.item?.id, nearest.price.kind, nearest.price.priceUSD], ['p620', 'none', undefined], 'la misma potencia, sin precio');
+assert.match(nearest.reason, /más cercano/);
+assert.equal(chooseCatalogEquipment(unpricedCatalog, 'panel', { preferredMagnitude: 600 }).item?.id, 'p590', '600 W: el más cercano (590, a 10 W; 615, a 15 W)');
+assert.equal(chooseCatalogEquipment(unpricedCatalog, 'panel', { preferredMagnitude: 602.5 }).item?.id, 'p590', 'a igual distancia, el primero del catálogo');
+assert.equal(chooseCatalogEquipment(unpricedCatalog, 'panel', { preferredName: 'Panel p615', preferredMagnitude: 620 }).item?.id, 'p615', 'el nombre pedido manda sobre la potencia');
+assert.equal(chooseCatalogEquipment(unpricedCatalog, 'panel', {}).item, undefined, 'sin nada pedido no se elige un modelo al azar');
 
 // ── 6. La cantidad sugerida de un grupo (antes en el JSX de la revisión del borrador) ─────────
 // Rendimiento 1.500 kWh/kWp, meta 15.000 kWh, otro grupo de 4 × 500 W (2 kWp = 3.000 kWh) ⇒ faltan 12.000 kWh ⇒ 8 kWp ⇒ 16 de 500 W.

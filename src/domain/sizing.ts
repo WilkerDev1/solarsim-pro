@@ -261,12 +261,18 @@ export function equipmentPrice(item: SolarEquipmentItem, genericFor?: (id: strin
 /**
  * Equipo del catálogo para una propuesta nueva (o para dimensionar): el modelo pedido (ajustes) si tiene precio; si no, el de
  * la oferta preferida de su proveedor; si no, el más barato en stock (por W, kW o kWh, sin ofertas agotadas); sin ofertas, el
- * de precio genérico (señalado como tal); sin nada, el modelo pedido sin precio. Nunca se inventa un precio.
+ * de precio genérico (señalado como tal); sin nada, el modelo pedido sin precio o, si no está, el de potencia o capacidad más
+ * cercana a los ajustes, sin precio. Nunca se inventa un precio.
  */
 export function chooseCatalogEquipment(
   catalog: readonly SolarEquipmentItem[],
   kind: EquipmentKind,
-  options: { preferredName?: string; genericFor?: (id: string) => GenericPriceInfo | null | undefined },
+  options: {
+    preferredName?: string;
+    /** Potencia (W, kW) o capacidad (kWh) de los ajustes: sin precio en el catálogo, elige el modelo más cercano a ella. */
+    preferredMagnitude?: number;
+    genericFor?: (id: string) => GenericPriceInfo | null | undefined;
+  },
 ): EquipmentChoice {
   const items = catalog.filter((item) => item.type === kind);
   const requested = options.preferredName ? items.find((item) => item.displayName === options.preferredName) : undefined;
@@ -292,7 +298,33 @@ export function chooseCatalogEquipment(
   if (inStock) return { item: inStock.item, price: inStock.price, reason: 'Oferta más barata en stock' };
   const generic = cheapest(items);
   if (generic) return { item: generic.item, price: generic.price, reason: 'Precio genérico del catálogo (sin oferta de proveedor)' };
-  return { item: requested, price: { kind: 'none', label: 'Sin precio: sin oferta de proveedor ni precio genérico' }, reason: requested ? 'Modelo de los ajustes, sin precio' : 'Sin equipos de este tipo en el catálogo' };
+  const none = { kind: 'none', label: 'Sin precio: sin oferta de proveedor ni precio genérico' } as const;
+  if (requested) return { item: requested, price: none, reason: 'Modelo de los ajustes, sin precio' };
+  // Sin precio en ningún modelo: el más cercano a los ajustes, para que el grupo sea un equipo del catálogo (nombre, potencia y
+  // ofertas del mismo modelo) y no el nombre de los ajustes, que el dock emparejaría por potencia con otro modelo.
+  const nearest = nearestByMagnitude(items, kind, options.preferredMagnitude);
+  if (nearest) return { item: nearest, price: none, reason: 'Modelo del catálogo más cercano a los ajustes, sin precio' };
+  return { item: undefined, price: none, reason: items.length ? 'Ningún modelo del catálogo pedido, sin precio' : 'Sin equipos de este tipo en el catálogo' };
+}
+
+/** Potencia (W, kW) o capacidad (kWh) del modelo, en las unidades de los ajustes. */
+const OWN_MAGNITUDE: Record<EquipmentKind, (item: SolarEquipmentItem) => number | undefined> = {
+  panel: (item) => item.powerW,
+  inverter: (item) => item.powerKW,
+  battery: (item) => item.capacityKWh,
+};
+
+/** El modelo con la potencia o capacidad más cercana a `target` (a igual distancia, el primero del catálogo). */
+function nearestByMagnitude(items: readonly SolarEquipmentItem[], kind: EquipmentKind, target: number | undefined): SolarEquipmentItem | undefined {
+  if (!(typeof target === 'number' && Number.isFinite(target) && target > 0)) return undefined;
+  let best: { item: SolarEquipmentItem; delta: number } | undefined;
+  for (const item of items) {
+    const magnitude = OWN_MAGNITUDE[kind](item);
+    if (!(typeof magnitude === 'number' && magnitude > 0)) continue;
+    const delta = Math.abs(magnitude - target);
+    if (!best || delta < best.delta) best = { item, delta };
+  }
+  return best?.item;
 }
 
 // ── Cantidad sugerida de un grupo (la revisión del borrador de IA) ───────────────────────────────
