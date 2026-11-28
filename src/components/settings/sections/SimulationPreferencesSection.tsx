@@ -23,7 +23,7 @@ import { AITariffResolutionModal } from './AITariffResolutionModal';
 import { TariffPreferencesPanel } from './TariffPreferencesPanel';
 import { DEFAULT_PRICE_PER_WATT_USD } from '../../../../shared/projectDefaults';
 import { DEFAULT_ANNUAL_DEGRADATION_PCT, DEFAULT_ENERGY_INFLATION_PCT, DEFAULT_PROJECT_LIFESPAN_YEARS, DEFAULT_QUOTE_VALIDITY_DAYS, DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_TARGET_COVERAGE_PCT } from '../../../../shared/assumptions';
-import { DEFAULT_TARGET_MARGIN_PCT } from '../../../store/defaultSimulationSettings';
+import { DEFAULT_TARGET_MARGIN_PCT, PREVIOUS_DEFAULT_TARGET_MARGIN_PCT } from '../../../store/defaultSimulationSettings';
 import { InfoTip } from '../../simulator/params/ui';
 
 export const SimulationPreferencesSection: React.FC = () => {
@@ -527,7 +527,7 @@ export const SimulationPreferencesSection: React.FC = () => {
               <div>
                 <label className="flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
                   Margen Bruto Objetivo (%)
-                  <InfoTip label="Sobre el margen objetivo" text={`Factor de venta con que nace toda propuesta nueva, desde «Nueva simulación», el asistente o un agente (${DEFAULT_TARGET_MARGIN_PCT} % = factor ${(1 + DEFAULT_TARGET_MARGIN_PCT / 100).toFixed(2).replace('.', ',')} de fábrica). Si guardaste otro valor antes, se conserva. Las propuestas ya creadas no cambian.`} />
+                  <InfoTip label="Sobre el margen objetivo" text={`Factor de venta con que nace toda propuesta nueva, desde «Nueva simulación», el asistente o un agente. El valor de fábrica es ${DEFAULT_TARGET_MARGIN_PCT} % (factor ${(1 + DEFAULT_TARGET_MARGIN_PCT / 100).toFixed(2).replace('.', ',')}). Si esta instalación ya tenía ajustes guardados, conserva el valor que tenía, aunque nunca lo cambiaras (${PREVIOUS_DEFAULT_TARGET_MARGIN_PCT} %, el de fábrica anterior): escribe ${DEFAULT_TARGET_MARGIN_PCT} para usar el nuevo. Las propuestas ya creadas no cambian.`} />
                 </label>
                 <input
                   type="number"
