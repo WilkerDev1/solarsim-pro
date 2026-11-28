@@ -7,13 +7,14 @@ import { resolveAITariffSelection } from './aiTariffContext';
 import { getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTariffs';
 import { tariffMatrixKey } from '../../shared/tariffRules';
 import { resolveSystemLossesPct, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
-import { assumptionFields, resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
-import { automatedSaleMarginMultiplier } from './saleMargin';
+import { resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
+import { createNewProposal } from '../domain/newProposal';
+import type { GenericPriceLookup } from '../domain/rules/equipmentRules';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
 import { NEW_PROPOSAL_NET_METERING_REGIME, reconcileGridUseCharge } from '../../shared/netMetering';
 import { editEquipment, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { migrateLegacySpecs } from '../../shared/equipment';
-import { detachedCatalogIdentity, withoutInheritedPanelDegradation } from './equipmentGroups';
+import { detachedCatalogIdentity } from './equipmentGroups';
 import type { SolarEquipmentItem } from '../types/equipment';
 
 /** Un solo grupo por tipo recibe la selección escalar del borrador (con varios modelos se conservan, como antes). */
@@ -129,19 +130,18 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
   return {...base,specs:enforceAutomatedPricing(specs),rates,client:{...base.client,province},monthlyConsumption:[...data.monthlyConsumptionKWh],financials:{...base.financials,...(data.commercial?.pricePerWattUSD!==undefined?{pricePerWattUSD:data.commercial.pricePerWattUSD}:{}),...(data.commercial?.customItems!==undefined?{customItems:structuredClone(data.commercial.customItems)}:{}),...(data.commercial?.customDiscounts!==undefined?{customDiscounts:structuredClone(data.commercial.customDiscounts)}:{})}};
 }
 
-export function createAIProposalBase(template:ProjectSimulation,defaults:DefaultSimulationSettings,province:string):ProjectSimulation {
- const base=structuredClone(template);
-
-      // ADR 0003 (d): los ajustes del usuario primero, luego las constantes compartidas (la misma fábrica que el proyecto nuevo).
-      const seeded=assumptionFields(undefined,defaults);
-      base.specs={...base.specs,pricePerWattUSD:seeded.specs.pricePerWattUSD,systemLosses:seeded.specs.systemLosses,annualDegradation:seeded.specs.annualDegradation,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:automatedSaleMarginMultiplier(defaults),installationUnitPriceUSD:0};
-      // Grupos explícitos; el DOD por defecto vive en el grupo de batería.
-      const withGroups=withoutInheritedPanelDegradation(migrateLegacySpecs(base.specs)); // la degradación configurada manda sobre el 0.5 % de la referencia
-      base.specs={...withGroups,batteries:withGroups.batteries?.map((group,index)=>index===0?{...group,dodPct:defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT}:group)};
-      base.rates={...base.rates,targetCoveragePct:seeded.rates.targetCoveragePct,isZeroExport:defaults.defaultZeroExport,currency:defaults.currency || 'USD',annualEnergyInflationPct:seeded.rates.annualEnergyInflationPct};
-      base.financials={...base.financials,applyLey5707:defaults.applyLey5707,applyITBISExemption:defaults.applyITBISExemption,discountRatePct:seeded.financials.discountRatePct,projectLifespanYears:seeded.financials.projectLifespanYears,pricePerWattUSD:seeded.financials.pricePerWattUSD,customItems:[],customDiscounts:[],customCostUSD:undefined,customLey5707CreditUSD:undefined,customITBISSavedUSD:undefined};
-      base.client={...base.client,company:'',address:'',contactPhone:'',contactEmail:'',contactPerson:'',location:province,customMonthlyHSP:undefined,coordinates:undefined};
- return base;
+/**
+ * Base de un borrador de IA nuevo: la fábrica única (F2b, ADR 0009), la misma que «Nueva simulación», con la política de
+ * precio automatizada (matriz de costos). `template` solo aporta los identificadores provisionales (id y códigos) que los
+ * llamadores reemplazan al crear; su contenido (el caso de referencia) ya no se hereda. `options` trae lo que la fábrica
+ * necesita para elegir y cotizar equipos (sin catálogo, los de Ajustes sin precio).
+ */
+export function createAIProposalBase(template:ProjectSimulation,defaults:DefaultSimulationSettings,province:string,options:{tariffMatrix?:GlobalTariffMatrix|null;catalog?:readonly SolarEquipmentItem[];genericPriceFor?:GenericPriceLookup}={}):ProjectSimulation {
+  return createNewProposal({
+    source:'assistant',defaults,tariffMatrix:options.tariffMatrix,catalog:options.catalog,genericPriceFor:options.genericPriceFor,
+    identity:{id:template.id,now:template.createdAt,sequence:{projectId:template.client.projectId,quoteNumber:template.client.quoteNumber || ''}},
+    client:{province},
+  });
 }
 
 /** Document totals are references for dialogue, never inputs that override engine results. */

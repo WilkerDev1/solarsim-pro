@@ -5,8 +5,8 @@
  * `triggerAutoSync` y un paso del diario de deshacer, agrupado por ráfaga como antes (`DEFAULT_EDIT_COALESCE_KEY`).
  *
  * Las reglas que el dock arma antes de escribir (perfil de carga al cambiar de tarifa, margen en % ↔ factor, $/W ↔ $/kWp,
- * tarifa oficial, «Mejor proveedor», borrar la radiación propia al cambiar de provincia) siguen en sus constructores de
- * parche: mudarlas al dominio es F2b.
+ * tarifa oficial, «Mejor proveedor», borrar la radiación propia al cambiar de provincia, catálogo y lista de equipos) viven
+ * en el dominio desde F2b (`src/domain/rules/`); la transacción las aplica también a un lote por ruta (`editIntents.ts`).
  */
 import type { ClientInfo, FinancialParams, SystemSpecs, UtilityRates } from '../../../../types';
 import { editsFromPatch, type ProjectFieldEdit } from '../../../../domain/projectEditTransaction';

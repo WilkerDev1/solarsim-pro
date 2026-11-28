@@ -1,6 +1,7 @@
 import { executeAgentTool } from '../../../../features/agentTools/registry';
 import { assistantOwner } from '../../../../features/assistant/tools';
 import { createAIProposalBase, prepareProposalDraftProject, proposalReconciliationIssues } from '../../../../utils/proposalDraftProject';
+import { NEW_PROPOSAL_DEFAULTS } from '../../../../domain/newProposal';
 import { BENCHMARK_PROJECT } from '../../../../engine/referenceCase';
 import { calculateProjectFinancialSummary, engineGridUseCharge } from '../../../../engine/financeEngine';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
@@ -65,7 +66,7 @@ export function useAIInvoiceScanner() {
       annualSpecificYieldKWhPerKWp: yieldInfo.annualSpecificYieldKWhPerKWp,
       monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses,target?.client.customMonthlyHSP),
       calculationMode: mode,
-      commercial: {pricingMode:'cost_matrix',markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? 0,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
+      commercial: {pricingMode:'cost_matrix',markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? NEW_PROPOSAL_DEFAULTS.laborUSDPerKWp,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
       equipmentPrices:target?[...(target.specs.panels || []),...(target.specs.inverters || []),...(target.specs.batteries || [])].filter(g=>g.unitPriceUSD!==undefined).map(g=>({id:g.id,unitPriceUSD:g.unitPriceUSD!,priceSource:g.priceSource ?? 'manual'})):[],
       genericPrices,
     } as AIProposalContext;
@@ -151,14 +152,14 @@ export function useAIInvoiceScanner() {
   const validatedDraft = useMemo(() => extractedData ? normalizeProposalDraft(extractedData, equipmentCatalog, context) : null, [extractedData, equipmentCatalog, context]);
   const draftEnergy=useMemo(()=>{
     if(!validatedDraft || validatedDraft.monthlyConsumptionKWh.length!==12 || !validatedDraft.panels?.length || validatedDraft.panels.some(g=>!g.id||!Number.isFinite(g.powerW)||g.powerW<=0||!Number.isInteger(g.count)||g.count<=0))return null;
-    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
+    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '',{tariffMatrix,catalog:equipmentCatalog});
     const project=prepareProposalDraftProject(base,{...validatedDraft,commercial:{}},tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:equipmentCatalog});
     const assumptions=resolveAssumptions(project); // ADR 0003: retención y cargo efectivos
     return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,assumptions.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode,engineGridUseCharge(assumptions)).map(m=>m.productionKWh);
   },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog]);
   const draftPreview=useMemo(()=>{
     if(!validatedDraft || blocksPreview(validatedDraft.validationIssues || []))return null;
-    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
+    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '',{tariffMatrix,catalog:equipmentCatalog});
     const project=prepareProposalDraftProject(base,validatedDraft,tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:equipmentCatalog});
     const financial=calculateProjectFinancialSummary({...project,monthlyConsumption:project.monthlyConsumption.length===12?project.monthlyConsumption:Array(12).fill(0)},mode);
     return {project,financial};

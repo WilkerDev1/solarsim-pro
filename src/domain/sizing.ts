@@ -186,7 +186,8 @@ export function nightProfileBatteryRequirementKWh(input: { monthlyConsumption: r
 
 /** Energía útil de `count` unidades, de `batteryBank` (la única fórmula del banco; ADR 0002). */
 function usableOf(unit: BatteryUnit, count: number): number {
-  return batteryBank(readEquipment({ hasBattery: true, batteries: [{ id: 'sizing', brandModel: 'sizing', count, ...unit }] } as SystemSpecs)).usableKWh;
+  const group = { id: 'sizing', brandModel: 'sizing', capacityKWh: unit.capacityKWh, dodPct: unit.dodPct, efficiencyPct: unit.efficiencyPct, count };
+  return batteryBank(readEquipment({ hasBattery: true, batteries: [group] } as SystemSpecs)).usableKWh;
 }
 
 /** Unidades de batería necesarias para la regla (por defecto la activa). Sin consumo o sin capacidad, 0. */
@@ -202,8 +203,8 @@ export function recommendBatteryCount(input: { unit: BatteryUnit; monthlyConsump
   if (!(requiredKWh > 0) || !(perUnit > 0)) return { count: 0, rule, requiredKWh: Math.max(0, requiredKWh || 0), usableKWh: 0, assumptions };
   // Estimación por unidad y comprobación con el banco entero (el banco pondera por capacidad: con unidades iguales es lineal).
   let count = Math.max(1, Math.ceil(requiredKWh / perUnit - 1e-9));
-  while (usableOf(input.unit, count) + 1e-9 < requiredKWh) count++;
-  while (count > 1 && usableOf(input.unit, count - 1) + 1e-9 >= requiredKWh) count--;
+  for (let guard = 0; guard < 1000 && usableOf(input.unit, count) + 1e-9 < requiredKWh; guard++) count++;
+  for (let guard = 0; guard < 1000 && count > 1 && usableOf(input.unit, count - 1) + 1e-9 >= requiredKWh; guard++) count--;
   return { count, rule, requiredKWh, usableKWh: usableOf(input.unit, count), assumptions };
 }
 

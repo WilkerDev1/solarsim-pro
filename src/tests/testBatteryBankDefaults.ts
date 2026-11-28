@@ -163,7 +163,8 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
 // El escalar de un proyecto existente solo es el valor del grupo principal.
 {
   const existingBase = draftBaseFor();
-  const existing = { ...existingBase, specs: { ...existingBase.specs, batteries: existingBase.specs.batteries!.map((group) => ({ ...group, dodPct: 80, efficiencyPct: 85 })) } };
+  // F2b: la base de IA (fábrica única) ya no hereda las baterías del caso de referencia; la propuesta existente trae la suya.
+  const existing = { ...existingBase, specs: { ...existingBase.specs, hasBattery: true, batteries: [{ ...group('B0', 16, 3), dodPct: 80, efficiencyPct: 85 }] } };
   const data = {
     monthlyConsumptionKWh: Array(12).fill(1000), averageMonthlyKWh: 1000, province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS1',
     panels: [{ id: 'p', brandModel: 'P', powerW: 600, count: 10 }], inverters: [{ id: 'i', brandModel: 'I', powerKW: 5, count: 1 }],

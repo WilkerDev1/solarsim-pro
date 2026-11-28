@@ -7,6 +7,8 @@
  * 2. resuelve las dependencias declaradas: activa lo que haga falta («Incluir batería» al elegir una batería) como cambio
  *    derivado y avisado, o rechaza lo que no aplica (el cargo SIE-007 en el régimen anterior), comprobado contra la
  *    propuesta ya aplicada (paso 3) para leer el estado efectivo y no el lote crudo;
+ * 2b. completa la intención con las reglas del dock (F2b, `editIntents.ts`): «cambia la distribuidora» trae su código,
+ *    su precio de referencia y su perfil, «elige este panel del catálogo» su grupo entero… salvo lo que el lote ya fija;
  * 3. ordena las ediciones por ruta y las agrupa en un plan por sección, relativo a la base del lote, y lo aplica con
  *    `applyProjectEditPlan`: las reglas de `projectEdit.ts` corren UNA vez contra la base, así que el resultado no
  *    depende del orden de las ediciones;

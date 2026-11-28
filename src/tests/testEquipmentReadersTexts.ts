@@ -115,7 +115,9 @@ section('5. Borrador de IA: arma los grupos sin escribir campos heredados a mano
   };
   const base = createAIProposalBase(BENCHMARK_PROJECT, { defaultBatteryDOD: 85 } as never, 'Santiago');
   assert.equal(base.specs.batteries![0].dodPct, 85, 'la base de IA trae grupos');
-  assert.equal(readEquipment(base.specs).batteries[0].dodPct, 85, 'el DOD por defecto vive en el grupo');
+  // F2b: la base (fábrica única) ya no hereda «Incluir batería» del caso de referencia: el grupo está, oculto mientras esté apagada.
+  assert.equal(base.specs.hasBattery, false);
+  assert.equal(readEquipment({ ...base.specs, hasBattery: true }).batteries[0].dodPct, 85, 'el DOD por defecto vive en el grupo');
   const grounded = prepareProposalDraftProject(base, data as never, DEFAULT_RD_TARIFF_MATRIX as never, { isNew: true });
   assert.equal(grounded.specs.panels![0].count, 10);
   assert.equal(grounded.specs.batteries![0].dodPct, 80);

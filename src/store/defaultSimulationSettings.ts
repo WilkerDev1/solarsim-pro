@@ -11,8 +11,12 @@ import {
   DEFAULT_TARGET_COVERAGE_PCT,
 } from "../../shared/assumptions";
 
-/** Margen objetivo (%) que siembra las propuestas de IA; las propuestas nuevas parten del multiplicador compartido. */
-export const DEFAULT_TARGET_MARGIN_PCT = 28;
+/**
+ * «Margen bruto objetivo» de fábrica (%): el factor de venta con que nace TODA propuesta nueva (fábrica única, ADR 0009) y la
+ * línea de catálogo de una cotización. 40 % = factor 1,40 (decisión del dueño; antes 28 %). Una instalación que ya guardó
+ * sus ajustes conserva el valor guardado (no se migra): se cambia en Ajustes → Costos y margen.
+ */
+export const DEFAULT_TARGET_MARGIN_PCT = 40;
 
 /**
  * Ajustes de fábrica del usuario. Los supuestos del proyecto se toman de `shared/assumptions.ts` (ADR 0003): estos valores
