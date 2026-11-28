@@ -262,6 +262,9 @@ export const PROJECT_FIELDS: readonly ProjectFieldDefinition[] = [
   bool('specs.isDetailed', 'Modo de equipamiento manual', 'equipment', 'control', { anchor: 'dock-equipment-mode' }),
   num('specs.systemLosses', 'Pérdidas del sistema', 'equipment', 'control', { ...rule('systemLossesPct'), anchor: 'dock-equipment-losses' }),
   bool('specs.autoCalculatePanels', 'Auto-calcular paneles', 'equipment', 'control', { optional: true, anchor: 'dock-equipment', anchorNote: 'Interruptor sin id; ancla de la sección.' }),
+  choice('specs.sizingBasis', 'Base de dimensionado de paneles', 'equipment', 'hidden', ['average', 'peak_month'], {
+    optional: true, note: 'Sin el campo, el consumo real del año (lo guardado); las propuestas nuevas, el mes pico como promedio (domain/sizing, ADR 0009).',
+  }),
   ...equipmentGroup('panels'),
   num('specs.panelEfficiency', 'Eficiencia del panel', 'equipment', 'control', { min: 0, max: 100, anchor: 'dock-panel-efficiency' }),
   num('specs.tempCoeff', 'Coef. de temperatura', 'equipment', 'control', { min: -5, max: 5, anchor: 'dock-panel-temp-coeff' }),

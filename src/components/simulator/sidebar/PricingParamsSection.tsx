@@ -8,12 +8,11 @@ import {
   marginPctFromMultiplier,
   multiplierFromMarginInput,
   multiplierFromQuickMargin,
-  roundedWattPrice,
+  suggestedWattPrice,
   wattPricePatch,
   wholeMarginPctFromMultiplier,
 } from '../params/logic/pricingSync';
 import { resolveAssumptions } from '../../../../shared/assumptions';
-import { resolvePricePerWattUSD } from '../params/logic/dockDefaults';
 import { ChipGroup, CommitNumberField, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { DirectPrice } from '../params/sections/pricing/DirectPrice';
 import { NumberField } from '../params/sections/pricing/NumberField';
@@ -63,7 +62,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
       updateSpecs({ pricingMode: 'cost_matrix' });
       return;
     }
-    const autoWp = roundedWattPrice(matrix?.salePricePerWattUSD, resolvePricePerWattUSD(specs, project.financials));
+    const autoWp = suggestedWattPrice(matrix?.salePricePerWattUSD, specs, project.financials?.pricePerWattUSD);
     updateSpecs({ pricingMode: 'direct_watt', ...wattPricePatch(autoWp) });
   };
 

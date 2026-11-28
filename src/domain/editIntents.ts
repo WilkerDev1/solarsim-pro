@@ -12,7 +12,6 @@ import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { LIST_KEY, migrateLegacySpecs, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { resolveAssumptions } from '../../shared/assumptions';
-import { resolvePricePerWattUSD } from '../../shared/projectDefaults';
 import { tariffMatrixKey } from '../../shared/tariffRules';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { resolveProjectEquipment } from '../utils/equipmentMatchingUtils';
@@ -24,7 +23,7 @@ import {
   LOAD_PROFILE_DAYTIME_PCT, averageMonthlyConsumption, currentDistributor, currentTariffCode, recommendedProfileSpecs, referenceRatesPatch,
 } from './rules/tariffRules';
 import {
-  bestSupplierPricingPatch, multiplierFromMarginInput, multiplierFromQuickMargin, pricePerKWpFromWatt, pricePerWattFromKWp, roundedWattPrice,
+  bestSupplierPricingPatch, multiplierFromMarginInput, multiplierFromQuickMargin, pricePerKWpFromWatt, pricePerWattFromKWp, suggestedWattPrice,
   wattPricePatch,
 } from './rules/pricingRules';
 import { groupAddPatch, groupRemovePatch, groupSelectPatch } from './rules/equipmentRules';
@@ -70,7 +69,7 @@ function primaryCatalogItems(specs: SystemSpecs, catalog: readonly SolarEquipmen
 /** $/Wp que sugiere la matriz de costos de la propuesta (al pasar a Directo y «Sugerir de costos»). */
 export function suggestedDirectWattPrice(project: ProjectSimulation, calculationMode: EnergyCalculationMode = 'legacy'): number {
   const matrix = calculateProjectFinancialSummary(project, calculationMode).costMatrix;
-  return roundedWattPrice(matrix?.salePricePerWattUSD, resolvePricePerWattUSD(project.specs, { pricePerWattUSD: project.financials?.pricePerWattUSD }));
+  return suggestedWattPrice(matrix?.salePricePerWattUSD, project.specs, project.financials?.pricePerWattUSD);
 }
 
 /**

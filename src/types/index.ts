@@ -95,6 +95,12 @@ export interface SystemSpecs {
   isDetailed: boolean;
   pricingMode?: 'cost_matrix' | 'direct_watt'; // 'cost_matrix' (default) or 'direct_watt' (manual $/W or $/kW)
   autoCalculatePanels?: boolean;
+  /**
+   * Base con que el autodimensionado calcula la cantidad de paneles (F2b, ADR 0009; `src/domain/sizing.ts`). Sin el campo
+   * (todo lo guardado antes), el consumo real del año: abrir una propuesta guardada calcula lo mismo que antes. Las
+   * propuestas nuevas nacen con `peak_month`: el mes de mayor consumo como si fuera el promedio (12 × mes pico).
+   */
+  sizingBasis?: 'average' | 'peak_month';
   pricePerWattUSD: number;       // USD per Wp e.g. 1.13
   pricePerKWpUSD?: number;       // USD per kWp e.g. 1130.00
   hasBattery: boolean;
@@ -510,6 +516,12 @@ export interface SyncSettings {
 export interface ProjectSimulation {
   proposalLink?: import("../../shared/proposalLinks").ProposalLink;
   commercial?: import('../../shared/proposalCommercial').ProposalCommercial;
+  /**
+   * Consumo con que nació la propuesta cuando no había datos (F2b, ADR 0009): la fábrica pone 12 × `monthlyKWh` y lo marca.
+   * La propuesta se considera con consumo ESTIMADO mientras sus doce meses sigan siendo ese valor (`isConsumptionEstimated`);
+   * sin el campo, el comportamiento de siempre.
+   */
+  consumptionEstimate?: { kind: 'factory_default'; monthlyKWh: number };
   aiSource?: { consumptionSource?: ExtractedInvoiceData["consumptionSource"]; energyRateSource?: ExtractedInvoiceData["energyRateSource"]; extractedFromFileName?: string; modelUsed?: string; requestedModel?: string; notes?: string };
   organizationId?: string;
   syncServerUrl?: string;

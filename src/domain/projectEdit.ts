@@ -5,7 +5,7 @@ import { resolveAssumption, resolveAssumptions } from '../../shared/assumptions'
 import { reconcileGridUseCharge, reconcileLegacySettlement } from '../../shared/netMetering';
 import { reconcileEnergyRateSource } from '../../shared/tariffBilling';
 import { resolveSystemLossesPct } from '../../shared/projectDefaults';
-import { calculateRecommendedPanelCount } from '../engine/solarEngine';
+import { recommendPanelCount, resolveSizingBasis } from './sizing';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { editEquipmentGroup, normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../utils/equipmentGroups';
 import { normalizeEnabledBatteries } from '../utils/batteryState';
@@ -226,26 +226,29 @@ export function withoutStaleFinancialOverrides(project: Pick<ProjectSimulation, 
 
 /** Specs con la cantidad de paneles que recomienda el motor para el consumo, la provincia y la cobertura del proyecto. */
 function withRecommendedPanels(project: ProjectSimulation, specs: SystemSpecs): SystemSpecs {
-  const rec = calculateRecommendedPanelCount(
-    project.client.province,
-    project.monthlyConsumption,
-    readEquipment(specs).panels[0]?.powerW || 620,
-    resolveAssumption('targetCoveragePct', project.rates.targetCoveragePct), // la frontera: 0 o fuera de rango dimensiona con el valor resuelto, no con 1 %
-    resolveSystemLossesPct(specs),
-    project.client.customMonthlyHSP
-  );
+  // F2b: la recomendación sale del dimensionado del dominio con la base guardada en la propuesta (sin el campo, el consumo
+  // real del año, como siempre; las propuestas nuevas, el mes pico).
+  const rec = recommendPanelCount({
+    province: project.client.province,
+    monthlyConsumption: project.monthlyConsumption,
+    panelPowerW: readEquipment(specs).panels[0]?.powerW || 620,
+    coveragePct: resolveAssumption('targetCoveragePct', project.rates.targetCoveragePct), // la frontera: 0 o fuera de rango dimensiona con el valor resuelto, no con 1 %
+    lossesPct: resolveSystemLossesPct(specs),
+    customMonthlyHSP: project.client.customMonthlyHSP,
+    basis: resolveSizingBasis(specs),
+  });
   // Solo un grupo de paneles recibe la recomendación; con varios modelos la cantidad no se autocalcula.
   return readEquipment(specs).panels.length === 1
-    ? editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { count: rec.recommendedPanelCount } })
+    ? editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { count: rec.count } })
     : specs;
 }
 
-/** Entradas del dimensionamiento: potencia del panel principal, consumo, provincia y HSP propio, cobertura y pérdidas resueltas. */
+/** Entradas del dimensionamiento: potencia del panel principal, consumo, provincia y HSP propio, cobertura, pérdidas resueltas y base. */
 const sizingInputs = (project: ProjectSimulation) => {
   const assumptions = resolveAssumptions(project);
   return JSON.stringify([
     readEquipment(project.specs).panels[0]?.powerW, project.monthlyConsumption, project.client.province, project.client.customMonthlyHSP,
-    assumptions.targetCoveragePct, assumptions.systemLossesPct,
+    assumptions.targetCoveragePct, assumptions.systemLossesPct, resolveSizingBasis(project.specs),
   ]);
 };
 

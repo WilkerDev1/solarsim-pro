@@ -6,7 +6,8 @@ import path from 'node:path';
  * Guarda del ADR 0004: las reglas de edición de un proyecto viven en `src/domain/projectEdit.ts`
  * (`applyProjectEdit`) y mirar un proyecto nunca lo escribe. Pragmática, no exhaustiva:
  *  1. `withRecommendedPanels` (el autodimensionado de una edición) no existe fuera del módulo.
- *  2. `calculateRecommendedPanelCount` (la recomendación del motor) solo la llaman el motor, el módulo y las pantallas/
+ *  2. `calculateRecommendedPanelCount` (la recomendación del motor) solo la llaman el motor, el dimensionado del dominio
+ *     (`src/domain/sizing.ts`, desde F2b; el módulo de edición dimensiona a través de él), el módulo y las pantallas/
  *     tuberías del borrador de IA, que dimensionan o leen el rendimiento de un borrador, no editan un proyecto abierto.
  *     Las porciones del store y los componentes del simulador no la llaman: piden la edición al módulo.
  *  3. Ningún efecto (`useEffect`/`useLayoutEffect`) de `src/components/simulator` llama a los escritores del proyecto
@@ -27,6 +28,8 @@ const MODULE = 'src/domain/projectEdit.ts';
 const TRANSACTION = 'src/domain/projectEditTransaction.ts';
 const STORE_WRITER = 'src/store/slices/projectSlice.ts';
 const ENGINE = 'src/engine/solarEngine.ts';
+/** Dimensionado del dominio (F2b): el único llamador de la recomendación del motor fuera del motor (revisión de F2, B7). */
+const SIZING = 'src/domain/sizing.ts';
 /** Borrador de IA: dimensiona o lee el rendimiento específico de un borrador; no aplica una edición a un proyecto abierto. */
 const DRAFT_PIPELINE = new Set([
   'src/store/slices/aiSlice.ts',
@@ -96,7 +99,7 @@ const direct: string[] = [];
 const plans: string[] = [];
 for (const { file, source } of files) {
   if (file !== MODULE && /\bwithRecommendedPanels\b/.test(source)) sizing.push(file);
-  if (![MODULE, ENGINE].includes(file) && !DRAFT_PIPELINE.has(file) && !LEGACY_DRAFT_PIPELINE.has(file) && /\bcalculateRecommendedPanelCount\b/.test(source)) recommendation.push(file);
+  if (![MODULE, ENGINE, SIZING].includes(file) && !DRAFT_PIPELINE.has(file) && !LEGACY_DRAFT_PIPELINE.has(file) && /\bcalculateRecommendedPanelCount\b/.test(source)) recommendation.push(file);
   if ((file.startsWith('src/store/slices/') || file.startsWith('src/features/agentTools/'))
     && ['updateActiveProject', 'updateProjectById'].some((name) => callBodies(source, name).some(directWrite))) direct.push(file);
   if (file.startsWith('src/components/simulator/') && effectBodies(source).some((body) => WRITERS.test(body))) effects.push(file);
@@ -128,6 +131,9 @@ assert.equal(callBodies('updateProjectById(id, (p) => ({ customization: { ...p.c
 assert.deepEqual(effectBodies('React.useEffect(() => { updateSpecs({}); }, [a]); useEffect(() => { (x)(); }, [])').map((body) => WRITERS.test(body)), [true, false]);
 assert.ok(files.some((file) => file.file === MODULE), `${MODULE} debe existir (actualiza la guarda si se mueve)`);
 assert.ok(files.some((file) => file.file === ENGINE) && DRAFT_PIPELINE.size > 0);
+assert.ok(files.some((file) => file.file === SIZING), `${SIZING} debe existir (actualiza la guarda si se mueve)`);
+// Desde F2b el módulo de edición dimensiona por el dominio, no llamando al motor directamente.
+assert.ok(!/\bcalculateRecommendedPanelCount\b/.test(files.find((file) => file.file === MODULE)?.source ?? ''), `${MODULE} dimensiona con ${SIZING}`);
 for (const draft of DRAFT_PIPELINE) assert.ok(files.some((file) => file.file === draft), `${draft} ya no existe: quítalo de DRAFT_PIPELINE`);
 for (const legacy of LEGACY_DRAFT_PIPELINE) assert.ok(files.some((file) => file.file === legacy), `${legacy} ya no existe (F6 lo eliminó): quítalo de LEGACY_DRAFT_PIPELINE`);
 console.log('PASS: las reglas de edición de proyecto viven en domain/projectEdit y ningún efecto del simulador escribe.');

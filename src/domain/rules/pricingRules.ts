@@ -11,7 +11,7 @@
 import type { SystemSpecs } from '../../types';
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../../types/equipment';
 import { editEquipmentGroup } from '../../utils/equipmentGroups';
-import { resolveSaleMarginMultiplier } from '../../../shared/projectDefaults';
+import { resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../../shared/projectDefaults';
 
 export type PricedKind = 'panel' | 'inverter' | 'battery';
 
@@ -29,6 +29,14 @@ export function pricePerWattFromKWp(pricePerKWpUSD: number): number {
 export function roundedWattPrice(...candidates: Array<number | undefined>): number {
   const value = candidates.find((c) => !!c) ?? 0;
   return Math.round(value * 100) / 100;
+}
+
+/**
+ * $/Wp sugerido al pasar a Directo y con «Sugerir de costos»: el $/Wp de venta de la matriz de costos, o el precio directo
+ * que ya resuelve el motor (specs → finanzas → supuesto), a centavos.
+ */
+export function suggestedWattPrice(matrixSalePricePerWattUSD: number | undefined, specs: Pick<SystemSpecs, 'pricePerWattUSD'>, financialsPricePerWattUSD?: number): number {
+  return roundedWattPrice(matrixSalePricePerWattUSD, resolvePricePerWattUSD(specs, { pricePerWattUSD: financialsPricePerWattUSD }));
 }
 
 /** Los dos campos de precio para un $/Wp. */

@@ -4,7 +4,7 @@ import { Sparkles } from 'lucide-react';
 import { CommitNumberField, InfoTip, ParamRow, StatStrip, SubHeader, SubHeaderTextButton, ToggleGroup } from '../../ui';
 import type { FinancialSummaryResult, SystemSpecs } from '../../../../../types';
 import { isValidDirectPrice, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../logic/dockDefaults';
-import { kwpPricePatch, pricePerKWpFromWatt, roundedWattPrice, wattPricePatch } from '../../logic/pricingSync';
+import { kwpPricePatch, pricePerKWpFromWatt, suggestedWattPrice, wattPricePatch } from '../../logic/pricingSync';
 import { usd } from './format';
 
 interface DirectPriceProps {
@@ -38,7 +38,7 @@ export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, financ
             <InfoTip text={TIP} />
             <SubHeaderTextButton
               icon={<Sparkles size={13} strokeWidth={2} aria-hidden="true" />}
-              onClick={() => updateSpecs(wattPricePatch(roundedWattPrice(matrix?.salePricePerWattUSD, wattPrice)))}
+              onClick={() => updateSpecs(wattPricePatch(suggestedWattPrice(matrix?.salePricePerWattUSD, specs, financialsPricePerWattUSD)))}
             >
               Sugerir de costos
             </SubHeaderTextButton>

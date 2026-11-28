@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import type { AIProposalContext } from '../../../../../shared/aiProposal';
 import { resolveAssumption } from '../../../../../shared/assumptions';
-import { calculateRecommendedPanelCount } from '../../../../engine/solarEngine';
+import { draftPanelRecommendation, suggestedGroupPanelCount } from '../../../../domain/sizing';
 import { INVOICE_MONTH_NAMES } from '../types';
 import { issuesAt, reviewAnchor, worstTier, type ReviewIssueView } from '../reviewIssues';
 import { IssueNotes } from './ReviewFlags';
@@ -21,10 +21,11 @@ export function ProposalConsumptionReview({draft,context,production,update,issue
   const max=Math.max(1,...observed.map(n=>n ?? 0),...(production || []));
   const panels=draft.panels || [];
   const chosen=panels[adjustable];
-  const sizing=calculateRecommendedPanelCount(draft.province || context.province || '',complete?observed as number[]:Array(12).fill(0),chosen?.powerW || 620,resolveAssumption('targetCoveragePct',draft.targetCoveragePct),context.systemLosses,context.customMonthlyHSP);
+  const sizing=draftPanelRecommendation(draft.province || context.province || '',complete?observed as number[]:Array(12).fill(0),chosen?.powerW || 620,resolveAssumption('targetCoveragePct',draft.targetCoveragePct),context.systemLosses,context.customMonthlyHSP);
+  // F2b: la cantidad sugerida del grupo es una función pura del dominio (antes vivía aquí, en el JSX).
   const otherKWp=panels.reduce((sum,g,i)=>sum+(i===adjustable?0:g.powerW*g.count/1000),0);
   const remainingKWh=sizing.targetAnnualKWh-otherKWp*sizing.annualSpecificYieldKWhPerKWp;
-  const suggested=chosen?.powerW && remainingKWh>0?Math.ceil(remainingKWh/(sizing.annualSpecificYieldKWhPerKWp*chosen.powerW/1000)):0;
+  const suggested=suggestedGroupPanelCount({targetAnnualKWh:sizing.targetAnnualKWh,annualSpecificYieldKWhPerKWp:sizing.annualSpecificYieldKWhPerKWp,groups:panels,index:adjustable});
   const generation=(production || []).reduce((sum,n)=>sum+n,0);
   return <>
     <section><h3>Consumo y generación mensual</h3><p className="proposal-note">{draft.consumptionSource==='theoretical'?'Consumo teórico temporal igual a producción':draft.consumptionSource==='estimated'?'Historial estimado':draft.consumptionSource==='context'?'Historial del proyecto':'Historial observado'} · enero a diciembre. Los huecos requieren completar el mes.</p>
