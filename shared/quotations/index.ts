@@ -24,3 +24,4 @@ export {
   type LibraryValidation, type QuotationLibraryMeta, type QuotationSignature, type QuotationSignatureContent, type QuotationSignatureKind,
   type QuotationTemplate, type QuotationTemplateContent, type QuotationTemplateDesign,
 } from './library.js';
+export { LOCAL_ONLY_FIELDS, withoutLocalOnlyMissingIn, type LocalOnlyField } from './localOnlyFields.js';
