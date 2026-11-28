@@ -30,6 +30,7 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 ## Operaciones
 
 - [Verificación y QA](QA.md): pruebas automatizadas y guardas de arquitectura, integración continua, ensayos de staging, matriz manual, proceso de revisión de PR y revisión con Claude (suscripción o API).
+- [QA manual del asistente único](QA_ASISTENTE.md): guion por vista, las tres entradas, acoplado y flotante, edición en vivo, deshacer, precios, sin clave y Electron; evaluación con el modelo real y recuento de propuestas incompletas.
 - [Guía de revisión](../REVIEW.md): qué comprobar en cada PR (contratos, API, motor financiero, PDF, pruebas sin producción); la usan el revisor automático y la revisión manual.
 - [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md): ramas, gates, versión mínima de cliente, publicación firmada y actualizaciones.
 - [Infraestructura y despliegue](INFRASTRUCTURE_ARCHITECTURE.md): topología, despliegue protegido de la API, rollback, recuperación de respaldos, rotación de secretos, respaldo diario con aviso de caída y conmutación a naski.
