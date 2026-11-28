@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } fro
 import { dockHighlightStore } from '../../../store/dockHighlightStore';
 import { dockHighlightView, nextExpiry, type DockHighlightView } from '../../../domain/dockHighlight';
 import type { DockSectionKey, SimulatorTabKey } from '../../../domain/fieldAnchors';
-import { presentInDock, collapsedInDock, syncChangedMarks, type MarkRoot } from './dockHighlightDom';
+import { presentInDock, collapsedInDock, syncChangedMarks, COLLAPSED_ATTR, type MarkRoot } from './dockHighlightDom';
 
 const EMPTY: DockHighlightView = { controls: [], sections: {}, tabs: {} };
 const sameView = (a: DockHighlightView, b: DockHighlightView) => JSON.stringify(a) === JSON.stringify(b);
@@ -33,6 +33,15 @@ export function useDockHighlight(projectId: string, open: Readonly<Record<DockSe
   const state = useHighlightState();
   const [view, setView] = useState<DockHighlightView>(EMPTY);
   const marked = useRef(false);
+  // «Avanzado» guarda su estado en su propio useState: desplegarlo no repinta al anfitrión. Se observa el atributo para recalcular.
+  const [, setDomTick] = useState(0);
+  useEffect(() => {
+    const aside = rootRef.current;
+    if (!aside || typeof MutationObserver === 'undefined') return undefined;
+    const observer = new MutationObserver(() => setDomTick((tick) => tick + 1));
+    observer.observe(aside, { attributes: true, attributeFilter: [COLLAPSED_ATTR], subtree: true });
+    return () => observer.disconnect();
+  }, [rootRef]);
   useEffect(() => {
     const root = rootRef.current as unknown as MarkRoot | null;
     const next = root && state.marks.length

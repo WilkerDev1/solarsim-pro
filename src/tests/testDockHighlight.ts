@@ -67,6 +67,17 @@ const advView = dockHighlightView(adv, T0, { projectId: 'p1', open: ALL_OPEN, is
 assert.deepEqual(advView.controls, [], 'un control plegado no se marca');
 assert.match(advView.sections.equipment ?? '', /Profundidad de descarga.*Avanzado/, 'la sección abierta indica que cambió dentro de Avanzado');
 assert.doesNotMatch(advView.sections.equipment ?? '', /organización/, 'y no culpa a la organización');
+// Caso mixto: la nota va con cada etiqueta, no con todo el indicador, y «oculto por la organización» no tapa «Avanzado».
+const mixed = addHighlights(EMPTY_HIGHLIGHTS, { projectId: 'p1', now: T0, changes: [
+  { path: 'specs.panels[0].count', label: 'Cantidad de paneles' },
+  { path: 'specs.batteries[0].dodPct', label: 'Profundidad de descarga' },
+] });
+const mixedView = dockHighlightView(mixed, T0, { projectId: 'p1', open: { ...ALL_OPEN, equipment: false }, isPresent: (t) => t !== advTarget, isCollapsed: (t) => t === advTarget, activeTab: 'cotizacion' });
+assert.match(mixedView.sections.equipment ?? '', /Cantidad de paneles(?! \()/, 'la cantidad de paneles no se atribuye a Avanzado');
+assert.match(mixedView.sections.equipment ?? '', /Profundidad de descarga \(en Avanzado, plegado\)/, 'cada etiqueta lleva su nota');
+const mixedHidden = dockHighlightView(mixed, T0, { projectId: 'p1', open: ALL_OPEN, isPresent: () => false, isCollapsed: (t) => t === advTarget, activeTab: 'cotizacion' });
+assert.match(mixedHidden.sections.equipment ?? '', /Profundidad de descarga \(en Avanzado, plegado\)/, 'lo oculto no tapa la nota de Avanzado');
+assert.match(mixedHidden.sections.equipment ?? '', /Cantidad de paneles \(sin control visible/, 'lo oculto lleva su propia nota');
 // Un indicador largo se acorta con «y N más».
 const many = addHighlights(EMPTY_HIGHLIGHTS, { projectId: 'p1', now: T0, changes: ['client.name', 'client.location', 'client.address', 'client.contactPhone', 'client.contactPerson'].map((path) => ({ path, label: `Campo ${path}` })) });
 const folded = dockHighlightView(many, T0, { projectId: 'p1', open: { ...ALL_OPEN, client: false }, isPresent: () => true, activeTab: 'cotizacion' });
@@ -240,3 +251,4 @@ assert.match(readFileSync('src/components/simulator/sidebar/ParameterSidebar.tsx
 assert.match(readFileSync('src/components/simulator/SimulatorView.tsx', 'utf8'), /data-assistant-changed/, 'la pestaña de Energía lleva su indicador');
 
 console.log('PASS: resaltado del dock: anclas por lote del asistente, caducidad, secciones plegadas, controles ocultos, pestaña, solo origen asistente y reduced-motion.');
+assert.match(hook, /MutationObserver[\s\S]*COLLAPSED_ATTR|COLLAPSED_ATTR[\s\S]*MutationObserver/, 'recalcula al plegar o desplegar Avanzado');
