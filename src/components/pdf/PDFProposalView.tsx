@@ -11,7 +11,7 @@ import { exportProposalPdf } from './export/exportProposalPdf';
 import { ProposalAnnexSync } from './annexes/ProposalAnnexSync';
 import { confirmMissingAnnexes } from './annexes/confirmMissingAnnexes';
 import { PDFSectionId } from '../../constants/pdfSections';
-import { buildPdfLayout, normalizeSectionOrder, proposalDocumentSections } from '../../utils/pdfLayout';
+import { normalizeSectionOrder, proposalDocumentLayout } from '../../utils/pdfLayout';
 import { formatProposalDate } from '../../utils/formatDateUtils';
 import { DocumentEditorProvider } from './editor/DocumentEditorContext';
 import { DocumentEditorToolbar } from './editor/DocumentEditorToolbar';
@@ -112,12 +112,15 @@ export const PDFProposalView: React.FC = () => {
     [project?.customization?.sectionOrder]
   );
 
-  const { pageNumbers, footerTotalPages, tocItems } = buildPdfLayout(
+  // Páginas que se dibujan y su numeración: incompleta, solo las páginas sin cifras, numeradas sin huecos (ADR 0009).
+  const docPages = proposalDocumentLayout(
     effectiveSectionOrder,
     sectionVisibility,
+    !results.summary,
     project.customization?.extraTocItems || [],
     project.customization?.attachedPdfs || [],
   );
+  const { pageNumbers, footerTotalPages, tocItems } = docPages;
 
   // Una propuesta en papelera, con conflicto o de un lector se ve pero no se edita.
   const writable = canEditDocument({ project, user: currentUser });
@@ -226,21 +229,14 @@ export const PDFProposalView: React.FC = () => {
           actions={editorActions}
         >
           <DocumentEditorToolbar isEditMode={editing} setIsEditMode={setIsEditMode} readOnlyReason={readOnlyReason} />
-          {(() => {
-            const docPages = proposalDocumentSections(effectiveSectionOrder, sectionVisibility, !results.summary);
-            return (
-              <>
-                {docPages.pending && (
-                  <div className="w-[850px] bg-white dark:bg-zinc-900 rounded-xl">
-                    <ResultsPending completeness={results} title="Documento pendiente: las páginas con cifras se muestran al completar la propuesta" />
-                  </div>
-                )}
-                <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
-                  {docPages.sections.map((sectionId) => renderSection(sectionId))}
-                </div>
-              </>
-            );
-          })()}
+          {docPages.pending && (
+            <div className="w-[850px] bg-white dark:bg-zinc-900 rounded-xl">
+              <ResultsPending completeness={results} title="Documento pendiente: las páginas con cifras se muestran al completar la propuesta" />
+            </div>
+          )}
+          <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
+            {docPages.sections.map((sectionId) => renderSection(sectionId))}
+          </div>
         </DocumentEditorProvider>
       </main>
     </div>

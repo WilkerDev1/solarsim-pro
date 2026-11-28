@@ -87,3 +87,20 @@ export function proposalDocumentSections(
     ? { sections: visible.filter((id) => SECTIONS_WITHOUT_FIGURES.includes(id)), pending: true }
     : { sections: visible, pending: false };
 }
+
+/**
+ * Páginas que se dibujan y su numeración (índice, «Página N de M»): la de las páginas que se dibujan. Incompleta, el índice y
+ * los totales cuentan solo las páginas sin cifras (QA de F2b: decía «11 páginas» y apuntaba a páginas ocultas). Completa, es
+ * `buildPdfLayout` de siempre.
+ */
+export function proposalDocumentLayout(
+  order: readonly PDFSectionId[],
+  visibility: Record<PDFSectionId, boolean>,
+  incomplete: boolean,
+  extraTocItems: readonly ExtraTOCItem[] = [],
+  attachedPdfs: readonly AttachedPDFDocument[] = [],
+): PdfLayout & { sections: PDFSectionId[]; pending: boolean } {
+  const pages = proposalDocumentSections(order, visibility, incomplete);
+  const shown = Object.fromEntries(DEFAULT_PDF_SECTION_ORDER.map((id) => [id, pages.sections.includes(id)])) as Record<PDFSectionId, boolean>;
+  return { ...pages, ...buildPdfLayout(order, pages.pending ? shown : visibility, extraTocItems, attachedPdfs) };
+}

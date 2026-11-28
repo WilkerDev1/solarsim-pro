@@ -7,7 +7,7 @@ import { migrateLegacySpecs } from '../../shared/equipment';
 import { calculateProjectFinancialSummary, isDirectWattPricing } from '../engine/financeEngine';
 import { salesPerformance } from '../features/proposals/commercial';
 import { contractPriceForTotals, PENDING_VALUE, proposalActionBlock, proposalCompleteness, proposalResults, shownMetric } from '../domain/proposalCompleteness';
-import { proposalDocumentSections } from '../utils/pdfLayout';
+import { buildPdfLayout, proposalDocumentLayout, proposalDocumentSections } from '../utils/pdfLayout';
 import { DEFAULT_PDF_SECTION_ORDER } from '../constants/pdfSections';
 import { readFileSync } from 'node:fs';
 import { editEquipmentGroup } from '../utils/equipmentGroups';
@@ -164,12 +164,24 @@ const pendingDoc = proposalDocumentSections(DEFAULT_PDF_SECTION_ORDER, visibilit
 assert.equal(pendingDoc.pending, true);
 assert.deepEqual(pendingDoc.sections, ['tableOfContents', 'aboutUs', 'benefits', 'techIntro'], 'sin portada, resumen, descripción, energía, cotización, retorno, flujo ni costos');
 assert.deepEqual(proposalDocumentSections(DEFAULT_PDF_SECTION_ORDER, { ...visibility, aboutUs: false }, true).sections, ['tableOfContents', 'benefits', 'techIntro'], 'respeta las ocultas');
+// Índice y numeración de una incompleta (QA de F2b): cuentan solo las páginas que se dibujan, sin huecos.
+const pendingLayout = proposalDocumentLayout(DEFAULT_PDF_SECTION_ORDER, visibility, true);
+assert.deepEqual(pendingLayout.sections, pendingDoc.sections);
+assert.equal(pendingLayout.footerTotalPages, pendingDoc.sections.length, '«Página N de 4», no «de 11»');
+assert.deepEqual(pendingDoc.sections.map((id) => pendingLayout.pageNumbers[id]), [1, 2, 3, 4], 'numeradas sin huecos');
+assert.ok(pendingLayout.tocItems.every((item) => item.sectionId && pendingDoc.sections.includes(item.sectionId)), 'el índice no apunta a páginas ocultas');
+assert.ok(pendingLayout.tocItems.every((item, i) => item.targetPage <= pendingLayout.footerTotalPages && item.number === String(i + 1)));
+const extras = [{ id: 'x', title: 'Anexo', pageCount: 2 }];
+assert.equal(proposalDocumentLayout(DEFAULT_PDF_SECTION_ORDER, visibility, true, extras as never).footerTotalPages, 6, 'los anexos siguen detrás');
+// Completa: la numeración de siempre.
+const { sections: _s, pending: _p, ...completeLayout } = proposalDocumentLayout(DEFAULT_PDF_SECTION_ORDER, visibility, false, extras as never);
+assert.deepEqual(completeLayout, buildPdfLayout(DEFAULT_PDF_SECTION_ORDER, visibility, extras as never));
 // La interfaz decide con esas funciones (no con condicionales propios que ninguna prueba ve).
 const uses: Record<string, string[]> = {
   'src/components/simulator/SimulatorView.tsx': ['proposalResults('],
   'src/components/simulator/tabs/EnergyAnalysisTab.tsx': ['shownMetric('],
   'src/components/hub/ProjectHubView.tsx': ['proposalResults(', 'shownMetric('],
-  'src/components/pdf/PDFProposalView.tsx': ['proposalResults(', 'proposalDocumentSections('],
+  'src/components/pdf/PDFProposalView.tsx': ['proposalResults(', 'proposalDocumentLayout('],
   'src/components/quotations/editor/ProposalViewer.tsx': ['proposalResults('],
   'src/components/quotations/editor/ProposalViewerDocument.tsx': ['proposalDocumentSections('],
   // «Total de venta» también (QA de F2b: mostraba la cifra parcial sin los equipos sin precio).
