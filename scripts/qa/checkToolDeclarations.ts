@@ -11,7 +11,10 @@
 //   --surface <nombre>  solo las herramientas de esa superficie (app-assistant, proposal-assistant, mcp)
 //   --each              probar también cada herramienta por separado aunque el lote completo pase
 //   --mode <modo>       modo de llamada a funciones: validated (por defecto, el del bucle nuevo), auto, any o none
-// Sale con código 1 si algún modelo rechaza alguna declaración (o el lote) y con 2 si falta la clave o un argumento.
+// Sale con código 1 si algún modelo rechaza alguna declaración (o el lote), con 2 si falta la clave o un argumento y
+// con 3 si la prueba no se pudo hacer. Solo un 400 cuenta como rechazo de declaración: ante clave inválida, cuota (429),
+// 403 de permiso, modelo inexistente, 5xx, plazo o red se aborta sin contar rechazos ni lanzar la prueba una a una
+// (serían decenas de peticiones facturadas inútiles).
 // Las herramientas no se ejecutan nunca: si el modelo llama a alguna, la llamada se descarta.
 import { AGENT_TOOL_DEFINITIONS } from '../../shared/agentTools/definitions';
 import type { AgentSource, AgentToolDefinition } from '../../shared/agentTools/types';
@@ -43,6 +46,10 @@ function toolDeclaration(definition: AgentToolDefinition): LlmToolDeclaration {
 }
 
 type Verdict = { ok: true } | { ok: false; message: string };
+
+/** Fallo que no dice nada de las declaraciones: se aborta la ejecución. */
+class ProbeAborted extends Error {}
+const isSchemaRejection = (error: unknown) => isLlmError(error, 'bad_request') && error.status === 400;
 async function probe(llm: LlmClient, model: string, tools: LlmToolDeclaration[], mode: LlmToolMode): Promise<Verdict> {
   try {
     await llm.generate({
@@ -55,8 +62,11 @@ async function probe(llm: LlmClient, model: string, tools: LlmToolDeclaration[],
     }, { timeoutMs: 60000 });
     return { ok: true };
   } catch (error) {
-    if (isLlmError(error)) return { ok: false, message: `${error.kind}${error.status ? ` ${error.status}` : ''}: ${error.serverMessage ?? error.message}` };
-    return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    const message = isLlmError(error)
+      ? `${error.kind}${error.status ? ` ${error.status}` : ''}: ${error.serverMessage ?? error.message}`
+      : error instanceof Error ? error.message : String(error);
+    if (isSchemaRejection(error)) return { ok: false, message };
+    throw new ProbeAborted(`${model}: la prueba no se pudo hacer (${message}). No se cuenta como rechazo de declaraciones.`);
   }
 }
 
@@ -85,4 +95,10 @@ async function main() {
   process.exit(rejected ? 1 : 0);
 }
 
-await main();
+try {
+  await main();
+} catch (error) {
+  if (!(error instanceof ProbeAborted)) throw error;
+  console.error(`\nAbortado. ${error.message}`);
+  process.exit(3);
+}
