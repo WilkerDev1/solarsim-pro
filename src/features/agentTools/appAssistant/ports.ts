@@ -1,7 +1,8 @@
 /**
- * Puertos que F4 conecta (F3a deja el contrato): la lectura de una factura con visión (`extract_invoice`) y la navegación
- * (`open_proposal`). Sin puerto, la herramienta responde `not_available` y no hace nada: el bucle y el panel nuevos son de
- * F4/F5, y hoy nada declara estas herramientas al modelo.
+ * Puertos del conjunto (F3a deja el contrato, F4 los conecta en la sesión del asistente, `session/assistantSession.ts`): la
+ * lectura de una factura con visión (`extract_invoice`, una subllamada estructurada por LlmClient) y la navegación
+ * (`open_proposal`, que abre la propuesta en la vista pedida). Sin puerto (otra superficie, pruebas), la herramienta responde
+ * `not_available` y no hace nada.
  *
  * Las extracciones se guardan aquí en memoria (no se persisten ni se sincronizan) y se pasan POR REFERENCIA: `extract_invoice`
  * devuelve un `extractionId` que `create_proposal` acepta, así los doce consumos no pasan por el modelo.

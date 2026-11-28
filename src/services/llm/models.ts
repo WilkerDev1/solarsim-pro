@@ -2,6 +2,10 @@
 // así que no puede importar el adaptador.
 import type { GeminiModelInfo } from '../../types/aiInvoice';
 import { DEFAULT_GEMINI_MODEL } from '../../../shared/geminiTransport';
+
+// El bucle nuevo toma de aquí los nombres de modelo (no del transporte antiguo): cuando F6 borre shared/geminiTransport,
+// las constantes se mueven solo en este sitio.
+export { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../../shared/geminiTransport';
 import type { LlmModel } from './types';
 
 // Presets are documented endpoints (https://ai.google.dev/gemini-api/docs/models); quotas depend on the account, not this list.

@@ -1,3 +1,5 @@
+// Camino antiguo del flotante: desde F4 el panel usa la sesión nueva (session/assistantSession.ts) y este hook no lo monta
+// nadie. Se conserva hasta F6, que lo borra junto con service.ts (ADR 0011).
 import { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { assistantOwner } from './tools';

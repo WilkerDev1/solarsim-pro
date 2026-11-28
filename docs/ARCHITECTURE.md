@@ -53,6 +53,16 @@ El perfil empresarial de la organización sincroniza el membrete principal; los 
 
 El contrato conversacional distingue respuesta informativa de borrador mutable. El consumo teórico usa factores sin redondear exportados por el motor solar, sin duplicar una fórmula asociada a documentos comerciales. Hook, normalización de transporte y store comparten esa referencia; el store sigue verificando antes de aplicar. Totales documentales son referencias informativas, nunca overrides del motor.
 
-## Asistente general experimental
+## Asistente general
+
+Desde F4 ([ADR 0011](adr/0011-sesion-y-bucle-del-asistente.md)) el panel flotante (`components/AppAssistant.tsx`) solo pinta una sesión que vive fuera de React (`src/features/assistant/session/assistantSession.ts`: conversación, historial del modelo de turnos cerrados, adjuntos y turno en curso; sobrevive a cambiar de vista, de propuesta y a cerrar el panel, y se descarta al cambiar de espacio o de sesión). La sesión corre un bucle propio (`session/agentLoop.ts`) sobre el puerto `LlmClient` ([ADR 0008](adr/0008-puerto-llm-y-sdk-google-genai.md)) con el conjunto de herramientas de F3a (`listAssistantToolset`/`executeAssistantToolset`), las instrucciones en tres capas y los eventos del turno de F3c, y conecta los puertos de navegación y de lectura de facturas:
+
+```
+AppAssistant (React) ──subscribe──▶ assistantSession ──▶ runAgentLoop ──▶ LlmClient ──▶ geminiAdapter (@google/genai)
+                                          │                    └──▶ executeAssistantToolset ──▶ commitProjectEdits / registro
+                                          └──▶ puertos: openProposal (navega) · extractInvoice (LlmClient.structured)
+```
+
+El camino antiguo (`service.ts`, `useAppAssistant.ts`, `executeForAssistant`, `shared/geminiTransport.ts`) sigue en el código sin uso desde el panel hasta F6. Lo que sigue describe las piezas comunes.
 
 `src/features/assistant/` separa transporte conversacional, registro de herramientas, validación, hooks y tarjetas React. Las herramientas solo actúan sobre el espacio actual según su tipo (consulta, borrador con deshacer o cambio con confirmación); no ejecutan funciones arbitrarias, código ni HTML. Cada aplicación revalida servidor/organización, sesión/rol y fingerprint. App monta el panel de forma diferida; conversación/divisor se comparten con el borrador de propuestas. Su activación es una preferencia local (`uiSlice.appAssistantEnabled`, apagada por defecto), no una función de `shared/applicationFeatures.ts` ni parte de la política de organización. Las herramientas viven en un registro común (`shared/agentTools/` y `src/features/agentTools/`) que comparten el asistente de propuestas, el asistente general y el futuro MCP local. Ver [AGENT_TOOLS.md](AGENT_TOOLS.md).

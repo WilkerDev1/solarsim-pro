@@ -1,3 +1,5 @@
+// Bucle antiguo del flotante (transporte REST propio, 4 rondas). Desde F4 el panel usa session/agentLoop.ts sobre LlmClient;
+// este módulo queda solo por las suites que lo caracterizan y se borra en F6 (ADR 0011).
 import {
   geminiResponseText,
   requestGeminiJson,

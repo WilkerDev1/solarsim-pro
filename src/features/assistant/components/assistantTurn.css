@@ -1,0 +1,14 @@
+/* F4: detalles del turno en el panel mínimo (listas de texto; la tarjeta de diff es de F5a). Avisos discretos, sin cajas de color. */
+.assistant-turn-details { margin-top: 10px; display: grid; gap: 8px; font-size: 12px; line-height: 1.5; }
+.assistant-turn-details h3 { font-size: 12px; font-weight: 650; margin: 0 0 2px; color: var(--chat-muted, #bccbdd); }
+.assistant-turn-list { margin: 0; padding-left: 16px; display: grid; gap: 2px; }
+.assistant-turn-label { font-weight: 600; }
+.assistant-turn-muted { color: var(--chat-muted, #bccbdd); }
+.assistant-turn-pending { border-left: 2px solid var(--assistant-border, #52647b); padding-left: 8px; }
+.assistant-turn-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.assistant-turn-actions button { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #52647b; background: transparent; color: inherit; padding: 3px 8px; border-radius: 7px; font-size: 12px; cursor: pointer; }
+.assistant-turn-actions button:hover:not(:disabled) { background: rgb(255 255 255 / .06); }
+.assistant-turn-actions button:disabled { opacity: .55; cursor: default; }
+.assistant-turn-notes { margin: 0; display: flex; flex-wrap: wrap; gap: 10px; color: var(--chat-muted, #bccbdd); }
+.assistant-turn-notes > span { display: inline-flex; align-items: center; gap: 2px; }
+.assistant-turn-notice { margin: 6px 0 0; font-size: 12px; color: var(--chat-muted, #bccbdd); }
