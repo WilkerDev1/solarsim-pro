@@ -116,6 +116,10 @@ assert.match(conduct, /español/i);
 assert.match(conduct, /breve/i);
 assert.match(conduct, /qué cambió, qué supusiste, qué falta/i, 'cierra el turno con su resumen');
 assert.match(conduct, /una pregunta/i, 'pregunta solo una cosa y solo si hace falta');
+// Evaluación con el modelo real (2026-11-28): a veces consultaba y dimensionaba, y cerraba el turno sin aplicar el cambio pedido.
+assert.match(conduct, /no termina hasta aplicarlo/i, 'un cambio pedido se aplica en el mismo turno');
+assert.match(conduct, /consultar o dimensionar es solo el paso previo/i, 'consultar no es la respuesta a un cambio');
+assert.match(conduct, /nunca digas que algo cambió sin un resultado aplicado/i, 'no da por hecho un cambio sin resultado');
 // No contradice la capa 1: no ofrece cifras propias ni promete guardar sin confirmación.
 assert.doesNotMatch(conduct, /USD\/W|\$\/W/, 'ningún precio por vatio en la conducta');
 assert.doesNotMatch(conduct, /\b\d+(?:[.,]\d+)?\s*USD\b/, 'ningún importe en USD');

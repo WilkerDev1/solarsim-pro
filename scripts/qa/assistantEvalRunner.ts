@@ -272,7 +272,8 @@ async function runCase(evalCase: EvalCase, model: string, options: EvalRunOption
     const messages = assistantMessages(session);
     const tools: EvalToolCall[] = messages.flatMap((m) => m.turn.toolOrder.map((id) => ({ name: m.turn.tools[id].name, status: m.turn.tools[id].status })));
     const last = messages.at(-1);
-    const finalText = redact(last?.turn.text ?? '', secrets);
+    // Con varios turnos se guardan todas las respuestas: el fallo suele estar en un turno anterior al último.
+    const finalText = redact(messages.map((m) => m.turn.text ?? '').filter(Boolean).join(' ‖ '), secrets);
     const outcome = last?.outcome;
     const fallback = messages.map((m) => m.modelNotice).find(Boolean);
     const common = { tools, steps: counter.n, durationMs: now() - startedAt, finalText, ...(outcome ? { outcome } : {}), ...(fallback ? { fallback: redact(fallback, secrets) } : {}) };
@@ -326,7 +327,7 @@ export function formatResult(result: EvalCaseResult): string {
   if (result.failure) lines.push(`         Falló: ${result.failure}`);
   if (result.error) lines.push(`         No se pudo evaluar: ${result.error}`);
   if (result.fallback) lines.push(`         Aviso: ${result.fallback}`);
-  if (result.finalText && result.status !== 'pass') lines.push(`         Respuesta: ${result.finalText.replace(/\s+/g, ' ').slice(0, 200)}`);
+  if (result.finalText && result.status !== 'pass') lines.push(`         Respuesta: ${result.finalText.replace(/\s+/g, ' ').slice(0, 700)}`);
   return lines.join('\n');
 }
 
