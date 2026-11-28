@@ -4,9 +4,9 @@
  * ni valida: el store valida con `validateQuotationContent` al guardar (`updateQuotationRecord`). Los ids nuevos
  * salen del generador inyectado (`newId`) para que las pruebas sean deterministas.
  */
-import { QUOTATION_LIMITS, convertCents, formatExchangeRate } from '../../shared/quotations';
+import { QUOTATION_LIMITS, convertCents, formatExchangeRate, withAttachmentDestinations } from '../../shared/quotations';
 import type {
-  QuotationAttachment, QuotationContent, QuotationCurrency, QuotationDesign, QuotationDiscount, QuotationIssuer, QuotationLine, QuotationPrintedClient,
+  AttachmentDestinations, QuotationAttachment, QuotationContent, QuotationCurrency, QuotationDesign, QuotationDiscount, QuotationIssuer, QuotationLine, QuotationPrintedClient,
 } from '../../shared/quotations';
 
 export type IdFactory = () => string;
@@ -189,7 +189,26 @@ export function updateAttachment(content: QuotationContent, id: string, patch: P
   const attachments = content.attachments.map((a) => {
     if (a.id !== id || Object.entries(patch).every(([key, value]) => a[key as keyof QuotationAttachment] === value)) return a;
     changed = true;
-    return { ...a, ...patch };
+    const next = { ...a, ...patch };
+    // `alsoSeparate` solo existe dentro del PDF: pasar a `related` lo suelta.
+    if (next.mode === 'related' && next.alsoSeparate !== undefined) delete next.alsoSeparate;
+    return next;
+  });
+  return changed ? { ...content, attachments } : content;
+}
+
+/**
+ * Fija los destinos de un adjunto («Dentro del PDF», «Archivo aparte en el correo»). Sin ninguno no cambia nada: la
+ * regla «al menos uno» la dice la pestaña antes de llamar.
+ */
+export function setAttachmentDestinations(content: QuotationContent, id: string, destinations: AttachmentDestinations): QuotationContent {
+  let changed = false;
+  const attachments = content.attachments.map((a) => {
+    if (a.id !== id) return a;
+    const next = withAttachmentDestinations(a, destinations);
+    if (!next || (next.mode === a.mode && next.alsoSeparate === a.alsoSeparate)) return a;
+    changed = true;
+    return next;
   });
   return changed ? { ...content, attachments } : content;
 }
@@ -280,7 +299,7 @@ const withoutDismissed = (content: QuotationContent): QuotationContent => {
 };
 
 /**
- * Enlaza una propuesta y trae sus documentos (como «Solo relacionado»). Cambiar de propuesta olvida los quitados de la
+ * Enlaza una propuesta y trae sus documentos (como «Archivo aparte en el correo»). Cambiar de propuesta olvida los quitados de la
  * anterior; los documentos de la anterior que siguieran en la lista se conservan tal cual.
  */
 export function linkSourceProposal(content: QuotationContent, projectId: string, documents: readonly QuotationAttachment[]): SourceDocumentsMerge {

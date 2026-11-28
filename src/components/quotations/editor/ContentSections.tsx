@@ -170,7 +170,7 @@ export interface SourceProposalProps {
 /** Mensaje tras enlazar: cuántos documentos de la propuesta llegaron a «Adjuntos». */
 export function linkedDocumentsNotice(added: number, overflow: number): string | null {
   const parts = [
-    added ? `${added === 1 ? 'Se agregó 1 documento' : `Se agregaron ${added} documentos`} de la propuesta en Adjuntos, como «Solo relacionado».` : '',
+    added ? `${added === 1 ? 'Se agregó 1 documento' : `Se agregaron ${added} documentos`} de la propuesta en Adjuntos, como «Archivo aparte en el correo».` : '',
     overflow ? `${overflow === 1 ? '1 documento no cupo' : `${overflow} documentos no cupieron`} (máximo ${QUOTATION_LIMITS.maxAttachments} adjuntos).` : '',
   ].filter(Boolean);
   return parts.length ? parts.join(' ') : null;
@@ -221,7 +221,7 @@ const SourceProposalField: React.FC<SectionProps & SourceProposalProps> = ({ rea
               {options?.length === 0 && <option value="" disabled>No hay propuestas para enlazar</option>}
               {options?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
             </select>
-            <InfoTip label="Qué trae enlazar una propuesta" text="El enlace y sus documentos (fichas y anexos guardados), en Adjuntos como «Solo relacionado». No cambia líneas, cliente ni importes, y la propuesta no se modifica." />
+            <InfoTip label="Qué trae enlazar una propuesta" text="El enlace y sus documentos (fichas y anexos guardados), en Adjuntos como «Archivo aparte en el correo». No cambia líneas, cliente ni importes, y la propuesta no se modifica." />
           </div>
         )
       ) : (

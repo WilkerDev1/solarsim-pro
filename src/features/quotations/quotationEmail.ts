@@ -5,7 +5,7 @@
  * aplicación de correo del usuario.
  */
 import {
-  QUOTATION_SHEET_TEXTS, computeQuotationTotals, formatMoney, formatSheetDate,
+  QUOTATION_SHEET_TEXTS, computeQuotationTotals, formatMoney, formatSheetDate, goesInsidePdf, goesSeparate,
   type QuotationAttachment, type QuotationContent, type QuotationPrintedClient,
 } from '../../../shared/quotations';
 import { isValidEmailAddress } from '../../../shared/externalUrl';
@@ -40,8 +40,12 @@ export interface QuotationEmailFile {
   name: string;
   /** Tipo que se muestra en la etiqueta: PDF, PNG, JPG, WEBP. */
   kind: string;
-  /** Va aparte (adjunto «solo relacionado» que el usuario adjunta a mano); el PDF de la cotización no. */
+  /** Va aparte (adjunto con «Archivo aparte en el correo», que el usuario adjunta a mano); el PDF de la cotización no. */
   separate: boolean;
+  /** Aparte y además dentro del PDF (los dos destinos). */
+  alsoInPdf?: boolean;
+  /** Para el PDF: «Incluye N adjuntos»; vacío sin adjuntos dentro. */
+  annexes?: string;
   note: string;
 }
 
@@ -173,22 +177,32 @@ const kindOf = (name: string) => {
   return ext === 'JPEG' ? 'JPG' : ext && ['PDF', 'PNG', 'JPG', 'WEBP'].includes(ext) ? ext : 'PDF';
 };
 
+/** «Incluye N adjuntos»: los «Dentro del PDF» que el PDF lleva al final; sin ninguno, vacío. */
+export function includedAnnexesLabel(attachments: readonly QuotationAttachment[]): string {
+  const included = attachments.filter(goesInsidePdf).length;
+  return included ? `Incluye ${included === 1 ? '1 adjunto' : `${included} adjuntos`}` : '';
+}
+
 /**
- * Lo que acompañaría al mensaje: el PDF de la cotización con su nombre real de exportación (los adjuntos «incluir»
- * ya van dentro) y, aparte, los «solo relacionado», que el usuario descarga y adjunta a mano.
+ * Lo que acompañaría al mensaje: el PDF de la cotización con su nombre real de exportación (los adjuntos «Dentro del
+ * PDF» ya van dentro, y se dice cuántos) y, aparte, los que tienen «Archivo aparte en el correo» (solo correo o los dos
+ * destinos), que el usuario descarga en Adjuntos y adjunta a mano.
  */
 export function quotationEmailAttachments(number: string | null, attachments: readonly QuotationAttachment[]): QuotationEmailFile[] {
-  const included = attachments.filter((a) => a.mode === 'include').length;
   const pdf: QuotationEmailFile = {
     id: 'quotation-pdf',
     name: quotationPdfFileName(number),
     kind: 'PDF',
     separate: false,
-    note: included ? `Incluye ${included === 1 ? '1 adjunto' : `${included} adjuntos`} al final` : 'La cotización',
+    annexes: includedAnnexesLabel(attachments),
+    note: includedAnnexesLabel(attachments) || 'La cotización',
   };
-  return [pdf, ...attachments.filter((a) => a.mode === 'related').map((a) => {
+  return [pdf, ...attachments.filter(goesSeparate).map((a) => {
     const name = a.fileName.trim() || a.title.trim() || 'Adjunto';
-    return { id: a.id, name, kind: kindOf(name), separate: true, note: 'Aparte: descárgalo en Adjuntos y adjúntalo a mano' };
+    const note = goesInsidePdf(a)
+      ? 'Aparte (también va dentro del PDF): descárgalo en Adjuntos y adjúntalo a mano'
+      : 'Aparte: descárgalo en Adjuntos y adjúntalo a mano';
+    return { id: a.id, name, kind: kindOf(name), separate: true, ...(goesInsidePdf(a) ? { alsoInPdf: true } : {}), note };
   })];
 }
 

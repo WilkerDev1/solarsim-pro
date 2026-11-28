@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, FileText, Mail } from 'lucide-react';
-import { sheetPageLabel } from '../../../../shared/quotations';
+import { goesInsidePdf, sheetPageLabel } from '../../../../shared/quotations';
 import { SHEET_LAYOUT, paginateQuotation } from '../../../features/quotations/paginate';
 import { exportQuotationPdf, quotationPages } from '../../../features/quotations/exportQuotationPdf';
 import { QuotationSheet, type QuotationSheetData } from '../sheet/QuotationSheet';
@@ -9,6 +9,7 @@ import { skippedAttachmentsMessage } from '../../../features/quotations/attachme
 import { quotationAttachmentResolver, resolveAssetImage } from '../../../features/quotations/assetImages';
 import { EMPTY_EMAIL_DRAFT, type QuotationEmailDraft } from '../../../features/quotations/quotationEmail';
 import { QuotationEmailPreview } from './QuotationEmailPreview';
+import { AnnexPreviewPage, annexPreviewLabel } from './AnnexPreviewPage';
 
 const DEFAULT_SCALE = 0.62;
 
@@ -26,6 +27,13 @@ interface ExportSheet {
 }
 
 export type PreviewView = 'pdf' | 'email';
+
+/**
+ * Etiqueta de la paginación de la vista previa: las páginas de la hoja cuentan solo entre ellas («Página X de N») y
+ * las de referencia de los anexos, aparte («Anexo K de M»).
+ */
+export const previewPageLabel = (index: number, sheetPages: number, annexes: number): string =>
+  index < sheetPages ? sheetPageLabel(index + 1, sheetPages) : annexPreviewLabel(index - sheetPages + 1, annexes);
 const VIEWS: { id: PreviewView; label: string; icon: typeof FileText }[] = [
   { id: 'pdf', label: 'PDF', icon: FileText },
   { id: 'email', label: 'Correo', icon: Mail },
@@ -45,20 +53,24 @@ export const QuotationPreview: React.FC<{
   imageSources?: readonly SheetImageSource[];
   /** Vista al abrir (las pruebas dibujan el correo directamente). */
   initialView?: PreviewView;
+  /** Página al abrir (las pruebas dibujan una de referencia de los anexos). */
+  initialPage?: number;
   /** Lleva al campo «Correo» del cliente; sin él (bloqueada o LECTOR) la vista de correo solo avisa. */
   onGoToClientEmail?: () => void;
-}> = ({ quotation, stampImage, quotationId, attachments = [], imageSources = [], initialView = 'pdf', onGoToClientEmail }) => {
+}> = ({ quotation, stampImage, quotationId, attachments = [], imageSources = [], initialView = 'pdf', initialPage = 0, onGoToClientEmail }) => {
   const [view, setView] = useState<PreviewView>(initialView);
   // Texto del correo cambiado para este envío: estado local, se pierde al salir del editor y nunca se guarda.
   const [emailDraft, setEmailDraft] = useState<QuotationEmailDraft>(EMPTY_EMAIL_DRAFT);
-  const pageCount = useMemo(() => paginateQuotation(quotation).length, [quotation]);
-  const [page, setPage] = useState(0);
+  const sheetPages = useMemo(() => paginateQuotation(quotation).length, [quotation]);
+  // Los adjuntos «Dentro del PDF» se ven al final como páginas de referencia (una por adjunto); nunca se exportan así.
+  const annexes = useMemo(() => attachments.filter(goesInsidePdf), [attachments]);
+  const pageCount = sheetPages + annexes.length;
+  const [page, setPage] = useState(initialPage);
   const [scale, setScale] = useState(DEFAULT_SCALE);
   const [preparing, setPreparing] = useState(false);
   const [exportSheet, setExportSheet] = useState<ExportSheet | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
-  const included = attachments.filter((a) => a.mode === 'include').length;
   const area = useRef<HTMLDivElement>(null);
   const exportRoot = useRef<HTMLDivElement>(null);
   const current = Math.min(page, pageCount - 1);
@@ -130,7 +142,7 @@ export const QuotationPreview: React.FC<{
           {view === 'pdf' && (
             <div className="qe-pager">
               <button type="button" className="qe-icon-btn" aria-label="Página anterior" disabled={current === 0} onClick={() => setPage(current - 1)}><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button>
-              <span aria-live="polite">{sheetPageLabel(current + 1, pageCount)}</span>
+              <span aria-live="polite">{previewPageLabel(current, sheetPages, annexes.length)}</span>
               <button type="button" className="qe-icon-btn" aria-label="Página siguiente" disabled={current >= pageCount - 1} onClick={() => setPage(current + 1)}><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
             </div>
           )}
@@ -147,13 +159,14 @@ export const QuotationPreview: React.FC<{
           <div ref={area} className="qe-sheet-area">
             <div className="qe-sheet-frame" style={{ width: SHEET_LAYOUT.width * scale, height: SHEET_LAYOUT.height * scale }}>
               <div style={{ width: SHEET_LAYOUT.width, height: SHEET_LAYOUT.height, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-                <QuotationSheet quotation={quotation} stampImage={stampImage} onlyPage={current} />
+                {current < sheetPages
+                  ? <QuotationSheet quotation={quotation} stampImage={stampImage} onlyPage={current} />
+                  : <AnnexPreviewPage attachment={annexes[current - sheetPages]} index={current - sheetPages + 1} total={annexes.length} number={quotation.number} accent={quotation.design.accent} />}
               </div>
             </div>
           </div>
           <p className="qe-field-hint qe-preview-hint">
-            El PDF se genera como imagen de cada página.
-            {included ? ` ${included === 1 ? 'Se añade 1 adjunto' : `Se añaden ${included} adjuntos`} al final al exportar.` : ''}
+            {`El PDF se genera como imagen de cada página.${annexes.length ? ` ${annexes.length === 1 ? '1 adjunto se ve al final como referencia y se añade completo' : `${annexes.length} adjuntos se ven al final como referencia y se añaden completos`} al exportar.` : ''}`}
           </p>
         </div>
       ) : (

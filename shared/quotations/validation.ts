@@ -252,6 +252,9 @@ function attachment(raw: unknown, seen: Set<string>): QuotationAttachment {
   const catalogItemId = optionalText(raw.catalogItemId, QUOTATION_LIMITS.id, 'Anexo inválido: id del equipo');
   const sourceProjectId = optionalText(raw.sourceProjectId, QUOTATION_LIMITS.id, 'Anexo inválido: id de la propuesta');
   const thumbnailDataUrl = image(raw.thumbnailDataUrl, QUOTATION_LIMITS.thumbnailDataUrl, 'Anexo inválido: miniatura (use una imagen PNG, JPEG o WebP)') || undefined;
+  // «También aparte en el correo»: opcional y solo con `include`; con `related` ya va aparte, así que se descarta.
+  if (raw.alsoSeparate != null && typeof raw.alsoSeparate !== 'boolean') return reject('Anexo inválido: destino');
+  if (raw.alsoSeparate === true && result.mode === 'include') result.alsoSeparate = true;
   if (assetId) result.assetId = assetId;
   if (catalogItemId) result.catalogItemId = catalogItemId;
   if (sourceProjectId) result.sourceProjectId = sourceProjectId;

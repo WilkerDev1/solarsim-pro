@@ -43,7 +43,7 @@ export const ALL_CONVERSION_BLOCKS: Readonly<ConversionBlocks> = { client: true,
 export const CONVERSION_BLOCKS: readonly { id: ConversionBlock; label: string; description: string }[] = [
   { id: 'client', label: 'Cliente enlazado', description: 'El mismo cliente del directorio y los datos impresos de la propuesta' },
   { id: 'items', label: 'Equipos y materiales', description: 'Paneles, inversores, baterías e ítems extra con sus precios, descuentos e ITBIS' },
-  { id: 'documents', label: 'Documentos', description: 'Fichas técnicas de los equipos y anexos de la propuesta, como «Solo relacionado»' },
+  { id: 'documents', label: 'Documentos', description: 'Fichas técnicas de los equipos y anexos de la propuesta, como «Archivo aparte en el correo»' },
   { id: 'currency', label: 'Moneda y tasa', description: 'La moneda de la propuesta (US$) y su tasa del dólar; si no, pesos con la tasa de las cotizaciones nuevas' },
   { id: 'conditions', label: 'Condiciones y vigencia', description: 'Forma de pago, garantías, servicios incluidos y fecha de validez' },
 ];
