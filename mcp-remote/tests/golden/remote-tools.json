@@ -1,0 +1,351 @@
+[
+  {
+    "name": "search_projects",
+    "title": "Buscar propuestas",
+    "kind": "read",
+    "scope": "read",
+    "description": "Busca propuestas sincronizadas de la organización por nombre del cliente, código o provincia. Máximo 12, de la modificada más recientemente a la más antigua (updatedAt). Query vacío: las más recientes. No incluye la papelera.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Texto a buscar; vacío lista los primeros resultados."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_project",
+    "title": "Consultar propuesta",
+    "kind": "read",
+    "scope": "read",
+    "description": "Consulta los datos guardados de una propuesta sincronizada por id: cliente impreso, equipos, tarifas, finanzas y consumos. No ejecuta el motor: producción, ahorro y retorno se consultan en la app.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "search_equipment",
+    "title": "Buscar equipos",
+    "kind": "read",
+    "scope": "read",
+    "description": "Busca catálogo por marca/modelo. type limita a paneles, inversores o baterías («muéstrame los paneles» = type panel, query vacío). unavailableOnly indica sin oferta confirmada in_stock, no implica agotado.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Texto a buscar; vacío lista los primeros resultados."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "panel",
+            "inverter",
+            "battery"
+          ]
+        },
+        "unavailableOnly": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_equipment",
+    "title": "Consultar equipo",
+    "kind": "read",
+    "scope": "read",
+    "description": "Consulta un equipo con ofertas y referencias de adjuntos.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del equipo del catálogo."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_price_history",
+    "title": "Consultar historial de precios",
+    "kind": "read",
+    "scope": "read",
+    "description": "Historial de precios de un equipo (más recientes primero): registros con fuente (supplier_offer, ai_scan, proposal, manual, agent), tipo (observation = precio visto, generic = fijó el precio genérico), moneda y monto originales, proveedor o propuesta, autor y anulación; más el precio genérico vigente y un resumen por mes del año con variación a 3, 6 y 12 meses. Meses sin registros quedan en null: no los rellenes. Requiere sesión iniciada.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "equipmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del equipo del catálogo."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Registros a devolver (por defecto 50)."
+        }
+      },
+      "required": [
+        "equipmentId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "list_supplier_offers",
+    "title": "Consultar ofertas",
+    "kind": "read",
+    "scope": "read",
+    "description": "Lista ofertas de proveedores por equipo, proveedor o texto. Máximo 50.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "equipmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del equipo."
+        },
+        "supplier": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_tariffs",
+    "title": "Consultar tarifas",
+    "kind": "read",
+    "scope": "read",
+    "description": "Consulta la matriz de tarifas personalizada de la organización y su procedencia; sin matriz propia se usa el pliego oficial integrado en la app.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "search_clients",
+    "title": "Buscar clientes",
+    "kind": "read",
+    "scope": "read",
+    "description": "Busca en el directorio de clientes por nombre, RNC/cédula, teléfono o correo. Máximo 20.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "persona",
+            "empresa",
+            "all"
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_client",
+    "title": "Consultar cliente",
+    "kind": "read",
+    "scope": "read",
+    "description": "Datos del cliente, propuestas enlazadas y resumen de sus estados (borrador/final/archivada y decisión comercial).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del cliente."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "create_client",
+    "title": "Crear cliente",
+    "kind": "draft",
+    "scope": "write",
+    "description": "Crea un cliente en el directorio. Solo el nombre es obligatorio. Es independiente del nombre impreso en las propuestas.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "persona",
+            "empresa"
+          ]
+        },
+        "taxId": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "RNC o cédula."
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "province": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "update_client",
+    "title": "Editar cliente",
+    "kind": "draft",
+    "scope": "write",
+    "description": "Actualiza datos opcionales de un cliente del directorio.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID del cliente."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "persona",
+            "empresa"
+          ]
+        },
+        "taxId": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "RNC o cédula."
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "province": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "link_proposal_to_client",
+    "title": "Enlazar propuesta con cliente",
+    "kind": "draft",
+    "scope": "write",
+    "description": "Enlaza una propuesta con un cliente del directorio (clientId null la desenlaza). No cambia el nombre ni los datos impresos en la propuesta.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "ID de la propuesta."
+        },
+        "clientId": {
+          "type": "string",
+          "maxLength": 64,
+          "nullable": true
+        }
+      },
+      "required": [
+        "proposalId"
+      ],
+      "additionalProperties": false
+    }
+  }
+]

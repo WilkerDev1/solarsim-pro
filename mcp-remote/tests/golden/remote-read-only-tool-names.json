@@ -1,0 +1,11 @@
+[
+  "search_projects",
+  "get_project",
+  "search_equipment",
+  "get_equipment",
+  "get_price_history",
+  "list_supplier_offers",
+  "get_tariffs",
+  "search_clients",
+  "get_client"
+]
