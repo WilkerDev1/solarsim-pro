@@ -50,7 +50,7 @@ export const APP_ASSISTANT_OWN_TOOLS: readonly AgentToolDefinition[] = [
   },
   {
     name: 'create_proposal', title: 'Crear propuesta', kind: 'draft', category: 'proposals', card: 'proposal', surfaces: SURFACE,
-    description: `Crea una propuesta nueva. Todo es opcional: sin datos nace con los valores de fábrica (consumo estimado de 1.000 kWh/mes, avisado; tarifa de referencia; margen objetivo de Ajustes) y el sistema dimensionado con equipos del catálogo. Acepta extractionId de extract_invoice en lugar de transcribir la factura. ${PRICE_RULE} No abre la propuesta: el resultado indica openSimulator; ábrela con open_proposal si el usuario quiere verla.`,
+    description: `Crea una propuesta nueva. Todo es opcional: sin datos nace con los valores de fábrica (consumo estimado de 1.000 kWh/mes, avisado; tarifa de referencia; margen objetivo de Ajustes) y el sistema dimensionado con equipos del catálogo. Acepta extractionId de extract_invoice en lugar de transcribir la factura. ${PRICE_RULE} La app la abre en el simulador al crearla (el resultado lo dice con opened): no hace falta open_proposal.`,
     inputSchema: object({
       clientName: { type: 'string', maxLength: 200 },
       company: { type: 'string', maxLength: 200 },
@@ -136,7 +136,7 @@ export const APP_ASSISTANT_OWN_TOOLS: readonly AgentToolDefinition[] = [
 ];
 
 /**
- * El conjunto ÚNICO que verá el asistente de la app (F4 lo declarará entero al empezar cada turno, sin cambiarlo a mitad).
+ * El conjunto ÚNICO que ve el asistente de la app (el bucle de F4 lo declara entero al empezar cada turno, sin cambiarlo a mitad).
  * Las siete propias más las compartidas que siguen siendo útiles (textos y diseño del documento, anexos, clientes, catálogo,
  * ofertas, estado y decisión comercial). Entre 10 y 20 activas, como recomienda Google.
  */

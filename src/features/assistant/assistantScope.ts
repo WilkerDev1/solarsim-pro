@@ -12,7 +12,8 @@ export const assistantProjectId = (view: string, activeProjectId?: string): stri
 
 /**
  * Clave React del panel del asistente: espacio de trabajo/sesión (`owner`) y propuesta abierta (`global` sin ninguna).
- * Hoy cambia al abrir o crear otra propuesta, lo que remonta el panel, aborta el turno y vacía la conversación
- * (se invierte en F5b: la conversación pasará a vivir fuera del árbol con clave).
+ * Todavía cambia al abrir o crear otra propuesta y remonta el panel; desde F4 eso ya no aborta el turno ni vacía la
+ * conversación, que viven en la sesión fuera de React (`session/assistantSession.ts`). Dejarla solo por espacio/sesión
+ * es de F5b (se invierte en F5b).
  */
 export const assistantPanelKey = (owner: string, projectId?: string): string => `${owner}|${projectId || 'global'}`;

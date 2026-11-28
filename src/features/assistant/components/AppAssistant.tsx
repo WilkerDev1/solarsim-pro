@@ -1,79 +1,52 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  MessageCircle,
-  X,
-  Maximize2,
-  Minimize2,
-  RotateCcw,
-  Settings,
-} from 'lucide-react';
+import React, { useEffect, useRef, useSyncExternalStore } from 'react';
+import { MessageCircle, X, Maximize2, Minimize2, RotateCcw, Settings } from 'lucide-react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppAssistant } from '../useAppAssistant';
 import { assistantOwner } from '../tools';
 import { assistantPanelKey, assistantProjectId, assistantVisibleIn } from '../assistantScope';
 import { ChatMessage } from './ChatMessage';
 import { ChatComposer, ChatSuggestions, ChatThinking, ScrollToLatest } from './ChatComposer';
-import { reusableUserText, useChatAnnouncement, useElapsedSeconds, useResend, useStickToBottom } from '../chatUi';
-import { AgentCardView } from '../cards/registry';
-import { announceActivities } from '../../agentTools/documentTextLog';
-import {
-  AssistantActionCard,
-  AssistantAppliedCard,
-  AssistantResultCard,
-} from './AssistantResultCard';
-import { AssistantResultList } from './AssistantResultList';
+import { useChatAnnouncement, useElapsedSeconds, useStickToBottom } from '../chatUi';
+import { AssistantTurnDetails, turnSteps } from './AssistantTurnDetails';
+import { assistantSession, type AssistantSession, type SessionAssistantMessage } from '../session/assistantSession';
+import type { LlmClient } from '../../../services/llm/types';
 import '../chat.css';
-import type { GeminiTransport } from '../../../../shared/geminiTransport';
+import './assistantTurn.css';
 
-const PROJECT_SUGGESTIONS = ['Resume esta propuesta y sus supuestos', '¿Por qué el ahorro del primer año es este?', 'Busca un inversor alternativo en el inventario'];
-const GLOBAL_SUGGESTIONS = ['Muestra mis propuestas más recientes', 'Busca baterías de litio en el inventario', '¿Qué propuestas siguen pendientes de decisión?'];
-function AssistantPanel({
-  projectId,
-  transport,
-  belowToolbar,
-}: {
-  projectId?: string;
-  transport?: GeminiTransport;
-  /** En la vista del documento el panel se limita en alto para no tapar la barra de edición fija. */
-  belowToolbar?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const ai = useAppAssistant(projectId, transport);
+// F4: el panel flotante pinta la sesión del asistente (`session/assistantSession.ts`), que vive fuera de React. Remontar el
+// panel (otra propuesta, otra vista) no pierde la conversación ni el turno; cerrarlo tampoco cancela: «Detener» es aparte.
+// El camino antiguo (`useAppAssistant` + `service.ts`) ya no lo usa este panel; queda hasta F6 por sus suites.
+
+const PROJECT_SUGGESTIONS = ['Ponle baterías a esta propuesta', 'Resume esta propuesta y sus supuestos', '¿Por qué el ahorro del primer año es este?'];
+const GLOBAL_SUGGESTIONS = ['Crea una propuesta', 'Muestra mis propuestas más recientes', 'Busca baterías de litio en el inventario'];
+
+const useSession = (session: AssistantSession) => useSyncExternalStore(session.subscribe, session.getState, session.getState);
+
+function joinText(a: string, b: string) {
+  return a && b ? `${a}\n\n${b}` : a || b;
+}
+
+function AssistantPanel({ projectId, belowToolbar }: { projectId?: string; belowToolbar?: boolean }) {
+  const session = assistantSession();
+  const ai = useSession(session);
   const state = useSimulationStore(useShallow((s) => ({ projects: s.projects, isSettingsModalOpen: s.isSettingsModalOpen, isAIInvoiceModalOpen: s.isAIInvoiceModalOpen, isAIDatasheetModalOpen: s.isAIDatasheetModalOpen, isAIPriceCatalogModalOpen: s.isAIPriceCatalogModalOpen, isNewProjectModalOpen: s.isNewProjectModalOpen, activeConflict: s.activeConflict, isTrashActive: s.isTrashActive, openSettingsModal: s.openSettingsModal, geminiApiKey: s.geminiApiKey })));
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
-  const scroll = useStickToBottom(log, [ai.messages, ai.busy, ai.steps.length, open]);
+  const open = ai.panelOpen;
+  const last = ai.messages[ai.messages.length - 1];
+  const liveLength = last?.role === 'assistant' ? last.liveText.length + last.turn.text.length + last.turn.toolOrder.length : 0;
+  const scroll = useStickToBottom(log, [ai.messages.length, liveLength, ai.busy, open]);
   const elapsed = useElapsedSeconds(ai.busy);
   const project = state.projects.find((p) => p.id === projectId);
-  // Un error que llega al terminar una consulta es un turno del hilo (con reintento); los de adjuntos van al compositor.
-  const wasBusy = useRef(false);
-  const [threadError, setThreadError] = useState('');
-  useEffect(() => {
-    // El error más reciente manda: uno nuevo fuera de una consulta (adjunto rechazado) sustituye al turno de error anterior.
-    if (ai.busy || !ai.error) setThreadError('');
-    else setThreadError(wasBusy.current ? ai.error : '');
-    wasBusy.current = ai.busy;
-  }, [ai.busy, ai.error]);
-  const resend = useResend(ai.prompt, ai.setPrompt, () => void ai.send(), ai.busy);
-  const lastUser = [...ai.messages].reverse().find((m) => m.role === 'user');
-  const retryText = lastUser ? reusableUserText(lastUser.text) : '';
-  const retry = retryText ? () => resend(retryText) : undefined;
-  const lastAssistantIndex = ai.messages.map((m) => m.role).lastIndexOf('assistant');
-  const announcement = useChatAnnouncement(ai.busy, () => ai.error ? 'La respuesta no se completó.' : ai.messages[ai.messages.length - 1]?.role === 'user' ? 'Respuesta detenida.' : 'Respuesta lista.');
-  // Cambios de textos aplicados por el asistente: se anuncian (propuesta, texto, antes → después), sobre todo si no es la abierta.
-  const [changeAnnouncement, setChangeAnnouncement] = useState('');
-  const announceApplied = (ids: string[]) => setChangeAnnouncement(announceActivities(ids, useSimulationStore.getState().agentActivity));
-  // Se limpia al empezar un turno y al vaciar el chat: un cambio idéntico al anterior (deshacer y reaplicar) vuelve a anunciarse.
-  useEffect(() => { if (ai.busy || !ai.messages.length) setChangeAnnouncement(''); }, [ai.busy, !ai.messages.length]);
-  useEffect(() => {
-    const last = ai.messages[ai.messages.length - 1];
-    if (last?.role === 'assistant' && last.applied?.length) announceApplied(last.applied.map((a) => a.activityId));
-  }, [ai.messages]);
+  const announcement = useChatAnnouncement(ai.busy, () => {
+    const reply = ai.messages[ai.messages.length - 1];
+    if (reply?.role !== 'assistant') return 'Respuesta lista.';
+    return reply.outcome === 'cancelled' ? 'Respuesta detenida.' : reply.outcome === 'failed' ? 'La respuesta no se completó.' : 'Respuesta lista.';
+  });
   useEffect(() => {
     if (open) input.current?.focus();
   }, [open]);
+  // Un modal o la papelera ocultan el panel; el turno sigue (las herramientas revalidan permisos y conflictos al aplicar).
   const blocked =
     state.isSettingsModalOpen ||
     state.isAIInvoiceModalOpen ||
@@ -82,170 +55,127 @@ function AssistantPanel({
     state.isNewProjectModalOpen ||
     !!state.activeConflict ||
     state.isTrashActive;
-  useEffect(() => {
-    if (blocked) ai.cancel();
-  }, [blocked]);
   if (blocked) return null;
+  const openSettings = () => state.openSettingsModal('ai');
+  const actions = {
+    confirmPending: (actionId: string) => { session.confirmPending(actionId); },
+    rejectPending: (actionId: string) => session.rejectPending(actionId),
+    undo: (activityId: string) => { session.undoActivity(activityId); },
+    continueTurn: () => void session.continueTurn(),
+  };
+  const lastAssistant = [...ai.messages].reverse().find((m): m is SessionAssistantMessage => m.role === 'assistant');
   return (
     // data-pdf-chrome: en la vista del documento el chat nunca se imprime ni se exporta.
     <div className={`assistant-widget${belowToolbar ? ' assistant-widget-below-toolbar' : ''}`} data-pdf-chrome="">
       {!open ? (
-        <button
-          className="assistant-fab"
-          aria-label="Abrir asistente de IA"
-          onClick={() => setOpen(true)}
-        >
+        <button className="assistant-fab" aria-label="Abrir asistente de IA" onClick={() => session.setPanelOpen(true)}>
           <MessageCircle size={18} />
           Asistente
+          {ai.busy && <span className="sr-only"> (trabajando)</span>}
         </button>
       ) : (
         <section
-          className={`assistant-widget-panel ${expanded ? 'assistant-expanded' : ''}`}
+          className={`assistant-widget-panel ${ai.expanded ? 'assistant-expanded' : ''}`}
           aria-label="Asistente de SolarSim"
           onKeyDown={(e) => {
+            // Esc cierra el panel; no detiene el turno (el compositor detiene con Esc mientras trabaja).
             if (e.key === 'Escape') {
               e.preventDefault();
               e.stopPropagation();
-              ai.cancel();
-              setOpen(false);
+              session.setPanelOpen(false);
             }
           }}
         >
           <div className="assistant-widget-header">
             <h2>
               Asistente
-              <small>
-                {project
-                  ? `${project.client.projectId} · ${project.client.name}`
-                  : 'Propuestas e inventario'}
-              </small>
+              <small>{project ? `${project.client.projectId} · ${project.client.name}` : 'Propuestas e inventario'}</small>
             </h2>
-            <button
-              className="assistant-icon"
-              title="Configurar IA"
-              aria-label="Configurar IA"
-              onClick={() => {
-                ai.cancel();
-                state.openSettingsModal('ai');
-              }}
-            >
+            <button className="assistant-icon" title="Configurar IA" aria-label="Configurar IA" onClick={openSettings}>
               <Settings size={16} />
             </button>
-            <button
-              className="assistant-icon"
-              title="Nueva conversación"
-              aria-label="Nueva conversación"
-              disabled={ai.busy}
-              onClick={ai.reset}
-            >
+            <button className="assistant-icon" title="Nueva conversación" aria-label="Nueva conversación" disabled={ai.busy} onClick={session.reset}>
               <RotateCcw size={16} />
             </button>
-            <button
-              className="assistant-icon"
-              title={expanded ? 'Comprimir chat' : 'Ampliar chat'}
-              aria-label={expanded ? 'Comprimir chat' : 'Ampliar chat'}
-              onClick={() => setExpanded(!expanded)}
-            >
-              {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            <button className="assistant-icon" title={ai.expanded ? 'Comprimir chat' : 'Ampliar chat'} aria-label={ai.expanded ? 'Comprimir chat' : 'Ampliar chat'} onClick={() => session.setExpanded(!ai.expanded)}>
+              {ai.expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
-            <button
-              className="assistant-icon"
-              title="Cerrar asistente"
-              aria-label="Cerrar asistente"
-              onClick={() => {
-                ai.cancel();
-                setOpen(false);
-              }}
-            >
+            <button className="assistant-icon" title="Cerrar asistente (no detiene el trabajo en curso)" aria-label="Cerrar asistente" onClick={() => session.setPanelOpen(false)}>
               <X size={18} />
             </button>
           </div>
           <div className="chat-log-wrap">
-          <div
-            className="assistant-widget-log"
-            ref={log}
-            onScroll={scroll.onScroll}
-            role="log"
-            aria-live="off"
-            tabIndex={0}
-            aria-label="Conversación con SolarSim"
-          >
-            {!ai.messages.length && (
-              <ChatSuggestions
-                title={project ? 'Pregunta sobre esta simulación' : '¿En qué te ayudo?'}
-                description={project ? 'Puedo explicar resultados o preparar cambios que revisas antes de aplicar.' : 'Consulta tus propuestas o busca equipos del inventario.'}
-                items={project ? PROJECT_SUGGESTIONS : GLOBAL_SUGGESTIONS}
-                onPick={(text) => {
-                  ai.setPrompt(text);
-                  requestAnimationFrame(() => input.current?.focus());
-                }}
-              />
-            )}
-            {ai.messages.map((m, i) => (
-              <ChatMessage key={i} role={m.role} text={m.text}
-                onCopy={m.role === 'assistant' ? () => navigator.clipboard.writeText(m.text) : undefined}
-                onRetry={i === lastAssistantIndex && !ai.busy && !threadError ? retry : undefined}
-                onReuse={m.role === 'user' && !ai.busy ? () => { ai.setPrompt(reusableUserText(m.text)); requestAnimationFrame(() => input.current?.focus()); } : undefined}>
-                {m.cards?.map((card) => (
-                  <AssistantResultCard
-                    key={`${card.kind}:${card.id}`}
-                    card={card}
-                  />
-                ))}
-                {m.lists?.map((list, index) => (
-                  <AssistantResultList key={`list-${index}`} list={list} />
-                ))}
-                {m.actions?.map((action) => (
-                  <AssistantActionCard
-                    key={action.id}
-                    action={action}
-                    disabled={ai.busy}
-                    onApplied={(text, activityId) => { ai.append(text); if (activityId) { setChangeAnnouncement(''); requestAnimationFrame(() => announceApplied([activityId])); } }}
-                  />
-                ))}
-                {m.agentCards?.map((card) => (
-                  <AgentCardView key={`${card.type}:${card.id}`} card={card} />
-                ))}
-                {m.applied?.map((a) => (
-                  <AssistantAppliedCard key={a.activityId} activityId={a.activityId} title={a.title} />
-                ))}
-              </ChatMessage>
-            ))}
-            {threadError && !ai.busy && (
-              <ChatMessage role="assistant" variant="error" text={threadError} onRetry={retry}
-                onOpenSettings={() => { ai.cancel(); state.openSettingsModal('ai'); }} />
-            )}
-            {ai.busy && (
-              <ChatThinking label="Consultando la aplicación…" steps={ai.steps} elapsed={elapsed} />
-            )}
+            <div className="assistant-widget-log" ref={log} onScroll={scroll.onScroll} role="log" aria-live="off" tabIndex={0} aria-label="Conversación con SolarSim">
+              {!ai.messages.length && (
+                <ChatSuggestions
+                  title={project ? 'Pregunta o pide un cambio' : '¿En qué te ayudo?'}
+                  description={project ? 'Aplico los cambios en la propuesta al momento, con deshacer.' : 'Crea una propuesta, consulta las tuyas o busca equipos del inventario.'}
+                  items={project ? PROJECT_SUGGESTIONS : GLOBAL_SUGGESTIONS}
+                  onPick={(text) => {
+                    session.setDraft(text);
+                    requestAnimationFrame(() => input.current?.focus());
+                  }}
+                />
+              )}
+              {ai.messages.map((m) => {
+                if (m.role === 'user')
+                  return (
+                    <ChatMessage key={m.id} role="user" text={m.text} files={m.files}
+                      onReuse={!ai.busy ? () => { session.setDraft(m.text); requestAnimationFrame(() => input.current?.focus()); } : undefined} />
+                  );
+                const running = ai.busy && m.id === lastAssistant?.id && !m.outcome;
+                if (m.error && !m.turn.text)
+                  return (
+                    <ChatMessage key={m.id} role="assistant" variant="error" text={m.error.message}
+                      onRetry={m.retryText && !ai.busy ? () => void session.send(m.retryText) : undefined}
+                      onOpenSettings={openSettings}>
+                      <AssistantTurnDetails message={m} busy={ai.busy} actions={actions} />
+                    </ChatMessage>
+                  );
+                const text = joinText(m.turn.text, m.liveText);
+                return (
+                  <React.Fragment key={m.id}>
+                    {(text || !running) && (
+                      <ChatMessage role="assistant" text={text || m.notice || ''}
+                        onCopy={!running && text ? () => navigator.clipboard.writeText(text) : undefined}
+                        onRetry={m.retryText && !ai.busy ? () => void session.send(m.retryText) : undefined}>
+                        {text && m.notice && <p className="assistant-turn-notice">{m.notice}</p>}
+                        {!running && <AssistantTurnDetails message={m} busy={ai.busy} actions={actions} />}
+                      </ChatMessage>
+                    )}
+                    {running && (
+                      <ChatThinking label={m.turn.toolOrder.length ? 'Trabajando…' : 'Pensando…'} steps={turnSteps(m)} detail={m.thinking} elapsed={elapsed} />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+            <ScrollToLatest visible={scroll.away} onClick={() => scroll.scrollToBottom()} />
           </div>
-          <ScrollToLatest visible={scroll.away} onClick={() => scroll.scrollToBottom()} />
-          </div>
-          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{changeAnnouncement}</p>
-          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{threadError && !ai.busy ? 'La respuesta no se completó.' : announcement}</p>
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</p>
           <ChatComposer
             id="app-assistant-input"
             label="Mensaje al asistente"
             inputRef={input}
-            value={ai.prompt}
-            onChange={ai.setPrompt}
-            onSubmit={() => void ai.send()}
-            onCancel={ai.cancel}
-            onPickFiles={(files) => void ai.addFiles(files)}
+            value={ai.draft}
+            onChange={session.setDraft}
+            onSubmit={() => void session.send()}
+            onCancel={session.cancel}
+            onPickFiles={(files) => void session.addFiles(files)}
             busy={ai.busy}
-            canSend={!!ai.prompt.trim() && !!state.geminiApiKey && !ai.loadingFiles}
+            canSend={!!ai.draft.trim() && !!state.geminiApiKey && ai.loadingFiles === 0}
             disabledReason={!state.geminiApiKey ? 'Configura Gemini para conversar.' : ai.loadingFiles ? 'Leyendo archivos adjuntos…' : 'Escribe un mensaje.'}
-            placeholder="Pregunta o pide un cambio…"
+            placeholder={project ? 'Pide un cambio o pregunta…' : 'Pide una propuesta o pregunta…'}
             accept="application/pdf,image/png,image/jpeg,image/webp"
-            attachments={ai.files.map((f) => ({ key: f.id, name: f.name, onRemove: () => ai.removeFile(f.id) }))}
+            attachments={ai.files.map((f) => ({ key: f.id, name: f.name, onRemove: () => session.removeFile(f.id) }))}
             notices={
               <>
-                {ai.error && !threadError && <p role="alert" className="chat-notice" data-tone="error">{ai.error}</p>}
-                {ai.loadingFiles && <p role="status" className="chat-notice">Leyendo archivos adjuntos…</p>}
+                {ai.composerError && <p role="alert" className="chat-notice" data-tone="error">{ai.composerError}</p>}
+                {ai.loadingFiles > 0 && <p role="status" className="chat-notice">Leyendo archivos adjuntos…</p>}
                 {!state.geminiApiKey && (
                   <div className="chat-notice">
                     Configura Gemini para conversar.
-                    <button type="button" onClick={() => { ai.cancel(); state.openSettingsModal('ai'); }}>
+                    <button type="button" onClick={openSettings}>
                       <Settings size={14} aria-hidden />Abrir ajustes de IA
                     </button>
                   </div>
@@ -254,11 +184,10 @@ function AssistantPanel({
             }
             footer={
               <details className="proposal-note-details">
-                <summary>Contexto y privacidad</summary>Solo se consulta el
-                espacio actual. Texto, archivos adjuntos y resultados de las
-                herramientas se envían a Google Gemini. Los borradores se aplican
-                con opción de deshacer; catálogo, precios y estados piden confirmación
-                (Ajustes → Agentes e IA).
+                <summary>Contexto y privacidad</summary>Solo se consulta el espacio actual. Texto, archivos adjuntos y
+                resultados de las herramientas se envían a Google Gemini. Los cambios dentro de una propuesta se aplican al
+                momento y se pueden deshacer; catálogo, estados, papelera y lo compartido piden confirmación (Ajustes →
+                Agentes e IA).
               </details>
             }
           />
@@ -267,19 +196,21 @@ function AssistantPanel({
     </div>
   );
 }
-export function AppAssistant({
-  transport,
-}: { transport?: GeminiTransport } = {}) {
+
+export function AppAssistant({ llmClientFactory }: { llmClientFactory?: (apiKey: string) => LlmClient | Promise<LlmClient> } = {}) {
   const state = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, activeProjectId: s.activeProjectId, appAssistantEnabled: s.appAssistantEnabled })));
+  // Solo fixtures de QA pasan un modelo falso; la app usa el adaptador de Gemini.
+  useEffect(() => {
+    if (llmClientFactory) assistantSession().configure({ createClient: llmClientFactory });
+  }, [llmClientFactory]);
   const projectId = assistantProjectId(state.activeView, state.activeProjectId);
-  if (!state.appAssistantEnabled || !assistantVisibleIn(state.activeView))
-    return null;
+  if (!state.appAssistantEnabled || !assistantVisibleIn(state.activeView)) return null;
   return (
     <AssistantPanel
+      // La clave aún cambia con la propuesta (F5b la deja solo por espacio/sesión): remontar ya no pierde nada.
       key={assistantPanelKey(assistantOwner(), projectId)}
       projectId={projectId}
       belowToolbar={state.activeView === 'pdf-preview'}
-      transport={transport}
     />
   );
 }
