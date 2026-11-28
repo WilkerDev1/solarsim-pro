@@ -122,14 +122,18 @@ Salida: 0 todas las aserciones se cumplen; 1 alguna no; 2 argumento inválido o 
 
 ## 9. Recuento de propuestas que pasarían a «Incompleta»
 
-Decisión abierta del [ADR 0009](adr/0009-fabrica-unica-dimensionado-y-propuesta-incompleta.md): antes de publicar hay que saber cuántas propuestas guardadas pasan a «Incompleta» con las reglas de F2b y por qué. `scripts/qa/countIncompleteProposals.ts` es de **solo lectura** (no escribe, no abre la app, no usa la red). Archivo de entrada: el respaldo de Ajustes → «Respaldo & Exportación» → «Descargar Respaldo JSON» o el estado guardado local (clave `solarsim-pro-storage`; trae también los ajustes).
+Decisión abierta del [ADR 0009](adr/0009-fabrica-unica-dimensionado-y-propuesta-incompleta.md): antes de publicar hay que saber cuántas propuestas guardadas pasan a «Incompleta» con las reglas de F2b y por qué. `scripts/qa/countIncompleteProposals.ts` es de **solo lectura** (no escribe, no abre la app, no usa la red). Archivo de entrada, preferido: el **estado guardado completo** de la app INSTALADA (el almacenamiento local va por origen y la ventana de desarrollo, `localhost:3000`, no es el de la instalación real). En la app instalada: Ver → «Alternar Herramientas de Desarrollador» (Ctrl+Shift+I) → Consola → `copy(localStorage.getItem('solarsim-pro-storage'))` y pegarlo en un archivo `.json`. Trae el espacio activo, los espacios archivados (local y organizaciones) y los ajustes de cada uno.
+
+**Cuidado con ese archivo:** contiene la clave de Gemini (`geminiApiKey`) y el token de sesión (`syncSettings.authToken`). No lo compartas, no lo subas a ningún sitio y bórralo al terminar.
+
+Alternativa más pobre: el respaldo de Ajustes → «Respaldo & Exportación» → «Descargar Respaldo JSON». Solo exporta el espacio ACTIVO (no las propuestas de los otros espacios ni de la organización si no es la activa) y no lleva los ajustes; haría falta uno por espacio.
 
 ```bash
 npx tsx scripts/qa/countIncompleteProposals.ts respaldo.json --margin 28
-npx tsx scripts/qa/countIncompleteProposals.ts equipo-a.json equipo-b.json --detail
+npx tsx scripts/qa/countIncompleteProposals.ts estado-a.json estado-b.json --detail   # una instalación por archivo
 ```
 
-Cuenta incompletas por motivo, desglosa el precio de equipo (un 0 heredado sin procedencia frente a un equipo sin precio, y cuántos ceros se guardaron antes del 2026-11-21), las que se arreglarían relajando solo la regla del 0 heredado, el inversor con cantidad 0, la decisión comercial y cuántas instalaciones conservan el margen de 28 % (un archivo por instalación; el respaldo de proyectos no lleva los ajustes: lee el valor en Ajustes → Costos y margen y pásalo con `--margin`). El informe agregado no imprime nombres de clientes; `--detail` lista el código de cada propuesta incompleta.
+Cuenta incompletas por motivo, desglosa el precio de equipo (un 0 heredado sin procedencia frente a un equipo sin precio, y cuántos ceros tienen un último guardado anterior al 2026-11-21: esa fecha es la del ÚLTIMO guardado, no la de cuando se tecleó el 0, así que es una cota inferior del 0 heredado), las que se arreglarían relajando solo la regla del 0 heredado, el inversor con cantidad 0, la decisión comercial y cuántos espacios de trabajo (el activo y los archivados del estado guardado) conservan el margen de 28 % (el respaldo de proyectos no lleva los ajustes: lee el valor en Ajustes → Costos y margen y pásalo con `--margin`). El informe agregado no imprime nombres de clientes; `--detail` lista el código de cada propuesta incompleta.
 
 ## 10. Electron: qué mirar
 

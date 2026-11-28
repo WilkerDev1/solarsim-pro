@@ -102,6 +102,24 @@ const margins = countIncompleteProposals([
 assert.deepEqual(margins.margin, { installations: 5, saved28: 2, saved40: 1, other: 1, unknown: 1 }, 'un respaldo sin ajustes es «sin dato» salvo que se pase el margen leído en Ajustes');
 assert.equal(margins.files, 5);
 
+// El estado guardado archiva los otros espacios de trabajo (local u organización) en `organizationWorkspaces`: también cuentan, con su margen.
+const archived = {
+  state: {
+    projects: [complete], defaultSimulationSettings: { ...DEFAULT_SIMULATION_SETTINGS, defaultTargetMarginPct: 40 },
+    organizationWorkspaces: {
+      'https://x.invalid::org-1': { projects: [zeroInherited, zeroInheritedNew, complete], defaultSimulationSettings: { ...DEFAULT_SIMULATION_SETTINGS, defaultTargetMarginPct: 28 } },
+      'https://x.invalid::org-2': { projects: [noConsumption] },
+    },
+  },
+  version: 0,
+};
+const withArchive = countIncompleteProposals([{ name: 'estado.json', json: archived }]);
+assert.equal(withArchive.evaluated, 4, 'activo (1) + organización (3 sin repetir la completa que ya estaba) + otro espacio (1) = 1 + 2 + 1');
+assert.equal(withArchive.incomplete, 3, 'las incompletas del espacio archivado cuentan');
+assert.deepEqual(withArchive.margin, { installations: 3, saved28: 1, saved40: 1, other: 0, unknown: 1 }, 'el margen se mira por espacio de trabajo, no solo en el activo');
+assert.equal(readExportedProjects(archived).workspaces.length, 3);
+assert.ok(formatIncompleteCount(withArchive).includes('espacios de trabajo'), 'el informe habla de espacios de trabajo');
+
 // Varias instalaciones suman; un archivo ilegible se cuenta aparte y no tumba el resto.
 const many = countIncompleteProposals([{ name: 'a.json', json: persisted([complete, zeroInherited], 28) }, { name: 'b.json', json: persisted([zeroInheritedNew], 40) }, { name: 'rota.json', json: { hola: 1 } }]);
 assert.equal(many.evaluated, 3);

@@ -65,6 +65,14 @@ function validValue(def: ProjectFieldDefinition, current: unknown): unknown {
   }
 }
 
+/** Una lista distinta de la actual: su primera fila con la cantidad (o el valor) un punto mayor. */
+function changedCollection(path: string, current: unknown): unknown {
+  const rows = structuredClone(current) as Array<Record<string, unknown>>;
+  const key = path === 'financials.customItems' ? 'quantity' : path === 'financials.customDiscounts' ? 'value' : 'count';
+  rows[0] = { ...rows[0], [key]: Number(rows[0][key] ?? 0) + 1 };
+  return rows;
+}
+
 /**
  * Rutas que `edit_proposal` NO escribe, cada una con su motivo (y la prueba exige que la herramienta la rechace con él). El
  * precio directo $/W y el modo manual son del dock: el asistente cotiza siempre en modo Simple con la matriz de costos.
@@ -74,7 +82,7 @@ const DECLARED_EXCLUSIONS: Readonly<Record<string, { reason: string; message: Re
   [...DIRECT_PRICING_PATHS].map((path) => [path, { reason: 'Precio directo $/W y modo manual: son del dock (las propuestas del asistente cotizan con la matriz de costos, AUTOMATED_PRICING).', message: DIRECT_PRICING_REASON }]),
 );
 
-type Outcome = 'written' | 'confirmed' | 'unchanged' | 'excluded';
+type Outcome = 'written' | 'confirmed' | 'excluded';
 const outcomes = new Map<string, Outcome>();
 const failures: string[] = [];
 let seq = 0;
@@ -89,7 +97,9 @@ for (const def of PROJECT_FIELDS) {
   if (!required.ok) { failures.push(`${def.path}: sus dependencias no se pueden fijar (${JSON.stringify(required.errors)})`); continue; }
   const current = readProjectField(required.project, concrete);
   const isCollection = (def.type === 'list' || def.type === 'object') && !SAMPLES[def.path];
-  const value = isCollection ? current : validValue(def, current);
+  const value = isCollection ? changedCollection(def.path, current) : validValue(def, current);
+  // Toda escritura debe cambiar algo: escribir el mismo valor no detectaría que la herramienta ignora la ruta.
+  if (JSON.stringify(value) === JSON.stringify(current)) { failures.push(`${def.path}: el valor de prueba es igual al actual`); continue; }
 
   resetEvalStore({ catalog: offerCatalog(), projects: [project], view: 'simulator' });
   store.setState({ activeProjectId: project.id });
@@ -116,7 +126,6 @@ for (const def of PROJECT_FIELDS) {
     status = 'confirmed';
     result = { ...response, status: 'applied' };
   }
-  if (result.status === 'ok' && isCollection && response.warnings.some((w) => /Sin cambios/.test(w))) { outcomes.set(def.path, 'unchanged'); continue; }
   if (result.status !== 'applied') { failures.push(`${def.path}: ${response.status}${response.error ? ` (${response.error.message})` : ''}`); continue; }
   const written = readProjectField(store.getState().projects[0], concrete);
   if (JSON.stringify(written) !== JSON.stringify(value)) { failures.push(`${def.path}: se escribió ${JSON.stringify(written)} y se pedía ${JSON.stringify(value)}`); continue; }
@@ -132,4 +141,4 @@ assert.ok(count('written') + count('confirmed') >= 100, 'el registro tiene más 
 assert.equal(count('excluded'), Object.keys(DECLARED_EXCLUSIONS).length, 'cada exclusión declarada se probó (y la herramienta la rechazó con su motivo)');
 assert.ok(count('confirmed') > 0, 'al menos un costo de equipo a mano pasó por la confirmación');
 
-console.log(`PASS: edit_proposal reaches every field of the registry (${writable.length} routes: ${count('written')} written, ${count('confirmed')} confirmed, ${count('unchanged')} lists rewritten unchanged, ${count('excluded')} declared exclusions).`);
+console.log(`PASS: edit_proposal reaches every field of the registry (${writable.length} routes: ${count('written')} written, ${count('confirmed')} confirmed, ${count('excluded')} declared exclusions).`);

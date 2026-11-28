@@ -2,14 +2,16 @@
 // Lee los archivos JSON que le pases y cuenta con las reglas de producción (`proposalCompleteness`); no escribe nada, no abre el
 // almacén de la app y no usa la red. Ejecútalo tú, en tu equipo, con tus datos: el informe agregado no imprime nombres de clientes.
 //
-// Cómo obtener el archivo (cualquiera de los dos):
-//   1. Respaldo de proyectos: en la app, Ajustes → «Respaldo & Exportación» → «Descargar Respaldo JSON» (SolarSim_Pro_Backup_Proyectos_….json).
-//      No incluye los ajustes: para contar el margen guardado, léelo en Ajustes → «Costos y margen» («Margen bruto objetivo») y pásalo
-//      con --margin.
-//   2. Estado guardado local (incluye los ajustes): con la app en modo de desarrollo (`npm run electron:dev`), en la consola del
-//      desarrollador (Application → Local Storage → la clave `solarsim-pro-storage`), o desde la consola con
-//      `copy(localStorage.getItem('solarsim-pro-storage'))`, y pegarlo en un archivo .json.
-//      Con una sesión de la organización, el respaldo (1) trae lo que hay en este equipo (lo sincronizado y lo local).
+// Cómo obtener el archivo (preferido: el estado guardado COMPLETO de la app INSTALADA):
+//   El almacenamiento local va por origen: la ventana de desarrollo (`electron:dev`, localhost:3000) no es el de la instalación real.
+//   En la app instalada: Ver → «Alternar Herramientas de Desarrollador» (Ctrl+Shift+I) → Consola →
+//   `copy(localStorage.getItem('solarsim-pro-storage'))` y pegarlo en un archivo .json. Trae el espacio activo, los archivados
+//   (`organizationWorkspaces`: local y organizaciones) y los ajustes de cada uno.
+//   CUIDADO: ese archivo contiene la clave de Gemini (`geminiApiKey`) y el token de sesión (`syncSettings.authToken`). No lo
+//   compartas ni lo subas a ningún sitio, y bórralo al terminar.
+//   Alternativa más pobre: el respaldo de Ajustes → «Respaldo & Exportación» → «Descargar Respaldo JSON». Solo exporta el espacio
+//   ACTIVO y no lleva los ajustes (haría falta uno por espacio; el margen se pasa con --margin).
+//   Los ceros «guardados antes del 2026-11-21» usan la fecha del ÚLTIMO guardado: es una cota inferior del 0 heredado.
 //
 // Uso:
 //   npx tsx scripts/qa/countIncompleteProposals.ts respaldo.json

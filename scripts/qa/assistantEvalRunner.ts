@@ -10,6 +10,8 @@
 // estado final no cumple la aserción. La clave nunca entra en el informe: `redact` la quita de todo texto que viene del servidor.
 import { useSimulationStore } from '../../src/store/useSimulationStore';
 import { DEFAULT_GEMINI_MODEL } from '../../src/services/llm/models';
+import { DEFAULT_RD_TARIFF_MATRIX } from '../../src/data/rdTariffs';
+import { isConsumptionEstimated } from '../../src/domain/newProposal';
 import { engineResults } from '../../src/domain/proposalSnapshot';
 import { proposalCompleteness } from '../../src/domain/proposalCompleteness';
 import { PROJECT_SECTIONS, pickFields } from '../../src/features/agentTools/nativeTools';
@@ -106,7 +108,7 @@ export const EVAL_CASES: EvalCase[] = [
   {
     id: 'distribuidora', turns: ['cambia la distribuidora a EDENORTE'], setup: 'proposal',
     assertion: 'La distribuidora de la propuesta es EDENORTE y su tarifa es una de EDENORTE (no queda la de otra distribuidora).',
-    check: onActive('La distribuidora no es EDENORTE', (p) => p.rates.distributor === 'EDENORTE' && !!p.rates.tariffCode),
+    check: onActive('La distribuidora no es EDENORTE', (p) => p.rates.distributor === 'EDENORTE' && !!p.rates.tariffCode && p.rates.tariffCode in (DEFAULT_RD_TARIFF_MATRIX.schedules.EDENORTE.tariffs as Record<string, unknown>)),
   },
   {
     id: 'margen-35', turns: ['pon el margen en 35 %'], setup: 'proposal',
@@ -116,7 +118,7 @@ export const EVAL_CASES: EvalCase[] = [
   {
     id: 'consumo-1500', turns: ['el cliente consume 1.500 kWh al mes'], setup: 'proposal',
     assertion: 'Los doce meses de consumo son 1.500 kWh y el consumo deja de estar marcado como estimado.',
-    check: onActive('El consumo no es 1.500 kWh en los doce meses', (p) => p.monthlyConsumption.length === 12 && p.monthlyConsumption.every((v) => v === 1500)),
+    check: onActive('El consumo no es 1.500 kWh en los doce meses', (p) => p.monthlyConsumption.length === 12 && p.monthlyConsumption.every((v) => v === 1500) && !isConsumptionEstimated(p)),
   },
   {
     id: 'paneles-20', turns: ['ponle 20 paneles'], setup: 'proposal',
@@ -335,7 +337,9 @@ export function formatReport(report: EvalReport): string {
     const results = report.results.filter((r) => r.model === model);
     out.push('', `Modelo: ${model}`, ...results.map(formatResult));
     const count = (status: EvalCaseResult['status']) => results.filter((r) => r.status === status).length;
-    out.push('', `  Resumen ${model}: ${count('pass')}/${results.length} aprobadas, ${count('fail')} fallidas, ${count('error')} sin evaluar.`);
+    // Una petición que contestó el modelo de respaldo no habla del modelo pedido: se cuenta aparte.
+    const viaFallback = results.filter((r) => r.status === 'pass' && r.fallback).length;
+    out.push('', `  Resumen ${model}: ${count('pass') - viaFallback}/${results.length} aprobadas${viaFallback ? ` (y ${viaFallback} aprobadas con el modelo de respaldo, que no cuentan para ${model})` : ''}, ${count('fail')} fallidas, ${count('error')} sin evaluar.`);
   }
   return out.join('\n');
 }

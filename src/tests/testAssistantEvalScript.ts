@@ -117,6 +117,18 @@ for (const wanted of ['crea una propuesta', 'ponle baterías', 'sube la cobertur
   assert.ok(done.results.find((r) => r.caseId === 'deshaz-eso')!.failure!.length > 10);
 }
 
+// ── Si contesta el modelo de respaldo, el resumen no lo cuenta como del modelo pedido ──────────────────────────────────────────────
+{
+  const scripts = { ...GOOD, 'cobertura-90': [{ error: new LlmError('server', { status: 503 }) } as ScriptedStep, ...GOOD['cobertura-90']] };
+  const done = await run(scripts).report;
+  const result = done.results.find((r) => r.caseId === 'cobertura-90')!;
+  assert.equal(result.status, 'pass', 'el estado final se cumple');
+  assert.ok(result.fallback, 'y queda anotado que contestó el respaldo');
+  const text = formatReport(done);
+  assert.ok(/respaldo/i.test(text.split('Resumen')[1] ?? ''), 'el resumen separa las aprobadas con el modelo de respaldo');
+  assert.ok(new RegExp(`${EVAL_CASES.length - 1}/${EVAL_CASES.length} aprobadas`).test(text), 'solo cuentan como del modelo pedido las que contestó él');
+}
+
 // ── Un fallo de la API es «error», no «falla»; la clave no sale en ninguna parte ──────────────────────────────────────────────────
 {
   const secret = 'AIzaSy-CLAVE-QUE-NO-DEBE-SALIR-123456';

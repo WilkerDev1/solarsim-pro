@@ -1,5 +1,5 @@
 // Recuento de SOLO LECTURA (F7a): cuántas propuestas guardadas pasarían a «Incompleta» con las reglas de F2b y por qué motivo, más
-// cuántas instalaciones conservan guardado el margen de fábrica anterior (28 %). Es la medición que el ADR 0009 deja al dueño
+// cuántos espacios de trabajo conservan guardado el margen de fábrica anterior (28 %). Es la medición que el ADR 0009 deja al dueño
 // («No está medido cuántas son»): sirve para decidir si alguna regla se relaja (el 0 heredado, el inversor con cantidad 0) y para
 // las notas de la 2.11.0.
 //
@@ -24,11 +24,20 @@ export const MANUAL_PRICE_SOURCE_SINCE = '2026-11-21';
 const LEGACY_EXAMPLE_IDS = new Set(['benchmark-centro-medico', 'proj-logistics-hub', 'proj-residential-42']);
 
 export type ExportFormat = 'persisted_state' | 'state' | 'projects_backup' | 'single_project' | 'array' | 'unknown';
+export interface ExportedWorkspace {
+  /** `activo` o la clave del espacio archivado (servidor::organización; sin datos personales). */
+  scope: string;
+  projects: ProjectSimulation[];
+  /** Ajustes guardados de ese espacio (solo el estado guardado local los lleva; un respaldo de proyectos no). */
+  settings?: { defaultTargetMarginPct?: number };
+}
 export interface ExportedProjects {
   format: ExportFormat;
+  /** Propuestas y ajustes del espacio ACTIVO. */
   projects: ProjectSimulation[];
-  /** Ajustes guardados (solo el estado guardado local los lleva; un respaldo de proyectos no). */
   settings?: { defaultTargetMarginPct?: number };
+  /** El activo y, en el estado guardado, los espacios archivados (`organizationWorkspaces`: local u organización). */
+  workspaces: ExportedWorkspace[];
 }
 export interface ExportedFile {
   name: string;
@@ -54,14 +63,25 @@ const settingsOf = (value: unknown): ExportedProjects['settings'] => {
  */
 export function readExportedProjects(json: unknown): ExportedProjects {
   const keep = (list: unknown[]) => list.filter(isProject);
-  if (Array.isArray(json)) return { format: 'array', projects: keep(json) };
-  if (!isRecord(json)) return { format: 'unknown', projects: [] };
-  if (isRecord(json.state) && Array.isArray(json.state.projects)) return { format: 'persisted_state', projects: keep(json.state.projects), settings: settingsOf(json.state) };
-  if (json.type === 'projects_backup' && Array.isArray(json.projects)) return { format: 'projects_backup', projects: keep(json.projects) };
-  if (isRecord(json.project) && isProject(json.project)) return { format: 'single_project', projects: [json.project] };
-  if (Array.isArray(json.projects)) return { format: 'state', projects: keep(json.projects), settings: settingsOf(json) };
-  if (isProject(json)) return { format: 'single_project', projects: [json] };
-  return { format: 'unknown', projects: [] };
+  const one = (format: ExportFormat, projects: ProjectSimulation[], settings?: ExportedProjects['settings']): ExportedProjects =>
+    ({ format, projects, ...(settings ? { settings } : {}), workspaces: projects.length || format !== 'unknown' ? [{ scope: 'activo', projects, ...(settings ? { settings } : {}) }] : [] });
+  if (Array.isArray(json)) return one('array', keep(json));
+  if (!isRecord(json)) return one('unknown', []);
+  if (isRecord(json.state) && Array.isArray(json.state.projects)) {
+    const active = one('persisted_state', keep(json.state.projects), settingsOf(json.state));
+    // Los otros espacios de trabajo (local u organización) se archivan en `organizationWorkspaces` con sus propuestas y ajustes.
+    const archive = isRecord(json.state.organizationWorkspaces) ? json.state.organizationWorkspaces : {};
+    for (const [scope, space] of Object.entries(archive)) {
+      if (!isRecord(space) || !Array.isArray(space.projects)) continue;
+      active.workspaces.push({ scope, projects: keep(space.projects), ...(settingsOf(space) ? { settings: settingsOf(space) } : {}) });
+    }
+    return active;
+  }
+  if (json.type === 'projects_backup' && Array.isArray(json.projects)) return one('projects_backup', keep(json.projects));
+  if (isRecord(json.project) && isProject(json.project)) return one('single_project', [json.project]);
+  if (Array.isArray(json.projects)) return one('state', keep(json.projects), settingsOf(json));
+  if (isProject(json)) return one('single_project', [json]);
+  return one('unknown', []);
 }
 
 export interface IncompleteDetail { file: string; code: string; reasons: IncompleteReasonCode[]; decision: string }
@@ -93,7 +113,7 @@ export interface IncompleteCountReport {
   inverterCountZero: number;
   /** Decisión comercial de las incompletas. */
   byDecision: { pending: number; approved: number; rejected: number };
-  /** Instalaciones (archivos legibles) según el margen bruto objetivo que guardan. */
+  /** Espacios de trabajo (el activo de cada archivo y los archivados en `organizationWorkspaces`) según el margen bruto objetivo que guardan. */
   margin: { installations: number; saved28: number; saved40: number; other: number; unknown: number };
   details: IncompleteDetail[];
 }
@@ -111,45 +131,51 @@ export function countIncompleteProposals(files: readonly ExportedFile[], options
   for (const file of files) {
     const exported = readExportedProjects(file.json);
     if (exported.format === 'unknown') { report.unreadable.push(file.name); continue; }
-    const saved = exported.settings?.defaultTargetMarginPct ?? file.margin;
-    report.margin.installations++;
-    if (saved === undefined) report.margin.unknown++;
-    else if (saved === PREVIOUS_DEFAULT_TARGET_MARGIN_PCT) report.margin.saved28++;
-    else if (saved === DEFAULT_TARGET_MARGIN_PCT) report.margin.saved40++;
-    else report.margin.other++;
+    const seen = new Set<string>();
+    for (const [index, space] of exported.workspaces.entries()) {
+      // El margen se mira por espacio de trabajo: el activo puede llevar uno y el de una organización otro.
+      const saved = space.settings?.defaultTargetMarginPct ?? (index === 0 ? file.margin : undefined);
+      report.margin.installations++;
+      if (saved === undefined) report.margin.unknown++;
+      else if (saved === PREVIOUS_DEFAULT_TARGET_MARGIN_PCT) report.margin.saved28++;
+      else if (saved === DEFAULT_TARGET_MARGIN_PCT) report.margin.saved40++;
+      else report.margin.other++;
 
-    for (const stored of exported.projects) {
-      if (stored.isDeleted || stored.deletedAt) { report.skipped.trashed++; continue; }
-      if (LEGACY_EXAMPLE_IDS.has(stored.id)) { report.skipped.legacyExample++; continue; }
-      // Como la hidratación: los equipos heredados pasan a grupos antes de mirar nada.
-      const project: ProjectSimulation = { ...stored, specs: migrateLegacySpecs(stored.specs) };
-      report.evaluated++;
-      const { incomplete, reasons } = proposalCompleteness(project);
-      if (!incomplete) { report.complete++; continue; }
-      report.incomplete++;
-      const codes = [...new Set(reasons.map((r) => r.code))];
-      for (const code of codes) report.byReason[code]++;
-      const status = commercialState(project).status;
-      if (status === 'approved') report.byDecision.approved++;
-      else if (status === 'rejected') report.byDecision.rejected++;
-      else report.byDecision.pending++;
+      for (const stored of space.projects) {
+        if (seen.has(stored.id)) continue; // la misma propuesta archivada en dos espacios no se cuenta dos veces
+        seen.add(stored.id);
+        if (stored.isDeleted || stored.deletedAt) { report.skipped.trashed++; continue; }
+        if (LEGACY_EXAMPLE_IDS.has(stored.id)) { report.skipped.legacyExample++; continue; }
+        // Como la hidratación: los equipos heredados pasan a grupos antes de mirar nada.
+        const project: ProjectSimulation = { ...stored, specs: migrateLegacySpecs(stored.specs) };
+        report.evaluated++;
+        const { incomplete, reasons } = proposalCompleteness(project);
+        if (!incomplete) { report.complete++; continue; }
+        report.incomplete++;
+        const codes = [...new Set(reasons.map((r) => r.code))];
+        for (const code of codes) report.byReason[code]++;
+        const status = commercialState(project).status;
+        if (status === 'approved') report.byDecision.approved++;
+        else if (status === 'rejected') report.byDecision.rejected++;
+        else report.byDecision.pending++;
 
-      const price = reasons.find((r) => r.code === 'missing_equipment_price');
-      if (price) {
-        const zero = /está en 0 sin confirmar/.test(price.message);
-        const missing = /Falta el precio de/.test(price.message);
-        if (zero) {
-          report.priceDetail.zeroWithoutOrigin++;
-          const saved = typeof project.updatedAt === 'string' && project.updatedAt ? project.updatedAt.slice(0, 10) : '';
-          if (!saved) report.priceDetail.zeroNoDate++;
-          else if (saved < MANUAL_PRICE_SOURCE_SINCE) report.priceDetail.zeroSavedBefore++;
-          else report.priceDetail.zeroSavedOnOrAfter++;
+        const price = reasons.find((r) => r.code === 'missing_equipment_price');
+        if (price) {
+          const zero = /está en 0 sin confirmar/.test(price.message);
+          const missing = /Falta el precio de/.test(price.message);
+          if (zero) {
+            report.priceDetail.zeroWithoutOrigin++;
+            const saved = typeof project.updatedAt === 'string' && project.updatedAt ? project.updatedAt.slice(0, 10) : '';
+            if (!saved) report.priceDetail.zeroNoDate++;
+            else if (saved < MANUAL_PRICE_SOURCE_SINCE) report.priceDetail.zeroSavedBefore++;
+            else report.priceDetail.zeroSavedOnOrAfter++;
+          }
+          if (missing) report.priceDetail.missing++;
+          if (zero && !missing && codes.length === 1) report.onlyZeroWithoutOrigin++;
         }
-        if (missing) report.priceDetail.missing++;
-        if (zero && !missing && codes.length === 1) report.onlyZeroWithoutOrigin++;
+        if (codes.includes('missing_inverter') && readEquipment(project.specs).inverters.some((g) => (g.powerKW ?? 0) > 0 && g.count === 0)) report.inverterCountZero++;
+        if (options.detail) report.details.push({ file: file.name, code: project.client.projectId || project.id, reasons: codes, decision: status });
       }
-      if (codes.includes('missing_inverter') && readEquipment(project.specs).inverters.some((g) => (g.powerKW ?? 0) > 0 && g.count === 0)) report.inverterCountZero++;
-      if (options.detail) report.details.push({ file: file.name, code: project.client.projectId || project.id, reasons: codes, decision: status });
     }
   }
   return report;
@@ -174,13 +200,14 @@ export function formatIncompleteCount(report: IncompleteCountReport, options: { 
     `  Precio de la energía: ${r.byReason.missing_energy_price}`,
     `  Precio de equipo: ${r.byReason.missing_equipment_price}`,
     `    con un equipo en 0 sin procedencia (heredado): ${r.priceDetail.zeroWithoutOrigin}`
-      + ` — guardadas antes del ${MANUAL_PRICE_SOURCE_SINCE}: ${r.priceDetail.zeroSavedBefore}, desde esa fecha: ${r.priceDetail.zeroSavedOnOrAfter}, sin fecha: ${r.priceDetail.zeroNoDate}`,
+      + ` — con último guardado antes del ${MANUAL_PRICE_SOURCE_SINCE}: ${r.priceDetail.zeroSavedBefore}, desde esa fecha: ${r.priceDetail.zeroSavedOnOrAfter}, sin fecha: ${r.priceDetail.zeroNoDate}`,
+    '      (la fecha es la del último guardado: cota inferior del 0 heredado, no la de cuando se tecleó)',
     `    con un equipo sin precio: ${r.priceDetail.missing}`,
     `  Incompletas solo por un cero heredado (las que arreglaría relajar esa regla): ${r.onlyZeroWithoutOrigin}`,
     '',
     `Decisión comercial de las incompletas: ${r.byDecision.pending} pendientes, ${r.byDecision.approved} aprobadas, ${r.byDecision.rejected} rechazadas.`,
     '',
-    `Margen bruto objetivo guardado (${r.margin.installations} ${r.margin.installations === 1 ? 'instalación' : 'instalaciones'}): ${r.margin.saved28} con 28 % (el de fábrica anterior; las propuestas nuevas nacen con 1,28),`
+    `Margen bruto objetivo guardado (${r.margin.installations} ${r.margin.installations === 1 ? 'espacio de trabajo' : 'espacios de trabajo'}; el activo y los archivados): ${r.margin.saved28} con 28 % (el de fábrica anterior; las propuestas nuevas nacen con 1,28),`
       + ` ${r.margin.saved40} con 40 %, ${r.margin.other} con otro valor, ${r.margin.unknown} sin dato.`,
   ];
   if (r.margin.unknown) lines.push('  «Sin dato»: un respaldo de proyectos no lleva los ajustes; léelo en Ajustes → Costos y margen y pásalo con --margin <pct>, o usa el estado guardado local.');
