@@ -5,7 +5,7 @@ import { resolveAssumption, resolveAssumptions } from '../../shared/assumptions'
 import { reconcileGridUseCharge, reconcileLegacySettlement } from '../../shared/netMetering';
 import { reconcileEnergyRateSource } from '../../shared/tariffBilling';
 import { resolveSystemLossesPct } from '../../shared/projectDefaults';
-import { calculateRecommendedPanelCount } from '../engine/solarEngine';
+import { recommendPanelCount, resolveSizingBasis } from './sizing';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { editEquipmentGroup, normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../utils/equipmentGroups';
 import { normalizeEnabledBatteries } from '../utils/batteryState';
@@ -15,6 +15,7 @@ import { normalizeSupplyAlternativePatch } from '../../shared/offGridSupply';
 import { tariffMatrixKey } from '../../shared/tariffRules';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTariffs';
 import type { GlobalTariffMatrix, UtilityDistributor } from '../types/tariffs';
+import type { GenericPriceLookup } from './rules/equipmentRules';
 
 /**
  * Edición de proyecto (ADR 0004): la única regla para aplicar un cambio de specs, tarifas, cliente, consumo o
@@ -53,6 +54,11 @@ export interface ProjectEditContext {
   equipmentCatalog: readonly SolarEquipmentItem[];
   /** Matriz tarifaria activa: de ella sale la fila y el precio de referencia al cambiar de tarifa. Sin ella, la de fábrica. */
   tariffMatrix?: GlobalTariffMatrix | null;
+  /**
+   * Precio genérico efectivo de un equipo (ADR 0006), para elegir un modelo del catálogo por ruta como lo hace el dock. Sin
+   * sesión (modo local) no se pasa y no hay genérico.
+   */
+  genericPriceFor?: GenericPriceLookup;
 }
 
 const distributorKey = (value: unknown): string => (typeof value === 'string' ? value.trim().toUpperCase() : '');
@@ -101,48 +107,76 @@ const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringif
 
 /** Aplica una edición y devuelve el proyecto editado. No muta la entrada ni sella la mutación (eso es del store). */
 export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, ctx: ProjectEditContext): ProjectSimulation {
-  const catalog = ctx.equipmentCatalog;
-  let next: ProjectSimulation;
   switch (edit.kind) {
-    case 'specs':
-      next = editSpecs(project, edit.patch, catalog);
-      break;
-    case 'supplierPrice':
-      next = editSpecs(project, supplierPricePatch(project, edit, catalog), catalog);
-      break;
-    case 'rates': {
-      // Tipo de conexión: `gridConnection` e `isZeroExport` se escriben siempre juntos y coherentes; alternativa de
-      // suministro saneada; cargo por uso de la red reconciliado (SIE-007-2026).
-      const patch = withTariffChange(project, normalizeGridConnectionPatch(project.rates, normalizeSupplyAlternativePatch(edit.patch)), ctx.tariffMatrix);
-      const rates = reconcileLegacySettlement(project.rates, reconcileEnergyRateSource(project.rates, reconcileGridUseCharge(project.rates, { ...project.rates, ...patch }, patch), patch), patch);
-      next = resizeIfNeeded(project, { ...project, rates, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, edit.patch.targetCoveragePct !== undefined);
-      break;
-    }
-    case 'client': {
-      const client = { ...project.client, ...edit.patch };
-      const customization = { ...(project.customization || {}) };
-      if (edit.patch.contactPhone !== undefined) customization.clientPhone = edit.patch.contactPhone;
-      if (edit.patch.contactPerson !== undefined) customization.contactName = edit.patch.contactPerson;
-      if (edit.patch.contactEmail !== undefined) customization.clientEmail = edit.patch.contactEmail;
-      next = resizeIfNeeded(project, { ...project, client, customization, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, !!edit.patch.province);
-      break;
-    }
-    case 'consumption': {
-      const monthlyConsumption = edit.monthlyConsumption.map((value) => Math.max(0, value));
-      const reconciled = { ...reconcileWithCatalog(project.specs, project.specs, catalog) };
-      const specs = edit.lockAutoPanels ? { ...reconciled, autoCalculatePanels: false } : reconciled;
-      next = resizeIfNeeded(project, {
-        ...project,
-        monthlyConsumption,
-        aiSource: project.aiSource?.consumptionSource === 'theoretical' ? { ...project.aiSource, consumptionSource: 'estimated' } : project.aiSource,
-        specs,
-      }, true);
-      break;
-    }
-    case 'financials':
-      // Sin reconciliación ni entradas de dimensionamiento: la cantidad de paneles no se toca.
-      next = { ...project, financials: withoutStaleFinancialOverrides(project, { ...project.financials, ...edit.patch }) };
-      break;
+    case 'specs': return applyProjectEditPlan(project, { specs: edit.patch }, ctx);
+    case 'supplierPrice': return applyProjectEditPlan(project, { specs: supplierPricePatch(project, edit, ctx.equipmentCatalog) }, ctx);
+    case 'rates': return applyProjectEditPlan(project, { rates: edit.patch }, ctx);
+    case 'client': return applyProjectEditPlan(project, { client: edit.patch }, ctx);
+    case 'consumption': return applyProjectEditPlan(project, { consumption: { monthlyConsumption: edit.monthlyConsumption, lockAutoPanels: edit.lockAutoPanels } }, ctx);
+    case 'financials': return applyProjectEditPlan(project, { financials: edit.patch }, ctx);
+  }
+}
+
+/**
+ * Lote de cambios por sección que se aplica de una vez (F2a2, transacción). Cada parche es relativo a la MISMA base: la
+ * propuesta antes del lote. Una edición suelta es un plan con una sola sección (`applyProjectEdit`).
+ */
+export interface ProjectEditPlan {
+  client?: Partial<ClientInfo>;
+  rates?: Partial<UtilityRates>;
+  specs?: Partial<SystemSpecs>;
+  financials?: Partial<FinancialParams>;
+  consumption?: { monthlyConsumption: number[]; lockAutoPanels?: boolean };
+}
+
+/**
+ * Aplica un plan con las reglas de este módulo UNA vez contra la base del lote. Primero se mezclan los datos de cada
+ * sección; después corren, una sola vez y con `previous` = la base, la normalización de equipos, el proveedor soltado, la
+ * reconciliación con el catálogo y el autodimensionado (con los insumos finales: consumo, provincia, cobertura y potencia
+ * del lote). Así el resultado no depende del orden en que llegaron las ediciones (revisión de F2, B2): un pliegue de
+ * `applyProjectEdit` revertía dentro del mismo lote una potencia que el propio lote fijó, y redimensionaba con insumos
+ * intermedios. Con una sola sección es exactamente la edición suelta de siempre (lo fija `testProjectEdit`).
+ */
+export function applyProjectEditPlan(project: ProjectSimulation, plan: ProjectEditPlan, ctx: ProjectEditContext): ProjectSimulation {
+  const catalog = ctx.equipmentCatalog;
+  const touchesSpecsInputs = !!(plan.client || plan.rates || plan.specs || plan.consumption);
+  let next: ProjectSimulation = { ...project };
+
+  // 1. Datos de cada sección, todos relativos a la base.
+  if (plan.client) {
+    next.client = { ...project.client, ...plan.client };
+    const customization = { ...(project.customization || {}) };
+    if (plan.client.contactPhone !== undefined) customization.clientPhone = plan.client.contactPhone;
+    if (plan.client.contactPerson !== undefined) customization.contactName = plan.client.contactPerson;
+    if (plan.client.contactEmail !== undefined) customization.clientEmail = plan.client.contactEmail;
+    next.customization = customization;
+  }
+  if (plan.consumption) {
+    next.monthlyConsumption = plan.consumption.monthlyConsumption.map((value) => Math.max(0, value));
+    next.aiSource = project.aiSource?.consumptionSource === 'theoretical' ? { ...project.aiSource, consumptionSource: 'estimated' } : project.aiSource;
+  }
+  const specsData = plan.specs ? normalizeEnabledBatteries(normalizeEquipmentEdit(project.specs, plan.specs)) : undefined;
+  if (plan.rates) {
+    // Tipo de conexión: `gridConnection` e `isZeroExport` se escriben siempre juntos y coherentes; alternativa de
+    // suministro saneada; cargo por uso de la red reconciliado (SIE-007-2026). El precio de referencia de una tarifa nueva
+    // sale del consumo y de la tasa con que queda el lote; «cambió la tarifa» se mide contra las tarifas de la base.
+    const pricing = { ...next, specs: specsData ?? project.specs, rates: project.rates };
+    const patch = withTariffChange(pricing, normalizeGridConnectionPatch(project.rates, normalizeSupplyAlternativePatch(plan.rates)), ctx.tariffMatrix);
+    next.rates = reconcileLegacySettlement(project.rates, reconcileEnergyRateSource(project.rates, reconcileGridUseCharge(project.rates, { ...project.rates, ...patch }, patch), patch), patch);
+  }
+  if (plan.financials) next.financials = withoutStaleFinancialOverrides(project, { ...project.financials, ...plan.financials });
+  else if (plan.specs) next.financials = withoutStaleFinancialOverrides(project, project.financials);
+
+  // 2. Equipos y dimensionado, una vez, contra la base.
+  const lock = !!plan.consumption?.lockAutoPanels;
+  if (specsData && plan.specs) {
+    next.specs = editSpecs(project, next, specsData, plan.specs, catalog, lock);
+  } else if (touchesSpecsInputs) {
+    // Sin reconciliación ni entradas de dimensionamiento en `financials`: la cantidad de paneles no se toca.
+    const reconciled = { ...reconcileWithCatalog(project.specs, project.specs, catalog) };
+    next.specs = lock ? { ...reconciled, autoCalculatePanels: false } : reconciled;
+    const forced = plan.rates?.targetCoveragePct !== undefined || !!plan.client?.province || !!plan.consumption;
+    next = resizeIfNeeded(project, next, forced);
   }
   return normalizeProjectEquipment(project, next);
 }
@@ -192,26 +226,29 @@ export function withoutStaleFinancialOverrides(project: Pick<ProjectSimulation, 
 
 /** Specs con la cantidad de paneles que recomienda el motor para el consumo, la provincia y la cobertura del proyecto. */
 function withRecommendedPanels(project: ProjectSimulation, specs: SystemSpecs): SystemSpecs {
-  const rec = calculateRecommendedPanelCount(
-    project.client.province,
-    project.monthlyConsumption,
-    readEquipment(specs).panels[0]?.powerW || 620,
-    resolveAssumption('targetCoveragePct', project.rates.targetCoveragePct), // la frontera: 0 o fuera de rango dimensiona con el valor resuelto, no con 1 %
-    resolveSystemLossesPct(specs),
-    project.client.customMonthlyHSP
-  );
+  // F2b: la recomendación sale del dimensionado del dominio con la base guardada en la propuesta (sin el campo, el consumo
+  // real del año, como siempre; las propuestas nuevas, el mes pico).
+  const rec = recommendPanelCount({
+    province: project.client.province,
+    monthlyConsumption: project.monthlyConsumption,
+    panelPowerW: readEquipment(specs).panels[0]?.powerW || 620,
+    coveragePct: resolveAssumption('targetCoveragePct', project.rates.targetCoveragePct), // la frontera: 0 o fuera de rango dimensiona con el valor resuelto, no con 1 %
+    lossesPct: resolveSystemLossesPct(specs),
+    customMonthlyHSP: project.client.customMonthlyHSP,
+    basis: resolveSizingBasis(specs),
+  });
   // Solo un grupo de paneles recibe la recomendación; con varios modelos la cantidad no se autocalcula.
   return readEquipment(specs).panels.length === 1
-    ? editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { count: rec.recommendedPanelCount } })
+    ? editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { count: rec.count } })
     : specs;
 }
 
-/** Entradas del dimensionamiento: potencia del panel principal, consumo, provincia y HSP propio, cobertura y pérdidas resueltas. */
+/** Entradas del dimensionamiento: potencia del panel principal, consumo, provincia y HSP propio, cobertura, pérdidas resueltas y base. */
 const sizingInputs = (project: ProjectSimulation) => {
   const assumptions = resolveAssumptions(project);
   return JSON.stringify([
     readEquipment(project.specs).panels[0]?.powerW, project.monthlyConsumption, project.client.province, project.client.customMonthlyHSP,
-    assumptions.targetCoveragePct, assumptions.systemLossesPct,
+    assumptions.targetCoveragePct, assumptions.systemLossesPct, resolveSizingBasis(project.specs),
   ]);
 };
 
@@ -228,23 +265,28 @@ function resizeIfNeeded(before: ProjectSimulation, next: ProjectSimulation, forc
 
 // ── Specs ───────────────────────────────────────────────────────────────────────────────────
 
-function editSpecs(project: ProjectSimulation, patch: Partial<SystemSpecs>, catalog: readonly SolarEquipmentItem[]): ProjectSimulation {
-  let specs = normalizeEnabledBatteries(normalizeEquipmentEdit(project.specs, patch));
+/**
+ * Reglas de equipos de una edición de specs contra la base `project`: `specsData` ya trae el parche mezclado y normalizado;
+ * `merged` es la propuesta con el resto del lote (consumo, provincia, cobertura), de donde el autodimensionado toma sus
+ * insumos. `lock`: el consumo del lote fija la cantidad de paneles (apaga el autocálculo).
+ */
+function editSpecs(project: ProjectSimulation, merged: ProjectSimulation, specsData: SystemSpecs, patch: Partial<SystemSpecs>, catalog: readonly SolarEquipmentItem[], lock: boolean): SystemSpecs {
+  let specs = specsData;
   const before = readEquipment(project.specs);
   const after = readEquipment(specs);
   // Editar la cantidad del primer grupo de paneles (dock, asistente) es una cantidad manual: apaga el autocálculo.
   const panelCountEdited = after.panels[0]?.count !== before.panels[0]?.count;
-  const shouldAutoCalc = patch.autoCalculatePanels !== undefined
+  const shouldAutoCalc = !lock && (patch.autoCalculatePanels !== undefined
     ? patch.autoCalculatePanels
-    : (project.specs.autoCalculatePanels && !panelCountEdited);
+    : (project.specs.autoCalculatePanels && !panelCountEdited));
 
   specs = dropSupplierOfChangedModel(project.specs, specs, catalog);
   specs = reconcileWithCatalog(project.specs, specs, catalog);
 
-  if (shouldAutoCalc) specs = { ...withRecommendedPanels(project, specs), autoCalculatePanels: true };
+  if (shouldAutoCalc) specs = { ...withRecommendedPanels(merged, specs), autoCalculatePanels: true };
+  else if (lock) specs = { ...specs, autoCalculatePanels: false };
   else if (panelCountEdited && patch.autoCalculatePanels === undefined) specs = { ...specs, autoCalculatePanels: false };
-
-  return { ...project, specs, financials: withoutStaleFinancialOverrides(project, project.financials) };
+  return specs;
 }
 
 /**

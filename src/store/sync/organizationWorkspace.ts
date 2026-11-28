@@ -1,3 +1,4 @@
+import { EMPTY_UNDO_HISTORY } from "../undo/projectUndoJournal";
 import { REFERENCE_EQUIPMENT_IDS } from "../../../shared/referenceEquipment";
 import type { SimulationStore } from "../types";
 import type { SyncSettings } from "../../types";
@@ -435,8 +436,7 @@ export function changeWorkspace(
     activeConflict: null,
     pendingImportConflict: null,
     pendingAgentActions: [],
-    undoStack: [],
-    redoStack: [],
+    undoHistory: EMPTY_UNDO_HISTORY,
     canUndo: false,
     canRedo: false,
     notifications: [],

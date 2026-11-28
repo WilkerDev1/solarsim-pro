@@ -35,6 +35,8 @@ export interface RatesFieldsProps {
   projectionEnabled: boolean;
   updateRates: (rates: Partial<UtilityRates>) => void;
   updateSpecs?: (specs: Partial<SystemSpecs>) => void;
+  /** Distribuidora o tarifa con su perfil de carga en un solo lote (dock sobre la transacción); sin él, dos escrituras. */
+  updateRatesAndSpecs?: (rates: Partial<UtilityRates>, specs?: Partial<SystemSpecs> | null) => void;
   /** Función de este equipo `netMeteringRegimeSelector` (visible por defecto). */
   showRegimeSelector?: boolean;
 }
@@ -55,7 +57,7 @@ const parseOptionalNumber = (raw: string): number | undefined => {
   return raw.trim() === '' || !Number.isFinite(value) ? undefined : value;
 };
 
-export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs, showRegimeSelector = true }) => {
+export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs, updateRatesAndSpecs, showRegimeSelector = true }) => {
   // Un solo origen: `projectionEnabled` (modo `self_consumption`) decide también con qué modo se estima la factura.
   const calculationMode: EnergyCalculationMode = projectionEnabled ? 'self_consumption' : 'legacy';
   const { rates } = project;
@@ -84,6 +86,8 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
   const costNotice = offGrid && supply === 'generator' ? generatorCostNotice(rates.generatorCostPerKWh) : null;
 
   const apply = (plan: TariffChangePlan) => {
+    // El perfil solo se escribe si hay con qué (canWriteSpecs ya lo decidió en el plan).
+    if (updateRatesAndSpecs && updateSpecs) return updateRatesAndSpecs(plan.rates, plan.specs);
     updateRates(plan.rates);
     if (plan.specs) updateSpecs?.(plan.specs);
   };

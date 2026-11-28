@@ -11,6 +11,7 @@ import {
 } from '../../../shared/applicationFeatures';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
 import { readEquipment, type EquipmentKind } from '../../../shared/equipment';
+import { proposalCompleteness } from '../../domain/proposalCompleteness';
 import { editableAssistantFields, validateAssistantEdits } from './validation';
 import { preserveHiddenInQuotation } from '../../../shared/quotationItems';
 import type { CustomQuotationItem } from '../../types';
@@ -19,6 +20,7 @@ import { searchEquipmentByRequest } from '../../../shared/equipmentMatch';
 import { effectiveGenericPrice } from '../../store/slices/equipmentPriceSlice';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
+import { legacySectionPatches, writeProposeProjectUpdate } from '../agentTools/proposeProjectUpdateFacade';
 import { resolveGridConnection } from '../../../shared/gridConnection';
 import {
   hasSavingsComparison, noSavingsNote, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, savingsValuationCostPerKWh,
@@ -213,7 +215,10 @@ export function executeAssistantTool(
       comparable ? row : { ...row, ...Object.fromEntries(fields.map((field) => [field, null])) };
     // `withoutMoney` es superficial: el desglose anidado de la factura (`tariffBill`, con importes) se vacía entero.
     const monthlyMoney = ['savingsUSD', 'originalBillUSD', 'netBillUSD', 'gridUseChargeUSD', 'tariffBill'];
-    const summary = calculateProjectFinancialSummary(p, mode);
+    // ADR 0009 (pendiente cerrado en F3a): una propuesta incompleta no devuelve cifras del motor (serían rellenos: equipos a
+    // 0, consumo supuesto…), sino sus motivos; `summary` y `energy` van en null.
+    const completeness = proposalCompleteness(p);
+    const summary = completeness.incomplete ? null : calculateProjectFinancialSummary(p, mode);
     return {
       data: {
         id: p.id,
@@ -229,7 +234,8 @@ export function executeAssistantTool(
         financials: p.financials,
         monthlyConsumption: p.monthlyConsumption,
         calculationMode: mode,
-        energy: calculateMonthlySolarProduction(
+        ...(completeness.incomplete ? { incomplete: { reasons: completeness.reasons } } : {}),
+        energy: summary === null ? null : calculateMonthlySolarProduction(
           p.client.province,
           p.specs,
           p.monthlyConsumption,
@@ -244,7 +250,7 @@ export function executeAssistantTool(
           // Misma valoración que el resumen: facturación neta en SIE-007-2026 (bloques o precio único).
           engineBlockBilling(resolveAssumptions(p), p.rates, savingsValuationCostPerKWh(p.rates))
         ).map((month) => withoutMoney(month, monthlyMoney)),
-        summary: comparable ? summary : {
+        summary: summary === null || comparable ? summary : {
           ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct', 'annualCreditSettlementUSD']),
           monthlyBreakdown: summary.monthlyBreakdown.map((month) => withoutMoney(month, monthlyMoney)),
         },
@@ -413,63 +419,8 @@ export function applyAssistantAction(action: AssistantAction, options: { require
       Object.fromEntries(fresh.edits.map((e) => [e.field, e.value]))
     );
   } else {
-    s.recordUndoState(s.getActiveProject());
-    const patch = (section: string) =>
-      Object.fromEntries(
-        fresh.edits
-          .filter((e) => e.section === section)
-          .map((e) => [e.field, e.value])
-      );
-    if (fresh.edits.some((e) => e.section === 'client'))
-      s.updateClient(patch('client'));
-    if (fresh.edits.some((e) => e.section === 'specs')) {
-      const specs = patch('specs');
-      for (const key of ['panels', 'inverters', 'batteries'])
-        if (Array.isArray(specs[key])) {
-          specs[key] = (
-            specs[key] as { id: string; count: number; unitPriceUSD: number }[]
-          ).map((g) => {
-            const e = s.equipmentCatalog.find((e) => e.id === g.id)!;
-            const common = {
-              id: g.id,
-              count: g.count,
-              unitPriceUSD: g.unitPriceUSD,
-              priceSource: 'manual',
-              brandModel: e.displayName,
-              weightKilos: e.weightKg,
-            };
-            if (key === 'panels')
-              return {
-                ...common,
-                powerW: e.powerW,
-                efficiencyPct: e.efficiencyPct,
-                tempCoeff: e.tempCoeff,
-                annualDegradation: e.annualDegradation,
-              };
-            if (key === 'inverters')
-              return {
-                ...common,
-                powerKW: e.powerKW,
-                efficiencyPct: e.maxEfficiencyPct,
-              };
-            return {
-              ...common,
-              capacityKWh: e.capacityKWh,
-              dodPct: e.dodPct,
-              efficiencyPct: e.batteryEfficiencyPct,
-            };
-          });
-          if (key === 'batteries')
-            specs.hasBattery = (specs[key] as unknown[]).length > 0;
-          if (key === 'panels') specs.autoCalculatePanels = false;
-        }
-      s.updateSpecs(specs);
-    }
-    if (fresh.edits.some((e) => e.section === 'rates'))
-      s.updateRates(patch('rates'));
-    if (fresh.edits.some((e) => e.section === 'financials'))
-      s.updateFinancials(patch('financials'));
-    const consumption = fresh.edits.find((e) => e.section === 'consumption');
-    if (consumption) s.setMonthlyConsumption(consumption.value as number[]);
+    // F3c: fachada. Los mismos parches por sección de siempre; la transacción los escribe en una sola escritura solo si deja
+    // exactamente la misma propuesta (ver proposeProjectUpdateFacade.ts).
+    writeProposeProjectUpdate(legacySectionPatches(fresh.edits, s.equipmentCatalog));
   }
 }

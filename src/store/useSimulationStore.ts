@@ -95,7 +95,7 @@ export const useSimulationStore = create<SimulationStore>()(
     {
       name: typeof window !== 'undefined' && window.location?.pathname.startsWith('/scripts/qa/fixtures/') ? 'solarsim-qa-fixture-storage' : 'solarsim-pro-storage',
       storage: persistStorage,
-      onRehydrateStorage: () => hydrateSimulationStore,
+      onRehydrateStorage: () => (state) => hydrateSimulationStore(state),
 
       partialize: serializeSimulationStore,
     }

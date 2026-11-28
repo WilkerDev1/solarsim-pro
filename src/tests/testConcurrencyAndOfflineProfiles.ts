@@ -99,11 +99,12 @@ async function runTests() {
     activeProjectId: testProject.id,
   }));
 
-  // Inicializar estado base
+  // Inicializar estado base: el primer registro de una propuesta sin diario activo es su base.
   store.recordUndoState(testProject);
   let vState = useSimulationStore.getState();
-  assert(vState.undoStack.length === 1, 'undoStack inicializado con estado base');
-  assert(!vState.canUndo, 'canUndo es falso con un solo estado base');
+  assert(vState.undoHistory.activeId === testProject.id, 'diario de la propuesta activa inicializado');
+  assert(vState.undoHistory.journals[testProject.id].undo.length === 0, 'la base no es un paso');
+  assert(vState.canUndo === false, 'canUndo es falso con solo la base');
 
   // Modificar paneles de 38 a 50
   const modified1 = {
@@ -112,25 +113,24 @@ async function runTests() {
   };
   useSimulationStore.setState((s) => ({
     projects: s.projects.map((p) => (p.id === testProject.id ? modified1 : p)),
-    undoStack: [...s.undoStack, modified1],
-    canUndo: true,
   }));
+  store.recordUndoState(modified1);
 
-  assert(useSimulationStore.getState().canUndo, 'canUndo es verdadero tras mutación');
+  assert(useSimulationStore.getState().canUndo === true, 'canUndo es verdadero tras mutación');
 
   // Ejecutar Undo
   store.undo();
   let afterUndo = useSimulationStore.getState();
   let currentActive = afterUndo.projects.find((p) => p.id === testProject.id);
   assert(panelCountOf(currentActive?.specs) === 38, 'Undo restauró los paneles a 38');
-  assert(afterUndo.canRedo, 'canRedo es verdadero tras Undo');
+  assert(afterUndo.canRedo === true, 'canRedo es verdadero tras Undo');
 
   // Ejecutar Redo
   store.redo();
   let afterRedo = useSimulationStore.getState();
   currentActive = afterRedo.projects.find((p) => p.id === testProject.id);
   assert(panelCountOf(currentActive?.specs) === 50, 'Redo restauró los paneles a 50');
-  assert(!afterRedo.canRedo, 'canRedo es falso tras agotar redoStack');
+  assert(afterRedo.canRedo === false, 'canRedo es falso tras agotar los pasos que rehacer');
 
   // -----------------------------------------------------------------
   // 4. CONTROL DE VERSIONES GIT & HITOS (Snapshots)

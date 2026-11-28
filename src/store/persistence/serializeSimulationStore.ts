@@ -12,6 +12,8 @@ export function serializeSimulationStore(state: SimulationStore) {
     sidebarWidth: state.sidebarWidth,
     dashboardViewMode: state.dashboardViewMode,
     appAssistantEnabled: state.appAssistantEnabled,
+    appAssistantEnabledChosenByUser: state.appAssistantEnabledChosenByUser,
+    appAssistantDefaultsVersion: state.appAssistantDefaultsVersion,
     localFeatureSettings: state.localFeatureSettings,
     organizationFeaturePolicies: state.organizationFeaturePolicies,
     geminiApiKey: state.geminiApiKey,

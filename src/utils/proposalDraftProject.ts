@@ -2,18 +2,19 @@ import type { DefaultSimulationSettings } from '../store/types';
 import type { ProjectSimulation, SystemSpecs } from '../types';
 import type { ExtractedInvoiceData } from '../types/aiInvoice';
 import type { GlobalTariffMatrix } from '../types/tariffs';
-import { calculateRecommendedPanelCount } from '../engine/solarEngine';
+import { recommendPanelCount, resolveSizingBasis, type SizingBasis } from '../domain/sizing';
 import { resolveAITariffSelection } from './aiTariffContext';
 import { getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTariffs';
 import { tariffMatrixKey } from '../../shared/tariffRules';
 import { resolveSystemLossesPct, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
-import { assumptionFields, resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
-import { automatedSaleMarginMultiplier } from './saleMargin';
+import { resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
+import { createNewProposal } from '../domain/newProposal';
+import type { GenericPriceLookup } from '../domain/rules/equipmentRules';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
 import { NEW_PROPOSAL_NET_METERING_REGIME, reconcileGridUseCharge } from '../../shared/netMetering';
 import { editEquipment, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { migrateLegacySpecs } from '../../shared/equipment';
-import { detachedCatalogIdentity, withoutInheritedPanelDegradation } from './equipmentGroups';
+import { detachedCatalogIdentity } from './equipmentGroups';
 import type { SolarEquipmentItem } from '../types/equipment';
 
 /** Un solo grupo por tipo recibe la selección escalar del borrador (con varios modelos se conservan, como antes). */
@@ -42,7 +43,9 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
   const isGrounded=Array.isArray(data.panels)||Array.isArray(data.inverters)||Array.isArray(data.batteries);
     const panelW=data.selectedPanelWatts ?? readEquipment(base.specs).panels[0]?.powerW ?? 0;
     const coverage=resolveAssumption('targetCoveragePct',data.targetCoveragePct,resolveAssumptions(base).targetCoveragePct);
-    const count=data.recommendedPanelCount || calculateRecommendedPanelCount(province,data.monthlyConsumptionKWh,panelW,coverage,losses,base.client.customMonthlyHSP).recommendedPanelCount;
+    // Con la base de dimensionado de la propuesta (ADR 0009): la que guarda es la que usa al nacer. Sin base (lo guardado antes
+    // de F2b), el consumo tal cual, como siempre.
+    const count=data.recommendedPanelCount || recommendPanelCount({province,monthlyConsumption:data.monthlyConsumptionKWh,panelPowerW:panelW,coveragePct:coverage,lossesPct:losses,customMonthlyHSP:base.client.customMonthlyHSP,basis:resolveSizingBasis(base.specs)}).count;
     const dcKWp=(data.panels || []).reduce((sum,g)=>sum+g.powerW*g.count/1000,0);
     let specs:SystemSpecs={...base.specs,autoCalculatePanels:false,dopExchangeRate:resolveAssumption('dopExchangeRate',data.dopExchangeRate,base.rates.usdExchangeRate,base.specs.dopExchangeRate),
       ...(data.hasBattery!==undefined?{hasBattery:data.hasBattery}:{}),
@@ -129,19 +132,39 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
   return {...base,specs:enforceAutomatedPricing(specs),rates,client:{...base.client,province},monthlyConsumption:[...data.monthlyConsumptionKWh],financials:{...base.financials,...(data.commercial?.pricePerWattUSD!==undefined?{pricePerWattUSD:data.commercial.pricePerWattUSD}:{}),...(data.commercial?.customItems!==undefined?{customItems:structuredClone(data.commercial.customItems)}:{}),...(data.commercial?.customDiscounts!==undefined?{customDiscounts:structuredClone(data.commercial.customDiscounts)}:{})}};
 }
 
-export function createAIProposalBase(template:ProjectSimulation,defaults:DefaultSimulationSettings,province:string):ProjectSimulation {
- const base=structuredClone(template);
+/** ¿El borrador pide dimensionar los paneles? Un solo modelo con cantidad 0: la condición del normalizador compartido. */
+function asksPanelSizing(raw:Record<string,any>):boolean {
+  const rows=Array.isArray(raw.panels)?raw.panels:(raw.selectedPanelId || raw.matchedPanelId)?[{quantity:raw.selectedPanelCount ?? raw.matchedPanelCount ?? raw.recommendedPanelCount}]:[];
+  return rows.length===1&&(rows[0]?.quantity ?? rows[0]?.count)===0;
+}
 
-      // ADR 0003 (d): los ajustes del usuario primero, luego las constantes compartidas (la misma fábrica que el proyecto nuevo).
-      const seeded=assumptionFields(undefined,defaults);
-      base.specs={...base.specs,pricePerWattUSD:seeded.specs.pricePerWattUSD,systemLosses:seeded.specs.systemLosses,annualDegradation:seeded.specs.annualDegradation,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:automatedSaleMarginMultiplier(defaults),installationUnitPriceUSD:0};
-      // Grupos explícitos; el DOD por defecto vive en el grupo de batería.
-      const withGroups=withoutInheritedPanelDegradation(migrateLegacySpecs(base.specs)); // la degradación configurada manda sobre el 0.5 % de la referencia
-      base.specs={...withGroups,batteries:withGroups.batteries?.map((group,index)=>index===0?{...group,dodPct:defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT}:group)};
-      base.rates={...base.rates,targetCoveragePct:seeded.rates.targetCoveragePct,isZeroExport:defaults.defaultZeroExport,currency:defaults.currency || 'USD',annualEnergyInflationPct:seeded.rates.annualEnergyInflationPct};
-      base.financials={...base.financials,applyLey5707:defaults.applyLey5707,applyITBISExemption:defaults.applyITBISExemption,discountRatePct:seeded.financials.discountRatePct,projectLifespanYears:seeded.financials.projectLifespanYears,pricePerWattUSD:seeded.financials.pricePerWattUSD,customItems:[],customDiscounts:[],customCostUSD:undefined,customLey5707CreditUSD:undefined,customITBISSavedUSD:undefined};
-      base.client={...base.client,company:'',address:'',contactPhone:'',contactEmail:'',contactPerson:'',location:province,customMonthlyHSP:undefined,coordinates:undefined};
- return base;
+/**
+ * Cantidad de paneles de un borrador con grupos que pidió dimensionar, con la base de la propuesta (ADR 0009). El
+ * normalizador compartido (`shared/aiProposal`, fuera del alcance de una versión solo de cliente) dimensiona con el consumo
+ * real; con la base `peak_month` (las propuestas nuevas) aquí se rehace con el mes pico, para que nazca con la base que guarda
+ * y activar el autodimensionado no cambie la cantidad. Con la base heredada, el borrador tal cual. La comparten la vista
+ * previa del modal y la aplicación (`buildProjectFromDraft`). Pura.
+ */
+export function sizeDraftPanelsWithBasis(raw:Record<string,any>,data:ExtractedInvoiceData,ctx:{province:string;lossesPct?:number;customMonthlyHSP?:number[];basis:SizingBasis}):ExtractedInvoiceData {
+  const group=data.panels?.length===1?data.panels[0]:undefined;
+  if(ctx.basis!=='peak_month'||!group||!(group.count>0)||!(group.powerW>0)||data.consumptionSource==='theoretical'||data.monthlyConsumptionKWh?.length!==12||!asksPanelSizing(raw)) return data;
+  const count=recommendPanelCount({province:data.province || ctx.province,monthlyConsumption:data.monthlyConsumptionKWh,panelPowerW:group.powerW,coveragePct:resolveAssumption('targetCoveragePct',data.targetCoveragePct),lossesPct:ctx.lossesPct,customMonthlyHSP:ctx.customMonthlyHSP,basis:ctx.basis}).count;
+  if(count===group.count) return data;
+  return {...data,panels:[{...group,count}],recommendedPanelCount:count,recommendedCapacityKWp:group.powerW*count/1000};
+}
+
+/**
+ * Base de un borrador de IA nuevo: la fábrica única (F2b, ADR 0009), la misma que «Nueva simulación», con la política de
+ * precio automatizada (matriz de costos). `template` solo aporta los identificadores provisionales (id y códigos) que los
+ * llamadores reemplazan al crear; su contenido (el caso de referencia) ya no se hereda. `options` trae lo que la fábrica
+ * necesita para elegir y cotizar equipos (sin catálogo, los de Ajustes sin precio).
+ */
+export function createAIProposalBase(template:ProjectSimulation,defaults:DefaultSimulationSettings,province:string,options:{tariffMatrix?:GlobalTariffMatrix|null;catalog?:readonly SolarEquipmentItem[];genericPriceFor?:GenericPriceLookup}={}):ProjectSimulation {
+  return createNewProposal({
+    source:'assistant',defaults,tariffMatrix:options.tariffMatrix,catalog:options.catalog,genericPriceFor:options.genericPriceFor,
+    identity:{id:template.id,now:template.createdAt,sequence:{projectId:template.client.projectId,quoteNumber:template.client.quoteNumber || ''}},
+    client:{province},
+  });
 }
 
 /** Document totals are references for dialogue, never inputs that override engine results. */

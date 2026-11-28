@@ -35,13 +35,7 @@ export {
 /** Coordenadas de ejemplo (Santo Domingo) para el modo GPS sin coordenadas. */
 export const SAMPLE_GPS_COORDINATES = '18.4861, -69.9312';
 
-// ── Tarifas ──
-/** Consumo mensual (kWh) usado para la tarifa de referencia si el proyecto no tiene meses. */
-export const DEFAULT_MONTHLY_CONSUMPTION_KWH = 900;
-
-// ── Equipamiento ──
-/** Valores que toma un panel del catálogo al que le faltan datos (`||`). */
-export const DEFAULT_CATALOG_PANEL = { powerW: 550, efficiencyPct: 22, tempCoeff: -0.29, annualDegradation: 0.4 } as const;
-/** Potencia (kW) de un inversor del catálogo sin potencia (`||`). */
-export const DEFAULT_CATALOG_INVERTER_KW = 8;
+// ── Tarifas y equipamiento: los usan las reglas del dominio (F2b), que los declaran ──
+export { DEFAULT_MONTHLY_CONSUMPTION_KWH } from '../../../../domain/rules/tariffRules';
+export { DEFAULT_CATALOG_INVERTER_KW, DEFAULT_CATALOG_PANEL } from '../../../../domain/rules/equipmentRules';
 

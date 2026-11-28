@@ -1,13 +1,16 @@
 import { executeAgentTool } from '../../../../features/agentTools/registry';
 import { assistantOwner } from '../../../../features/assistant/tools';
-import { createAIProposalBase, prepareProposalDraftProject, proposalReconciliationIssues } from '../../../../utils/proposalDraftProject';
+import { createAIProposalBase, prepareProposalDraftProject, proposalReconciliationIssues, sizeDraftPanelsWithBasis } from '../../../../utils/proposalDraftProject';
+import { aiProposalFactoryOptions } from '../../../../store/slices/aiSlice';
+import { annualSpecificYieldKWhPerKWp, resolveSizingBasis, SIZING_ASSUMPTIONS } from '../../../../domain/sizing';
+import { NEW_PROPOSAL_DEFAULTS } from '../../../../domain/newProposal';
 import { BENCHMARK_PROJECT } from '../../../../engine/referenceCase';
 import { calculateProjectFinancialSummary, engineGridUseCharge } from '../../../../engine/financeEngine';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { parseProposalWithAI } from '../../../../services/geminiInvoiceService';
-import { calculateRecommendedPanelCount, calculateMonthlySolarProduction, getMonthlySolarProductionFactors } from '../../../../engine/solarEngine';
+import { calculateMonthlySolarProduction, getMonthlySolarProductionFactors } from '../../../../engine/solarEngine';
 import { getProvinceHSP } from '../../../../data/rdProvinces';
 import { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import { FilePreview } from '../types';
@@ -54,7 +57,6 @@ export function useAIInvoiceScanner() {
     const province = extractedData?.province || target?.client.province || defaults.defaultProvince;
     // ADR 0003 (c): una propuesta guardada usa sus supuestos efectivos; los ajustes del usuario solo siembran la nueva.
     const losses = target ? resolveAssumptions(target).systemLossesPct : resolveAssumption('systemLossesPct', defaults.defaultSystemLosses);
-    const yieldInfo = calculateRecommendedPanelCount(province, Array(12).fill(0), 620, 95, losses, target?.client.customMonthlyHSP);
     return {
       province, systemLosses: losses, targetCoveragePct: target ? resolveAssumptions(target).targetCoveragePct : resolveAssumption('targetCoveragePct', defaults.defaultTargetCoveragePct),
       customMonthlyHSP: target?.client.customMonthlyHSP,
@@ -62,10 +64,10 @@ export function useAIInvoiceScanner() {
       distributor: target?.rates.distributor,
       tariffCode: target?.rates.tariffCode,
       tariffReference: buildAITariffContext(tariffMatrix),
-      annualSpecificYieldKWhPerKWp: yieldInfo.annualSpecificYieldKWhPerKWp,
+      annualSpecificYieldKWhPerKWp: annualSpecificYieldKWhPerKWp(province, losses, target?.client.customMonthlyHSP),
       monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses,target?.client.customMonthlyHSP),
       calculationMode: mode,
-      commercial: {pricingMode:'cost_matrix',markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? 0,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
+      commercial: {pricingMode:'cost_matrix',markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? NEW_PROPOSAL_DEFAULTS.laborUSDPerKWp,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
       equipmentPrices:target?[...(target.specs.panels || []),...(target.specs.inverters || []),...(target.specs.batteries || [])].filter(g=>g.unitPriceUSD!==undefined).map(g=>({id:g.id,unitPriceUSD:g.unitPriceUSD!,priceSource:g.priceSource ?? 'manual'})):[],
       genericPrices,
     } as AIProposalContext;
@@ -148,21 +150,25 @@ export function useAIInvoiceScanner() {
     } catch (error) { if (isCurrent()) {if(!dispatched)setPrompt(current=>restoreComposerText(current,sentPrompt));const text=(error as Error).message || 'No se pudo analizar la entrada. Reintenta.';setErrorMsg(text);setMessages(previous=>[...previous,{role:'assistant',kind:'error',text}]);} }
     finally { if (isCurrent()) setIsProcessing(false); }
   };
-  const validatedDraft = useMemo(() => extractedData ? normalizeProposalDraft(extractedData, equipmentCatalog, context) : null, [extractedData, equipmentCatalog, context]);
+  // Base de dimensionado del borrador (ADR 0009): la de la propuesta destino; una nueva nace con la de la fábrica (mes pico).
+  const sizingBasis = target ? resolveSizingBasis(target.specs) : SIZING_ASSUMPTIONS.newProposalBasis;
+  // Misma regla que al aplicar (buildProjectFromDraft): si el borrador pide dimensionar, con esa base.
+  const validatedDraft = useMemo(() => extractedData ? sizeDraftPanelsWithBasis(extractedData as unknown as Record<string, unknown>, normalizeProposalDraft(extractedData, equipmentCatalog, context),
+    { province: context.province || '', lossesPct: context.systemLosses, customMonthlyHSP: context.customMonthlyHSP, basis: sizingBasis }) : null, [extractedData, equipmentCatalog, context, sizingBasis]);
   const draftEnergy=useMemo(()=>{
     if(!validatedDraft || validatedDraft.monthlyConsumptionKWh.length!==12 || !validatedDraft.panels?.length || validatedDraft.panels.some(g=>!g.id||!Number.isFinite(g.powerW)||g.powerW<=0||!Number.isInteger(g.count)||g.count<=0))return null;
-    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
+    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '',aiProposalFactoryOptions(useSimulationStore.getState()));
     const project=prepareProposalDraftProject(base,{...validatedDraft,commercial:{}},tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:equipmentCatalog});
     const assumptions=resolveAssumptions(project); // ADR 0003: retención y cargo efectivos
     return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,assumptions.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode,engineGridUseCharge(assumptions)).map(m=>m.productionKWh);
-  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog]);
+  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog,genericPrices]);
   const draftPreview=useMemo(()=>{
     if(!validatedDraft || blocksPreview(validatedDraft.validationIssues || []))return null;
-    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
+    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '',aiProposalFactoryOptions(useSimulationStore.getState()));
     const project=prepareProposalDraftProject(base,validatedDraft,tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:equipmentCatalog});
     const financial=calculateProjectFinancialSummary({...project,monthlyConsumption:project.monthlyConsumption.length===12?project.monthlyConsumption:Array(12).fill(0)},mode);
     return {project,financial};
-  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog]);
+  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog,genericPrices]);
   const attentionIssues=useMemo(()=>[...(validatedDraft?.validationIssues || []),...(validatedDraft&&draftPreview?proposalReconciliationIssues(validatedDraft,draftPreview.financial):[])],[validatedDraft,draftPreview]);
   // Modelo único de avisos: lo consumen la revisión, el resumen del chat y el pie (reviewIssues.ts).
   const issueModel=useMemo(()=>buildIssueModel(attentionIssues,validatedDraft || undefined),[attentionIssues,validatedDraft]);
@@ -184,7 +190,7 @@ export function useAIInvoiceScanner() {
     closeAIInvoiceModal: () => { cancel(); state.closeAIInvoiceModal(); }, openAISettings: () => {cancel();state.closeAIInvoiceModal();state.openSettingsModal('ai');},
     files, addFiles, removeFile:(index:number) => {setFiles(previous=>previous.filter((_,i)=>i!==index));setReviewConfirmed(false);}, fileInputRef,
     isProcessing, cancel, reset, prompt, setPrompt, messages, errorMsg, processSmartProposal,
-    extractedData:validatedDraft, draftPreview, draftEnergy, updateDraft, equipmentCatalog, tariffMatrix, context, useCurrentProject,
+    extractedData:validatedDraft, draftPreview, draftEnergy, updateDraft, equipmentCatalog, tariffMatrix, context, sizingBasis, useCurrentProject,
     setUseCurrentProject:(value:boolean)=>{cancel();setUseCurrentProject(value);setExtractedData(null);setReviewConfirmed(false);setMessages([]);},
     draftGeneration, reviewConfirmed, setReviewConfirmed, blockingIssues, attentionIssues, issueModel, canApply,
     handleApplyAsNew:()=>apply(true), handleApplyToActive:()=>apply(false),

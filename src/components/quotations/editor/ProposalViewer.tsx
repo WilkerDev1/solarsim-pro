@@ -6,7 +6,8 @@ import { noSavingsNote, supplyPresentation, supplySummaryText } from '../../../.
 import { irrText } from '../../../../shared/returnIndicators';
 import type { ProposalViewerTab } from '../../../store/types';
 import type { FinancialSummaryResult, ProjectSimulation } from '../../../types';
-import { calculateProjectFinancialSummary } from '../../../engine/financeEngine';
+import { proposalResults } from '../../../domain/proposalCompleteness';
+import { ResultsPending } from '../../simulator/ProposalStatusHints';
 import { useEnergyCalculationMode } from '../../../features/application/useApplicationFeatures';
 import { proposalName } from '../../../features/quotations/linkedQuotations';
 import { DOCUMENT_STATUS_LABELS } from '../../../utils/clientSummary';
@@ -191,7 +192,9 @@ export const ProposalViewer: React.FC<ProposalViewerProps> = React.memo(({ proje
   const mode = useEnergyCalculationMode();
   // Moneda de la tabla de costos: solo de esta vista (no se guarda en la propuesta).
   const [costCurrency, setCostCurrency] = useState<CostTableCurrency>('ALL');
-  const summary = useMemo(() => calculateProjectFinancialSummary(project, mode), [project, mode]);
+  // F2b (ADR 0009): incompleta ⇒ sin cifras (resumen, documento y costos muestran los motivos); los parámetros, tal cual.
+  const results = useMemo(() => proposalResults(project, mode), [project, mode]);
+  const summary = results.summary;
   const meta = [DOCUMENT_STATUS_LABELS[project.status] ?? project.status, project.client.projectId?.trim() || null].filter(Boolean).join(' · ');
   const focusTab = (next: ProposalViewerTab) => {
     onTabChange(next);
@@ -232,14 +235,15 @@ export const ProposalViewer: React.FC<ProposalViewerProps> = React.memo(({ proje
         ))}
       </div>
       <div className="pv-body" role="tabpanel" id="pv-panel" aria-labelledby={`pv-tab-${tab}`} tabIndex={0}>
-        {tab === 'summary' && <SummaryTab project={project} summary={summary} />}
-        {tab === 'document' && (
+        {!summary && tab !== 'parameters' && <ResultsPending completeness={results} title="Propuesta incompleta: sin cifras hasta completarla" />}
+        {tab === 'summary' && summary && <SummaryTab project={project} summary={summary} />}
+        {tab === 'document' && summary && (
           <Suspense fallback={<p className="qe-field-hint pv-doc-hint" role="status">Cargando el documento…</p>}>
             <ProposalViewerDocument project={project} summary={summary} />
           </Suspense>
         )}
         {tab === 'parameters' && <ParametersTab project={project} />}
-        {tab === 'costs' && (
+        {tab === 'costs' && summary && (
           <div className="pv-costs">
             <CostMatrixTable project={project} summary={summary} currency={costCurrency} onCurrencyChange={setCostCurrency} />
           </div>

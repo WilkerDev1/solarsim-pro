@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { SolarEquipmentItem, EquipmentType } from '../../../types/equipment';
+import { chipMagnitude } from '../../../utils/equipmentMatchingUtils';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { EquipmentPreviewThumb } from '../../common/equipment/EquipmentPreviewThumb';
 import { isInsideEquipmentPreview } from '../../common/equipment/EquipmentPreviewDialog';
@@ -163,13 +164,10 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
     return null;
   }, [items, type, selectedValue, selectedPower]);
 
+  // La del grupo (la que se cotiza); la del modelo emparejado solo si el grupo no tiene.
   const effectivePower = useMemo(() => {
-    if (matchingItem) {
-      if (isPanel) return matchingItem.powerW;
-      if (isBattery) return matchingItem.capacityKWh;
-      return matchingItem.powerKW;
-    }
-    return selectedPower;
+    const matched = !matchingItem ? undefined : isPanel ? matchingItem.powerW : isBattery ? matchingItem.capacityKWh : matchingItem.powerKW;
+    return chipMagnitude(selectedPower, matched);
   }, [matchingItem, isPanel, isBattery, selectedPower]);
 
   const formatPowerBadge = (item: SolarEquipmentItem) => {

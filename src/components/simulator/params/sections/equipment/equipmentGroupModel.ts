@@ -1,10 +1,15 @@
 import type { BatteryItemSpec, InverterItemSpec, PanelItemSpec, SystemSpecs } from '../../../../../types';
 import type { SolarEquipmentItem } from '../../../../../types/equipment';
-import { catalogPanelGroupPatch } from '../../../../../utils/catalogGroupPatch';
-import { detachedCatalogIdentity, editEquipmentGroup, selectCatalogEquipment, type EquipmentKind } from '../../../../../utils/equipmentGroups';
+import type { EquipmentKind } from '../../../../../utils/equipmentGroups';
 import { readEquipment } from '../../../../../../shared/equipment';
-import { autoPriceFields, buildCatalogSelectionUpdate, type GenericPriceLookup } from '../../logic/catalogSelection';
-import { MANUAL_BRAND_PLACEHOLDER, resolveBatteryDodPct, resolveBatteryEfficiencyPct } from '../../logic/dockDefaults';
+import {
+  buildNewItem as buildDomainNewItem, groupAddPatch, groupBrandPatch, groupCountPatch, groupMagnitudePatch, groupRemovePatch, groupSelectPatch,
+  groupUpdatePatch, type GenericPriceLookup,
+} from '../../../../../domain/rules/equipmentRules';
+import { MANUAL_BRAND_PLACEHOLDER } from '../../logic/dockDefaults';
+
+/** Las reglas de la lista (catálogo, «+», quitar, cantidad, marca y magnitud) viven en el dominio desde F2b. */
+export { wholeCount } from '../../../../../domain/rules/equipmentRules';
 
 export type EquipmentMode = 'catalog' | 'manual';
 type GroupItem = { panel: PanelItemSpec; inverter: InverterItemSpec; battery: BatteryItemSpec };
@@ -88,70 +93,9 @@ export function groupViews(specs: SystemSpecs, kind: EquipmentKind): GroupModelV
   }));
 }
 
-/**
- * Modelo nuevo para «+»: el primer equipo del catálogo distinto del principal, o un valor por defecto. Su precio sale del
- * resolvedor único (oferta → genérico, ADR 0006) y, sin ninguno, de la estimación por W/kW/kWh.
- */
+/** Modelo nuevo para «+» (regla del dominio, `buildNewItem` de `equipmentRules`); `now` da el id del grupo. */
 export function buildNewItem<K extends EquipmentKind>(kind: K, specs: SystemSpecs, catalog: SolarEquipmentItem[], now: number = Date.now(), genericFor?: GenericPriceLookup): GroupItem[K] {
-  const current = itemsOf(specs, kind)[0]?.brandModel;
-  const candidate = catalog.find(entry => entry.type === kind && entry.displayName !== current);
-  const auto = candidate ? autoPriceFields(candidate, genericFor?.(candidate.id)) : undefined;
-  const priced = auto && auto.kind !== 'none' ? auto.fields : {};
-  const price = priced.unitPriceUSD as number | undefined;
-  if (kind === 'panel') {
-    return {
-      id: `panel-${now}`,
-      catalogItemId: candidate?.id,
-      // Con catálogo, los campos propios del modelo (degradación, eficiencia…) salen del mismo parche que la selección.
-      ...(candidate ? catalogPanelGroupPatch(candidate) : { brandModel: 'Módulos JA Solar JAM66D45-630/LB (630W)', powerW: 630 }),
-      count: 10,
-      unitPriceUSD: price || (candidate?.powerW ? candidate.powerW * 0.17 : 105),
-      ...withoutPrice(priced),
-    } as GroupItem[K];
-  }
-  if (kind === 'inverter') {
-    return {
-      id: `inv-${now}`,
-      catalogItemId: candidate?.id,
-      brandModel: candidate?.displayName || 'Inversor Huawei SUN2000-5KTL-M1 (5.0kW)',
-      powerKW: candidate?.powerKW || 5.0,
-      count: 1,
-      unitPriceUSD: price || (candidate?.powerKW ? candidate.powerKW * 220 : 1100),
-      ...withoutPrice(priced),
-    } as GroupItem[K];
-  }
-  return {
-    id: `battery-${now}`,
-    catalogItemId: candidate?.id,
-    brandModel: candidate?.displayName || 'Batería Dyness A48100 (5.12 kWh)',
-    capacityKWh: candidate?.capacityKWh || 5.12,
-    count: 1,
-    unitPriceUSD: price || (candidate?.capacityKWh ? candidate.capacityKWh * 160 : 850),
-    ...withoutPrice(priced),
-    dodPct: resolveBatteryDodPct(candidate?.dodPct),
-    efficiencyPct: resolveBatteryEfficiencyPct(candidate?.batteryEfficiencyPct),
-  } as GroupItem[K];
-}
-
-/** Campos de precio de `autoPriceFields` sin `unitPriceUSD` (que «+» resuelve con su estimación) y sin claves vacías. */
-function withoutPrice(fields: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(fields).filter(([key, value]) => key !== 'unitPriceUSD' && value !== undefined));
-}
-
-/**
- * Campos que un modelo secundario toma del catálogo, más su precio del resolvedor único (oferta → genérico → sin precio);
- * nunca el precio del modelo anterior.
- */
-function secondaryCatalogExtras(kind: EquipmentKind, item: SolarEquipmentItem, generic: ReturnType<GenericPriceLookup>): Record<string, unknown> {
-  const price = autoPriceFields(item, generic).fields;
-  if (kind === 'panel') return { ...catalogPanelGroupPatch(item), ...price };
-  if (kind === 'inverter') return { powerKW: item.powerKW || 5.0, ...price };
-  return { capacityKWh: item.capacityKWh || 5.12, ...price, dodPct: resolveBatteryDodPct(item.dodPct), efficiencyPct: resolveBatteryEfficiencyPct(item.batteryEfficiencyPct) };
-}
-
-/** Cantidad en unidades enteras, mínimo 1: el Stepper acepta fracciones y los equipos no se cuentan en fracciones. */
-export function wholeCount(count: number): number {
-  return Number.isFinite(count) ? Math.max(1, Math.trunc(count)) : 1;
+  return buildDomainNewItem(kind, specs, catalog, now, genericFor);
 }
 
 export interface GroupActions<K extends EquipmentKind> {
@@ -179,27 +123,14 @@ export function createGroupActions<K extends EquipmentKind>(
   const commit = (patch: Partial<SystemSpecs>) => {
     if (Object.keys(patch).length > 0) updateSpecs(patch);
   };
-  const update = (index: number, patch: Partial<GroupItem[K]>) => commit(editEquipmentGroup(specs, kind, { type: 'update', index, patch }));
-  const field = KIND_CONFIG[kind].magnitudeField;
   return {
-    add: () => {
-      const edit = editEquipmentGroup(specs, kind, { type: 'add', item: buildNewItem(kind, specs, catalog, Date.now(), genericFor) });
-      // Con varios modelos la cantidad de paneles ya no se calcula sola; una batería nueva implica «con batería».
-      commit({ ...edit, ...(kind === 'panel' ? { autoCalculatePanels: false } : {}), ...(kind === 'battery' ? { hasBattery: true } : {}) });
-    },
-    remove: index => commit(editEquipmentGroup(specs, kind, { type: 'remove', index })),
-    update,
-    select: (index, item) => {
-      const generic = genericFor?.(item.id);
-      if (index === 0) return commit(buildCatalogSelectionUpdate(specs, kind, item, generic));
-      commit(selectCatalogEquipment(specs, kind, index, item, secondaryCatalogExtras(kind, item, generic) as Partial<GroupItem[K]>));
-    },
-    setCount: (index, count) => update(index, { count: wholeCount(count) } as Partial<GroupItem[K]>),
-    setBrand: (index, brandModel) => {
-      const group = itemsOf(specs, kind)[index];
-      update(index, { brandModel, ...(group ? detachedCatalogIdentity(kind, group, brandModel, catalog, catalog.length > 0) : {}) } as Partial<GroupItem[K]>);
-    },
-    setMagnitude: (index, value) => update(index, { [field]: value } as Partial<GroupItem[K]>),
+    add: () => commit(groupAddPatch(kind, specs, catalog, Date.now(), genericFor)),
+    remove: index => commit(groupRemovePatch(kind, specs, index)),
+    update: (index, patch) => commit(groupUpdatePatch(kind, specs, index, patch)),
+    select: (index, item) => commit(groupSelectPatch(kind, specs, index, item, genericFor?.(item.id))),
+    setCount: (index, count) => commit(groupCountPatch(kind, specs, index, count)),
+    setBrand: (index, brandModel) => commit(groupBrandPatch(kind, specs, index, brandModel, catalog)),
+    setMagnitude: (index, value) => commit(groupMagnitudePatch(kind, specs, index, value)),
   };
 }
 

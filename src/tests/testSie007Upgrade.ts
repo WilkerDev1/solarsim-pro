@@ -10,6 +10,7 @@ import {
 } from '../domain/netMeteringUpgrade';
 import { DEFAULT_RD_TARIFF_MATRIX, referenceBillingTariff } from '../data/rdTariffs';
 import type { LegacyProjectSpecs, ProjectSimulation, UtilityRates } from '../types';
+import { EMPTY_UNDO_HISTORY } from '../store/undo/projectUndoJournal';
 
 /**
  * Fase 7 del plan tarifario: propuestas existentes en el régimen anterior (`legacy_retention`).
@@ -191,13 +192,13 @@ assert.doesNotMatch(renderRates(project(), false), /data-sie007-upgrade/, 'la or
 
 // ── 6. Pulsar «Actualizar» pasa por el store (applyProjectEdit) y deshacer devuelve el estado previo exacto ──
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const UNDO_DEBOUNCE_MS = 700; // recordUndoState agrupa en 600 ms
+const UNDO_DEBOUNCE_MS = 700; // el diario agrupa las ediciones seguidas en una ventana de 600 ms
 {
   const original = store.getState();
   const saved = project({ energyRateSource: 'manual' }, { id: 'fase7-undo' });
   const savedRates = structuredClone(saved.rates);
   try {
-    store.setState({ projects: [structuredClone(saved)], activeProjectId: saved.id, equipmentCatalog: [], undoStack: [], redoStack: [], canUndo: false, canRedo: false, triggerAutoSync: noop });
+    store.setState({ projects: [structuredClone(saved)], activeProjectId: saved.id, equipmentCatalog: [], undoHistory: EMPTY_UNDO_HISTORY, canUndo: false, canRedo: false, triggerAutoSync: noop });
     store.getState().setActiveProject(saved.id, 'simulator');
     const plan = planSie007Upgrade(store.getState().projects[0].rates)!;
     store.getState().updateRates(plan.patch);
@@ -211,10 +212,12 @@ const UNDO_DEBOUNCE_MS = 700; // recordUndoState agrupa en 600 ms
     assert.deepEqual(restored.rates, savedRates, 'deshacer devuelve las tarifas exactas');
     assert.equal('netMeteringRegime' in restored.rates, false, 'sin el campo de régimen');
     assert.equal('gridUseChargeDOPPerKWh' in restored.rates, false, 'ni el cargo');
-    // El historial guarda instantáneas JSON (sin claves `undefined`), igual que el resto de ediciones.
+    // Deshacer solo restaura las rutas del paso (aquí, las tarifas): el resto queda tal cual estaba, sin pasar por JSON.
     const asJson = <T>(value: T): T => JSON.parse(JSON.stringify(value));
-    assert.deepEqual(restored.specs, asJson(saved.specs), 'specs intactas');
-    assert.deepEqual(restored.financials, asJson(saved.financials), 'finanzas intactas');
+    assert.deepEqual(asJson(restored.specs), asJson(saved.specs), 'specs intactas');
+    assert.deepEqual(restored.specs, upgraded.specs, 'deshacer no toca las specs');
+    assert.deepEqual(asJson(restored.financials), asJson(saved.financials), 'finanzas intactas');
+    assert.deepEqual(restored.financials, upgraded.financials, 'ni las finanzas');
     assert.deepEqual(restored.monthlyConsumption, saved.monthlyConsumption, 'consumo intacto');
   } finally {
     store.setState(original, true);

@@ -390,6 +390,14 @@ export function calculateIRR(initialInvestment: number, cashFlows: number[]): nu
  */
 export const resolveAnnualDegradationPct = (specs: SystemSpecs): number => resolveAnnualDegradation(specs);
 
+/**
+ * Regla única del precio directo ($/W): el modo explícito, o una propuesta Simple sin `pricingMode` (lo heredado: un .json
+ * importado, una pasada a «Catálogo» antes de que se escribiera el modo, un borrador de IA antiguo). En ese modo el precio
+ * base no depende del costo de los equipos. La usan el motor y `proposalCompleteness`.
+ */
+export const isDirectWattPricing = (specs: Pick<SystemSpecs, 'pricingMode' | 'isDetailed'>): boolean =>
+  specs.pricingMode === 'direct_watt' || (!specs.isDetailed && specs.pricingMode !== 'cost_matrix');
+
 export function calculateFinancialSummary(
   provinceName: string,
   specs: SystemSpecs,
@@ -410,7 +418,7 @@ export function calculateFinancialSummary(
   const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp, customItems, customDiscounts, rates);
 
   // Pricing Mode: 'cost_matrix' (default) vs 'direct_watt' (manual $/W or $/kW base price)
-  const isDirectWatt = specs.pricingMode === 'direct_watt' || (!specs.isDetailed && specs.pricingMode !== 'cost_matrix');
+  const isDirectWatt = isDirectWattPricing(specs);
   const effectivePricePerWatt = resolvePricePerWattUSD(specs, financials);
 
   const customItemsTotalUSD = Math.round(customItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPriceUSD || 0)), 0) * 100) / 100;

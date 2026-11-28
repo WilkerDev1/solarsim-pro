@@ -11,114 +11,65 @@ import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { restoreProjectContent } from '../sync/projectMutation';
 import { equipmentTotals, readEquipment } from '../../../shared/equipment';
 import { SimulationSlice, VersionHistorySlice } from '../types';
+import { DEFAULT_EDIT_COALESCE_KEY, EMPTY_UNDO_HISTORY, activateJournal, dropJournal, recordUndo, redoStep, undoAvailability, undoStep, type UndoHistory, type UndoSnapshot } from '../undo/projectUndoJournal';
 import { ProjectSimulation, ProjectSnapshot, DiffFieldChange, ProjectConflictInfo } from '../../types';
 
-let undoDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-let lastRecordedProjectId: string | null = null;
+/** Solo vuelven las rutas del paso, también las que valían `undefined` (la instantánea JSON no tiene esa clave); el resto queda como está. */
+const asRestoreSource = (project: ProjectSimulation, snapshot: UndoSnapshot, paths: string[]): ProjectSimulation =>
+  ({ ...project, ...Object.fromEntries(paths.map((path) => [path, (snapshot as Record<string, unknown>)[path]])) });
 
-export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (set, get) => ({
-  undoStack: [],
-  redoStack: [],
+/** Indicadores de los botones para la propuesta activa: solo su propio diario cuenta. */
+const flags = (history: UndoHistory, activeProjectId: string) => undoAvailability(history, activeProjectId);
+
+export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (set, get) => {
+  /** Deshacer o rehacer en el diario de la propuesta activa; restaura como `restore` (sin reglas de edición), igual que antes. */
+  const move = (direction: 'undo' | 'redo') => {
+    const { activeProjectId, projects } = get();
+    const current = projects.find((p) => p.id === activeProjectId);
+    // La papelera es de solo lectura también para el historial.
+    if (!current || current.isDeleted) return;
+    let history = get().undoHistory;
+    // La activa cambió sin pasar por activateUndoJournal (p. ej. un setState directo): se activa SU diario, nunca el de otra.
+    if (history.activeId !== activeProjectId) history = activateJournal(history, current);
+    const result = direction === 'undo' ? undoStep(history, activeProjectId, current) : redoStep(history, activeProjectId, current);
+    if (!result) return commit(history);
+    set((state) => ({
+      undoHistory: result.history,
+      ...flags(result.history, activeProjectId),
+      projects: state.projects.map((p) => (p.id === activeProjectId ? restoreProjectContent(p, asRestoreSource(p, result.snapshot, result.entry.paths.map((change) => change.path)), get().syncSettings) : p)),
+    }));
+    get().triggerAutoSync();
+  };
+
+  /** Guarda un diario nuevo y sus indicadores; sin cambios no escribe (ni notifica a los suscriptores). */
+  const commit = (undoHistory: UndoHistory) => {
+    if (undoHistory !== get().undoHistory) set({ undoHistory, ...flags(undoHistory, get().activeProjectId) });
+  };
+
+  return {
+  undoHistory: EMPTY_UNDO_HISTORY,
   canUndo: false,
   canRedo: false,
   snapshotsByProject: {},
   activeConflict: null,
   projectConflicts: {},
 
-  recordUndoState: (project) => {
-    if (!project || !project.id) return;
-
-    const generation = get().sessionGeneration;
-    // Deep clone state to freeze snapshot
-    const cloned = JSON.parse(JSON.stringify(project));
-
-    // If switching projects or starting fresh, initialize base immediately
-    if (lastRecordedProjectId !== project.id || get().undoStack.length === 0) {
-      if (undoDebounceTimer) clearTimeout(undoDebounceTimer);
-      lastRecordedProjectId = project.id;
-      set({
-        undoStack: [cloned],
-        redoStack: [],
-        canUndo: false,
-        canRedo: false,
-      });
-      return;
-    }
-
-    if (undoDebounceTimer) {
-      clearTimeout(undoDebounceTimer);
-    }
-
-    undoDebounceTimer = setTimeout(() => {
-      if (get().sessionGeneration !== generation) return;
-      set((state) => {
-        let currentStack = state.undoStack;
-        if (lastRecordedProjectId !== project.id) {
-          currentStack = [cloned];
-          lastRecordedProjectId = project.id;
-        }
-
-        // Un estado idéntico al último no es un paso: abrir o reabrir una propuesta no deja entradas de deshacer (ADR 0004).
-        const last = currentStack[currentStack.length - 1];
-        if (currentStack === state.undoStack && last && JSON.stringify(last) === JSON.stringify(cloned)) return {};
-        const newStack = [...currentStack, cloned].slice(-50); // Keep max 50
-        return {
-          undoStack: newStack,
-          redoStack: [], // Clear redo on new action
-          canUndo: newStack.length > 1,
-          canRedo: false,
-        };
-      });
-    }, 600);
+  recordUndoState: (project, options) => {
+    const state = get();
+    if (!project?.id || project.id !== state.activeProjectId) return;
+    commit(recordUndo(state.undoHistory, project, { source: 'user', coalesceKey: DEFAULT_EDIT_COALESCE_KEY, ...options, now: Date.now() }));
   },
 
-  undo: () => {
-    const { undoStack, redoStack, activeProjectId, projects } = get();
-    if (undoStack.length <= 1) return;
-    // La papelera es de solo lectura también para el historial.
-    if (projects.find((p) => p.id === activeProjectId)?.isDeleted) return;
-
-    const currentProject = projects.find((p) => p.id === activeProjectId);
-    if (!currentProject) return;
-
-    // Pop the current state
-    const newUndoStack = [...undoStack];
-    const currentState = newUndoStack.pop()!;
-    const previousState = newUndoStack[newUndoStack.length - 1];
-
-    if (!previousState) return;
-
-    // Push current to redo
-    const newRedoStack = [...redoStack, currentState];
-
-    set((state) => ({
-      undoStack: newUndoStack,
-      redoStack: newRedoStack,
-      canUndo: newUndoStack.length > 1,
-      canRedo: true,
-      projects: state.projects.map((p) => (p.id === activeProjectId ? restoreProjectContent(p, previousState, get().syncSettings) : p)),
-    }));
-    get().triggerAutoSync();
+  activateUndoJournal: (project) => {
+    const state = get();
+    if (!project?.id || project.id !== state.activeProjectId) return;
+    commit(activateJournal(state.undoHistory, project));
   },
 
-  redo: () => {
-    const { undoStack, redoStack, activeProjectId, projects } = get();
-    if (redoStack.length === 0) return;
-    if (projects.find((p) => p.id === activeProjectId)?.isDeleted) return;
+  forgetUndoJournal: (projectId) => commit(dropJournal(get().undoHistory, projectId)),
 
-    const newRedoStack = [...redoStack];
-    const nextState = newRedoStack.pop()!;
-    const newUndoStack = [...undoStack, nextState];
-
-    set((state) => ({
-      undoStack: newUndoStack,
-      redoStack: newRedoStack,
-      canUndo: true,
-      canRedo: newRedoStack.length > 0,
-      projects: state.projects.map((p) => (p.id === activeProjectId ? restoreProjectContent(p, nextState, get().syncSettings) : p)),
-    }));
-    get().triggerAutoSync();
-  },
+  undo: () => move('undo'),
+  redo: () => move('redo'),
 
   createSnapshot: (projectId, label, notes = '', type = 'manual') => {
     const project = get().projects.find((p) => p.id === projectId);
@@ -353,4 +304,5 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     });
     get().triggerAutoSync();
   },
-});
+};
+};

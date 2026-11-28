@@ -5,7 +5,7 @@ import type { AgentSource, AgentToolCall, AgentToolDefinition, AgentToolOutcome 
 import type { AgentCard } from '../../../shared/agentCards';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { isWriterRole } from '../../../shared/permissions';
-import { agentPolicyKey, installAgentRuntime, type AgentActivityEntry, type AgentSourcePolicy, type AgentChange, type PendingAgentAction } from '../../store/slices/agentSlice';
+import { agentPolicyKey, installAgentRuntime, type AgentActivityEntry, type AgentChange, type PendingAgentAction } from '../../store/slices/agentSlice';
 import { editableAssistantFields } from '../assistant/validation';
 import { applyAssistantAction, assistantOwner, executeAssistantTool } from '../assistant/tools';
 import type { AgentToolContext, NativeHandler, NativePlan } from './nativeTools';
@@ -18,6 +18,7 @@ import { PRICE_TOOL_HANDLERS } from './priceTools';
 import { touchesPricing } from '../assistant/pricingFields';
 import { assistantFieldLabel, assistantValueLabel } from '../assistant/labels';
 import type { AssistantAction, AssistantCard, AssistantToolResult } from '../assistant/types';
+import { decideAgentToolPermission, type AgentToolScope } from './permissionProfile';
 
 export type { AgentToolContext } from './nativeTools';
 const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS, ...ATTACHMENT_TOOL_HANDLERS, ...CLIENT_TOOL_HANDLERS, ...PRICE_TOOL_HANDLERS };
@@ -120,6 +121,8 @@ function runNativePlan(plan: NativePlan, meta: PlanMeta) {
   const activityId = store().recordAgentActivity({
     ...meta, targetType: plan.targetType, targetId: execution.targetId, title: plan.title, changes: execution.changes ?? plan.changes, undo: execution.undo,
     ...(execution.subject ? { subject: execution.subject } : {}),
+    ...(execution.activity?.turnId ? { turnId: execution.activity.turnId } : {}),
+    ...(execution.activity?.editKey ? { editKey: execution.activity.editKey } : {}),
   });
   return { activityId, execution };
 }
@@ -249,7 +252,17 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   return { status: 'pending_confirmation', actionId: action.id, summary: action.title, cards: [...(cards ?? []), pendingCard(action.id, action.title, changes)] };
 }
 
-async function executeNative(handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolOutcome> {
+/**
+ * Ejecuta una herramienta nativa con las MISMAS reglas de permisos que las compartidas (política por fuente, rol actual,
+ * confirmación, bypass y sus excepciones). La usan las herramientas propias del asistente de la app (F3a,
+ * `appAssistant/toolset.ts`), que no están en `shared/agentTools/definitions.ts`. `scope: 'proposal'` (F3b) dice que el plan
+ * solo cambia una propuesta y tiene deshacer: con el perfil «edición en vivo» el asistente de la app lo aplica al momento
+ * (`permissionProfile.ts`); sin él, `shared`, la decisión de siempre.
+ */
+export const runNativeTool = (handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext, options: { scope?: AgentToolScope } = {}) =>
+  executeNative(handler, definition, args, ctx, options.scope ?? 'shared');
+
+async function executeNative(handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext, scope: AgentToolScope = 'shared'): Promise<AgentToolOutcome> {
   if (ctx.owner !== assistantOwner()) return { status: 'error', code: 'stale_owner', message: 'El espacio o la sesión cambió.' };
   let result;
   try {
@@ -266,15 +279,13 @@ async function executeNative(handler: NativeHandler, definition: AgentToolDefini
   const kind = definition.kind === 'guarded' ? 'guarded' : 'draft';
   // The policy or the account role may have changed while the handler awaited: decide with today's permissions,
   // never with the ones captured before the await.
-  const policy: AgentSourcePolicy = store().agentPolicy[agentPolicyKey(ctx.source)];
-  if (policy[kind] === 'deny')
+  // Una sola decisión (permissionProfile.ts): política por fuente, perfil «edición en vivo», bypass y sus excepciones.
+  const decision = decideAgentToolPermission(store().agentPolicy, { source: ctx.source, kind, scope, undoable: !BYPASS_EXEMPT_TOOLS.has(definition.name) });
+  if (decision === 'deny')
     return { status: 'error', code: 'denied', message: 'Los permisos de agentes de este dispositivo no permiten esta acción.' };
   if (!canWriteNow()) return { status: 'error', code: 'tool_failed', message: 'Tu cuenta solo puede consultar.' };
   const meta = { source: ctx.source, clientLabel: ctx.clientLabel, tool: definition.name, kind } as const;
-  // In the proposal assistant the user already reviewed and clicked «Aplicar»: that click is the confirmation.
-  const confirmedInUi = ctx.source === 'proposal-assistant' && policy.draft === 'confirm';
-  const bypassed = kind === 'guarded' && policy.guarded === 'allow' && !BYPASS_EXEMPT_TOOLS.has(definition.name);
-  if ((kind === 'draft' && (policy.draft === 'allow' || confirmedInUi)) || bypassed) {
+  if (decision === 'apply') {
     try {
       const { activityId, execution } = runNativePlan(result.plan, meta);
       return { status: 'applied', data: { status: 'applied', ...(execution.data as object) }, activityId, cards: execution.cards ?? result.cards };

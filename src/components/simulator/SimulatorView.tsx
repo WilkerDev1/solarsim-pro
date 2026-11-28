@@ -1,5 +1,5 @@
 import { isReaderRole } from '../../../shared/permissions';
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { draggedSidebarWidth } from './sidebar/sidebarWidth';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,9 +9,12 @@ import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationA
 import { Shield, Trash2, RotateCcw, ArrowLeft, Undo2, Redo2 } from 'lucide-react';
 import { ParameterSidebar } from './sidebar/ParameterSidebar';
 import { SAMPLE_GPS_COORDINATES } from './params/logic/dockDefaults';
+import { createDockWriters, DOCK_COMMIT_OPTIONS } from './params/logic/dockEdits';
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
 import { QuotationEquipmentsTab } from './tabs/QuotationEquipmentsTab';
 import { FinancialReturnTab } from './tabs/FinancialReturnTab';
+import { IncompleteNotice, ResultsPending } from './ProposalStatusHints';
+import { proposalResults } from '../../domain/proposalCompleteness';
 import { confirmAction } from '../common/confirmAction';
 
 export const SimulatorView: React.FC = () => {
@@ -20,10 +23,8 @@ export const SimulatorView: React.FC = () => {
     activeProjectId,
     getActiveProject,
     getFinancialSummary,
-    updateClient,
+    commitProjectEdits,
     updateSpecs,
-    updateRates,
-    updateFinancials,
     updateMonthlyConsumption,
     updateAllMonthlyConsumption,
     setMonthlyConsumption,
@@ -39,10 +40,18 @@ export const SimulatorView: React.FC = () => {
     canRedo,
     undo,
     redo,
-  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId, getActiveProject: s.getActiveProject, getFinancialSummary: s.getFinancialSummary, updateClient: s.updateClient, updateSpecs: s.updateSpecs, updateRates: s.updateRates, updateFinancials: s.updateFinancials, updateMonthlyConsumption: s.updateMonthlyConsumption, updateAllMonthlyConsumption: s.updateAllMonthlyConsumption, setMonthlyConsumption: s.setMonthlyConsumption, openAIInvoiceModal: s.openAIInvoiceModal, syncSettings: s.syncSettings, sidebarWidth: s.sidebarWidth, setSidebarWidth: s.setSidebarWidth, restoreProject: s.restoreProject, hardDeleteProject: s.hardDeleteProject, setActiveView: s.setActiveView, setIsTrashActive: s.setIsTrashActive, canUndo: s.canUndo, canRedo: s.canRedo, undo: s.undo, redo: s.redo, energyMode: energyCalculationMode(effectiveFeatureSettings(s)) })));
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId, getActiveProject: s.getActiveProject, getFinancialSummary: s.getFinancialSummary, commitProjectEdits: s.commitProjectEdits, updateSpecs: s.updateSpecs, updateMonthlyConsumption: s.updateMonthlyConsumption, updateAllMonthlyConsumption: s.updateAllMonthlyConsumption, setMonthlyConsumption: s.setMonthlyConsumption, openAIInvoiceModal: s.openAIInvoiceModal, syncSettings: s.syncSettings, sidebarWidth: s.sidebarWidth, setSidebarWidth: s.setSidebarWidth, restoreProject: s.restoreProject, hardDeleteProject: s.hardDeleteProject, setActiveView: s.setActiveView, setIsTrashActive: s.setIsTrashActive, canUndo: s.canUndo, canRedo: s.canRedo, undo: s.undo, redo: s.redo, energyMode: energyCalculationMode(effectiveFeatureSettings(s)) })));
 
   const project = getActiveProject();
   const summary = getFinancialSummary();
+  // F2b (ADR 0009): sin los mínimos para calcular, los resultados se muestran vacíos con su motivo, nunca en cero.
+  // `results.summary === null` ⇒ «Resultados pendientes» (la decisión pura del dominio, probada en testProposalCompleteness).
+  const results = useMemo(() => proposalResults(project, 'legacy', summary), [project, summary]);
+  const completeness = results;
+  // F2a2: el dock escribe por la transacción de edición (un lote = una escritura, un autosync y un paso de deshacer).
+  // Atado al id de la propuesta que se ve: una respuesta tardía (radiación NASA) cae en la propuesta donde se pidió.
+  const projectId = project.id;
+  const dock = useMemo(() => createDockWriters((edits) => commitProjectEdits(projectId, edits, DOCK_COMMIT_OPTIONS)), [commitProjectEdits, projectId]);
 
   // Navigation tab for the right content area
   const [activeMainTab, setActiveMainTab] = useState<'energia' | 'cotizacion' | 'retorno'>('energia');
@@ -129,7 +138,7 @@ export const SimulatorView: React.FC = () => {
 
     try {
       const result = await fetchSolarRadiationByCoordinates(parts[0], parts[1]);
-      updateClient({
+      dock.updateClient({
         customMonthlyHSP: result.monthlyHSP,
         solarSourceMode: 'gps',
       });
@@ -154,10 +163,11 @@ export const SimulatorView: React.FC = () => {
         isFetchingSolar={isFetchingSolar}
         solarApiStatus={solarApiStatus}
         onFetchSolarApi={handleFetchSolarApi}
-        updateClient={project.isDeleted ? () => {} : updateClient}
-        updateSpecs={project.isDeleted ? () => {} : updateSpecs}
-        updateRates={project.isDeleted ? () => {} : updateRates}
-        updateFinancials={project.isDeleted ? () => {} : updateFinancials}
+        updateClient={project.isDeleted ? () => {} : dock.updateClient}
+        updateSpecs={project.isDeleted ? () => {} : dock.updateSpecs}
+        updateRates={project.isDeleted ? () => {} : dock.updateRates}
+        updateFinancials={project.isDeleted ? () => {} : dock.updateFinancials}
+        updateRatesAndSpecs={project.isDeleted ? () => {} : dock.updateRatesAndSpecs}
       />
 
       {/* Main Content Area */}
@@ -298,10 +308,12 @@ export const SimulatorView: React.FC = () => {
 
         {/* Scrollable Container for Tab Contents */}
         <div className="flex-1 overflow-y-auto p-6 gap-6 flex flex-col min-h-0">
+          <IncompleteNotice completeness={completeness} />
           {activeMainTab === 'energia' && (
             <EnergyAnalysisTab
               project={project}
               summary={summary}
+              completeness={completeness}
               openAIInvoiceModal={openAIInvoiceModal}
               updateMonthlyConsumption={updateMonthlyConsumption}
               updateAllMonthlyConsumption={updateAllMonthlyConsumption}
@@ -310,19 +322,21 @@ export const SimulatorView: React.FC = () => {
             />
           )}
 
-          {activeMainTab === 'cotizacion' && (
+          {activeMainTab === 'cotizacion' && !results.summary && <ResultsPending completeness={completeness} title="Cotización pendiente" />}
+          {activeMainTab === 'cotizacion' && results.summary && (
             <QuotationEquipmentsTab
               project={project}
-              summary={summary}
+              summary={results.summary}
               costTableCurrency={costTableCurrency}
               setCostTableCurrency={setCostTableCurrency}
             />
           )}
 
-          {activeMainTab === 'retorno' && (
+          {activeMainTab === 'retorno' && !results.summary && <ResultsPending completeness={completeness} title="Retorno pendiente" />}
+          {activeMainTab === 'retorno' && results.summary && (
             <FinancialReturnTab
               project={project}
-              summary={summary}
+              summary={results.summary}
             />
           )}
         </div>

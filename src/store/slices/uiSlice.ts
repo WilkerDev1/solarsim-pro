@@ -1,4 +1,5 @@
 import { SimulationSlice, UISlice } from '../types';
+import { proposalActionBlock } from '../../domain/proposalCompleteness';
 
 export const createUISlice: SimulationSlice<UISlice> = (set, get) => ({
   activeQuotationId: null,
@@ -25,7 +26,10 @@ export const createUISlice: SimulationSlice<UISlice> = (set, get) => ({
     activeView: s.activeQuotationId && s.quotations.some((q) => q.id === s.activeQuotationId) ? 'quotation-editor' : 'quotations-hub',
   })),
   appAssistantEnabled: false,
-  setAppAssistantEnabled: (enabled) => set({ appAssistantEnabled: enabled === true }),
+  appAssistantEnabledChosenByUser: false,
+  appAssistantDefaultsVersion: 0,
+  // Usar el interruptor es una elección: la migración del encendido (appAssistantEnablement.ts) nunca la pisa.
+  setAppAssistantEnabled: (enabled) => set({ appAssistantEnabled: enabled === true, appAssistantEnabledChosenByUser: true }),
   isNewProjectModalOpen: false,
   isUpdateModalOpen: false,
   isAIInvoiceModalOpen: false,
@@ -58,7 +62,17 @@ export const createUISlice: SimulationSlice<UISlice> = (set, get) => ({
   closeSupplierPriceModal: () => set({ supplierPriceModalEquipment: null }),
   openAISettingsModal: () => set({ isSettingsModalOpen: true, settingsActiveTab: 'ai' }),
   closeAISettingsModal: () => set({ isSettingsModalOpen: false }),
-  openShareModal: () => set({ isShareModalOpen: true }),
+  openShareModal: () => {
+    // F2b (ADR 0009): una propuesta incompleta no se comparte (lo mismo desde el resumen, el PDF, el menú o la cabecera).
+    const active = get().projects.find((p) => p.id === get().activeProjectId);
+    const block = active ? proposalActionBlock(active) : { blocked: false, reason: null };
+    if (block.blocked) {
+      set({ saveFeedbackMessage: `La propuesta está incompleta. ${block.reason}` });
+      setTimeout(() => { if (get().saveFeedbackMessage?.startsWith('La propuesta está incompleta')) set({ saveFeedbackMessage: null }); }, 5000);
+      return;
+    }
+    set({ isShareModalOpen: true });
+  },
   closeShareModal: () => set({ isShareModalOpen: false }),
   openSettingsModal: (tab = 'sync') => set({ isSettingsModalOpen: true, settingsActiveTab: tab }),
   closeSettingsModal: () => set({ isSettingsModalOpen: false }),

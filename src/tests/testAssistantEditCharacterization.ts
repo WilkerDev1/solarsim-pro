@@ -11,6 +11,7 @@ import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { executeForAssistant } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { probeStore, settleUndoDebounce } from './support/storeProbe';
+import { EMPTY_UNDO_HISTORY } from '../store/undo/projectUndoJournal';
 
 const store = useSimulationStore;
 const INITIAL_UPDATED_AT = '2026-01-01T00:00:00.000Z';
@@ -21,7 +22,7 @@ const inverter = catalog.find((e) => e.type === 'inverter')!;
 const reset = (policy = DEFAULT_AGENT_POLICY) => store.setState({
   appAssistantEnabled: true, workspaceScope: 'local', projects: [structuredClone(project)], activeProjectId: project.id, activeView: 'simulator',
   equipmentCatalog: structuredClone(catalog), deletedEquipmentIds: [], equipmentConflicts: {}, sessionGeneration: 0,
-  agentPolicy: policy, agentActivity: [], pendingAgentActions: [], undoStack: [], redoStack: [], canUndo: false, canRedo: false,
+  agentPolicy: policy, agentActivity: [], pendingAgentActions: [], undoHistory: EMPTY_UNDO_HISTORY, canUndo: false, canRedo: false,
   syncSettings: { ...store.getState().syncSettings, currentUser: null, authToken: null, autoSyncEnabled: false },
 });
 /** Estado de partida realista: la propuesta está abierta (su base ya está en el historial de Ctrl+Z, como al abrirla en la app). */
@@ -65,7 +66,11 @@ assert.deepEqual(engine(), BEFORE, 'ni cambia el resultado del motor');
 probe.reset();
 const confirmed = store.getState().confirmAgentAction(planned.action.id);
 assert.equal(confirmed.success, true);
-assert.deepEqual(probe.writes, [['projects'], ['projects'], ['projects'], ['agentActivity'], ['pendingAgentActions']],
+// F2a1: el diario de deshacer se actualiza en la MISMA escritura que la edición (antes, un temporizador de 600 ms lo escribía
+// después); por eso cada escritura a projects lleva también `undoHistory` (y `canUndo` la primera). El número de escrituras no cambia.
+const PROJECT_WRITE = ['projects', 'undoHistory'];
+const FIRST_PROJECT_WRITE = ['projects', 'undoHistory', 'canUndo'];
+assert.deepEqual(probe.writes, [FIRST_PROJECT_WRITE, PROJECT_WRITE, PROJECT_WRITE, ['agentActivity'], ['pendingAgentActions']],
   'tres escrituras a projects (una por sección editada: client, specs y rates), luego el registro de actividad y el estado de la cola');
 assert.deepEqual(probe.syncCalls, [false, false, false], 'triggerAutoSync(false) tras cada escritura a projects; ninguna sincronización inmediata');
 assert.equal(probe.updatedAtStamps.length, 3);
@@ -89,11 +94,14 @@ assert.equal(entry.source, 'app-assistant');
 assert.equal(entry.kind, 'guarded');
 assert.equal(entry.tool, 'propose_project_update');
 assert.deepEqual(entry.undo?.fields, ['client', 'specs', 'rates', 'financials', 'monthlyConsumption', 'customization'], 'el deshacer guarda las seis secciones del proyecto');
-assert.equal(store.getState().undoStack.length, 1, 'el historial de Ctrl+Z aún solo tiene la base: la entrada nueva se agrupa 600 ms');
+// F2a1: las tres escrituras se agrupan en el acto (misma clave y fuente dentro de la ventana de 600 ms) en un único paso de Ctrl+Z.
+const steps = store.getState().undoHistory.journals[project.id].undo;
+assert.equal(steps.length, 1, 'las tres escrituras son un único paso de Ctrl+Z');
+assert.deepEqual(steps[0].paths.map((p) => p.path).sort(), ['client', 'customization', 'financials', 'rates', 'specs'], 'con las secciones que cambiaron');
 probe.reset();
 await settleUndoDebounce();
-assert.deepEqual(probe.writes, [['undoStack', 'redoStack', 'canUndo']], 'pasado el agrupado, las tres escrituras son un único paso de Ctrl+Z');
-assert.equal(store.getState().undoStack.length, 2);
+assert.deepEqual(probe.writes, [], 'pasada la ventana no queda ninguna escritura diferida');
+assert.equal(store.getState().undoHistory.journals[project.id].undo.length, 1);
 probe.stop();
 
 // 3. El mismo lote con el modo sin confirmación («guarded: allow») deja exactamente el mismo proyecto y el mismo resultado del motor.
@@ -102,7 +110,7 @@ const bypassProbe = probeStore(store, project.id);
 const bypassed = await executeForAssistant(call('Equipos y tarifa', edits()), ctx());
 assert(bypassed.activityId, 'se aplica en el acto y queda registrada');
 assert.equal(bypassed.action, undefined, 'sin tarjeta de confirmación');
-assert.deepEqual(bypassProbe.writes, [['projects'], ['projects'], ['projects'], ['agentActivity']], 'sin cola: no hay escritura de estado pendiente');
+assert.deepEqual(bypassProbe.writes, [FIRST_PROJECT_WRITE, PROJECT_WRITE, PROJECT_WRITE, ['agentActivity']], 'sin cola: no hay escritura de estado pendiente');
 assert.deepEqual(bypassProbe.syncCalls, [false, false, false]);
 assert.deepEqual(engine(), AFTER);
 for (const section of ['client', 'specs', 'rates', 'financials', 'monthlyConsumption'] as const)
@@ -114,7 +122,7 @@ open();
 const draftProbe = probeStore(store, project.id);
 const live = await executeForAssistant(call('Solo tarifa', edits().filter((e) => e.section !== 'specs')), ctx());
 assert(live.activityId);
-assert.deepEqual(draftProbe.writes, [['projects'], ['projects'], ['agentActivity']], 'cliente y tarifa: dos escrituras a projects y el registro');
+assert.deepEqual(draftProbe.writes, [FIRST_PROJECT_WRITE, PROJECT_WRITE, ['agentActivity']], 'cliente y tarifa: dos escrituras a projects y el registro');
 assert.deepEqual(draftProbe.syncCalls, [false, false]);
 assert.equal(store.getState().pendingAgentActions.length, 0);
 draftProbe.stop();

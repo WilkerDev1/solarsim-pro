@@ -9,10 +9,12 @@ interface RatesParamsSectionProps {
   /** El dock ya no pinta según el tema: los tokens pd-* cambian solos. Se acepta para no romper al contenedor. */
   updateRates: (rates: Partial<UtilityRates>) => void;
   updateSpecs?: (specs: Partial<SystemSpecs>) => void;
+  /** Distribuidora o tarifa con su perfil de carga en un solo lote; sin él, dos escrituras (tarifas y specs). */
+  updateRatesAndSpecs?: (rates: Partial<UtilityRates>, specs?: Partial<SystemSpecs> | null) => void;
 }
 
 /** Cuerpo de «Tarifas y distribuidora»: conecta el store con `RatesFields`. */
-export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({ project, updateRates, updateSpecs }) => {
+export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({ project, updateRates, updateSpecs, updateRatesAndSpecs }) => {
   const calculationMode = useEnergyCalculationMode();
   const projectionEnabled = calculationMode === 'self_consumption';
   const tariffMatrix = useSimulationStore(state => state.tariffMatrix);
@@ -25,6 +27,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({ project,
       projectionEnabled={projectionEnabled}
       updateRates={updateRates}
       updateSpecs={updateSpecs}
+      updateRatesAndSpecs={updateRatesAndSpecs}
       showRegimeSelector={showRegimeSelector}
     />
   );

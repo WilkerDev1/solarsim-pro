@@ -1,4 +1,6 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { proposalActionBlock } from '../../../domain/proposalCompleteness';
+import { InfoTip } from '../../simulator/params/ui';
 import { Info, Search, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { formatMoney, type QuotationCurrency } from '../../../../shared/quotations';
@@ -94,6 +96,9 @@ export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ in
   }, [matches, selectedId, projects]);
   const totals = useMemo(() => new Map(shown.map((p) => [p.id, proposalPriceCents(calculateProjectFinancialSummary(p, mode), 'USD', 1)])), [shown, mode]);
   const selected = selectedId ? projects.find((p) => p.id === selectedId && !p.isDeleted) : undefined;
+  // F2b (ADR 0009): una propuesta incompleta se ve en la lista pero no se convierte; el motivo va en un ⓘ.
+  const blocked = useMemo(() => new Map(shown.map((p) => [p.id, proposalActionBlock(p).reason])), [shown]);
+  const selectedBlock = selected ? proposalActionBlock(selected).reason : null;
   // Avisos del borrador que saldría (documentos que no pasan, cliente fuera del directorio…): se muestran discretos.
   const preview = useMemo(() => {
     if (!selected) return null;
@@ -165,7 +170,9 @@ export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ in
                     <span className="qconv-option-name">{proposalName(project)}</span>
                     <span className="qconv-option-meta">{proposalMeta(project, folders)}</span>
                   </span>
-                  <span className="qconv-option-total">{formatMoney(totals.get(project.id) ?? 0, 'USD')}</span>
+                  {blocked.get(project.id)
+                    ? <span className="qconv-option-total">Incompleta <InfoTip label="Por qué no se puede convertir" text={blocked.get(project.id)!} /></span>
+                    : <span className="qconv-option-total">{formatMoney(totals.get(project.id) ?? 0, 'USD')}</span>}
                 </label>
               ))}
             </div>
@@ -200,7 +207,7 @@ export const ConvertProposalDialog: React.FC<ConvertProposalDialogProps> = ({ in
         </div>
         <div className="qconv-actions">
           <button type="button" className="qconv-btn" onClick={onClose}>Cancelar</button>
-          <button type="button" className="qconv-btn qconv-btn-primary" disabled={!selected} onClick={create}>Crear borrador</button>
+          <button type="button" className="qconv-btn qconv-btn-primary" disabled={!selected || !!selectedBlock} title={selectedBlock ?? undefined} onClick={create}>Crear borrador</button>
         </div>
       </div>
     </dialog>
