@@ -339,7 +339,52 @@ for (const value of knownSdkFinishReasons()) assert.notEqual(mapFinishReason(val
   assert.equal(text, 'directo');
 }
 
+// --- Partes que la app no interpreta: ida y vuelta intacta de todo campo que el SDK 3.6.1 conoce.
+// (El serializador del SDK filtra a nivel de parte los campos que no conoce: esos no sobreviven ni aquí ni en ningún
+// cliente del SDK. willContinue/partialArgs de functionCall son solo de Vertex: el SDK lanza si se le reenvían.)
+{
+  const modelParts = [
+    { executableCode: { language: 'PYTHON', code: 'print(1)' } },
+    { codeExecutionResult: { outcome: 'OUTCOME_OK', output: '1' } },
+    { thought: true, thoughtSignature: 'sig-only' },
+    { text: 'con metadatos', partMetadata: { origen: 'x' } },
+    { functionCall: { id: 'c-m', name: 'get_project', args: { projectId: 'p' } }, thoughtSignature: 'sig-m', partMetadata: { k: 1 } },
+  ];
+  let round = 0;
+  const { llm, requests } = client(async () => (++round === 1 ? stop(modelParts) : stop([{ text: 'ok' }])));
+  const first = await llm.generate({ model: 'gemini-4-hydrogen', contents: [user('x')] });
+  await llm.generate({ model: 'gemini-4-hydrogen', contents: [user('x'), first.content, user('y')] });
+  assert.deepEqual(requests[1].body.contents[1].parts, modelParts, 'opaque parts and known-but-uninterpreted fields go back unchanged');
+  // Un functionCall con willContinue (solo Vertex) no rompe la petición siguiente.
+  let hop = 0;
+  const vertexish = client(async () => (++hop === 1 ? stop([{ functionCall: { id: 'c', name: 'f', args: {}, willContinue: false } }]) : stop([{ text: 'ok' }])));
+  const turn = await vertexish.llm.generate({ model: 'gemini-4-hydrogen', contents: [user('x')] });
+  await vertexish.llm.generate({ model: 'gemini-4-hydrogen', contents: [user('x'), turn.content, user('y')] });
+  assert.deepEqual(vertexish.requests[1].body.contents[1].parts, [{ functionCall: { id: 'c', name: 'f', args: {} } }]);
+}
+
+// --- 403: solo es «clave inválida» si el servidor dice API_KEY_INVALID; permiso o servicio deshabilitado no lo son.
+{
+  const forbidden = (status: string, reason: string, message: string) => client(async () => new Response(
+    JSON.stringify({ error: { code: 403, message, status, details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason }] } }),
+    { status: 403, headers: { 'content-type': 'application/json' } },
+  ));
+  const disabled = forbidden('PERMISSION_DENIED', 'SERVICE_DISABLED', 'Generative Language API has not been used in project 1 before or it is disabled.');
+  await assert.rejects(() => disabled.llm.generate({ model: 'gemini-4-hydrogen', contents: [user('x')] }), (e: any) => {
+    assert.equal(e.kind, 'bad_request', 'SERVICE_DISABLED is not a key problem');
+    assert.equal(e.status, 403);
+    assert.match(e.message, /has not been used/, 'the server message reaches the user');
+    return true;
+  });
+  const denied = forbidden('PERMISSION_DENIED', 'ACCESS_DENIED', 'Permission denied on resource.');
+  await assert.rejects(() => denied.llm.generate({ model: 'gemini-4-hydrogen', contents: [user('x')] }), (e: any) => e.kind === 'bad_request');
+  const badKey = forbidden('PERMISSION_DENIED', 'API_KEY_INVALID', 'API key expired.');
+  await assert.rejects(() => badKey.llm.generate({ model: 'gemini-4-hydrogen', contents: [user('x')] }), (e: any) => e.kind === 'invalid_key');
+  const unauthorized = client(async () => { throw new GeminiRequestError('Request had invalid authentication credentials.', 401); });
+  await assert.rejects(() => unauthorized.llm.generate({ model: 'gemini-4-hydrogen', contents: [user('x')] }), (e: any) => e.kind === 'invalid_key');
+}
+
 // --- Sin clave no hay petición.
 assert.throws(() => createGeminiLlmClient({ apiKey: '  ', fetch: async () => { throw new Error('no'); } }), /API Key/);
 
-console.log('LlmClient adapter contract (v1beta, key header, no SDK retries/continuation/AFC, abort reason, signatures) passed.');
+console.log('LlmClient adapter contract (v1beta, key header, no SDK retries/continuation, function declarations only, abort reason, signatures, opaque parts) passed.');

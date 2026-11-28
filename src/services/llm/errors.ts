@@ -5,7 +5,7 @@ import type { LlmFinishReason } from './types';
  * mirando `kind`, nunca el adaptador.
  * - `cancelled`: la señal de quien llama se abortó; `reason` lleva su motivo.
  * - `timeout`: venció nuestro plazo del intento.
- * - `rate_limited` (429), `server` (5xx y 408 del servidor), `invalid_key` (clave rechazada), `bad_request` (otro 4xx,
+ * - `rate_limited` (429), `server` (5xx y 408 del servidor), `invalid_key` (401 o API_KEY_INVALID), `bad_request` (otro 4xx, 403 de permiso incluido,
  *   con el mensaje del servidor), `not_found` (404: modelo inexistente o retirado), `network` (sin respuesta HTTP).
  * - `malformed_response`: la respuesta no se pudo leer o no trae lo pedido (JSON inválido, salida truncada).
  * - `blocked`: la petición o la respuesta se bloqueó por seguridad.
@@ -69,7 +69,9 @@ export function llmErrorFromHttp(status: number, body: unknown, cause?: unknown)
   const details = Array.isArray(error?.details) ? error.details : [];
   const keyRejected = details.some((d: any) => d?.reason === 'API_KEY_INVALID') || /API key not valid/i.test(serverMessage ?? '');
   const common = { status, serverMessage, cause };
-  if (keyRejected || status === 401 || status === 403) return new LlmError('invalid_key', common);
+  // Un 403 sin API_KEY_INVALID es de permiso (servicio deshabilitado, región, modelo sin acceso): va a `bad_request`
+  // con el mensaje del servidor, no a «revisa tu clave».
+  if (keyRejected || status === 401) return new LlmError('invalid_key', common);
   if (status === 429) return new LlmError('rate_limited', common);
   if (status === 404) return new LlmError('not_found', common);
   if (status === 408 || status >= 500) return new LlmError('server', common);
