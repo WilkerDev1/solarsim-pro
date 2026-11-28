@@ -108,6 +108,9 @@ function withoutPrice(fields: Record<string, unknown>): Record<string, unknown> 
   return Object.fromEntries(Object.entries(fields).filter(([key, value]) => key !== 'unitPriceUSD' && value !== undefined));
 }
 
+/** A centavos: la estimación por W/kW/kWh no deja ruido de coma flotante en el campo (590 W × 0,17 = 100.30000000000001). */
+const cents = (value: number) => Math.round(value * 100) / 100;
+
 /**
  * Modelo nuevo para «+»: el primer equipo del catálogo distinto del principal, o un valor por defecto. Su precio sale del
  * resolvedor único (oferta → genérico, ADR 0006) y, sin ninguno, de la estimación por W/kW/kWh.
@@ -125,7 +128,7 @@ export function buildNewItem<K extends EquipmentKind>(kind: K, specs: SystemSpec
       // Con catálogo, los campos propios del modelo (degradación, eficiencia…) salen del mismo parche que la selección.
       ...(candidate ? catalogPanelGroupPatch(candidate) : { brandModel: 'Módulos JA Solar JAM66D45-630/LB (630W)', powerW: 630 }),
       count: 10,
-      unitPriceUSD: price || (candidate?.powerW ? candidate.powerW * 0.17 : 105),
+      unitPriceUSD: price || (candidate?.powerW ? cents(candidate.powerW * 0.17) : 105),
       ...withoutPrice(priced),
     } as GroupItem[K];
   }
@@ -136,7 +139,7 @@ export function buildNewItem<K extends EquipmentKind>(kind: K, specs: SystemSpec
       brandModel: candidate?.displayName || 'Inversor Huawei SUN2000-5KTL-M1 (5.0kW)',
       powerKW: candidate?.powerKW || 5.0,
       count: 1,
-      unitPriceUSD: price || (candidate?.powerKW ? candidate.powerKW * 220 : 1100),
+      unitPriceUSD: price || (candidate?.powerKW ? cents(candidate.powerKW * 220) : 1100),
       ...withoutPrice(priced),
     } as GroupItem[K];
   }
@@ -146,7 +149,7 @@ export function buildNewItem<K extends EquipmentKind>(kind: K, specs: SystemSpec
     brandModel: candidate?.displayName || 'Batería Dyness A48100 (5.12 kWh)',
     capacityKWh: candidate?.capacityKWh || 5.12,
     count: 1,
-    unitPriceUSD: price || (candidate?.capacityKWh ? candidate.capacityKWh * 160 : 850),
+    unitPriceUSD: price || (candidate?.capacityKWh ? cents(candidate.capacityKWh * 160) : 850),
     ...withoutPrice(priced),
     dodPct: resolveBatteryDodPct(candidate?.dodPct),
     efficiencyPct: resolveBatteryEfficiencyPct(candidate?.batteryEfficiencyPct),

@@ -172,7 +172,14 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const added = buildNewItem('panel', multi() as LegacyProjectSpecs, catalog, 3, lookup);
   assert.deepEqual([added.catalogItemId, added.unitPriceUSD, added.priceSource, added.genericPriceInfo?.priceUSD], ['p2', 111, 'generic', 111]);
   const estimated = buildNewItem('panel', multi() as LegacyProjectSpecs, catalog, 3);
-  assert.equal(estimated.unitPriceUSD, 600 * 0.17, 'sin genérico (o sin sesión) sigue la estimación por W');
+  assert.equal(estimated.unitPriceUSD, 102, 'sin genérico (o sin sesión) sigue la estimación por W (600 W × 0,17)');
+  // A centavos (QA de F2b): 590 W × 0,17 daba 100.30000000000001 en el campo de precio.
+  const odd = buildNewItem('panel', multi() as LegacyProjectSpecs, [{ ...catalog[1], powerW: 590 }], 3);
+  assert.equal(odd.unitPriceUSD, 100.3, 'estimación por W a centavos');
+  const oddInverter = buildNewItem('inverter', multi() as LegacyProjectSpecs, [{ ...catalog[3], id: 'i9', displayName: 'Inv 3.3', powerKW: 3.3, supplierPrices: [] }], 3);
+  assert.equal(oddInverter.unitPriceUSD, 726, 'estimación por kW a centavos (3,3 kW × 220)');
+  const oddBattery = buildNewItem('battery', multi() as LegacyProjectSpecs, [{ ...catalog[3], id: 'b9', type: 'battery', displayName: 'Bat 5.12', capacityKWh: 5.12, supplierPrices: [] }], 3);
+  assert.equal(oddBattery.unitPriceUSD, 819.2, 'estimación por kWh a centavos (5,12 kWh × 160)');
   assert.equal(estimated.priceSource, undefined);
   const offered = buildNewItem('panel', { ...multi(), panels: [{ id: 'pb', brandModel: 'Panel B 600', powerW: 600, count: 4 }] } as LegacyProjectSpecs, catalog, 3, lookup);
   assert.deepEqual([offered.catalogItemId, offered.unitPriceUSD, offered.priceSource, offered.selectedSupplierInfo?.supplierName], ['p1', 90, 'supplier', 'Alfa'], 'la oferta gana en «+»');
