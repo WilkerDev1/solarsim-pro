@@ -7,7 +7,9 @@
  *  - `sizing`: los supuestos del dimensionado (`SIZING_ASSUMPTIONS`, `src/domain/sizing.ts`);
  *  - `proposal`: un dato de la propia propuesta, por su ruta del registro de campos (`projectFields.ts`).
  * Nada más («lo habitual», «según mi experiencia», un precio de internet): eso no es un supuesto, es una cifra inventada.
- * La validación comprueba la clave contra la fuente y, cuando la fuente es una constante, que el valor sea el de verdad.
+ * La validación comprueba la clave contra la fuente y que el valor sea el de verdad: el de la constante (`factory`,
+ * `sizing`) o el de las referencias del turno (`settings`, `proposal`). Sin esas referencias, un supuesto de Ajustes o de la
+ * propuesta no se puede comprobar y no entra.
  */
 import type { ProjectSimulation } from '../../../types';
 import type { DefaultSimulationSettings } from '../../../store/types';
@@ -37,9 +39,9 @@ export interface DeclaredAssumption {
 }
 
 export interface AssumptionReferences {
-  /** Ajustes vigentes: si se dan, el valor declarado debe coincidir. */
+  /** Ajustes vigentes: el valor declarado debe coincidir (sin ellos, la fuente `settings` se rechaza). */
   settings?: DefaultSimulationSettings;
-  /** La propuesta: si se da, el valor declarado debe ser el suyo. */
+  /** La propuesta del turno: el valor declarado debe ser el suyo (sin ella, la fuente `proposal` se rechaza). */
   project?: ProjectSimulation;
 }
 
@@ -85,14 +87,18 @@ export function validateDeclaredAssumption(input: unknown, refs: AssumptionRefer
     }
     case 'settings': {
       if (!Object.prototype.hasOwnProperty.call(DEFAULT_SIMULATION_SETTINGS, key)) return { ok: false, reason: `«${key}» no es un campo de Ajustes.` };
-      if (refs.settings && !same(refs.settings[key as keyof DefaultSimulationSettings], value))
+      // Sin los Ajustes vigentes el valor no se puede comprobar: no se acepta a ciegas (podría ser una cifra inventada).
+      if (!refs.settings) return { ok: false, reason: `No se puede comprobar «${key}» sin los Ajustes vigentes: el supuesto no entra.` };
+      if (!same(refs.settings[key as keyof DefaultSimulationSettings], value))
         return { ok: false, reason: `${JSON.stringify(value)} no coincide con Ajustes («${key}» vale ${JSON.stringify(refs.settings[key as keyof DefaultSimulationSettings])}).` };
       return accepted(key);
     }
     case 'proposal': {
       const tokens = parseFieldPath(key);
       if (!tokens || !findProjectField(key)) return { ok: false, reason: `«${key}» no es una ruta del registro de campos de la propuesta.` };
-      if (refs.project && !same(readPath(refs.project, tokens), value))
+      // El valor tiene que ser el leído de la propuesta: sin ella, no entra.
+      if (!refs.project) return { ok: false, reason: `No se puede comprobar «${key}» sin la propuesta del turno: el supuesto no entra.` };
+      if (!same(readPath(refs.project, tokens), value))
         return { ok: false, reason: `${JSON.stringify(value)} no es el dato de la propuesta en «${key}» (${JSON.stringify(readPath(refs.project, tokens))}).` };
       return accepted(key);
     }
@@ -105,15 +111,35 @@ const PROPOSAL_SIZING_KEYS: Readonly<Record<string, string>> = {
   targetCoveragePct: 'rates.targetCoveragePct',
 };
 
+/** Argumento de la llamada que, si viene, fija el supuesto citado: entonces es lo que pidió el usuario, no un supuesto. */
+const SIZING_KEY_ARGUMENTS: Readonly<Record<string, string>> = {
+  targetCoveragePct: 'coveragePct',
+};
+
+export interface SizingCitationContext {
+  /** La propuesta del turno: un dato «de la propuesta» solo se declara si es el que ella guarda. */
+  project?: ProjectSimulation;
+  /** Argumentos de la llamada (p. ej. `size_system`). */
+  args?: Record<string, unknown>;
+}
+
 /**
  * Un supuesto que cita `sizing.ts` (`SizingAssumptionUsed`) como supuesto declarado: lo de SIZING_ASSUMPTIONS con fuente
- * `sizing`, lo de la propuesta con fuente `proposal`; lo que no está en la lista, nada.
+ * `sizing`; lo de la propuesta con fuente `proposal`, solo si es el valor que guarda la propuesta (sin ella no se declara);
+ * una base que falta en la propuesta es la heredada (`sizing`/`legacyBasis`). Lo que vino como argumento de la llamada es
+ * lo que pidió el usuario, no un supuesto; y lo que no está en la lista, nada.
  */
-export function assumptionFromSizing(used: SizingAssumptionUsed): DeclaredAssumption | undefined {
+export function assumptionFromSizing(used: SizingAssumptionUsed, context: SizingCitationContext = {}): DeclaredAssumption | undefined {
+  const argument = SIZING_KEY_ARGUMENTS[used.key];
+  if (argument && context.args?.[argument] !== undefined) return undefined;
   const proposalPath = PROPOSAL_SIZING_KEYS[used.key];
-  const candidate: DeclaredAssumption = proposalPath
-    ? { source: 'proposal', key: proposalPath, label: used.label, value: used.value }
-    : { source: 'sizing', key: used.key, label: used.label, value: used.value };
-  const result = validateDeclaredAssumption(candidate);
+  let candidate: DeclaredAssumption = { source: 'sizing', key: used.key, label: used.label, value: used.value };
+  if (proposalPath) {
+    if (!context.project) return undefined;
+    candidate = { source: 'proposal', key: proposalPath, label: used.label, value: used.value };
+    if (used.key === 'sizingBasis' && context.project.specs?.sizingBasis === undefined)
+      candidate = { source: 'sizing', key: 'legacyBasis', label: used.label, value: used.value };
+  }
+  const result = validateDeclaredAssumption(candidate, { project: context.project });
   return result.ok ? result.assumption : undefined;
 }

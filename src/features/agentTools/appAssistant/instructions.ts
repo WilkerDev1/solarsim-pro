@@ -18,7 +18,6 @@ import { AGENT_RULES_ES } from '../../../../shared/agentTools/rules';
 import { PROJECT_FIELDS } from '../../../domain/projectFields';
 import { NEW_PROPOSAL_DEFAULTS } from '../../../domain/newProposal';
 import { SIZING_ASSUMPTIONS } from '../../../domain/sizing';
-import { DEFAULT_TARGET_MARGIN_PCT } from '../../../store/defaultSimulationSettings';
 import { appAssistantToolDefinitions } from './definitions';
 import { ASSUMPTION_SOURCES, ASSUMPTION_SOURCE_LABELS } from './assumptions';
 
@@ -72,13 +71,18 @@ function firstSentence(description: string): string {
 
 const KIND_ORDER: readonly AgentToolKind[] = ['read', 'draft', 'guarded'];
 
+/**
+ * Encabezado de cada grupo. Redacción neutra a propósito: la política del dispositivo puede pedir confirmación en los
+ * borradores, permitir las protegidas o confirmar un precio manual, y es estable en la sesión pero no se fija aquí (el
+ * prefijo no depende del perfil); manda el estado de cada resultado.
+ */
 function kindHeading(kind: AgentToolKind, names: ReadonlySet<string>): string {
   if (kind === 'read') return 'Consultar (no cambian nada):';
   if (kind === 'draft')
     return names.has('undo_change')
-      ? 'Cambiar (se aplican al momento; la app muestra el antes y el después, y undo_change los deshace):'
-      : 'Cambiar (se aplican al momento, con registro y deshacer):';
-  return 'Protegidas (piden la confirmación del usuario en la app):';
+      ? 'Cambiar (normalmente se aplican al momento, la app muestra el antes y el después y undo_change los deshace; según la política del dispositivo pueden pedir confirmación):'
+      : 'Cambiar (normalmente se aplican al momento, con registro y deshacer; según la política del dispositivo pueden pedir confirmación):';
+  return 'Protegidas (normalmente piden la confirmación del usuario en la app, según la política del dispositivo):';
 }
 
 /** Rutas editables del registro de campos por sección (primer segmento de la ruta), en el orden del registro. */
@@ -117,13 +121,13 @@ export function appAssistantConductLayer(): string {
   const sources = ASSUMPTION_SOURCES.map((source) => {
     const label = ASSUMPTION_SOURCE_LABELS[source];
     if (source === 'sizing')
-      return `${label} (base: ${BASIS_TEXT[SIZING_ASSUMPTIONS.newProposalBasis] ?? SIZING_ASSUMPTIONS.newProposalBasis}; relación DC/AC ${es(SIZING_ASSUMPTIONS.targetDcAcRatio)}; baterías para el ${pct(SIZING_ASSUMPTIONS.battery.peakDailyFraction)} del consumo diario del mes pico)`;
+      return `${label} (base de las propuestas nuevas: ${BASIS_TEXT[SIZING_ASSUMPTIONS.newProposalBasis] ?? SIZING_ASSUMPTIONS.newProposalBasis}, la guardada en cada propuesta manda; relación DC/AC ${es(SIZING_ASSUMPTIONS.targetDcAcRatio)}; baterías para el ${pct(SIZING_ASSUMPTIONS.battery.peakDailyFraction)} del consumo diario del mes pico)`;
     return label;
   });
   return [
     'Conducta del asistente en la app:',
     '- Sé proactivo: haz lo que se pide con las herramientas y luego explícalo. Resuelve tú las dependencias (p. ej. «ponle baterías»: inclúyelas, elígelas del catálogo y dimensiónalas en el mismo cambio).',
-    `- Si piden una propuesta sin datos, créala con los valores por defecto y di cuáles usaste: ${es(NEW_PROPOSAL_DEFAULTS.monthlyConsumptionKWh)} kWh/mes estimados, la tarifa de referencia de la distribuidora y el margen objetivo de Ajustes (${DEFAULT_TARGET_MARGIN_PCT} % de fábrica).`,
+    `- Si piden una propuesta sin datos, créala con los valores por defecto y di cuáles usaste: ${es(NEW_PROPOSAL_DEFAULTS.monthlyConsumptionKWh)} kWh/mes estimados, la tarifa de referencia de la distribuidora y el margen objetivo de Ajustes (informa el que devuelve la herramienta, no supongas una cifra).`,
     `- Declara tus supuestos y tómalos solo de esta lista: ${sources.join('; ')}. Lo que no salga de ahí no es un supuesto: pregúntalo.`,
     '- No te rindas: si una herramienta falla, lee el error y cambia de estrategia (corrige los argumentos, usa otra herramienta u otro camino); si aun así no puedes, di exactamente qué falta para hacerlo.',
     '- Pregunta solo cuando la respuesta cambia el resultado y no hay un valor por defecto razonable: una pregunta, no cinco.',
