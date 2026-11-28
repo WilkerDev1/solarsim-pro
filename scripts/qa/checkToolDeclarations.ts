@@ -84,14 +84,18 @@ const NEW_TOOL_PROMPTS = [
   { text: '¿Cuántos paneles e inversores necesita la propuesta prop-qa-1? No cambies nada.', expect: 'size_system' },
 ] as const;
 
-/** Una petición en modo `any` (el modelo tiene que llamar a una función): a cuál llamó, sin ejecutarla nunca. */
-async function promptCall(llm: LlmClient, model: string, tools: LlmToolDeclaration[], text: string): Promise<{ called?: string } | { rejected: string }> {
+/**
+ * Una petición en el modo del bucle (`auto` o `validated`): a cuál llamó, sin ejecutarla nunca.
+ * No se usa `any`: Gemini rechaza en ese modo el esquema de `edit_proposal` («too many states for serving»),
+ * aunque lo acepta en los modos que usa el asistente. Con `--mode any` se puede reproducir ese rechazo.
+ */
+async function promptCall(llm: LlmClient, model: string, tools: LlmToolDeclaration[], text: string, mode: LlmToolMode): Promise<{ called?: string } | { rejected: string }> {
   try {
     const response = await llm.generate({
       model,
       contents: [{ role: 'user', parts: [{ type: 'text', text }] }],
       tools,
-      toolMode: 'any',
+      toolMode: mode,
       thinkingLevel: 'low',
       maxOutputTokens: 512,
     }, { timeoutMs: 60000 });
@@ -132,7 +136,7 @@ async function main() {
     for (const model of options.models) {
       console.log(`\n${model}: peticiones que deben llamar a las herramientas nuevas`);
       for (const prompt of NEW_TOOL_PROMPTS) {
-        const verdict = await promptCall(llm, model, declarations, prompt.text);
+        const verdict = await promptCall(llm, model, declarations, prompt.text, options.mode);
         if ('rejected' in verdict) { rejected++; console.log(`  RECHAZA «${prompt.text}» — ${verdict.rejected}`); continue; }
         const ok = verdict.called === prompt.expect;
         console.log(`  ${ok ? 'llama  ' : 'AVISO  '} «${prompt.text}» → ${verdict.called ?? '(ninguna)'}${ok ? '' : ` (se esperaba ${prompt.expect})`}`);
