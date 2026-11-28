@@ -21,6 +21,7 @@ import { effectiveGenericPrice } from '../../store/slices/equipmentPriceSlice';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
 import { legacySectionPatches, writeProposeProjectUpdate } from '../agentTools/proposeProjectUpdateFacade';
+import type { ProjectEditSource } from '../../domain/projectEditTransaction';
 import { resolveGridConnection } from '../../../shared/gridConnection';
 import {
   hasSavingsComparison, noSavingsNote, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, savingsValuationCostPerKWh,
@@ -395,7 +396,7 @@ export function executeAssistantTool(
   throw new Error('Herramienta no permitida.');
 }
 /** Revalidate live owner, permission and target before every confirmed mutation. */
-export function applyAssistantAction(action: AssistantAction, options: { requireAssistantEnabled?: boolean } = {}) {
+export function applyAssistantAction(action: AssistantAction, options: { requireAssistantEnabled?: boolean; editSource?: ProjectEditSource } = {}) {
   const fresh = executeAssistantTool(
     {
       name:
@@ -421,6 +422,6 @@ export function applyAssistantAction(action: AssistantAction, options: { require
   } else {
     // F3c: fachada. Los mismos parches por sección de siempre; la transacción los escribe en una sola escritura solo si deja
     // exactamente la misma propuesta (ver proposeProjectUpdateFacade.ts).
-    writeProposeProjectUpdate(legacySectionPatches(fresh.edits, s.equipmentCatalog));
+    writeProposeProjectUpdate(legacySectionPatches(fresh.edits, s.equipmentCatalog), options.editSource);
   }
 }

@@ -17,13 +17,14 @@
 import type { ProjectSimulation } from '../../types';
 import type { SolarEquipmentItem } from '../../types/equipment';
 import { applyProjectEdit, type ProjectEditContext } from '../../domain/projectEdit';
-import { applyProjectEdits, editsFromPatch, type ProjectEditsContext, type ProjectFieldEdit } from '../../domain/projectEditTransaction';
+import { applyProjectEdits, diffProjectFields, editsFromPatch, type ProjectEditSource, type ProjectEditsContext, type ProjectFieldEdit } from '../../domain/projectEditTransaction';
 import type { AssistantEdit } from '../assistant/types';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { effectiveGenericPrice, priceFeatureActive } from '../../store/slices/equipmentPriceSlice';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../application/featurePolicy';
 import { DEFAULT_EDIT_COALESCE_KEY } from '../../store/undo/projectUndoJournal';
+import { dockHighlightStore } from '../../store/dockHighlightStore';
 
 /** Los parches por sección de un plan de `propose_project_update`, como los aplicaba `applyAssistantAction`. */
 export interface LegacySectionPatches {
@@ -119,15 +120,18 @@ function commitContext(): ProjectEditsContext {
  * Escribe los parches de un plan confirmado de `propose_project_update` en la propuesta ACTIVA: por la transacción si es
  * equivalente (ver el encabezado), si no como siempre, un parche por sección con las porciones del store.
  * Devuelve por dónde fue, para las pruebas y el diagnóstico.
+ *
+ * `source` es el origen del lote: `user` (como siempre; los agentes externos) o `assistant` (el asistente de la app), que deja
+ * el paso de deshacer con ese origen y destaca en el dock lo que cambió (F5a), también por el camino antiguo.
  */
-export function writeProposeProjectUpdate(patches: LegacySectionPatches): 'transaction' | 'legacy' {
+export function writeProposeProjectUpdate(patches: LegacySectionPatches, source: ProjectEditSource = 'user'): 'transaction' | 'legacy' {
   const s = useSimulationStore.getState();
   const project = s.getActiveProject();
   s.recordUndoState(project);
   const plan = planFacadeCommit(project, patches, commitContext());
   if (plan.delegate) {
     // La misma fuente y clave de agrupado que dejaba el camino antiguo en el diario de deshacer.
-    const committed = useSimulationStore.getState().commitProjectEdits(project.id, plan.edits, { source: 'user', coalesceKey: DEFAULT_EDIT_COALESCE_KEY, validation: 'strict' });
+    const committed = useSimulationStore.getState().commitProjectEdits(project.id, plan.edits, { source, coalesceKey: DEFAULT_EDIT_COALESCE_KEY, validation: 'strict' });
     if (committed.ok) return 'transaction';
     // Imposible con el mismo contexto y sin esperas; si ocurriera, la propuesta no se tocó y el camino antiguo la escribe.
   }
@@ -136,5 +140,10 @@ export function writeProposeProjectUpdate(patches: LegacySectionPatches): 'trans
   if (patches.rates) s.updateRates(patches.rates);
   if (patches.financials) s.updateFinancials(patches.financials);
   if (patches.monthlyConsumption) s.setMonthlyConsumption(patches.monthlyConsumption);
+  // El camino antiguo no es un lote por ruta (no pasa por `commitProjectEdits`): lo que cambió se destaca igual (F5a).
+  if (source === 'assistant') {
+    const written = useSimulationStore.getState().projects.find((p) => p.id === project.id);
+    if (written) dockHighlightStore.publish(project.id, diffProjectFields(project, written));
+  }
   return 'legacy';
 }
