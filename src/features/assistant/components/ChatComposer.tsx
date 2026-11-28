@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, FileText, Paperclip, Sparkles, Square, X } from 'lucide-react';
-import { createStopLatch, composerDropEffect, composerKeyAction, leavesContainer, shouldRefocusComposer, useAutoGrow } from '../chatUi';
+import { createStopLatch, composerDropEffect, composerEscapeAction, composerKeyAction, leavesContainer, shouldRefocusComposer, useAutoGrow } from '../chatUi';
 
 export interface ComposerAttachment { key: string; name: string; onRemove: () => void }
 
@@ -110,7 +110,7 @@ export function ChatComposer(props: ComposerProps) {
           aria-describedby={hintId}
           onChange={(e) => props.onChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Escape' && props.busy) { e.preventDefault(); e.stopPropagation(); stop(); return; }
+            if (e.key === 'Escape' && composerEscapeAction({ busy: props.busy, queueWhileBusy: !!props.queueWhileBusy, isComposing: e.nativeEvent.isComposing }) === 'stop') { e.preventDefault(); e.stopPropagation(); stop(); return; }
             if (composerKeyAction({ key: e.key, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, isComposing: e.nativeEvent.isComposing }) === 'send') {
               e.preventDefault();
               submit();
@@ -125,12 +125,12 @@ export function ChatComposer(props: ComposerProps) {
           <span className="chat-composer-hint" id={hintId}>
             {!props.busy && !props.canSend && props.disabledReason && <span className="sr-only">{props.disabledReason}</span>}
             {props.busy
-              ? <span className="chat-composer-hint-busy">{props.queueWhileBusy && props.value.trim() ? 'Enter lo deja en cola · Esc detiene' : 'Esc detiene'}</span>
+              ? <span className="chat-composer-hint-busy">{props.queueWhileBusy ? (props.value.trim() ? 'Enter lo deja en cola' : null) : 'Esc detiene'}</span>
               : props.value.trim() ? <span className="chat-composer-hint-keys">Enter envía · Shift+Enter salta línea</span> : null}
           </span>
           {props.busy && props.queueWhileBusy && (
             // Detener es un botón aparte del envío: con cola se ven los dos.
-            <button key="stop" type="button" className="chat-send chat-stop" aria-label="Detener" title="Detener (Esc)" onClick={stop}>
+            <button key="stop" type="button" className="chat-send chat-stop" aria-label="Detener" title="Detener (cerrar el panel no detiene)" onClick={stop}>
               <Square size={14} fill="currentColor" />
             </button>
           )}

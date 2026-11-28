@@ -27,9 +27,11 @@ import { createAssistantSession, type AssistantSession, type SessionMessage } fr
 import {
   ASSISTANT_PANEL_DEFAULT_PX, ASSISTANT_PANEL_MAX_PX, ASSISTANT_PANEL_MIN_PX, DOCK_MIN_CONTENT_PX, assistantPanelLayout, parameterSidebarPx,
 } from '../features/assistant/panelLayout';
-import { assistantBadge, turnChangeCards } from '../features/assistant/panelState';
+import { assistantBadge, createdProposalCard, turnChangeCards, turnUndoTargets } from '../features/assistant/panelState';
 import { ASSISTANT_ENTRY_PROMPTS, openAssistant } from '../features/assistant/assistantEntry';
-import { AssistantTurnDetails } from '../features/assistant/components/AssistantTurnDetails';
+import { AssistantTurnDetails, type TurnDetailsLive } from '../features/assistant/components/AssistantTurnDetails';
+import { composerEscapeAction } from '../features/assistant/chatUi';
+import { engineResults, proposalStateSummary } from '../domain/proposalSnapshot';
 import type { ProjectSimulation } from '../types';
 
 // ── 1. Acoplado o flotante ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -374,4 +376,194 @@ reset();
   assert.equal(session.getState().unseen, false);
 }
 
-console.log('PASS: panel completo del asistente (acoplado/flotante, cola mientras trabaja, Stop con cola, tres entradas, ChangeCard real, insignia).');
+// ── 7. Correcciones de la revisión adversarial de F5b ───────────────────────────────────────────────────────────────────
+const pdf = (name: string) => ({ name, arrayBuffer: async () => new TextEncoder().encode(`%PDF-1.4 ${name}`).buffer as ArrayBuffer });
+const details = (session: AssistantSession, live?: TurnDetailsLive) =>
+  renderToStaticMarkup(createElement(AssistantTurnDetails, {
+    message: assistants(session).at(-1)!, busy: false, live,
+    actions: { confirmPending() {}, rejectPending() {}, undo() {}, undoTurn() {}, continueTurn() {} },
+  }));
+const liveNow = (now = Date.now()): TurnDetailsLive => ({ agentActivity: s().agentActivity, pendingAgentActions: s().pendingAgentActions, now });
+{
+  // 7.1 Esc en el compositor: en modo cola (el asistente único) no detiene; Detener queda solo en su botón.
+  assert.equal(composerEscapeAction({ busy: true, queueWhileBusy: false, isComposing: false }), 'stop', 'sin cola (modal antiguo), Esc detiene como siempre');
+  assert.equal(composerEscapeAction({ busy: true, queueWhileBusy: true, isComposing: false }), null, 'con cola, Esc no mata el turno mientras se escribe');
+  assert.equal(composerEscapeAction({ busy: false, queueWhileBusy: true, isComposing: false }), null);
+  assert.equal(composerEscapeAction({ busy: true, queueWhileBusy: false, isComposing: true }), null, 'Esc de un IME nunca detiene');
+  const props = { id: 'c', label: 'Mensaje', value: 'algo', onChange() {}, onSubmit() {}, onCancel() {}, onPickFiles() {}, canSend: true, attachments: [], placeholder: '', accept: '' };
+  const queueing = renderToStaticMarkup(createElement(ChatComposer, { ...props, busy: true, queueWhileBusy: true }));
+  assert.doesNotMatch(queueing, /Esc detiene/, 'la pista no promete que Esc detiene');
+  assert.doesNotMatch(queueing, /title="Detener \(Esc\)"/);
+}
+reset();
+{
+  // 7.2 Deshacer que falla: la tarjeta lo dice (role=alert) y deja de ofrecer Deshacer.
+  const llm = new ScriptedLlm([
+    { functionCalls: [{ id: 'fc-u1', name: 'edit_proposal', args: { proposalId: base.id, title: 'Cobertura 85', ops: [{ op: 'set', path: 'rates.targetCoveragePct', valueJson: '85' }] } }] },
+    { text: 'Hecho.' },
+  ]);
+  const session = newSession(llm);
+  await session.send('Cobertura al 85 %');
+  const [card] = turnChangeCards(assistants(session).at(-1)!);
+  s().updateSpecs({ systemLosses: 17 });
+  s().updateRates({ targetCoveragePct: 70 });
+  const result = session.undoActivity(card.input.activityId!);
+  assert.equal(result.success, false, JSON.stringify(result));
+  const [after] = turnChangeCards(assistants(session).at(-1)!);
+  assert.equal(after.input.error?.message, result.error, 'el fallo de Deshacer queda en la tarjeta');
+  const html = details(session, liveNow());
+  assert.match(html, /role="alert"/);
+  assert.doesNotMatch(html, />Deshacer</, 'sin un Deshacer que vuelva a fallar');
+}
+reset();
+{
+  // 7.2b El modelo deshizo con undo_change: la tarjeta original pasa a «deshecho» (lo dice la actividad).
+  const llm = new ScriptedLlm([
+    { functionCalls: [{ id: 'fc-u2', name: 'edit_proposal', args: { proposalId: base.id, title: 'Cobertura 85', ops: [{ op: 'set', path: 'rates.targetCoveragePct', valueJson: '85' }] } }] },
+    { functionCalls: [{ id: 'fc-u3', name: 'undo_change', args: { proposalId: base.id } }] },
+    { text: 'Lo deshice.' },
+  ]);
+  const session = newSession(llm);
+  await session.send('Cobertura al 85 % y luego deshazlo');
+  llm.assertDone();
+  assert.equal(projectOf().rates.targetCoveragePct, base.rates.targetCoveragePct, 'undo_change revirtió');
+  const live = liveNow();
+  const cards = turnChangeCards(assistants(session).at(-1)!, live);
+  assert.equal(cards[0].input.status, 'undone', JSON.stringify(cards.map((c) => c.input.status)));
+  assert.doesNotMatch(details(session, live).split('data-change-card="undone"')[1]?.split('data-change-card')[0] ?? '', />Deshacer</);
+}
+reset();
+{
+  // 7.3a «Deshacer todo el turno»: con dos o más cambios deshacibles del turno, un botón que los revierte todos.
+  const llm = new ScriptedLlm([
+    { functionCalls: [{ id: 'fc-t1', name: 'edit_proposal', args: { proposalId: base.id, title: 'Margen', ops: [{ op: 'set_margin_pct', pct: 31 }] } }] },
+    { functionCalls: [{ id: 'fc-t2', name: 'edit_proposal', args: { proposalId: base.id, title: 'Cobertura', ops: [{ op: 'set', path: 'rates.targetCoveragePct', valueJson: '85' }] } }] },
+    { text: 'Dos cambios.' },
+  ]);
+  const session = newSession(llm);
+  await session.send('margen y cobertura');
+  const reply = assistants(session).at(-1)!;
+  assert.equal(turnUndoTargets(reply.id, s().agentActivity).length, 2);
+  assert.match(details(session, liveNow()), /Deshacer todo el turno/);
+  const result = session.undoTurn(reply.id);
+  assert.equal(result.success, true, JSON.stringify(result));
+  assert.equal(projectOf().rates.targetCoveragePct, base.rates.targetCoveragePct);
+  assert.equal(projectOf().specs.saleMarginMultiplier, base.specs.saleMarginMultiplier);
+  assert.deepEqual(turnChangeCards(assistants(session).at(-1)!, liveNow()).map((c) => c.input.status), ['undone', 'undone']);
+  assert.doesNotMatch(details(session, liveNow()), /Deshacer todo el turno/, 'nada más que deshacer');
+  // Un solo cambio: basta el Deshacer de su tarjeta.
+  const one = newSession(new ScriptedLlm([margin(30, 'fc-t3'), { text: 'ok' }]));
+  await one.send('margen');
+  assert.doesNotMatch(details(one, liveNow()), /Deshacer todo el turno/);
+}
+reset({ activeView: 'dashboard', activeProjectId: '' });
+{
+  // 7.3b Tarjeta «Propuesta creada»: equipos y, si está completa, kWp, precio de contrato, ahorro del año 1 y retorno.
+  const llm = new ScriptedLlm([{ functionCalls: [{ id: 'fc-created', name: 'create_proposal', args: {} }] }, { text: 'Creada.' }]);
+  const session = newSession(llm);
+  await session.send('Crea una propuesta');
+  const reply = assistants(session).at(-1)!;
+  assert.equal(reply.createdProposals?.length, 1, 'la creación deja su tarjeta');
+  const created = reply.createdProposals![0].card;
+  assert.equal(created.proposalId, s().activeProjectId);
+  const html = details(session, liveNow());
+  assert.match(html, /data-created-proposal=/);
+  assert.match(html, /Propuesta creada/);
+  if (created.metrics) assert.ok(created.metrics.length === 4);
+  else {
+    assert.ok(created.reasons.length > 0, 'incompleta: los motivos');
+    assert.doesNotMatch(html.split('data-created-proposal')[1], /\$\d/, 'incompleta: ninguna cifra');
+    assert.match(html, /Propuesta incompleta: sin resultados todavía/, 'la marca es de la propuesta');
+    assert.doesNotMatch(html, /assistant-turn-notes/, 'el motivo no se repite en el bloque «Propuesta incompleta» del turno');
+  }
+  // Completa: las cuatro cifras del motor.
+  const complete = { ...structuredClone(BENCHMARK_PROJECT), id: 'f5b-created', syncStatus: 'local_only' } as ProjectSimulation;
+  const card = createdProposalCard({
+    status: 'applied', tool: 'create_proposal', proposalId: complete.id, changes: [], warnings: [],
+    results: { before: null, after: engineResults(complete) }, proposal: proposalStateSummary(complete),
+  });
+  assert.ok(card);
+  assert.deepEqual(card!.metrics!.map((m) => m.label), ['Potencia', 'Precio de contrato', 'Ahorro del año 1', 'Retorno']);
+  assert.ok(card!.equipment.length > 0, 'los equipos');
+  assert.equal(card!.reasons.length, 0);
+  assert.equal(createdProposalCard({ status: 'error', tool: 'create_proposal', changes: [], warnings: [], results: { before: null, after: null }, proposal: null }), null);
+}
+reset();
+{
+  // 7.8 Una tarjeta incompleta no repite su motivo en el bloque «Propuesta incompleta».
+  const llm = new ScriptedLlm([
+    { functionCalls: [{ id: 'fc-zero', name: 'edit_proposal', args: { proposalId: base.id, title: 'Sin consumo', ops: [{ op: 'set', path: 'monthlyConsumption', valueJson: JSON.stringify(Array(12).fill(0)) }] } }] },
+    { text: 'Hecho.' },
+  ]);
+  const session = newSession(llm);
+  await session.send('consumo a cero');
+  const [card] = turnChangeCards(assistants(session).at(-1)!);
+  const reasons = card.input.results?.after && !card.input.results.after.complete ? card.input.results.after.reasons.map((r) => r.message) : [];
+  assert.ok(reasons.length, JSON.stringify(card.input.results));
+  const html = details(session, liveNow());
+  for (const reason of reasons) {
+    const escaped = renderToStaticMarkup(createElement('span', null, reason)).slice(6, -7);
+    assert.equal(html.split(escaped).length - 1, 1, `«${reason}» una sola vez`);
+  }
+}
+reset();
+{
+  // 7.9 Una tarjeta pendiente caducada se muestra caducada al pintarla, sin Confirmar.
+  reset({ agentPolicy: { ...DEFAULT_AGENT_POLICY, appAssistantProfile: 'confirm' } });
+  const session = newSession(new ScriptedLlm([margin(29, 'fc-exp'), { text: 'Confírmalo.' }]));
+  await session.send('Margen al 29 %');
+  const [pending] = turnChangeCards(assistants(session).at(-1)!, liveNow());
+  assert.equal(pending.input.status, 'pending_confirmation');
+  const later = Date.now() + 11 * 60_000;
+  assert.equal(turnChangeCards(assistants(session).at(-1)!, liveNow(later))[0].input.status, 'expired');
+  assert.doesNotMatch(details(session, liveNow(later)), />Confirmar</);
+  // Resuelta fuera del panel (p. ej. desde Ajustes → Agentes): la tarjeta lo refleja.
+  s().rejectAgentAction(pending.input.actionId!);
+  assert.equal(turnChangeCards(assistants(session).at(-1)!, liveNow())[0].input.status, 'rejected');
+}
+{
+  // 7.4 Con la papelera abierta, la entrada del menú de IA sale de la papelera para que el panel se vea.
+  reset({ isTrashActive: true });
+  const session = newSession(new ScriptedLlm());
+  openAssistant('dock-menu', { session });
+  assert.equal(s().isTrashActive, false);
+  assert.equal(session.getState().panelOpen, true);
+}
+{
+  // 7.5 El ⓘ del perfil no promete confirmaciones absolutas que el modo sin confirmación (bypass) no cumple.
+  const text = readFileSync(new URL('../components/settings/sections/agents/AgentPermissionsPanel.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(text, /se confirma siempre, y los agentes externos siguen pidiendo confirmación/);
+  assert.match(text, /sin confirmación/);
+}
+reset();
+{
+  // 7.6 Juntar en la cola más de tres archivos: lo que no cabe se queda en el compositor con su aviso (no se pierde).
+  const llm = new ScriptedLlm();
+  const session = newSession(llm);
+  llm.push(async () => {
+    await session.addFiles([pdf('a.pdf'), pdf('b.pdf'), pdf('c.pdf')]);
+    await session.send('uno');
+    await session.addFiles([pdf('d.pdf'), pdf('e.pdf')]);
+    await session.send('dos');
+    const st = session.getState();
+    assert.deepEqual(st.queued?.files.map((f) => f.name), ['a.pdf', 'b.pdf', 'c.pdf']);
+    assert.deepEqual(st.files.map((f) => f.name), ['d.pdf', 'e.pdf'], 'lo que no cabe sigue en el compositor');
+    assert.match(st.composerError, /Máximo tres archivos/);
+    // 7.7 Stop: lo encolado vuelve primero, delante de lo escrito después.
+    session.setDraft('escribiendo otra');
+    session.cancel();
+    return { text: 'ok' };
+  });
+  await session.send('cero');
+  const st = session.getState();
+  assert.equal(st.draft, 'uno\n\ndos\n\nescribiendo otra', 'el orden en que se escribió');
+  assert.deepEqual(st.files.map((f) => f.name), ['a.pdf', 'b.pdf', 'c.pdf'], 'vuelven los de la cola (los que caben)');
+  assert.match(st.composerError, /Máximo tres archivos/, 'y se avisa de lo que no cupo');
+}
+{
+  // 7.10 El comentario de cabecera ya no dice que el asistente viene apagado de fábrica.
+  const text = readFileSync(new URL('../store/persistence/appAssistantEnablement.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(text, /Hoy `appAssistantEnabled` es `false` de fábrica/);
+}
+
+console.log('PASS: panel completo del asistente (acoplado/flotante, cola mientras trabaja, Stop con cola, tres entradas, ChangeCard real, insignia, correcciones de la revisión).');

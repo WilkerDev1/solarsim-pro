@@ -38,6 +38,8 @@ export function openAssistant(entry: AssistantEntry, options: OpenAssistantOptio
   if (s.isNewProjectModalOpen) s.closeNewProjectModal();
   if (s.isSettingsModalOpen) s.closeSettingsModal();
   if (s.isAIInvoiceModalOpen) s.closeAIInvoiceModal();
+  // La papelera también oculta el panel: pedir el asistente sale de ella (el menú de IA se ve en la papelera).
+  if (s.isTrashActive) s.setIsTrashActive(false);
   const name = options.projectName?.trim();
   const prompt = entry === 'new-project' && name ? `Crea una propuesta llamada «${name.slice(0, 120)}»` : ASSISTANT_ENTRY_PROMPTS[entry];
   if (prompt && !session.getState().draft.trim()) session.setDraft(prompt);

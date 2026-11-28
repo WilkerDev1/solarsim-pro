@@ -44,6 +44,21 @@ function useViewportWidth(): number {
   return width;
 }
 
+/**
+ * Hora actual para la caducidad de las confirmaciones pendientes: solo late (cada 30 s) mientras hay alguna pendiente, para
+ * que una tarjeta se vea caducada sin tener que pulsarla.
+ */
+function useNowWhile(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+  return now;
+}
+
 /** Borde izquierdo de la columna acoplada: arrastrar o flechas (24 px; Inicio vuelve al ancho de fábrica). */
 function DockResizeHandle({ session, layout }: { session: AssistantSession; layout: AssistantPanelLayout }) {
   const drag = useRef<{ x: number; width: number } | null>(null);
@@ -85,7 +100,7 @@ function AssistantPanel({ projectId, belowToolbar, layout }: { projectId?: strin
   const session = assistantSession();
   const ai = useSession(session);
   const picker = useRef<(() => void) | null>(null);
-  const state = useSimulationStore(useShallow((s) => ({ projects: s.projects, isSettingsModalOpen: s.isSettingsModalOpen, isAIInvoiceModalOpen: s.isAIInvoiceModalOpen, isAIDatasheetModalOpen: s.isAIDatasheetModalOpen, isAIPriceCatalogModalOpen: s.isAIPriceCatalogModalOpen, isNewProjectModalOpen: s.isNewProjectModalOpen, activeConflict: s.activeConflict, isTrashActive: s.isTrashActive, openSettingsModal: s.openSettingsModal, geminiApiKey: s.geminiApiKey })));
+  const state = useSimulationStore(useShallow((s) => ({ projects: s.projects, isSettingsModalOpen: s.isSettingsModalOpen, isAIInvoiceModalOpen: s.isAIInvoiceModalOpen, isAIDatasheetModalOpen: s.isAIDatasheetModalOpen, isAIPriceCatalogModalOpen: s.isAIPriceCatalogModalOpen, isNewProjectModalOpen: s.isNewProjectModalOpen, activeConflict: s.activeConflict, isTrashActive: s.isTrashActive, openSettingsModal: s.openSettingsModal, geminiApiKey: s.geminiApiKey, agentActivity: s.agentActivity, pendingAgentActions: s.pendingAgentActions })));
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const open = ai.panelOpen;
@@ -93,6 +108,8 @@ function AssistantPanel({ projectId, belowToolbar, layout }: { projectId?: strin
   const liveLength = last?.role === 'assistant' ? last.liveText.length + last.turn.text.length + last.turn.toolOrder.length : 0;
   const scroll = useStickToBottom(log, [ai.messages.length, liveLength, ai.busy, open]);
   const elapsed = useElapsedSeconds(ai.busy);
+  const now = useNowWhile(state.pendingAgentActions.some((a) => a.status === 'pending'));
+  const live = { agentActivity: state.agentActivity, pendingAgentActions: state.pendingAgentActions, now };
   const project = state.projects.find((p) => p.id === projectId);
   const announcement = useChatAnnouncement(ai.busy, () => {
     const reply = ai.messages[ai.messages.length - 1];
@@ -125,7 +142,9 @@ function AssistantPanel({ projectId, belowToolbar, layout }: { projectId?: strin
   const actions = {
     confirmPending: (actionId: string) => { session.confirmPending(actionId); },
     rejectPending: (actionId: string) => session.rejectPending(actionId),
+    // El resultado (también el fallo) queda en el mensaje: la tarjeta lo pinta.
     undo: (activityId: string) => { session.undoActivity(activityId); },
+    undoTurn: (turnId: string) => { session.undoTurn(turnId); },
     continueTurn: () => void session.continueTurn(),
   };
   const lastAssistant = [...ai.messages].reverse().find((m): m is SessionAssistantMessage => m.role === 'assistant');
@@ -149,8 +168,8 @@ function AssistantPanel({ projectId, belowToolbar, layout }: { projectId?: strin
           className={`assistant-widget-panel ${ai.expanded && !docked ? 'assistant-expanded' : ''}`}
           aria-label="Asistente de SolarSim"
           onKeyDown={(e) => {
-            // Esc cierra el panel flotante; no detiene el turno (el compositor detiene con Esc mientras trabaja). Acoplado,
-            // Esc no cierra la columna (movería el contenido de la vista).
+            // Esc cierra el panel flotante y nunca detiene el turno (en modo cola el compositor tampoco: Detener es solo su
+            // botón). Acoplado, Esc no cierra ni cancela (movería el contenido de la vista).
             if (e.key === 'Escape' && !docked) {
               e.preventDefault();
               e.stopPropagation();
@@ -204,7 +223,7 @@ function AssistantPanel({ projectId, belowToolbar, layout }: { projectId?: strin
                     <ChatMessage key={m.id} role="assistant" variant="error" text={m.error.message}
                       onRetry={m.retryText && !ai.busy ? () => void session.send(m.retryText) : undefined}
                       onOpenSettings={openSettings}>
-                      <AssistantTurnDetails message={m} busy={ai.busy} actions={actions} />
+                      <AssistantTurnDetails message={m} busy={ai.busy} actions={actions} live={live} />
                     </ChatMessage>
                   );
                 const text = joinText(m.turn.text, m.liveText);
@@ -215,7 +234,7 @@ function AssistantPanel({ projectId, belowToolbar, layout }: { projectId?: strin
                         onCopy={!running && text ? () => navigator.clipboard.writeText(text) : undefined}
                         onRetry={m.retryText && !ai.busy ? () => void session.send(m.retryText) : undefined}>
                         {text && m.notice && <p className="assistant-turn-notice">{m.notice}</p>}
-                        {!running && <AssistantTurnDetails message={m} busy={ai.busy} actions={actions} />}
+                        {!running && <AssistantTurnDetails message={m} busy={ai.busy} actions={actions} live={live} />}
                       </ChatMessage>
                     )}
                     {running && (

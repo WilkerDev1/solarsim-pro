@@ -19,8 +19,10 @@
  * Panel completo (F5b): se puede escribir mientras trabaja. `send` con un turno en curso deja el mensaje en cola
  * (`queued`, varios se juntan en uno) y el bucle cede al terminar el paso en curso (`shouldYield`): el turno se cierra
  * `yielded` con las llamadas ejecutadas y su resultado real, y el mensaje encolado va como turno siguiente. Stop nunca
- * entrega nada: lo encolado vuelve al compositor. Cada respuesta de herramienta con cambios deja su tarjeta
- * (`changeCards`, la entrada de ChangeCard de F5a); `unseen` marca lo que terminó con el panel cerrado (la insignia).
+ * entrega nada: lo encolado vuelve al compositor (delante de lo escrito después). Cada respuesta de herramienta con cambios
+ * deja su tarjeta (`changeCards`, la entrada de ChangeCard de F5a) y cada creación la suya (`createdProposals`); Deshacer
+ * anota su fallo (`undoErrors`) y `undoTurn` deshace todo el turno. `unseen` marca lo que terminó con el panel cerrado (la
+ * insignia).
  */
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../../services/llm/models';
@@ -41,6 +43,7 @@ import { closedTurnProblems, runAgentLoop, type LoopError, type LoopLimits, type
 import { changeCardInputFromResponse, type ChangeCardInput } from '../../assistantFeedback/changeCardModel';
 import { dockHighlightStore } from '../../../store/dockHighlightStore';
 import { extractInvoiceWithLlm } from './invoiceExtraction';
+import { createdProposalCard, turnUndoTargets, type CreatedProposalCardView } from '../panelState';
 
 export interface SessionUserMessage {
   id: string;
@@ -71,6 +74,10 @@ export interface SessionAssistantMessage {
   resolutions?: Record<string, string>;
   /** Cambios deshechos desde el panel (activityId → true). */
   undone?: Record<string, boolean>;
+  /** Deshacer que falló desde el panel (activityId → motivo): la tarjeta lo muestra y deja de ofrecerlo. */
+  undoErrors?: Record<string, string>;
+  /** Tarjetas «Propuesta creada» de las `create_proposal` aplicadas del turno. */
+  createdProposals?: { callId: string; card: CreatedProposalCardView }[];
   /** Tarjetas de cambio (ChangeCard de F5a) de las respuestas de herramientas del turno, en orden de llamada. */
   changeCards?: { callId: string; input: ChangeCardInput }[];
 }
@@ -146,6 +153,8 @@ export interface AssistantSession {
   confirmPending(actionId: string): { success: boolean; error?: string };
   rejectPending(actionId: string): void;
   undoActivity(activityId: string): { success: boolean; error?: string };
+  /** «Deshacer todo el turno»: revierte los cambios aún aplicados del turno (`turnUndoTargets`), del más reciente al primero. */
+  undoTurn(turnId: string): { success: boolean; error?: string; undone: number };
   /** Historial del modelo (turnos cerrados). */
   history(): readonly LlmContent[];
   /** Conecta los puertos de F3a (navegación y lectura de facturas) a esta sesión. */
@@ -295,11 +304,25 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     return { settings: s.defaultSimulationSettings, ...(project ? { project } : {}) };
   };
 
-  /** Devuelve lo encolado al compositor (Stop, apagado). */
+  /** Adjuntos que se descartan porque no caben: se olvidan (no quedan registrados hasta «Nueva conversación»). */
+  const forgetFiles = (list: readonly ChatFile[]) => {
+    if (!list.length) return;
+    forgetChatFiles(list.map((f) => f.id));
+    for (const f of list) sessionFiles.delete(f.id);
+  };
+  const tooManyFiles = (kept: number, total: number) => `Máximo tres archivos por mensaje: quedan ${kept} de ${total}.`;
+
+  /** Devuelve lo encolado al compositor (Stop, apagado): primero lo encolado, que se escribió antes. */
   const returnQueueToComposer = () => {
     const queued = state.queued;
     if (!queued) return;
-    set({ queued: null, draft: joinText(state.draft, queued.text), files: [...state.files, ...queued.files].slice(0, CHAT_FILE_LIMITS.maxFiles) });
+    const all = [...queued.files, ...state.files];
+    const kept = all.slice(0, CHAT_FILE_LIMITS.maxFiles);
+    forgetFiles(all.slice(CHAT_FILE_LIMITS.maxFiles));
+    set({
+      queued: null, draft: joinText(queued.text, state.draft), files: kept,
+      ...(all.length > kept.length ? { composerError: tooManyFiles(kept.length, all.length) } : {}),
+    });
   };
 
   /** `fromQueue`: el texto y los archivos salen de la cola, así que el compositor (lo que se escribe ahora) no se toca. */
@@ -428,6 +451,9 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
           const card = response.duplicate ? null : changeCardInputFromResponse(response, { title, assumptions: assistant.turn.assumptions.slice(knownAssumptions) });
           if (card && (card.status !== 'error' || toolKind(call.name) !== 'read'))
             update((m) => ({ ...m, changeCards: [...(m.changeCards ?? []), { callId: call.callId, input: card }] }));
+          // La creación no tiene diff por ruta: su tarjeta es «Propuesta creada» (equipos y cifras del motor si está completa).
+          const created = response.duplicate ? null : createdProposalCard(response);
+          if (created) update((m) => ({ ...m, createdProposals: [...(m.createdProposals ?? []), { callId: call.callId, card: created }] }));
           // Las tarjetas son de la interfaz: el modelo recibe la forma común sin ellas.
           const { cards: _cards, ...body } = response;
           return body as unknown as Record<string, unknown>;
@@ -488,11 +514,15 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
       const text = (input ?? state.draft).trim();
       if (!text) return;
       if (state.busy) {
-        // Escribir mientras trabaja: a la cola (varios mensajes se juntan); se entrega al terminar el paso en curso.
+        // Escribir mientras trabaja: a la cola (varios mensajes se juntan); se entrega al terminar el paso en curso. Los
+        // adjuntos que no caben en el mensaje encolado se quedan en el compositor, con su aviso (nunca se pierden).
         const previous = state.queued;
+        const all = [...(previous?.files ?? []), ...state.files];
+        const queuedFiles = all.slice(0, CHAT_FILE_LIMITS.maxFiles);
+        const left = all.slice(CHAT_FILE_LIMITS.maxFiles);
         set({
-          queued: { text: previous ? `${previous.text}\n\n${text}` : text, files: [...(previous?.files ?? []), ...state.files].slice(0, CHAT_FILE_LIMITS.maxFiles) },
-          files: [], composerError: '', ...(input === undefined ? { draft: '' } : {}),
+          queued: { text: previous ? `${previous.text}\n\n${text}` : text, files: queuedFiles },
+          files: left, composerError: left.length ? tooManyFiles(queuedFiles.length, all.length) : '', ...(input === undefined ? { draft: '' } : {}),
         });
         return;
       }
@@ -566,11 +596,24 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     },
     undoActivity(activityId) {
       const result = store().undoAgentActivity(activityId);
-      if (result.success) {
-        const message = state.messages.find((m): m is SessionAssistantMessage => m.role === 'assistant' && Object.values(m.turn.tools).some((call) => call.activityId === activityId));
-        if (message) patchMessage(message.id, (m) => ({ ...m, undone: { ...m.undone, [activityId]: true } }));
-      }
+      const message = state.messages.find((m): m is SessionAssistantMessage => m.role === 'assistant' && (
+        Object.values(m.turn.tools).some((call) => call.activityId === activityId) || !!m.changeCards?.some((c) => c.input.activityId === activityId
+          // Un cambio confirmado desde la tarjeta: su actividad la dice la cola de confirmaciones.
+          || (!!c.input.actionId && store().pendingAgentActions.find((a) => a.id === c.input.actionId)?.activityId === activityId))));
+      // También el fallo: la tarjeta lo muestra (sin él, el botón fallaría en silencio).
+      if (message) patchMessage(message.id, (m) => (result.success
+        ? { ...m, undone: { ...m.undone, [activityId]: true } }
+        : { ...m, undoErrors: { ...m.undoErrors, [activityId]: result.error || 'No se pudo deshacer.' } }));
       return result;
+    },
+    undoTurn(turnId) {
+      let undone = 0;
+      for (const id of turnUndoTargets(turnId, store().agentActivity)) {
+        const result = session.undoActivity(id);
+        if (!result.success) return { success: false, undone, error: undone ? `Se deshicieron ${undone} cambios; el resto no: ${result.error}` : result.error };
+        undone++;
+      }
+      return { success: undone > 0, undone, ...(undone ? {} : { error: 'No queda nada de este turno que deshacer.' }) };
     },
     history: () => history,
     connectPorts() {

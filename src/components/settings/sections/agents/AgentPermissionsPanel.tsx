@@ -62,7 +62,7 @@ export const AgentPermissionsPanel: React.FC = () => {
                     Cambios dentro de una propuesta (asistente general)
                     <InfoTip
                       label="Qué cambia el perfil"
-                      text={'Edición en vivo: precios, margen, extras y descuentos de la propuesta se aplican al momento, con el antes y después y deshacer.\nPedir confirmación: esos cambios esperan a que los confirmes en la tarjeta.\nEn los dos casos, lo compartido (catálogo, ofertas, estados, papelera y borrados) se confirma siempre, y los agentes externos siguen pidiendo confirmación.'}
+                      text={'Edición en vivo: precios, margen, extras y descuentos de la propuesta se aplican al momento, con el antes y después y deshacer.\nPedir confirmación: esos cambios esperan a que los confirmes en la tarjeta.\nEn los dos casos, lo compartido (catálogo, ofertas, estados, papelera y borrados) se confirma, salvo que en «Cambios sensibles» elijas «Aplicar sin preguntar (bypass)», el modo sin confirmación; lo que no se puede deshacer se confirma siempre. Este perfil no cambia lo que piden los agentes externos.'}
                     />
                   </span>
                   <select

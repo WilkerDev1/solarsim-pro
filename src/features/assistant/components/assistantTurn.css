@@ -12,3 +12,12 @@
 .assistant-turn-notes { margin: 0; display: flex; flex-wrap: wrap; gap: 10px; color: var(--chat-muted, #bccbdd); }
 .assistant-turn-notes > span { display: inline-flex; align-items: center; gap: 2px; }
 .assistant-turn-notice { margin: 6px 0 0; font-size: 12px; color: var(--chat-muted, #bccbdd); }
+/* F5b: tarjeta «Propuesta creada» (misma superficie que ChangeCard) y la vigencia de una confirmación pendiente. */
+.assistant-created-card { border: 1px solid #374458; border-radius: 10px; padding: 10px 12px; }
+.assistant-created-card h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: inherit; }
+.assistant-created-card h3 small { font-weight: 400; color: var(--chat-muted, #bccbdd); margin-left: 4px; }
+.assistant-created-equipment { margin: 0 0 6px; color: var(--chat-muted, #bccbdd); overflow-wrap: anywhere; }
+.assistant-created-card dl { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.assistant-created-card dt { font-size: 11px; color: var(--chat-muted, #bccbdd); }
+.assistant-created-card dd { margin: 0; font-family: ui-monospace, monospace; font-weight: 600; }
+.assistant-created-pending, .assistant-turn-validity { margin: 0; display: inline-flex; align-items: center; gap: 2px; color: var(--chat-muted, #bccbdd); }

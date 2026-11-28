@@ -1,11 +1,15 @@
 // Lo que hizo un turno en el panel del asistente (F5b): una tarjeta de cambio (ChangeCard de F5a) por respuesta de herramienta,
 // con los datos reales de la respuesta (diff, resultados del motor antes/después, avisos y supuestos), y Deshacer,
-// Confirmar y Rechazar conectados a la sesión. Debajo, lo que no es de una tarjeta: supuestos sueltos, qué falta, qué falló,
-// el modelo de respaldo y «Continuar». Lee el estado del turno de la sesión (`TurnState` de F3c y `changeCards`).
+// Confirmar y Rechazar conectados a la sesión; una tarjeta «Propuesta creada» por creación; y «Deshacer todo el turno» con
+// dos o más cambios deshacibles. Debajo, lo que no es de una tarjeta: supuestos sueltos, qué falta (sin repetir lo que ya dice
+// una tarjeta), qué falló, el modelo de respaldo y «Continuar». Lee el estado del turno de la sesión (`TurnState` de F3c,
+// `changeCards`, `createdProposals`) y, con `live`, la actividad y la cola de confirmaciones del store.
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Undo2 } from 'lucide-react';
 import { ChangeCard } from '../../assistantFeedback/ChangeCard';
-import { turnChangeCards } from '../panelState';
+import { pendingValidUntil, turnChangeCards, turnUndoTargets, type CreatedProposalCardView, type TurnDetailsLive } from '../panelState';
+
+export type { TurnDetailsLive } from '../panelState';
 import type { SessionAssistantMessage } from '../session/assistantSession';
 import { assistantToolLabel } from '../session/assistantSession';
 import { assistantValueLabel } from '../labels';
@@ -30,7 +34,28 @@ export interface TurnDetailsActions {
   confirmPending(actionId: string): void;
   rejectPending(actionId: string): void;
   undo(activityId: string): void;
+  /** «Deshacer todo el turno» (sin él no se ofrece). */
+  undoTurn?(turnId: string): void;
   continueTurn(): void;
+}
+
+/** Tarjeta «Propuesta creada»: equipos y, solo si está completa, las cifras del motor (nunca ceros de una incompleta). */
+function CreatedProposalCard({ card }: { card: CreatedProposalCardView }) {
+  return (
+    <section className="assistant-created-card" data-created-proposal={card.metrics ? 'complete' : 'incomplete'} aria-label={`Propuesta creada: ${card.name}`}>
+      <h3>Propuesta creada <small>{card.name}</small></h3>
+      {card.equipment.length > 0 && <p className="assistant-created-equipment">{card.equipment.join(' · ')}</p>}
+      {card.metrics ? (
+        <dl>
+          {card.metrics.map((m) => (
+            <div key={m.label}><dt>{m.label}</dt><dd>{m.value}</dd></div>
+          ))}
+        </dl>
+      ) : card.reasons.length > 0 ? (
+        <p className="assistant-created-pending">Propuesta incompleta: sin resultados todavía <InfoTip label="Qué falta en la propuesta" text={card.reasons.join(' ')} /></p>
+      ) : null}
+    </section>
+  );
 }
 
 /** Llamadas del turno en curso como pasos legibles (para «Pensando…»). */
@@ -42,29 +67,49 @@ export function turnSteps(message: SessionAssistantMessage): string[] {
   });
 }
 
-export function AssistantTurnDetails({ message, busy, actions }: { message: SessionAssistantMessage; busy: boolean; actions: TurnDetailsActions }) {
+const validUntilText = (iso: string) => `Vale hasta las ${new Date(iso).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}; después hay que pedirla de nuevo.`;
+
+export function AssistantTurnDetails({ message, busy, actions, live }: { message: SessionAssistantMessage; busy: boolean; actions: TurnDetailsActions; live?: TurnDetailsLive }) {
   const { turn } = message;
   const summary = turn.summary;
   if (!summary) return null;
-  const cards = turnChangeCards(message);
-  // Los supuestos que ya muestra una tarjeta no se repiten abajo.
+  const cards = turnChangeCards(message, live);
+  const created = message.createdProposals ?? [];
+  // Los supuestos y los motivos de «incompleta» que ya muestra una tarjeta no se repiten abajo.
   const inCards = new Set(cards.flatMap(({ input }) => (input.assumptions ?? []).map((a) => `${a.source}:${a.key}`)));
   const looseAssumptions = summary.assumptions.filter((a) => !inCards.has(`${a.source}:${a.key}`));
+  const shownReasons = new Set([
+    ...cards.flatMap(({ input }) => (input.results?.after && !input.results.after.complete ? input.results.after.reasons.map((r) => r.message) : [])),
+    ...created.flatMap(({ card }) => card.reasons),
+  ]);
+  const missing = summary.missing.filter((reason) => !shownReasons.has(reason));
   const failed = summary.failedTools.map(assistantToolLabel);
-  if (!cards.length && !looseAssumptions.length && !failed.length && !summary.missing.length && !message.canContinue && !message.modelNotice) return null;
+  const undoAll = live ? turnUndoTargets(message.id, live.agentActivity).length : 0;
+  if (!cards.length && !created.length && !looseAssumptions.length && !failed.length && !missing.length && !message.canContinue && !message.modelNotice) return null;
   return (
     <div className="assistant-turn-details">
-      {cards.map(({ callId, input }) => (
-        <ChangeCard
-          key={callId}
-          input={input}
-          // Deshacer espera a que el turno termine (el modelo podría estar usando ese cambio); confirmar o rechazar no.
-          busy={busy && input.status === 'applied'}
-          onUndo={input.activityId ? () => actions.undo(input.activityId!) : undefined}
-          onConfirm={input.actionId ? () => actions.confirmPending(input.actionId!) : undefined}
-          onReject={input.actionId ? () => actions.rejectPending(input.actionId!) : undefined}
-        />
-      ))}
+      {created.map(({ callId, card }) => <CreatedProposalCard key={callId} card={card} />)}
+      {cards.map(({ callId, input }) => {
+        const until = input.status === 'pending_confirmation' && input.actionId ? pendingValidUntil(input.actionId, live) : undefined;
+        return (
+          <React.Fragment key={callId}>
+            <ChangeCard
+              input={input}
+              // Deshacer espera a que el turno termine (el modelo podría estar usando ese cambio); confirmar o rechazar no.
+              busy={busy && input.status === 'applied'}
+              onUndo={input.activityId ? () => actions.undo(input.activityId!) : undefined}
+              onConfirm={input.actionId ? () => actions.confirmPending(input.actionId!) : undefined}
+              onReject={input.actionId ? () => actions.rejectPending(input.actionId!) : undefined}
+            />
+            {until && <p className="assistant-turn-validity">Confirmación pendiente <InfoTip label="Hasta cuándo vale" text={validUntilText(until)} /></p>}
+          </React.Fragment>
+        );
+      })}
+      {undoAll >= 2 && actions.undoTurn && (
+        <div className="assistant-turn-actions">
+          <button type="button" disabled={busy} onClick={() => actions.undoTurn?.(message.id)}><Undo2 size={12} aria-hidden /> Deshacer todo el turno</button>
+        </div>
+      )}
       {looseAssumptions.length > 0 && (
         <section aria-label="Supuestos">
           <h3>Supuse</h3>
@@ -73,9 +118,9 @@ export function AssistantTurnDetails({ message, busy, actions }: { message: Sess
           </ul>
         </section>
       )}
-      {(summary.missing.length > 0 || failed.length > 0 || message.modelNotice) && (
+      {(missing.length > 0 || failed.length > 0 || message.modelNotice) && (
         <p className="assistant-turn-notes">
-          {summary.missing.length > 0 && <span>Propuesta incompleta <InfoTip label="Qué falta en la propuesta" text={summary.missing.join(' ')} /></span>}
+          {missing.length > 0 && <span>Propuesta incompleta <InfoTip label="Qué falta en la propuesta" text={missing.join(' ')} /></span>}
           {failed.length > 0 && <span>Sin completar: {failed.join(', ')}</span>}
           {message.modelNotice && <span>Modelo de respaldo <InfoTip label="Modelo de respaldo" text={message.modelNotice} /></span>}
         </p>

@@ -8,6 +8,15 @@ export function composerKeyAction(e: { key: string; shiftKey: boolean; ctrlKey: 
   return e.shiftKey || e.altKey ? null : 'send';
 }
 
+/**
+ * Esc en el compositor. Sin cola (el modal antiguo) detiene la respuesta, como siempre. Con cola (asistente único, F5b) el
+ * campo sigue editable mientras trabaja y Esc se pulsa para cosas de escribir (cerrar un autocompletado, un IME): nunca
+ * detiene el turno; Detener queda solo en su botón. Un Esc de composición (IME) nunca detiene.
+ */
+export function composerEscapeAction(e: { busy: boolean; queueWhileBusy: boolean; isComposing: boolean }): 'stop' | null {
+  return e.busy && !e.queueWhileBusy && !e.isComposing ? 'stop' : null;
+}
+
 /** Nombre legible de una herramienta para el progreso por pasos (título declarado o el nombre técnico). */
 export function toolStepLabel(name: string): string {
   return findAgentTool(name)?.title || name.replace(/_/g, ' ');

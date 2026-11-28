@@ -1,9 +1,9 @@
 /**
  * Encendido del asistente flotante (F3b, ADR 0010). Puro.
  *
- * Hoy `appAssistantEnabled` es `false` de fábrica y se guarda SIEMPRE (serializeSimulationStore), así que en cada
- * instalación ese `false` ya está escrito: cambiar el valor de fábrica no enciende a nadie, y un `false` guardado no dice si
- * el usuario lo apagó o nunca lo tocó. Por eso:
+ * Hasta F4, `appAssistantEnabled` era `false` de fábrica y se guarda SIEMPRE (serializeSimulationStore), así que en las
+ * instalaciones de antes ese `false` ya está escrito: cambiar el valor de fábrica no enciende a nadie, y un `false` guardado
+ * no dice si el usuario lo apagó o nunca lo tocó. Por eso:
  *
  * - Desde F3b el interruptor de Ajustes registra la elección (`appAssistantEnabledChosenByUser`), y la marca
  *   `appAssistantDefaultsVersion` dice que la migración ya corrió en esta instalación.
