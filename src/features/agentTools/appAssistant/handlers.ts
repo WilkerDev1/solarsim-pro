@@ -357,13 +357,19 @@ export function undoNeedsConfirmation(args: Record<string, unknown>): boolean {
   return undoTargets(args.proposalId, args).some((entry) => entry.kind === 'guarded' || entry.undo?.op === 'trash' || entry.undo?.op === 'restore');
 }
 
+/** Herramientas cuyos cambios se quedan DENTRO de una propuesta (F3b): su deshacer también. Lista blanca, no negra. */
+const PROPOSAL_SCOPED_TOOLS = new Set(['edit_proposal']);
+
 /**
- * ¿El deshacer se queda DENTRO de la propuesta (F3b)? Sí, salvo que alguno de los cambios mande a la papelera o restaure una
- * propuesta: eso es la papelera, compartida, y se confirma también con el perfil «edición en vivo».
+ * ¿El deshacer se queda DENTRO de la propuesta (F3b)? Solo si TODOS los cambios que revierte los hizo una herramienta de
+ * alcance propuesta (`edit_proposal`) y ninguno manda a la papelera ni restaura. Deshacer el estado técnico, la decisión
+ * comercial, una creación o cualquier otra herramienta compartida se confirma también con el perfil «edición en vivo»: lo que
+ * se confirmó al hacerlo se confirma al deshacerlo.
  */
 export function undoStaysInProposal(args: Record<string, unknown>): boolean {
   if (typeof args.proposalId !== 'string') return false;
-  return !undoTargets(args.proposalId, args).some((entry) => entry.undo?.op === 'trash' || entry.undo?.op === 'restore');
+  const targets = undoTargets(args.proposalId, args);
+  return targets.length > 0 && targets.every((entry) => PROPOSAL_SCOPED_TOOLS.has(entry.tool) && entry.undo?.op !== 'trash' && entry.undo?.op !== 'restore');
 }
 
 /**

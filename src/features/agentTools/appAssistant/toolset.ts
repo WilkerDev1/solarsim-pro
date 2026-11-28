@@ -19,7 +19,7 @@ import { diffProjectFields } from '../../../domain/projectEditTransaction';
 import { engineResults, proposalStateSummary, type ProposalStateSummary } from '../../../domain/proposalSnapshot';
 import { energyCalculationMode } from '../../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../application/featurePolicy';
-import { operationsTouchPricing } from './pricingOps';
+import { operationsSetManualPrice, operationsTouchPricing } from './pricingOps';
 import { visibleAssistantProjects } from '../../assistant/tools';
 import { executeAgentTool, runNativeTool } from '../registry';
 import { store, type AgentToolContext, type NativeHandler } from '../nativeTools';
@@ -28,7 +28,7 @@ import type { AgentToolScope } from '../permissionProfile';
 import { appAssistantToolDefinitions } from './definitions';
 
 export { APP_ASSISTANT_TOOLSET, appAssistantToolDefinitions } from './definitions';
-export { operationsTouchPricing } from './pricingOps';
+export { operationsSetManualPrice, operationsTouchPricing } from './pricingOps';
 
 export interface AssistantToolResponse extends Required<Pick<ToolPayload, 'changes' | 'results' | 'warnings'>> {
   status: 'ok' | 'applied' | 'pending_confirmation' | 'error';
@@ -90,7 +90,8 @@ async function runOwn(handler: NativeHandler, definition: AgentToolDefinition, a
   const guarded = (name === 'edit_proposal' && operationsTouchPricing(args.ops)) || (name === 'undo_change' && undoNeedsConfirmation(args));
   const effective: AgentToolDefinition = guarded ? { ...definition, kind: 'guarded' } : definition;
   // Dentro de una propuesta y con deshacer: el perfil «edición en vivo» decide (solo para el asistente de la app).
-  const scope: AgentToolScope = name === 'edit_proposal' || (name === 'undo_change' && undoStaysInProposal(args)) ? 'proposal' : 'shared';
+  // Un costo de equipo escrito a mano no sale de la transacción: se confirma también en la app (operationsSetManualPrice).
+  const scope: AgentToolScope = (name === 'edit_proposal' && !operationsSetManualPrice(args.ops)) || (name === 'undo_change' && undoStaysInProposal(args)) ? 'proposal' : 'shared';
   let preview: ToolPayload | undefined;
   const capture: NativeHandler = async (a, c) => {
     const result = await handler(a, c);

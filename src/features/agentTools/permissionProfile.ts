@@ -45,7 +45,9 @@ export function decideAgentToolPermission(policy: AgentPolicy, request: AgentPer
   if (liveEditApplies(policy, request)) {
     // Dentro de una propuesta el cambio se trata como un borrador (diff y deshacer): manda el nivel de borradores.
     if (levels.draft === 'deny') return 'deny';
-    return levels.draft === 'allow' ? 'apply' : 'confirm';
+    if (levels.draft === 'allow') return 'apply';
+    // «En vivo» nunca es más estricto que «confirmar»: el bypass explícito de cambios sensibles sigue aplicando.
+    return request.kind === 'guarded' && levels.guarded === 'allow' ? 'apply' : 'confirm';
   }
   if (request.kind === 'draft') {
     if (levels.draft === 'allow') return 'apply';
