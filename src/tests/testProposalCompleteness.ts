@@ -188,6 +188,8 @@ const uses: Record<string, string[]> = {
   'src/components/simulator/sidebar/PricingParamsSection.tsx': ['shownMetric(', 'shownMetric(completeness, `$${usd(summary?.grossInvestmentUSD'],
   'src/components/simulator/params/sections/pricing/DirectPrice.tsx': ['shownMetric('],
   'src/components/simulator/sidebar/BatteryEquipmentSection.tsx': ['shownMetric('],
+  // El aviso de equipos sin costo no cuenta la batería oculta de una propuesta sin baterías (QA de F2b).
+  'src/components/simulator/tabs/QuotationEquipmentsTab.tsx': ['project.specs.hasBattery ? project.specs.batteries || [] : [])'],
   'src/components/clients/ClientDetailPanel.tsx': ['contractPriceForTotals('],
   'src/features/proposals/ProposalSalesSummary.tsx': ['contractPriceForTotals('],
 };
