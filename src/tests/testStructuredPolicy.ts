@@ -7,6 +7,7 @@ import { LlmError } from '../services/llm/errors';
 import { MAX_INLINE_FILE_BASE64, requestStructured, type StructuredPolicyOptions } from '../services/llm/structuredPolicy';
 import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../shared/geminiTransport';
 import type { LlmStructuredRequest } from '../services/llm/types';
+import { clientFromTransport } from './support/clientFromTransport';
 import { ScriptedLlm, type ScriptedStep } from './support/scriptedLlm';
 
 const schema = { type: 'object', properties: { ok: { type: 'boolean' } } };
@@ -273,6 +274,50 @@ const sent = (llm: ScriptedLlm) => llm.calls.map((call) => call.request as LlmSt
   // Una cancelación sin razón de la señal ni del error: mensaje en español.
   const plain = new ScriptedLlm([{ error: new LlmError('cancelled') }]);
   await assert.rejects(run(plain), /Solicitud cancelada/);
+}
+
+// 10. Respuestas vacías o sin finishReason, con el adaptador real del SDK sobre un transporte sintético: lo mismo que
+// hacía requestGeminiStructured (shared/geminiTransport) en esos casos. Las suites de ScriptedLlm no las ven porque el
+// doble no distingue «texto vacío» de «JSON inválido».
+{
+  const NO_DATA = /Gemini no devolvió datos para analizar\. Revisa el archivo o las instrucciones\./;
+  const reply = (parts: unknown[], finishReason?: string) => ({ candidates: [{ content: { role: 'model', parts }, ...(finishReason ? { finishReason } : {}) }] });
+  const viaAdapter = (responses: unknown[]) => {
+    let calls = 0;
+    const client = clientFromTransport(async () => responses[Math.min(calls++, responses.length - 1)] as never);
+    return { run: () => requestStructured({ client, invalidMessage: INVALID, request: { contents, schema } }), calls: () => calls };
+  };
+  const good = reply([{ text: '{"ok":true}' }], 'STOP');
+  // STOP con texto vacío, o solo con razonamiento: «no devolvió datos», sin pagar un segundo intento.
+  for (const [name, response] of [
+    ['texto vacío', reply([{ text: '' }], 'STOP')],
+    ['solo razonamiento', reply([{ text: 'pienso', thought: true }], 'STOP')],
+    ['sin partes', reply([], 'STOP')],
+    ['sin candidatos', {}],
+  ] as const) {
+    const probe = viaAdapter([response, good]);
+    await assert.rejects(probe.run(), NO_DATA, name);
+    assert.equal(probe.calls(), 1, `${name}: sin reintento pagado`);
+  }
+  // JSON válido sin finishReason: se acepta (el transporte REST no lo exigía).
+  const noFinish = viaAdapter([reply([{ text: '{"ok":true}' }])]);
+  assert.deepEqual((await noFinish.run()).data, { ok: true });
+  assert.equal(noFinish.calls(), 1);
+  // Texto que no es JSON y sin finishReason: JSON inválido, un reintento (no «UNKNOWN»).
+  const noFinishBad = viaAdapter([reply([{ text: 'no-json' }]), good]);
+  assert.deepEqual((await noFinishBad.run()).data, { ok: true });
+  assert.equal(noFinishBad.calls(), 2);
+  // Un motivo de fin conocido distinto de STOP sigue dando «no completó la respuesta (…)», aunque el texto esté vacío.
+  const other = viaAdapter([reply([{ text: '' }], 'OTHER'), good]);
+  await assert.rejects(other.run(), /no completó la respuesta \(OTHER\)/);
+  assert.equal(other.calls(), 1);
+  // Seguridad: ni se reintenta ni se dice «no devolvió datos»; el mensaje es el del puerto, en español.
+  const safety = viaAdapter([reply([{ text: '' }], 'SAFETY'), good]);
+  await assert.rejects(safety.run(), (error: unknown) => error instanceof LlmError && error.kind === 'blocked' && /filtros de seguridad/.test(error.message));
+  assert.equal(safety.calls(), 1);
+  const promptBlocked = viaAdapter([{ promptFeedback: { blockReason: 'SAFETY' } }, good]);
+  await assert.rejects(promptBlocked.run(), (error: unknown) => error instanceof LlmError && error.kind === 'blocked');
+  assert.equal(promptBlocked.calls(), 1);
 }
 
 console.log('Structured policy over LlmClient: fallback model, MAX_TOKENS recovery, bounded JSON retry, deadline, 20 MiB and cancellation (ScriptedLlm only).');

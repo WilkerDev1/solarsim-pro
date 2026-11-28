@@ -159,4 +159,10 @@ for (const file of readdirSync('src/services').filter((name) => /^gemini.*Servic
   assert(!/geminiTransport|requestGeminiStructured|requestGeminiJson|parseGeminiJson|geminiResponseText|GeminiTransport/.test(source), `${file} no usa shared/geminiTransport`);
   assert(/structuredPolicy/.test(source), `${file} pide la salida estructurada por la política del puerto`);
 }
+// El servicio legado de propuestas (vivo hasta F6) sigue sin reimplementar el transporte: usa requestGeminiStructured.
+{
+  const legacy = readFileSync('src/services/geminiInvoiceService.ts', 'utf8');
+  assert(!/requestGeminiJson|parseGeminiJson|geminiResponseText/.test(legacy), 'geminiInvoiceService.ts usa requestGeminiStructured');
+  assert(/requestGeminiStructured/.test(legacy), 'geminiInvoiceService.ts pide la salida estructurada por requestGeminiStructured');
+}
 console.log('Gemini structured requests: one helper, injected transport, bounded JSON retry and limits (synthetic only).');

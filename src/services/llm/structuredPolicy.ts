@@ -77,6 +77,8 @@ const validTimeout = (ms?: number) => (typeof ms === 'number' && Number.isFinite
 const thinkingFor = (model: string, level: LlmThinkingLevel = 'low') => (/^gemini-[34][.-]/.test(model) ? level : undefined);
 const TRUNCATED = 'Gemini agotó el límite de respuesta. Reduce los adjuntos o divide las instrucciones. Tu borrador anterior se conserva; no se aplicaron datos parciales.';
 
+const NO_DATA = 'Gemini no devolvió datos para analizar. Revisa el archivo o las instrucciones.';
+
 /** El valor que se lanza al cancelar: la razón de quien canceló, o un error genérico si no dio ninguna. */
 const cancellation = (signal: AbortSignal | undefined, error?: LlmError): unknown =>
   error?.reason ?? signal?.reason ?? new Error(error?.message || 'Solicitud cancelada.');
@@ -133,6 +135,8 @@ export async function requestStructured<T extends Record<string, unknown> = Reco
         if (!(error instanceof LlmError)) throw error;
         if (error.kind === 'cancelled') throw cancellation(signal, error);
         if (error.kind === 'malformed_response' && error.finishReason) {
+          // Respuesta completa sin texto visible (vacía, sin candidatos o solo razonamiento): no es JSON inválido y no se reintenta.
+          if (error.finishReason === 'stop' && error.emptyOutput) throw new Error(NO_DATA);
           if (error.finishReason === 'stop') throw new StructuredInvalidJsonError(options.invalidMessage);
           if (error.finishReason === 'max_tokens') {
             const larger = maxOutputTokens ? Math.min(outputCeiling(model), Math.max(16_384, maxOutputTokens * 2)) : undefined;

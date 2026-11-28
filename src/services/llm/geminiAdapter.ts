@@ -224,13 +224,15 @@ function buildConfig(request: LlmRequest, signal: AbortSignal, extra: GenerateCo
   return config;
 }
 
-function parseJsonObject(text: string, response: LlmResponse): Record<string, unknown> {
+function parseJsonObject(text: string, finishReason: LlmFinishReason): Record<string, unknown> {
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  // Sin texto visible (vacío o solo razonamiento) no hay nada que reintentar: se distingue del JSON inválido.
+  if (!cleaned) throw new LlmError('malformed_response', { finishReason, emptyOutput: true });
   try {
     const parsed = JSON.parse(cleaned);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
   } catch { /* abajo */ }
-  throw new LlmError('malformed_response', { finishReason: response.finishReason });
+  throw new LlmError('malformed_response', { finishReason });
 }
 
 /** Mergea deltas de texto contiguos del stream cuando no llevan firma: el historial queda compacto sin perder firmas. */
@@ -315,8 +317,10 @@ export function createGeminiLlmClient(options: GeminiLlmClientOptions): LlmClien
       const { schema, ...rest } = request;
       const response = await generate(rest, callOptions, { responseMimeType: 'application/json', responseJsonSchema: schema });
       if (response.finishReason === 'safety') throw new LlmError('blocked', { finishReason: response.finishReason });
-      if (response.finishReason !== 'stop') throw new LlmError('malformed_response', { finishReason: response.finishReason });
-      return { data: parseJsonObject(response.text, response) as T, response };
+      // Una respuesta sin finishReason (ni candidatos) se trata como completa: lo que cuenta es si trae un objeto JSON.
+      const finishReason = response.finishReason === 'unknown' && !response.rawFinishReason ? 'stop' : response.finishReason;
+      if (finishReason !== 'stop') throw new LlmError('malformed_response', { finishReason });
+      return { data: parseJsonObject(response.text, finishReason) as T, response };
     },
     async listModels(callOptions?: LlmCallOptions): Promise<LlmModel[]> {
       const attempt = startAttempt(callOptions, defaultTimeoutMs);
