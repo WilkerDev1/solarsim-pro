@@ -24,6 +24,7 @@ import {
 } from '../store/persistence/appAssistantEnablement';
 import { hydrateSimulationStore } from '../store/persistence/hydrateSimulationStore';
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
+import { featureScope } from '../../shared/applicationFeatures';
 import type { ProjectSimulation } from '../types';
 import type { SimulationStore } from '../store/types';
 
@@ -78,6 +79,12 @@ assert.equal(decide('app-assistant', {}, internal({ guarded: 'deny' })), 'deny',
 assert.equal(decide('app-assistant', {}, internal({ draft: 'confirm' })), 'confirm', 'borradores con confirmación: el perfil no la salta');
 assert.equal(decide('app-assistant', {}, internal({ draft: 'deny' })), 'deny');
 assert.equal(decide('app-assistant', {}, internal({}, 'confirm')), 'confirm', 'perfil «confirmar»: como antes de F3b');
+// El bypass explícito de cambios sensibles sigue valiendo con el perfil: «en vivo» nunca es más estricto que «confirmar».
+const draftConfirmBypass = internal({ draft: 'confirm', guarded: 'allow' });
+assert.equal(decide('app-assistant', {}, draftConfirmBypass), 'apply', 'precio dentro de la propuesta con bypass de sensibles: se aplica');
+assert.equal(decide('app-assistant', {}, internal({ draft: 'confirm', guarded: 'allow' }, 'confirm')), 'apply', 'igual que con el perfil «confirmar»');
+assert.equal(decide('app-assistant', { kind: 'draft' }, draftConfirmBypass), 'confirm', 'un borrador con «Pedir confirmación» se confirma');
+assert.equal(decide('app-assistant', { undoable: false }, draftConfirmBypass), 'confirm', 'el bypass nunca salta lo que no se deshace');
 // Lo que ya existía no cambia: bypass explícito, sus excepciones y el clic de «Aplicar» del asistente de propuestas.
 const externalBypass: AgentPolicy = { ...DEFAULT_AGENT_POLICY, external: { read: 'allow', draft: 'allow', guarded: 'allow' } };
 assert.equal(decide('mcp', { scope: 'shared' }, externalBypass), 'apply', 'bypass explícito');
@@ -113,6 +120,20 @@ const liveStorage = await executeAssistantToolset({ name: 'edit_proposal', args:
 assert.equal(liveStorage.status, 'applied', JSON.stringify(liveStorage.error));
 assert.equal(projectOf().specs.batteries?.[0].unitPriceUSD, 2100, 'precio de la oferta del proveedor, nunca inventado');
 assert.equal(projectOf().specs.batteries?.[0].priceSource, 'supplier');
+// Un costo de equipo escrito por el modelo (precio «manual», sin oferta ni genérico) NO va en vivo: se confirma, para que
+// ningún precio inventado llegue a la propuesta sin un humano (regla de no inventar precios).
+for (const path of ['specs.panels[0].unitPriceUSD', 'specs.inverters[0].unitPriceUSD']) {
+  const pendingBefore = s().pendingAgentActions.length;
+  const frozenSpecs = JSON.stringify(projectOf().specs);
+  const manual = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: [{ op: 'set', path, valueJson: '0.01' }] } }, ctx('app-assistant'));
+  assert.equal(manual.status, 'pending_confirmation', `${path}: costo manual desde la app, confirmación (${JSON.stringify(manual.error ?? manual.status)})`);
+  assert.equal(JSON.stringify(projectOf().specs), frozenSpecs, 'pendiente: nada escrito');
+  assert.equal(s().pendingAgentActions.length, pendingBefore + 1);
+}
+// Mezclado con un cambio en vivo, el lote entero se confirma.
+const mixedManual = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: [...marginOps, { op: 'set', path: 'specs.panels[0].unitPriceUSD', valueJson: '0.01' }] } }, ctx('app-assistant'));
+assert.equal(mixedManual.status, 'pending_confirmation');
+store.setState({ pendingAgentActions: [] });
 // Deshacer un cambio de precios hecho en vivo es también un cambio dentro de la propuesta: en vivo.
 const undoLive = await executeAssistantToolset({ name: 'undo_change', args: { proposalId: base.id } }, ctx('app-assistant'));
 assert.equal(undoLive.status, 'applied', JSON.stringify(undoLive.error));
@@ -161,6 +182,39 @@ const created = await executeAssistantToolset({ name: 'create_proposal', args: {
 assert.equal(created.status, 'applied', JSON.stringify(created.error));
 const undoCreate = await executeAssistantToolset({ name: 'undo_change', args: { proposalId: created.proposalId! } }, ctx('app-assistant'));
 assert.equal(undoCreate.status, 'pending_confirmation', 'papelera vía deshacer: confirmación');
+// Deshacer el estado técnico o la decisión comercial tampoco va en vivo: lo que se confirmó al hacerlo se confirma al deshacerlo.
+reset();
+const statusShared = await executeAssistantToolset({ name: 'set_commercial_status', args: { id: base.id, status: 'approved' } }, ctx('app-assistant', 'turn-shared-1'));
+assert.equal(s().confirmAgentAction(statusShared.actionId!).success, true);
+assert.equal(projectOf().commercial?.status, 'approved');
+const undoCommercial = await executeAssistantToolset({ name: 'undo_change', args: { proposalId: base.id } }, ctx('app-assistant'));
+assert.equal(undoCommercial.status, 'pending_confirmation', 'deshacer la decisión comercial: confirmación');
+assert.equal(projectOf().commercial?.status, 'approved', 'pendiente: nada deshecho');
+store.setState({ pendingAgentActions: [] });
+const technical = await executeAssistantToolset({ name: 'set_proposal_status', args: { id: base.id, status: 'Final' } }, ctx('app-assistant', 'turn-shared-2'));
+assert.equal(s().confirmAgentAction(technical.actionId!).success, true);
+const statusAfter = projectOf().status;
+const undoTechnical = await executeAssistantToolset({ name: 'undo_change', args: { proposalId: base.id } }, ctx('app-assistant'));
+assert.equal(undoTechnical.status, 'pending_confirmation', 'deshacer el estado técnico: confirmación');
+assert.equal(projectOf().status, statusAfter);
+store.setState({ pendingAgentActions: [] });
+// Un turno que mezcla un cambio en vivo con uno compartido: deshacer el turno entero se confirma.
+const mixedTurn = 'turn-shared-3';
+const liveInTurn = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: [{ op: 'set', path: 'rates.targetCoveragePct', valueJson: '85' }] } }, ctx('app-assistant', mixedTurn));
+assert.equal(liveInTurn.status, 'applied', JSON.stringify(liveInTurn.error));
+const sharedInTurn = await executeAssistantToolset({ name: 'set_commercial_status', args: { id: base.id, status: 'rejected' } }, ctx('app-assistant', mixedTurn));
+assert.equal(s().confirmAgentAction(sharedInTurn.actionId!).success, true);
+// Hoy las herramientas compartidas no guardan el turno en la actividad; si F4 lo propaga, el turno quedaría mezclado. Se simula.
+const sharedEntryId = s().agentActivity.find((a) => a.tool === 'set_commercial_status' && a.status === 'applied')!.id; // la más reciente
+store.setState({ agentActivity: s().agentActivity.map((a) => (a.id === sharedEntryId ? { ...a, turnId: mixedTurn } : a)) });
+assert.equal(s().agentActivity.filter((a) => a.turnId === mixedTurn && a.status === 'applied').length, 2, 'ambos cambios del turno en la actividad');
+const undoTurn = await executeAssistantToolset({ name: 'undo_change', args: { proposalId: base.id, turnId: mixedTurn } }, ctx('app-assistant'));
+assert.equal(undoTurn.status, 'pending_confirmation', 'deshacer un turno con algo compartido: confirmación');
+// Un cambio en vivo solo se deshace en vivo.
+const liveOnly = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: [{ op: 'set', path: 'rates.targetCoveragePct', valueJson: '90' }] } }, ctx('app-assistant', 'turn-shared-4'));
+const undoLiveOnly = await executeAssistantToolset({ name: 'undo_change', args: { proposalId: base.id, activityId: liveOnly.activityId } }, ctx('app-assistant'));
+assert.equal(undoLiveOnly.status, 'applied', JSON.stringify(undoLiveOnly.error));
+store.setState({ pendingAgentActions: [] });
 // Un equipo del catálogo compartido (propose_equipment_update) sigue protegido.
 const equipmentEdit = await executeAgentTool({ name: 'propose_equipment_update', args: { id: battery.id, edits: [{ section: 'equipment', field: 'displayName', valueJson: '"Otro nombre"' }] } }, ctx('app-assistant'));
 assert.equal(equipmentEdit.status, 'pending_confirmation', JSON.stringify(equipmentEdit));
@@ -175,10 +229,24 @@ reset();
 store.setState({ projects: s().projects.map((p) => (p.id === base.id ? { ...p, syncStatus: 'conflict' as const } : p)) });
 const inConflict = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: marginOps } }, ctx('app-assistant'));
 assert.equal(inConflict.status, 'error', 'conflicto: solo lectura, también en vivo');
-reset();
-store.setState({ workspaceScope: 'organization', syncSettings: { ...s().syncSettings, currentUser: { id: 'u', email: 'lector@qa.test', name: 'Lector', role: 'LECTOR', organizationId: 'o', organizationName: 'QA' } as any, authToken: 'token-qa' } });
-const reader = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: marginOps } }, ctx('app-assistant'));
+// Permisos de la cuenta: con la propuesta VISIBLE en la organización, un lector no edita ni en vivo y un administrador sí.
+const orgServer = 'https://org.invalid';
+const inOrganization = (role: string) => {
+  reset();
+  store.setState({
+    workspaceScope: featureScope(orgServer, 'o'),
+    projects: s().projects.map((p) => ({ ...p, organizationId: 'o', syncServerUrl: orgServer })),
+    syncSettings: { ...s().syncSettings, serverUrl: orgServer, currentUser: { id: 'u', email: 'qa@qa.test', name: 'QA', role, organizationId: 'o', organizationName: 'QA' } as any, authToken: 'token-qa' },
+  });
+};
+inOrganization('LECTOR');
+const reader = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: priceOps } }, ctx('app-assistant'));
 assert.equal(reader.status, 'error', 'un lector solo consulta');
+assert.match(reader.error?.message ?? '', /permisos/, `el motivo es el rol, no la visibilidad: ${JSON.stringify(reader.error)}`);
+assert.equal(s().pendingAgentActions.length, 0);
+inOrganization('ADMIN');
+const admin = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: priceOps } }, ctx('app-assistant'));
+assert.equal(admin.status, 'applied', `un administrador sí, en vivo: ${JSON.stringify(admin.error)}`);
 reset();
 store.setState({ localFeatureSettings: { ...DEFAULT_FEATURE_SETTINGS, netMeteringRegimeSelector: false } });
 const hidden = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: [{ op: 'set_net_metering', regime: 'sie007_2026' }] } }, ctx('app-assistant'));
@@ -237,5 +305,27 @@ hydrateSimulationStore(legacy);
 assert.equal(legacy.appAssistantEnabled, false, 'hasta F4/F5b nadie se enciende solo');
 assert.equal(legacy.appAssistantEnabledChosenByUser, false);
 assert.equal(legacy.appAssistantDefaultsVersion, 0);
+
+// El ciclo completo con la bandera encendida (la que F4/F5b enciende): guardado antiguo con `false` → hidratar → encendido y
+// marca → el usuario lo apaga → guardar → rehidratar → sigue apagado.
+const onHydrate = { appAssistantOnByDefault: true };
+const oldInstall = structuredClone(legacyRaw) as Record<string, unknown>;
+oldInstall.appAssistantEnabled = false;
+delete oldInstall.appAssistantEnabledChosenByUser;
+const migrated = oldInstall as unknown as SimulationStore;
+hydrateSimulationStore(migrated, onHydrate);
+assert.equal(migrated.appAssistantEnabled, true, 'se enciende una vez');
+assert.equal(migrated.appAssistantDefaultsVersion, APP_ASSISTANT_DEFAULTS_VERSION, 'y queda la marca');
+reset();
+store.setState({ appAssistantEnabled: migrated.appAssistantEnabled, appAssistantEnabledChosenByUser: migrated.appAssistantEnabledChosenByUser, appAssistantDefaultsVersion: migrated.appAssistantDefaultsVersion });
+s().setAppAssistantEnabled(false);
+const afterOff = structuredClone(serializeSimulationStore(s())) as unknown as SimulationStore;
+hydrateSimulationStore(afterOff, onHydrate);
+assert.equal(afterOff.appAssistantEnabled, false, 'el apagado del usuario se respeta al rehidratar');
+assert.equal(afterOff.appAssistantDefaultsVersion, APP_ASSISTANT_DEFAULTS_VERSION);
+// Rehidratar lo ya migrado sin tocar el interruptor tampoco vuelve a correr la migración.
+const migratedAgain = structuredClone({ ...afterOff, appAssistantEnabledChosenByUser: false }) as SimulationStore;
+hydrateSimulationStore(migratedAgain, onHydrate);
+assert.equal(migratedAgain.appAssistantEnabled, false, 'la marca basta: no se vuelve a encender');
 
 console.log('PASS: perfil «edición en vivo»: precios dentro de la propuesta en vivo en la app y con confirmación desde fuera; lo compartido se confirma en ambas; propose_project_update igual; migración del encendido de una sola vez, detrás de su bandera.');
