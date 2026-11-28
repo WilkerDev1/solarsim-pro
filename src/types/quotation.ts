@@ -11,6 +11,19 @@ export type {
  */
 export interface QuotationRecord extends Quotation {
   organizationId?: string;
+  /**
+   * Campos «solo locales» (los que una API anterior descarta) tal como los tenía la última copia del servidor instalada,
+   * antes de conservar lo local (`serverTruth`, docs/QUOTATIONS.md#compatibilidad-de-alsoseparate). No se publica.
+   */
+  confirmedLocalOnly?: ConfirmedLocalOnly;
+  /** Tras «Usar la del servidor» de un rechazo: la siguiente copia del servidor se instala sin conservar lo local. */
+  discardLocalOnly?: true;
+}
+
+export interface ConfirmedLocalOnly {
+  dismissedSourceDocuments?: string[];
+  /** Ids de los adjuntos `include` con `alsoSeparate` en el servidor. */
+  alsoSeparate: string[];
 }
 
 /** Rechazo 4xx que no se reintenta hasta que cambie la cotización (nueva revisión) o el usuario lo resuelva. */

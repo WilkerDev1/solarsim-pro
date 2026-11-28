@@ -1,10 +1,10 @@
 import { isAssetRef } from '../../../shared/documentAssets';
 import {
   canTransitionQuotation, formatQuotationNumber, isQuotationContentLocked, parseQuotationNumber, quotationNumberYear, validateQuotationContent,
-  type QuotationContent,
+  type QuotationAttachment, type QuotationContent,
 } from '../../../shared/quotations';
 import { contentEqual } from './projectDifferences';
-import type { QuotationChange, QuotationRecord } from '../../types/quotation';
+import type { ConfirmedLocalOnly, QuotationChange, QuotationRecord } from '../../types/quotation';
 
 const CONTENT_KEYS = [
   'status', 'issueDate', 'validUntil', 'currency', 'exchangeRate', 'clientId', 'client', 'sourceProjectId', 'dismissedSourceDocuments', 'folderId', 'seller',
@@ -103,29 +103,135 @@ export function canonicalQuotationContent(record: QuotationContent): QuotationCo
 }
 
 /**
- * Campos opcionales que una API anterior descarta en silencio (la 2.10.0 valida con el `shared/` previo):
- * `dismissedSourceDocuments`. Si la copia del servidor no lo trae y la local sí, no cuenta como diferencia y, al
- * instalar la copia del servidor, se conserva el local (solo con la misma propuesta enlazada). Así funciona igual con
- * la API anterior y con la nueva, sin depender del orden de despliegue (docs/QUOTATIONS.md).
+ * Campos opcionales que una API anterior descarta en silencio (valida con un `shared/` previo):
+ * - `dismissedSourceDocuments` (lo descarta la 2.10.0): si la copia del servidor no lo trae y la local sí, con la misma
+ *   propuesta enlazada;
+ * - `alsoSeparate` de cada adjunto (lo descarta la 2.10.1, que rearma cada adjunto solo con las claves que conoce): si
+ *   el adjunto del mismo id en el servidor está `include` sin el campo y el local está `include` con él.
+ * Eso no cuenta como diferencia y, al instalar la copia del servidor, se conserva lo local. Así funciona igual con la
+ * API anterior y con la nueva, sin depender del orden de despliegue (docs/QUOTATIONS.md).
  */
-// TODO: cuando la API mínima (`MIN_CLIENT_VERSION` / versión mínima de la API) conozca `dismissedSourceDocuments`,
-// activar este relajo solo frente a una API anterior: con la nueva, un servidor sin el campo es un valor real.
-const withoutFieldsServerLacks = (local: QuotationContent, server: QuotationContent): QuotationContent => {
-  if (server.dismissedSourceDocuments !== undefined || local.dismissedSourceDocuments === undefined) return local;
-  const { dismissedSourceDocuments: _onlyLocal, ...rest } = local;
-  return rest;
+// TODO: cuando la API mínima (`MIN_CLIENT_VERSION` / versión mínima de la API) conozca estos campos, activar este
+// relajo solo frente a una API anterior: con la nueva, un servidor sin el campo es un valor real.
+const separateLostByServer = (server: QuotationAttachment | undefined, local: QuotationAttachment): boolean =>
+  !!server && server.mode === 'include' && server.alsoSeparate === undefined && local.mode === 'include' && local.alsoSeparate === true;
+
+/** Qué campos se relajan en una comparación (por defecto, todos). */
+export interface LocalOnlyRelax { dismissed?: boolean; separate?: boolean }
+
+/**
+ * Lo que se sabe de la API de un servidor: guarda `dismissedSourceDocuments` / `alsoSeparate` (la nueva) porque un
+ * recibo de un PUT que los llevaba los devolvió. Con la API detectada como nueva, un servidor sin el campo es un valor
+ * real (otro equipo lo quitó): no se relaja ni se conserva lo local. Solo en memoria, por `serverUrl`: tras reiniciar se
+ * vuelve a detectar con el siguiente PUT que lleve el campo (mientras tanto, el comportamiento de la API anterior).
+ */
+export interface LocalOnlySupport { dismissed: boolean; separate: boolean }
+const NO_SUPPORT: LocalOnlySupport = { dismissed: false, separate: false };
+const supportByServer = new Map<string, LocalOnlySupport>();
+export const quotationApiSupport = (serverUrl: string | undefined): LocalOnlySupport => supportByServer.get(serverUrl ?? '') ?? NO_SUPPORT;
+/** Olvida lo detectado (como un reinicio). Para pruebas. */
+export function forgetQuotationApiSupport(): void { supportByServer.clear(); }
+/** Recibo de un PUT: si llevaba un campo «solo local» y el servidor lo devuelve, esa API lo guarda. */
+export function noteQuotationReceipt(serverUrl: string | undefined, sent: QuotationContent, saved: QuotationContent): void {
+  const known = quotationApiSupport(serverUrl);
+  const savedAttachments = new Map((saved.attachments ?? []).map((a) => [a.id, a]));
+  const dismissed = known.dismissed || (!!sent.dismissedSourceDocuments?.length && !!saved.dismissedSourceDocuments?.length);
+  const separate = known.separate || (sent.attachments ?? []).some((a) => a.alsoSeparate === true && savedAttachments.get(a.id)?.alsoSeparate === true);
+  if (dismissed !== known.dismissed || separate !== known.separate) supportByServer.set(serverUrl ?? '', { dismissed, separate });
+}
+const relaxFor = (support: LocalOnlySupport, relax: LocalOnlyRelax = {}): LocalOnlyRelax => ({
+  dismissed: (relax.dismissed ?? true) && !support.dismissed,
+  separate: (relax.separate ?? true) && !support.separate,
+});
+
+/**
+ * Valores de los campos «solo locales» que tenía la copia del servidor instalada por última vez (antes de conservar
+ * lo local). Se guarda en el registro (`confirmedLocalOnly`) para que la base de un cambio sea lo que el servidor tiene
+ * de verdad y un cambio de estado de una bloqueada los envíe exactamente así.
+ */
+export function confirmedLocalOnlyOf(server: QuotationContent): ConfirmedLocalOnly {
+  return {
+    ...(server.dismissedSourceDocuments ? { dismissedSourceDocuments: [...server.dismissedSourceDocuments] } : {}),
+    alsoSeparate: (server.attachments ?? []).filter((a) => a.mode === 'include' && a.alsoSeparate === true).map((a) => a.id),
+  };
+}
+
+interface LocalOnlyValues { dismissedSourceDocuments?: string[]; separateIds: ReadonlySet<string> }
+/** `target` con los campos «solo locales» exactamente como los tiene `source` (lo demás, intacto). */
+export function withLocalOnlyOf<T extends QuotationContent>(target: T, source: LocalOnlyValues): T {
+  const { dismissedSourceDocuments: _mine, ...rest } = target;
+  return {
+    ...rest,
+    ...(source.dismissedSourceDocuments ? { dismissedSourceDocuments: [...source.dismissedSourceDocuments] } : {}),
+    attachments: (target.attachments ?? []).map((a) => {
+      const { alsoSeparate: _local, ...plain } = a;
+      return a.mode === 'include' && source.separateIds.has(a.id) ? { ...plain, alsoSeparate: true as const } : plain;
+    }),
+  } as T;
+}
+const localOnlyOfContent = (content: QuotationContent): LocalOnlyValues => ({
+  dismissedSourceDocuments: content.dismissedSourceDocuments,
+  separateIds: new Set((content.attachments ?? []).filter((a) => a.mode === 'include' && a.alsoSeparate === true).map((a) => a.id)),
+});
+
+/**
+ * Contenido confirmado de un registro: el registro con los campos «solo locales» como los tenía el servidor
+ * (`confirmedLocalOnly`). Sin esa copia (registros de una versión anterior), el registro tal cual.
+ */
+export function serverTruth(record: QuotationRecord): QuotationRecord {
+  const confirmed = record.confirmedLocalOnly;
+  if (!confirmed) return record;
+  return withLocalOnlyOf(record, { dismissedSourceDocuments: confirmed.dismissedSourceDocuments, separateIds: new Set(confirmed.alsoSeparate) });
+}
+
+/** Clave de los campos «solo locales» de un contenido, para saber si una edición los cambió. */
+export const localOnlyKey = (content: QuotationContent): string =>
+  JSON.stringify([content.dismissedSourceDocuments ?? null, [...localOnlyOfContent(content).separateIds].sort()]);
+
+const withoutFieldsServerLacks = (local: QuotationContent, server: QuotationContent, { dismissed = true, separate = true }: LocalOnlyRelax = {}): QuotationContent => {
+  let out = local;
+  if (dismissed && server.dismissedSourceDocuments === undefined && local.dismissedSourceDocuments !== undefined) {
+    const { dismissedSourceDocuments: _onlyLocal, ...rest } = local;
+    out = rest;
+  }
+  const serverAttachments = new Map((server.attachments ?? []).map((a) => [a.id, a]));
+  if (separate && (local.attachments ?? []).some((a) => separateLostByServer(serverAttachments.get(a.id), a))) {
+    out = {
+      ...out,
+      attachments: local.attachments.map((a) => {
+        if (!separateLostByServer(serverAttachments.get(a.id), a)) return a;
+        const { alsoSeparate: _onlyLocal, ...rest } = a;
+        return rest;
+      }),
+    };
+  }
+  return out;
 };
 
 /** La copia del servidor con lo que solo conoce este cliente (ver `withoutFieldsServerLacks`). */
-export function keepLocalOnlyFields<T extends QuotationContent>(server: T, local: QuotationContent | undefined): T {
-  if (!local?.dismissedSourceDocuments || server.dismissedSourceDocuments !== undefined) return server;
-  if (!server.sourceProjectId || server.sourceProjectId !== local.sourceProjectId) return server;
-  return { ...server, dismissedSourceDocuments: [...local.dismissedSourceDocuments] };
+export function keepLocalOnlyFields<T extends QuotationContent>(server: T, local: QuotationContent | undefined, support: LocalOnlySupport = NO_SUPPORT): T {
+  if (!local) return server;
+  let out = server;
+  if (!support.dismissed && local.dismissedSourceDocuments && server.dismissedSourceDocuments === undefined && server.sourceProjectId && server.sourceProjectId === local.sourceProjectId)
+    out = { ...out, dismissedSourceDocuments: [...local.dismissedSourceDocuments] };
+  const localAttachments = new Map((local.attachments ?? []).map((a) => [a.id, a]));
+  const lost = (a: QuotationAttachment) => { const mine = localAttachments.get(a.id); return !!mine && separateLostByServer(a, mine); };
+  if (!support.separate && (server.attachments ?? []).some(lost))
+    out = { ...out, attachments: server.attachments.map((a) => (lost(a) ? { ...a, alsoSeparate: true as const } : a)) };
+  return out;
 }
 
-/** Misma publicación: `server` es la copia del servidor y `local` la de este equipo (el orden importa). */
-export const sameQuotationContent = (server: QuotationContent, local: QuotationContent): boolean =>
-  contentEqual(canonicalQuotationContent(server), canonicalQuotationContent(withoutFieldsServerLacks(local, server)));
+/**
+ * Misma publicación: `server` es la copia del servidor y `local` la de este equipo (el orden importa). `relax` dice qué
+ * campos que el servidor no trae se dan por descartados por una API anterior (por defecto, todos).
+ *
+ * `alsoSeparate` se conmuta solo (es a menudo el único cambio de una edición), así que solo se relaja cuando el servidor
+ * ya pudo recibirlo: al recuperar un recibo perdido con la versión del servidor por delante de la base (quien llama lo
+ * decide) y en una bloqueada. Al planear desde la base, la base de una edición ya trae lo conservado (es el registro
+ * local confirmado), así que un `alsoSeparate` recién marcado sí es una diferencia y se publica.
+ */
+export const sameQuotationContent = (server: QuotationContent, local: QuotationContent, relax: LocalOnlyRelax = {}, support: LocalOnlySupport = NO_SUPPORT): boolean =>
+  contentEqual(canonicalQuotationContent(server), canonicalQuotationContent(withoutFieldsServerLacks(local, server, relaxFor(support, relax))));
 
 /**
  * The server never stores inline images: its empty value, or the reference of the same uploaded image, keeps the local
@@ -175,24 +281,27 @@ const withImagesOf = (target: QuotationContent, base: QuotationContent): Quotati
  * a quotation whose stored status is not `draft` change its status: other edits need a reopen (→ `draft`) first,
  * and a status that is not reachable in one step goes through `issued`. Empty = nothing to publish.
  */
-export function planQuotationPush(base: QuotationContent | undefined, local: QuotationContent): QuotationContent[] {
+export function planQuotationPush(base: QuotationContent | undefined, local: QuotationContent, support: LocalOnlySupport = NO_SUPPORT): QuotationContent[] {
   let target = canonicalQuotationContent(local);
   // A creation is only accepted as `draft` or `issued`: an accepted/rejected one that was never published is created
   // as issued first. (A never-published `void` is discarded by the store without any request.)
   if (!base) return target.status === 'accepted' || target.status === 'rejected' ? [{ ...target, status: 'issued' }, target] : [target];
   let current = canonicalQuotationContent(base);
-  // Lo que la base no tiene porque la API anterior lo descarta (`dismissedSourceDocuments`) no cuenta como edición: una
-  // bloqueada no se reabre por él. El PUT sigue llevando `target` con el campo.
-  const comparable = (content: QuotationContent) => withoutFieldsServerLacks(content, current);
-  // While it stays locked, an image uploaded later never reopens it: a status change keeps the confirmed images.
-  if (isQuotationContentLocked(current.status) && isQuotationContentLocked(target.status)) {
-    const kept = withImagesOf(target, current);
-    if (contentEqual(comparable({ ...kept, status: current.status }), current)) target = kept;
+  // Lo que la base no tiene porque la API anterior lo descarta (`dismissedSourceDocuments`, `alsoSeparate`) no cuenta
+  // como edición: una bloqueada no se reabre por él.
+  const comparable = (content: QuotationContent) => withoutFieldsServerLacks(content, current, relaxFor(support));
+  // Salir de un estado bloqueado (aceptar, rechazar, anular, reabrir) exige el contenido guardado idéntico (si no, 400
+  // `quotation_locked`): sin otras ediciones, el PUT lleva los campos «solo locales» exactamente como los tiene la base
+  // (la copia del servidor, `serverTruth`); lo local se conserva al instalar el recibo (`keepLocalOnlyFields`). While it
+  // stays locked, an image uploaded later never reopens it: a status change keeps the confirmed images.
+  if (isQuotationContentLocked(current.status)) {
+    const forced = withLocalOnlyOf(isQuotationContentLocked(target.status) ? withImagesOf(target, current) : target, localOnlyOfContent(current));
+    if (contentEqual({ ...forced, status: current.status }, current)) target = forced;
   }
   if (contentEqual(current, target)) return [];
   // Solo añade lo que la API anterior no guarda (`dismissedSourceDocuments`): nada que publicar, o sería un bucle de PUT.
   // Con cualquier otro cambio se publica todo, también el campo, para que la API nueva lo guarde.
-  if (sameQuotationContent(base, local)) return [];
+  if (sameQuotationContent(base, local, { separate: false }, support)) return [];
   const plan: QuotationContent[] = [];
   const { status: _currentStatus, ...currentRest } = current;
   const { status: _targetStatus, ...targetRest } = comparable(target);
@@ -256,7 +365,7 @@ export function dropQuotationLinks(
     if (q.status !== 'draft') return rest as QuotationRecord;
     const { rejected: _retry, ...kept } = changes[q.id] ?? {
       revision: '', ownerId, baseVersion: q.baseVersion ?? q.version ?? 0,
-      ...(q.version ? { base: canonicalQuotationContent(q) } : {}),
+      ...(q.version ? { base: canonicalQuotationContent(serverTruth(q)) } : {}),
     };
     changes = { ...changes, [q.id]: { ...kept, revision: crypto.randomUUID() } };
     return rest as QuotationRecord;

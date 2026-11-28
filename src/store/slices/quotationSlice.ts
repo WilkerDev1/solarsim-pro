@@ -9,9 +9,11 @@ import { QuotationSyncService, type QuotationWriteResult } from '../../services/
 import { workspaceScope } from '../sync/organizationWorkspace';
 import { reuseArray, reuseIfEqual, reuseRecord } from '../sync/structuralSharing';
 import {
-  canonicalQuotationContent, keepLocalImages, keepLocalOnlyFields, nextLocalQuotationNumber, planQuotationPush, quotationContent, sameQuotationContent,
+  canonicalQuotationContent, confirmedLocalOnlyOf, keepLocalImages, keepLocalOnlyFields, localOnlyKey, nextLocalQuotationNumber, noteQuotationReceipt,
+  planQuotationPush, quotationApiSupport, quotationContent, sameQuotationContent, serverTruth, withLocalOnlyOf, type LocalOnlySupport,
 } from '../sync/quotationContent';
 import { localIsoDate } from '../../utils/localDate';
+import { contentEqual } from '../sync/projectDifferences';
 import { DocumentAssetService } from '../../services/documentAssetService';
 import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
 import { publishQuotationAssets, uploadedQuotationAttachments } from '../sync/quotationAssets';
@@ -29,14 +31,24 @@ type ReceiptState = Pick<SimulationStore, 'quotations' | 'quotationChanges' | 'q
 const withContent = (record: QuotationRecord, content: QuotationContent, updatedAt: string): QuotationRecord => {
   const metadata: Partial<QuotationRecord> = { ...record };
   for (const key of Object.keys(quotationContent(record)) as (keyof QuotationContent)[]) delete metadata[key];
+  // Una nueva edición local de los campos «solo locales» vuelve a conservarlos tras «Usar la del servidor».
+  if (metadata.discardLocalOnly && localOnlyKey(record) !== localOnlyKey(content)) delete metadata.discardLocalOnly;
   return { ...(metadata as QuotationRecord), ...content, updatedAt };
 };
 
 /** Server number once assigned; it never changes afterwards. */
-const serverRecord = (server: QuotationRecord, local: QuotationRecord | undefined, { keepLocalOnly = true } = {}): QuotationRecord => {
-  const record = keepLocalImages({ ...server, number: local?.number ?? server.number ?? null }, local);
-  // Lo que una API anterior descarta (`dismissedSourceDocuments`) se conserva, salvo al elegir la copia del servidor.
-  return keepLocalOnly ? keepLocalOnlyFields(record, local) : record;
+const serverRecord = (
+  server: QuotationRecord,
+  local: QuotationRecord | undefined,
+  { keepLocalOnly = true, support }: { keepLocalOnly?: boolean; support?: LocalOnlySupport } = {},
+): QuotationRecord => {
+  const { confirmedLocalOnly: _old, discardLocalOnly: _discard, ...plain } = server;
+  const record = keepLocalImages({ ...plain, number: local?.number ?? server.number ?? null }, local);
+  // Lo que una API anterior descarta (`dismissedSourceDocuments`, `alsoSeparate` de cada adjunto) se conserva, salvo al
+  // elegir la copia del servidor (también en la descarga que sigue a «Usar la del servidor» de un rechazo). La copia del
+  // servidor sin lo conservado queda en `confirmedLocalOnly`: es la base de los cambios (`serverTruth`).
+  const keep = keepLocalOnly && !local?.discardLocalOnly;
+  return { ...(keep ? keepLocalOnlyFields(record, local, support) : record), confirmedLocalOnly: confirmedLocalOnlyOf(server) };
 };
 
 /**
@@ -44,7 +56,7 @@ const serverRecord = (server: QuotationRecord, local: QuotationRecord | undefine
  * An intermediate step of a multi-PUT plan (`final` false) or a newer local revision keeps the change pending
  * with the server version as its new base.
  */
-const installReceipt = (s: ReceiptState, id: string, revision: string, saved: QuotationRecord, final: boolean): Partial<ReceiptState> => {
+const installReceipt = (s: ReceiptState, id: string, revision: string, saved: QuotationRecord, final: boolean, support?: LocalOnlySupport): Partial<ReceiptState> => {
   const changes = { ...s.quotationChanges };
   const acknowledged = final && changes[id]?.revision === revision;
   if (acknowledged) delete changes[id];
@@ -52,9 +64,9 @@ const installReceipt = (s: ReceiptState, id: string, revision: string, saved: Qu
   return {
     quotations: s.quotations.map((q) => {
       if (q.id !== id) return q;
-      if (acknowledged) return serverRecord(saved, q);
+      if (acknowledged) return serverRecord(saved, q, { support });
       return {
-        ...q, number: q.number ?? saved.number ?? null, version: saved.version, baseVersion: saved.version,
+        ...q, number: q.number ?? saved.number ?? null, version: saved.version, baseVersion: saved.version, confirmedLocalOnly: confirmedLocalOnlyOf(saved),
         organizationId: saved.organizationId ?? q.organizationId, createdById: saved.createdById || q.createdById,
         createdBy: saved.createdBy || q.createdBy, createdAt: saved.createdAt || q.createdAt,
       };
@@ -63,6 +75,22 @@ const installReceipt = (s: ReceiptState, id: string, revision: string, saved: Qu
     quotationDeletionQueue: s.quotationDeletionQueue.map((c) => (c.id === id ? { ...c, baseVersion: saved.version } : c)),
   };
 };
+
+/**
+ * Contenido del reintento único tras un 400 `quotation_locked`: solo si el PUT era un cambio de estado de una bloqueada
+ * sin otras ediciones (difiere de la copia del servidor solo en los campos «solo locales»). La copia del servidor sale de
+ * la descarga de esta pasada o, si no vino (descarga incremental), de la base sin esos campos. `null`: no se reintenta.
+ */
+function lockedRetry(server: QuotationRecord | undefined, base: QuotationContent | undefined, sent: QuotationContent, baseVersion: number): QuotationContent | null {
+  const copy = server && server.version === baseVersion ? canonicalQuotationContent(server)
+    : base ? canonicalQuotationContent(withLocalOnlyOf(base, { separateIds: new Set() })) : null;
+  if (!copy || !isQuotationContentLocked(copy.status)) return null;
+  const separateIds = new Set(copy.attachments.filter((a) => a.alsoSeparate).map((a) => a.id));
+  const { status: _sent, ...rest } = canonicalQuotationContent(withLocalOnlyOf(sent, { dismissedSourceDocuments: copy.dismissedSourceDocuments, separateIds }));
+  const { status: _saved, ...stored } = copy;
+  if (!contentEqual(rest, stored) || contentEqual(copy, canonicalQuotationContent(sent))) return null;
+  return { ...copy, status: sent.status };
+}
 
 export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) => {
   let running: { generation: number; rerun: boolean; promise: Promise<{ success: boolean; message: string }> } | null = null;
@@ -77,7 +105,8 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
     // Editing keeps the quotation: a pending deletion conflict becomes an ordinary (version) conflict.
     const { rejected: _retry, deletionConflict: _keep, ...kept } = existing ?? {
       revision: '', baseVersion: previous.baseVersion ?? previous.version ?? 0,
-      ...(previous.version ? { base: canonicalQuotationContent(previous) } : {}),
+      // La base es lo que el servidor tiene (sin lo conservado solo aquí): ver `serverTruth`.
+      ...(previous.version ? { base: canonicalQuotationContent(serverTruth(previous)) } : {}),
     };
     return { ...changes, [previous.id]: { ...kept, revision: crypto.randomUUID(), ownerId: account()?.id } };
   };
@@ -270,6 +299,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
       if (resolution === 'keep_local' && !writable()) return;
       const changes = { ...state.quotationChanges };
       const local = state.quotations.find((q) => q.id === id);
+      const support = quotationApiSupport(state.syncSettings.serverUrl);
       if (change.serverDeleted) {
         // The id is a tombstone: keeping the edits creates a new draft with a new id and no number.
         delete changes[id];
@@ -288,7 +318,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
             quotationChanges: changes,
             quotationDeletionQueue: [
               ...state.quotationDeletionQueue.filter((c) => c.id !== id),
-              { id, ownerId: user?.id, baseVersion: server.version, quotation: serverRecord(server, local) },
+              { id, ownerId: user?.id, baseVersion: server.version, quotation: serverRecord(server, local, { support }) },
             ],
             quotationSyncFeedback: null,
           });
@@ -306,7 +336,9 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
         } else {
           changes[id] = { revision: crypto.randomUUID(), ownerId: change.ownerId, baseVersion: server.version, base: canonicalQuotationContent(server) };
           set({
-            quotations: state.quotations.map((q) => (q.id === id ? { ...q, number: q.number ?? server.number, version: server.version, baseVersion: server.version } : q)),
+            quotations: state.quotations.map((q) => (q.id === id
+              ? { ...q, number: q.number ?? server.number, version: server.version, baseVersion: server.version, confirmedLocalOnly: confirmedLocalOnlyOf(server) }
+              : q)),
             quotationChanges: changes,
             quotationSyncFeedback: null,
           });
@@ -323,7 +355,10 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
         delete changes[id];
         const published = !!local?.version;
         set({
-          quotations: published ? state.quotations : state.quotations.filter((q) => q.id !== id),
+          // La descarga completa que sigue instala la copia del servidor sin volver a añadir lo local (`discardLocalOnly`).
+          quotations: published
+            ? state.quotations.map((q) => (q.id === id ? { ...q, discardLocalOnly: true as const } : q))
+            : state.quotations.filter((q) => q.id !== id),
           quotationChanges: changes,
           quotationSyncCursor: published ? null : state.quotationSyncCursor,
           quotationSyncFeedback: null,
@@ -347,6 +382,8 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
         workspaceScope(get().syncSettings) === scope;
       const own = (ownerId?: string) => !ownerId || ownerId === user.id;
       const transport = QuotationSyncService.transport(initial.syncSettings.serverUrl, () => get().syncSettings.authToken || '');
+      // Se relee en cada uso: un recibo de esta misma pasada puede revelar que la API guarda los campos «solo locales».
+      const support = () => quotationApiSupport(initial.syncSettings.serverUrl);
       const assets = DocumentAssetService.transport(initial.syncSettings.serverUrl, () => get().syncSettings.authToken || '');
       const promise = (async () => {
         try {
@@ -409,7 +446,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               // A stale deletion is never applied blindly: the server record returns for review as a deletion conflict.
               const server = result.quotation;
               set((s) => ({
-                quotations: [...s.quotations.filter((q) => q.id !== command.id), serverRecord(server, command.quotation)],
+                quotations: [...s.quotations.filter((q) => q.id !== command.id), serverRecord(server, command.quotation, { support: support() })],
                 quotationDeletionQueue: s.quotationDeletionQueue.filter((c) => c.id !== command.id),
               }));
               patchChange(command.id, { serverQuotation: server, deletionConflict: true }, command.baseVersion);
@@ -418,7 +455,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               const shown = remote.get(command.id) ?? command.quotation;
               set((s) => ({
                 quotations: shown && !s.quotations.some((q) => q.id === command.id)
-                  ? [...s.quotations, serverRecord(shown, command.quotation)]
+                  ? [...s.quotations, serverRecord(shown, command.quotation, { support: support() })]
                   : s.quotations,
                 quotationDeletionQueue: s.quotationDeletionQueue.map((c) =>
                   c.id === command.id ? { ...c, rejected: { status: result.status, error: result.error } } : c),
@@ -489,9 +526,11 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               continue;
             }
             const serverCopy = remote.get(id);
-            if (serverCopy && sameQuotationContent(serverCopy, local)) {
+            // `alsoSeparate` ausente en el servidor solo se da por descartado si el servidor ya pudo recibirlo (su versión
+            // va por delante de la base): con la misma versión, un destino recién marcado es un cambio por publicar.
+            if (serverCopy && sameQuotationContent(serverCopy, local, { separate: serverCopy.version > change.baseVersion }, support())) {
               // Recover a lost PUT receipt only from identical authoritative content.
-              set((s) => installReceipt(s, id, change.revision, serverCopy, true));
+              set((s) => installReceipt(s, id, change.revision, serverCopy, true, support()));
               continue;
             }
             if (serverCopy && change.baseVersion === 0) {
@@ -509,7 +548,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
               });
               continue;
             }
-            const plan = planQuotationPush(change.base, local);
+            const plan = planQuotationPush(change.base, local, support());
             if (!plan.length) {
               // Back to the confirmed content (e.g. reopened and issued again without edits): nothing to publish.
               set((s) => {
@@ -521,12 +560,23 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
             }
             let baseVersion = change.baseVersion;
             for (const [index, content] of plan.entries()) {
-              const saved = await QuotationSyncService.put(transport, id, content, baseVersion);
+              let sent = content;
+              let saved = await QuotationSyncService.put(transport, id, sent, baseVersion);
               if (!current()) return SESSION_CHANGED;
+              const retry = !saved.ok && saved.status === 400 && saved.code === 'quotation_locked' ? lockedRetry(remote.get(id), change.base, sent, baseVersion) : null;
+              if (retry) {
+                // Respaldo: un cambio de estado sin otras ediciones que la API toma por una edición de la bloqueada (los
+                // campos «solo locales» no coinciden con lo guardado) se reintenta una vez con la copia del servidor.
+                sent = retry;
+                saved = await QuotationSyncService.put(transport, id, sent, baseVersion);
+                if (!current()) return SESSION_CHANGED;
+              }
               if (saved.ok) {
+                noteQuotationReceipt(initial.syncSettings.serverUrl, sent, saved.quotation);
                 remote.set(id, saved.quotation);
                 baseVersion = saved.quotation.version;
-                set((s) => installReceipt(s, id, change.revision, saved.quotation, index === plan.length - 1));
+                const receipt = saved.quotation;
+                set((s) => installReceipt(s, id, change.revision, receipt, index === plan.length - 1, support()));
                 continue;
               }
               failures++;
@@ -581,7 +631,7 @@ export const createQuotationSlice: SimulationSlice<QuotationSlice> = (set, get) 
             ));
             const hidden = new Set(s.quotationDeletionQueue.filter((c) => !c.rejected).map((c) => c.id));
             const known = new Map(s.quotations.map((q) => [q.id, q]));
-            const install = (server: QuotationRecord) => reuseIfEqual(known.get(server.id), serverRecord(server, known.get(server.id)));
+            const install = (server: QuotationRecord) => reuseIfEqual(known.get(server.id), serverRecord(server, known.get(server.id), { support: support() }));
             // A full pull is the whole list; a partial one (`since`) only brings changes and tombstones.
             const kept = s.quotations
               .filter((q) => changes[q.id] || (full ? remote.has(q.id) : !deleted.has(q.id)))
