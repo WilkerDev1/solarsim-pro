@@ -8,6 +8,7 @@ import { effectiveFeatureSettings } from '../../features/application/featurePoli
 import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
 import { Shield, Trash2, RotateCcw, ArrowLeft, Undo2, Redo2 } from 'lucide-react';
 import { ParameterSidebar } from './sidebar/ParameterSidebar';
+import { useTabHighlight } from './sidebar/useDockHighlight';
 import { SAMPLE_GPS_COORDINATES } from './params/logic/dockDefaults';
 import { createDockWriters, DOCK_COMMIT_OPTIONS } from './params/logic/dockEdits';
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
@@ -55,6 +56,8 @@ export const SimulatorView: React.FC = () => {
 
   // Navigation tab for the right content area
   const [activeMainTab, setActiveMainTab] = useState<'energia' | 'cotizacion' | 'retorno'>('energia');
+  // F5a: «Cambió aquí» en la pestaña de Energía cuando el asistente cambió el consumo y no se está viendo (sin cambiar de pestaña).
+  const tabHints = useTabHighlight(projectId, activeMainTab);
 
   // Currency view state for confidential cost matrix ('ALL' dual | 'USD' | 'DOP')
   const [costTableCurrency, setCostTableCurrency] = useState<'ALL' | 'USD' | 'DOP'>('ALL');
@@ -237,8 +240,9 @@ export const SimulatorView: React.FC = () => {
           <div className="flex gap-2.5 lg:gap-8 min-w-0 overflow-x-auto [scrollbar-width:thin]">
             <button
               onClick={() => setActiveMainTab('energia')}
-              aria-label="Análisis de Energía"
-              title="Análisis de Energía"
+              aria-label={tabHints.energia ? `Análisis de Energía. ${tabHints.energia}` : 'Análisis de Energía'}
+              title={tabHints.energia ?? 'Análisis de Energía'}
+              data-assistant-changed={tabHints.energia ? 'tab' : undefined}
               className={`pb-3 text-xs lg:text-sm font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
                 activeMainTab === 'energia'
                   ? 'text-emerald-800 font-extrabold border-b-2 border-emerald-700'
@@ -247,6 +251,7 @@ export const SimulatorView: React.FC = () => {
             >
               <span className="xl:hidden" aria-hidden="true">Energía</span>
               <span className="hidden xl:inline" aria-hidden="true">Análisis de Energía</span>
+              {tabHints.energia && <span aria-hidden="true" data-assistant-dot className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-600 align-middle" />}
             </button>
 
             <button

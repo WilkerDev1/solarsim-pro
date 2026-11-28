@@ -119,7 +119,7 @@ export const TariffValuationPanel: React.FC<TariffValuationPanelProps> = ({ proj
       )}
 
       {tierBasis && (
-        <ParamRow label="Rango cargo fijo" hint={<InfoTip label="Más información: Rango cargo fijo" text={tierBasis.note} />}>
+        <ParamRow label="Rango cargo fijo" labelId="pd-rates-fixed-tier" hint={<InfoTip label="Más información: Rango cargo fijo" text={tierBasis.note} />}>
           <div data-fixed-charge-tier-basis={basis}>
             <ToggleGroup<FixedChargeTierBasis>
               ariaLabel="Qué consumo elige el rango del cargo fijo"

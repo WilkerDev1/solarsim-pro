@@ -94,7 +94,8 @@ function applyPlan(action: AssistantAction, meta: { source: AgentSource; clientL
   const target = action.kind === 'equipment' ? s.equipmentCatalog.find((e) => e.id === action.targetId) : s.projects.find((p) => p.id === action.targetId);
   if (!target) throw new Error('Destino no disponible.');
   const before = pick(target, fields);
-  applyAssistantAction(action, { requireAssistantEnabled });
+  // F5a: lo que aplica el asistente de la app queda con su origen (deshacer) y se destaca en el dock; un agente externo, como siempre.
+  applyAssistantAction(action, { requireAssistantEnabled, editSource: requireAssistantEnabled ? 'assistant' : undefined });
   const after = action.kind === 'equipment'
     ? store().equipmentCatalog.find((e) => e.id === action.targetId)
     : store().projects.find((p) => p.id === action.targetId);

@@ -22,6 +22,7 @@ import { canEditDocument } from '../../components/pdf/editor/documentEditorState
 import { normalizeDocumentLayout } from '../../../shared/documentLayout';
 import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
 import { documentTextContextFor } from '../../utils/documentTextContext';
+import { dockHighlightStore } from '../dockHighlightStore';
 
 export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   /** Proposals in the trash are read-only until restored, whatever UI or tool calls the store. */
@@ -225,6 +226,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       }) : {}),
     }));
     get().triggerAutoSync(false);
+    // F5a: lo que aplica el asistente se ve en vivo en el dock (destacado, sin navegar ni mover el foco). Solo el origen
+    // «asistente»; el store del resaltado vive fuera de este (no añade escrituras al de propuestas).
+    if (options.source === 'assistant') dockHighlightStore.publish(projectId, result.changes);
     return rememberCommit(key, fingerprint, { ...result, project: after, written: true, undoRecorded: active });
   },
 

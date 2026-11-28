@@ -37,6 +37,7 @@ export const ItemsList: React.FC<ItemsListProps> = ({ items, marginMultiplier, t
           return (
             <ItemCard
               key={key}
+              anchor={`dock-financials-item-${index}`}
               title={item.description}
               onTitleChange={(description) => onUpdate(item.id, { description })}
               titleLabel={`Descripción del ítem ${index + 1}`}

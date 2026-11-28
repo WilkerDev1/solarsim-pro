@@ -13,13 +13,15 @@ export interface ItemCardProps {
   removeLabel?: string;
   /** Contenido entre el título y la papelera (monto de un descuento). */
   trailing?: React.ReactNode;
+  /** Ancla de la fila para el resaltado en vivo (`data-dock-anchor`, fieldAnchors). */
+  anchor?: string;
   children?: React.ReactNode;
 }
 
-export const ItemCard: React.FC<ItemCardProps> = ({ title, onTitleChange, titleLabel, titlePlaceholder, onRemove, removeLabel = 'Eliminar', trailing, children }) => {
+export const ItemCard: React.FC<ItemCardProps> = ({ title, onTitleChange, titleLabel, titlePlaceholder, onRemove, removeLabel = 'Eliminar', trailing, anchor, children }) => {
   const hasHeader = title !== undefined || onRemove !== undefined || trailing != null;
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-pd-border bg-pd-item p-2.5">
+    <div data-dock-anchor={anchor} className="flex flex-col gap-2 rounded-lg border border-pd-border bg-pd-item p-2.5">
       {hasHeader && (
         <div className="flex items-center gap-2">
           {onTitleChange ? (

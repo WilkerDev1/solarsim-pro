@@ -12,6 +12,7 @@ import { EquipmentParamsSection } from './EquipmentParamsSection';
 import { PricingParamsSection } from './PricingParamsSection';
 import { FinancialsParamsSection } from './FinancialsParamsSection';
 import { parameterSidebarCssWidth } from './sidebarWidth';
+import { useDockHighlight } from './useDockHighlight';
 
 interface ParameterSidebarProps {
   project: ProjectSimulation;
@@ -67,6 +68,9 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
   const toggleSection = (key: DockSectionKey) => updateOpen(toggleSectionState(openSections, key));
   const toggleAllSections = () => updateOpen(toggleAll(openSections));
   const badge = financialsBadge(project.financials);
+  // F5a: lo que cambia el asistente se destaca en su control (sin abrir secciones, desplazar ni mover el foco).
+  const asideRef = useRef<HTMLElement>(null);
+  const changeHints = useDockHighlight(project.id, openSections, asideRef);
 
   const renderBody = (key: DockSectionKey): React.ReactNode => {
     switch (key) {
@@ -98,6 +102,7 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
     <>
       {/* Left Sidebar: Parameters */}
       <aside
+        ref={asideRef}
         style={{ width: parameterSidebarCssWidth(sidebarWidth) }}
         className="flex flex-col shrink-0 h-full overflow-y-auto z-10 bg-pd-panel border-r border-pd-border shadow-sm transition-[background-color,border-color,color] duration-200"
       >
@@ -106,6 +111,7 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
           onToggle={toggleSection}
           onToggleAll={toggleAllSections}
           financialsBadge={badge}
+          changeHints={changeHints}
           renderBody={renderBody}
         />
       </aside>

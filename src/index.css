@@ -164,3 +164,23 @@
 @media (prefers-reduced-motion: no-preference) {
   .pd-select-panel { animation: pd-select-in 120ms ease-out; }
 }
+
+/* F5a: lo que el asistente acaba de cambiar en el simulador. `useDockHighlight` pone `data-assistant-changed` en el control o
+   la fila (`control`) y en la sección con un cambio que no se ve en un control (`section`); ni mueve el foco ni desplaza.
+   El contorno es fijo mientras dura el destacado; el pulso de entrada solo con movimiento permitido (prefers-reduced-motion). */
+[data-assistant-changed='control'] {
+  border-radius: 6px;
+  outline: 2px solid var(--pd-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--pd-accent) 14%, transparent);
+}
+[data-assistant-changed='section'] > h2 > button {
+  box-shadow: inset 3px 0 0 var(--pd-accent);
+}
+@keyframes assistant-changed-in {
+  from { box-shadow: 0 0 0 9px color-mix(in srgb, var(--pd-accent) 34%, transparent); }
+  to { box-shadow: 0 0 0 5px color-mix(in srgb, var(--pd-accent) 14%, transparent); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-assistant-changed='control'] { animation: assistant-changed-in 900ms ease-out; }
+}

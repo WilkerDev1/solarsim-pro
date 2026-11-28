@@ -28,6 +28,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
+// Solo desarrollo: `window.solarsimFeedbackQA` para ver el resaltado del dock y la tarjeta de cambio del asistente a mano (docs/QA.md).
+if (import.meta.env.DEV) void import('./features/assistantFeedback/devHook').then((hook) => hook.installAssistantFeedbackDevHook());
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

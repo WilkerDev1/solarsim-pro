@@ -41,7 +41,7 @@ export const UnitCostRow: React.FC<UnitCostRowProps> = ({
     if (result && onCommit) onCommit(result.previousUSD, result.priceUSD);
   };
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_120px] items-start gap-2.5">
+    <div data-dock-anchor={id} className="grid grid-cols-[minmax(0,1fr)_120px] items-start gap-2.5">
       <div className="min-w-0">
         <label htmlFor={id} className="block text-[13px] text-pd-text">{label}</label>
         <span className="flex min-w-0 items-center gap-1 text-xs text-pd-muted">

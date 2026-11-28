@@ -18,12 +18,14 @@ export interface ParameterDockPanelProps {
   onToggle: (key: DockSectionKey) => void;
   onToggleAll: () => void;
   financialsBadge: FinancialsBadge;
+  /** «Cambió aquí» por sección: lo que cambió el asistente y no se ve en un control (F5a). */
+  changeHints?: Partial<Record<DockSectionKey, string>>;
   /** Cuerpo de cada sección; siempre montado (oculto con hidden al colapsar) para conservar el estado local de cada sección (campos en edición). */
   renderBody: (key: DockSectionKey) => React.ReactNode;
 }
 
 /** Panel plano del dock: encabezado, las 5 secciones y el pie con «Colapsar todo». */
-export const ParameterDockPanel: React.FC<ParameterDockPanelProps> = ({ open, onToggle, onToggleAll, financialsBadge, renderBody }) => {
+export const ParameterDockPanel: React.FC<ParameterDockPanelProps> = ({ open, onToggle, onToggleAll, financialsBadge, changeHints, renderBody }) => {
   const allOpen = allSectionsOpen(open);
   const allLabel = allOpen ? 'Colapsar todo' : 'Expandir todo';
   const Icon = allOpen ? ChevronsDownUp : ChevronsUpDown;
@@ -61,6 +63,7 @@ export const ParameterDockPanel: React.FC<ParameterDockPanelProps> = ({ open, on
             onToggle={() => onToggle(key)}
             badge={key === 'financials' ? badge : undefined}
             badgeLabel={key === 'financials' ? financialsBadge.label : undefined}
+            changeHint={changeHints?.[key]}
           >
             {renderBody(key)}
           </ParamSection>
