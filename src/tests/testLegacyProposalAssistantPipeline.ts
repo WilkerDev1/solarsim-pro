@@ -1,5 +1,5 @@
-// LEGADO: se elimina en F6 junto con el modal ai-invoice (reviewIssues), geminiInvoiceService.parseProposalWithAI, electron/ai/httpClient y aiProposalNormalization.
-// Lo que de testAIProposalPipeline solo prueba código del asistente de propuestas: clasificación de avisos, IPC de Electron, cancelación HTTPS y paridad web/IPC.
+// LEGADO: se elimina en F6 junto con el modal ai-invoice (reviewIssues), applyExtractedInvoice (aiSlice), geminiInvoiceService.parseProposalWithAI, electron/ai/httpClient y aiProposalNormalization.
+// Lo que de testAIProposalPipeline solo prueba código del asistente de propuestas: clasificación de avisos, IPC de Electron, cancelación HTTPS, paridad web/IPC y el efecto de applyExtractedInvoice en el store.
 // Parte de una suite mixta partida en F0 (red de seguridad del asistente único): la lógica que sobrevive sigue en la suite de origen.
 import assert from 'node:assert/strict';
 import https from 'node:https';
@@ -59,4 +59,35 @@ try {
   const webResult=await parseProposalWithAI({apiKey:'synthetic-test-key',projectRequirementsText:'Texto',equipmentCatalog:catalog,context,dopExchangeRate:60.5});
   assert.deepEqual(webResult.panels,electronResult.panels);assert.equal(webResult.energyCostPerKWhUSD,electronResult.energyCostPerKWhUSD,'web and IPC processing parity');
 }finally{globalThis.fetch=oldFetch;}
-console.log('PASS (legado): proposal assistant pipeline: Electron processing, HTTPS cancellation, web/IPC parity and review issue tiers.');
+// Efecto de applyExtractedInvoice en el store (movido de testAIProposalPipeline al partir la suite en F0: el proyecto resultante sigue allí,
+// construido con buildProjectFromDraft). Número de proyectos, proyecto activo, actualización de la propuesta activa y rechazos sin escritura.
+{
+  const storeBefore=useSimulationStore.getState();
+  const normalized=normalizeProposalDraft(raw,catalog,context);
+  const wrongType=normalizeProposalDraft({...raw,panels:[{equipmentId:'inv-a',quantity:2}]},catalog,context);
+  const offline={...storeBefore.syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false};
+  useSimulationStore.setState({equipmentCatalog:catalog,syncSettings:offline,defaultSimulationSettings:{...storeBefore.defaultSimulationSettings,defaultProvince:'Santiago',defaultPricingMode:'direct',defaultDirectPriceUSDPerWp:2.5}});
+  const before=useSimulationStore.getState().projects;
+  useSimulationStore.getState().applyExtractedInvoice(normalized,true);
+  assert.equal(useSimulationStore.getState().projects.length,before.length+1,'una propuesta nueva suma un proyecto');
+  assert.equal(useSimulationStore.getState().projects[0].id,useSimulationStore.getState().activeProjectId,'la propuesta nueva queda activa y primera');
+  // Actualizar la propuesta activa (createNew=false): mismo proyecto, sin sumar, y borrar las notas revisadas las quita en vez de restaurarlas.
+  const withNotes=normalizeProposalDraft({...raw,specialTechnicalNotes:'No perforar cubierta',aiNotes:'Inspeccionar tablero'},catalog,context);
+  useSimulationStore.getState().applyExtractedInvoice(withNotes,true);
+  const created=useSimulationStore.getState().getActiveProject();
+  assert(created.aiSource?.notes?.includes('No perforar cubierta'));
+  const count=useSimulationStore.getState().projects.length;
+  useSimulationStore.getState().applyExtractedInvoice(normalizeProposalDraft({...withNotes,specialTechnicalNotes:'',aiNotes:undefined},catalog,context),false);
+  assert.equal(useSimulationStore.getState().projects.length,count,'actualizar no suma proyectos');
+  assert.equal(useSimulationStore.getState().activeProjectId,created.id);
+  assert.equal(useSimulationStore.getState().getActiveProject().aiSource?.notes,undefined,'borrar las notas revisadas las quita de la propuesta');
+  // Rechazos: no escriben (misma referencia del arreglo de proyectos).
+  const preserved=useSimulationStore.getState().projects;
+  useSimulationStore.getState().applyExtractedInvoice(wrongType,true);
+  assert.strictEqual(useSimulationStore.getState().projects,preserved,'invalid inference cannot commit a new project');
+  useSimulationStore.setState({syncSettings:{...offline,currentUser:{id:'viewer',role:'VIEWER',organizationId:'fixture'} as any}});
+  useSimulationStore.getState().applyExtractedInvoice(normalized,true);
+  assert.strictEqual(useSimulationStore.getState().projects,preserved,'invalidated viewer role still cannot mutate organization');
+  useSimulationStore.setState(storeBefore);
+}
+console.log('PASS (legado): proposal assistant pipeline: Electron processing, HTTPS cancellation, web/IPC parity and review issue tiers and applyExtractedInvoice store effects.');

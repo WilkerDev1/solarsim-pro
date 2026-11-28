@@ -75,12 +75,14 @@ const copy = s().projects.find((p) => p.id === copyId)!;
 assert.deepEqual(born(manual), {
   client: { name: 'Solo nombre', company: 'Cliente Comercial', province: 'Santo Domingo / Distrito Nacional', distributor: 'EDEESTE', tariffCode: 'BTS2',
     coordinates: '18.4861, -69.9312', customMonthlyHSP: undefined, address: 'Santo Domingo / Distrito Nacional, República Dominicana', contactPhone: '', quoteValidityDays: 7 },
+  // se invierte en F2b: factor 1,40 (hoy 1,25) y una sola mano de obra para todos los caminos (hoy 170 aquí y 0 en los del asistente)
   pricing: { laborUSDPerKWp: 170, marginFactor: 1.25, pricingMode: 'cost_matrix', isDetailed: false, pricePerWattUSD: 1.13, pricePerKWpUSD: 1130, financialsPricePerWattUSD: 1.13, autoSupplierPricing: undefined },
   sizing: { autoCalculatePanels: false, hasBattery: false,
     panels: [['Canadian Solar TOPBiHiKu6 CS6W-620TB-AG (620W)', 38, 620, 103.32, undefined, undefined]],
     inverters: [['Inversor Lux Power LXP-LB-US 8K (8.0Kw)', 1, 8, 2300, undefined]],
     batteries: [['Batería Hinaess 16 KwH-48 vdc.', 3, 16.08, 90, 1990, undefined]] },
   consumption: flat(3279), // se invierte en F2b: consumo genérico de 1000 kWh/mes
+  // se invierte en F2b: el precio de la energía se deriva de la facturación promedio de la distribuidora de la propuesta, no del caso de referencia
   rates: { energyCostPerKWh: 0.227, energyRateSource: 'reference', netMeteringRegime: 'sie007_2026', targetCoveragePct: 95, gridExportFeePct: 25, isZeroExport: false },
   other: { status: 'Draft', syncStatus: 'local_only', aiSource: undefined, companyProfileId: 'comp-default-rd', applyLey5707: true, customItems: 0 },
 });
@@ -90,11 +92,13 @@ assert.deepEqual(born(manualObject), { ...born(manual), client: { ...born(manual
 assert.deepEqual(born(proposalAssistant), {
   client: { name: 'Asistente de propuestas', company: '', province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS1',
     coordinates: undefined, customMonthlyHSP: undefined, address: '', contactPhone: '', quoteValidityDays: 7 },
+  // se invierte en F2b: factor 1,40 (hoy 1,28 = margen objetivo de los ajustes) y la mano de obra unificada con «Nueva simulación»
   pricing: { laborUSDPerKWp: 0, marginFactor: 1.28, pricingMode: 'cost_matrix', isDetailed: false, pricePerWattUSD: 1.13, pricePerKWpUSD: undefined, financialsPricePerWattUSD: 1.13, autoSupplierPricing: true },
   sizing: { autoCalculatePanels: false, hasBattery: false,
     panels: [['Módulos Canadian Solar CS6.1-72TB-590 (590W)', 12, 590, 95, 'supplier', 'eq-mod-cs-590']],
     inverters: [['Inversor Lux Power LXP-LB-US 8K (8.0Kw)', 1, 8, 1400, 'supplier']], batteries: [] },
   consumption: flat(700),
+  // se invierte en F2b: el precio de la energía se deriva de la facturación promedio de la distribuidora (hoy el de la tarifa de referencia)
   rates: { energyCostPerKWh: 0.18, energyRateSource: 'reference', netMeteringRegime: 'sie007_2026', targetCoveragePct: 95, gridExportFeePct: 25, isZeroExport: false },
   other: { status: 'Draft', syncStatus: 'local_only', aiSource: { consumptionSource: 'estimated', energyRateSource: 'reference' }, companyProfileId: 'comp-default-rd', applyLey5707: true, customItems: 0 },
 });
@@ -121,6 +125,7 @@ assert.equal(copy.proposalLink?.parentId, original.id);
 assert.equal(s().activeProjectId, proposalAssistant.id, 'duplicar con activate:false no cambia la propuesta abierta');
 
 // 5. Diferencias entre caminos que F2b unifica (resumen): mano de obra, margen, coordenadas y consumo no coinciden.
+// se invierte en F2b: factor 1,40 y misma mano de obra en los tres, consumo de 1000 kWh/mes cuando no hay datos y coordenadas según la provincia.
 assert.deepEqual([manual, proposalAssistant, floating].map((p) => [p.specs.installationUnitPriceUSD, p.specs.saleMarginMultiplier, p.client.coordinates === undefined, p.monthlyConsumption[0]]),
   [[170, 1.25, false, 3279], [0, 1.28, true, 700], [0, 1.28, true, 700]]);
 
@@ -135,6 +140,7 @@ const customAssistant = s().getActiveProject();
 const customFloating = await flotante('Flotante con ajustes');
 const pick = (p: ProjectSimulation) => ({ province: p.client.province, distributor: p.client.distributor, tariffCode: p.client.tariffCode, marginFactor: p.specs.saleMarginMultiplier,
   pricingMode: p.specs.pricingMode, pricePerWattUSD: p.specs.pricePerWattUSD, hasBattery: p.specs.hasBattery, laborUSDPerKWp: p.specs.installationUnitPriceUSD });
+// se invierte en F2b: el factor de partida de «Nueva simulación» pasa a 1,40 (hoy 1,25 aunque los ajustes pidan otro margen); la fábrica única decidirá cómo se combina con el margen objetivo.
 assert.deepEqual(pick(customManual), { province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS1', marginFactor: 1.25, pricingMode: 'direct_watt', pricePerWattUSD: 1.5, hasBattery: true, laborUSDPerKWp: 170 });
 assert.equal(customManual.specs.panels?.[0].powerW, 700);
 assert.equal(customManual.specs.batteries?.[0].dodPct, 70);

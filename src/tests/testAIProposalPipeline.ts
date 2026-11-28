@@ -8,6 +8,7 @@ import { DEFAULT_RD_TARIFF_MATRIX, referenceBillingTariff } from '../data/rdTari
 import { prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { requestGeminiJson, GeminiRequestError, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
 import { useSimulationStore } from '../store/useSimulationStore';
+import { buildProjectFromDraft } from '../store/slices/aiSlice';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../engine/financeEngine';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '../utils/equipmentSpecsUtils';
@@ -94,10 +95,15 @@ await assert.rejects(requestGeminiJson({apiKey:'test',body:{}},errors),/Cuota/);
 calls=0;await assert.rejects(requestGeminiJson({apiKey:'test',body:{}},async()=>{calls++;throw new GeminiRequestError('Key',401);}),/Key/);assert.equal(calls,1);
 calls=0;const fallback=await requestGeminiJson({apiKey:'test',model:'custom-model',body:{}},async(url,_body,headers)=>{calls++;assert(!url.includes('test'));assert.equal(headers['x-goog-api-key'],'test');if(calls===1)throw new GeminiRequestError('Temporal',503);return {ok:true};});assert.equal(calls,2);assert(fallback.modelWarning);
 useSimulationStore.setState({equipmentCatalog:catalog,syncSettings:{...useSimulationStore.getState().syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
-const before=useSimulationStore.getState().projects;
-useSimulationStore.getState().applyExtractedInvoice(normalized,true);
-const project=useSimulationStore.getState().getActiveProject();
-assert.equal(useSimulationStore.getState().projects.length,before.length+1);
+// El proyecto resultante se construye con buildProjectFromDraft (sobrevive a F6, pasa al dominio) y no escribe en el store: el efecto de
+// applyExtractedInvoice en el store (proyectos, activo, rechazos) se prueba en testLegacyProposalAssistantPipeline.
+const state=()=>useSimulationStore.getState();
+const build=(draft:Parameters<typeof buildProjectFromDraft>[1],createNew:boolean,from:Parameters<typeof buildProjectFromDraft>[0]=state())=>{
+  const built=buildProjectFromDraft(from,draft,createNew);
+  assert('project' in built,'error' in built?built.error:'');
+  return built.project;
+};
+const project=build(normalized,true);
 assert.equal(calculateTotalDCCapacityKWp(project.specs),10.2);assert.equal(calculateTotalBatteryCapacityKWh(project.specs),32);
 assert.equal(project.specs.saleMarginMultiplier,1);assert.equal(project.specs.panels?.[0].unitPriceUSD,100);
 assert.equal(project.specs.panels?.[1].unitPriceUSD,undefined,'missing supplier price stays unknown on the committed multi-model group');
@@ -112,8 +118,7 @@ assert.equal(batterySummary.batteryUsableKWh,Math.round(usefulBatteryKWh*10)/10,
 useSimulationStore.setState({defaultSimulationSettings:{...useSimulationStore.getState().defaultSimulationSettings,defaultProvince:'Santiago',defaultPricingMode:'direct',defaultDirectPriceUSDPerWp:2.5}});
 const withReferences=normalizeProposalDraft({...raw,province:undefined,targetMarginPct:undefined,nic:'NIC-123',nis:'NIS-456',contractNumber:'CON-789',meterNumber:'MED-001',specialTechnicalNotes:'No perforar cubierta',aiNotes:'Inspeccionar tablero',modelUsed:'synthetic-model',extractedFromFileName:'synthetic-invoice.pdf'},catalog,context);
 assert.equal(withReferences.province,'Santiago','review shows the effective province supplied by application defaults');
-useSimulationStore.getState().applyExtractedInvoice(withReferences,true);
-const fromDefaults=useSimulationStore.getState().getActiveProject();
+const fromDefaults=build(withReferences,true);
 assert.equal(fromDefaults.client.province,'Santiago');
 assert.equal(fromDefaults.specs.pricePerWattUSD,2.5);assert.equal(fromDefaults.financials.pricePerWattUSD,2.5);
 assert.equal(fromDefaults.client.nic,'NIC-123');assert.equal(fromDefaults.client.nis,'NIS-456');assert.equal(fromDefaults.client.contractNumber,'CON-789');assert.equal(fromDefaults.client.meterNumber,'MED-001');
@@ -122,16 +127,12 @@ assert(!fromDefaults.specs.installationServicesDesc?.includes('Notas del Sistema
 assert.equal(fromDefaults.aiSource?.extractedFromFileName,'synthetic-invoice.pdf');assert.equal(fromDefaults.aiSource?.modelUsed,'synthetic-model');
 const clearedNotes=normalizeProposalDraft({...withReferences,specialTechnicalNotes:'',aiNotes:undefined},catalog,context);
 assert.equal(clearedNotes.specialTechnicalNotes,'','manual empty note intent survives normalization');
-useSimulationStore.getState().applyExtractedInvoice(clearedNotes,false);
-assert.equal(useSimulationStore.getState().getActiveProject().aiSource?.notes,undefined,'clearing reviewed notes removes previous proposal notes instead of restoring them');
+assert.equal(build(clearedNotes,false,{...state(),projects:[fromDefaults,...state().projects],activeProjectId:fromDefaults.id}).aiSource?.notes,undefined,'clearing reviewed notes removes previous proposal notes instead of restoring them');
 
 const noContextProvince={...withReferences,province:undefined};
-useSimulationStore.getState().applyExtractedInvoice(noContextProvince,true);
-assert.equal(useSimulationStore.getState().getActiveProject().client.province,'Santiago','store commit also respects defaults when legacy draft omits province');
-const preserved=useSimulationStore.getState().projects;
-useSimulationStore.getState().applyExtractedInvoice(wrongType,true);assert.strictEqual(useSimulationStore.getState().projects,preserved,'invalid inference cannot commit a new project');
-useSimulationStore.setState({syncSettings:{...useSimulationStore.getState().syncSettings,authToken:null,currentUser:{id:'viewer',role:'VIEWER',organizationId:'fixture'} as any}});
-useSimulationStore.getState().applyExtractedInvoice(normalized,true);assert.strictEqual(useSimulationStore.getState().projects,preserved,'invalidated viewer role still cannot mutate organization');
+assert.equal(build(noContextProvince,true).client.province,'Santiago','draft build also respects defaults when legacy draft omits province');
+assert('error' in buildProjectFromDraft(state(),wrongType,true),'invalid inference cannot build a new project');
+assert('error' in buildProjectFromDraft({...state(),syncSettings:{...state().syncSettings,authToken:null,currentUser:{id:'viewer',role:'VIEWER',organizationId:'fixture'} as any}},normalized,true),'invalidated viewer role still cannot build a proposal for the organization');
 
 // Fase 5: medición neta en el escáner de facturas. Campos opcionales: ausentes si la factura no los trae, nunca inventados.
 {
@@ -259,8 +260,7 @@ useSimulationStore.getState().applyExtractedInvoice(normalized,true);assert.stri
   assert.equal(blockValuationNote(prepared.rates,prepared.monthlyConsumption),'Se valora mes a mes con los bloques oficiales de BTS1 (SIE-121-2026-TF). Precio medio de la energía en el año: RD$7.95/kWh (sin cargo fijo).','sin precio en el campo, solo las dos primeras frases');
   assert.equal(blockValuationNote({...prepared.rates,energyRateSource:'invoice'},prepared.monthlyConsumption,fieldDOP),null,'precio único: sin nota de bloques');
   useSimulationStore.setState({tariffMatrix:DEFAULT_RD_TARIFF_MATRIX,syncSettings:{...useSimulationStore.getState().syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
-  useSimulationStore.getState().applyExtractedInvoice(stepped,true);
-  const applied=useSimulationStore.getState().getActiveProject();
+  const applied=build(stepped,true);
   assert.equal(applied.client.name,'Cliente EDESUR BTS1');
   assert.equal(applied.rates.energyRateSource,'reference');assert.equal(resolveEnergyValuationMethod(applied.rates),'block_billing','la propuesta aplicada se valora por bloques');
   // Un precio tecleado en la revisión (manual) se respeta como precio único.
@@ -292,4 +292,4 @@ useSimulationStore.getState().applyExtractedInvoice(normalized,true);assert.stri
   assert.match(properties.marginalRateDOP.description!,/bloque/);
   assert.match(PROPOSAL_SYSTEM_INSTRUCTION,/marginalRateDOP/);
 }
-console.log('AI proposal pipeline: exact multi-model grounding, real sizing, no invented consumption, transport budget and store commit guards passed.');
+console.log('AI proposal pipeline: exact multi-model grounding, real sizing, no invented consumption, transport budget and draft build guards passed.');

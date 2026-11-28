@@ -6,6 +6,7 @@ import {createAIProposalBase,prepareProposalDraftProject} from '../utils/proposa
 import {calculateProjectFinancialSummary} from '../engine/financeEngine';
 import {BENCHMARK_PROJECT} from '../engine/referenceCase';
 import {useSimulationStore} from '../store/useSimulationStore';
+import {buildProjectFromDraft} from '../store/slices/aiSlice';
 const state=useSimulationStore.getState();
 const catalog=structuredClone(state.equipmentCatalog);
 const panel=catalog.find(e=>e.type==='panel')!,inverter=catalog.find(e=>e.type==='inverter')!;
@@ -33,8 +34,10 @@ assert.equal(prepared.financials.customItems?.[0].unitPriceUSD,25);
 assert.equal(prepared.financials.customDiscounts?.[0].value,10);
 const original={...state};
 useSimulationStore.setState({equipmentCatalog:catalog,projects:[],activeProjectId:'',syncSettings:{...state.syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
-useSimulationStore.getState().applyExtractedInvoice(again,true);
-const applied=useSimulationStore.getState().projects[0];
+// El proyecto se construye con buildProjectFromDraft (sobrevive a F6); que applyExtractedInvoice escriba lo mismo en el store se prueba en testLegacyProposalAssistantApplyExtractedInvoice.
+const builtProject=buildProjectFromDraft(useSimulationStore.getState(),again,true);
+assert('project' in builtProject,'error' in builtProject?builtProject.error:'');
+const applied=builtProject.project;
 for(const mode of ['legacy','self_consumption'] as const){
   const preview=calculateProjectFinancialSummary(prepared,mode),actual=calculateProjectFinancialSummary(applied,mode);
   assert.equal(actual.contractPriceUSD,preview.contractPriceUSD,'preview and apply use one adapter');
