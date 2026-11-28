@@ -10,7 +10,7 @@ import { useChatAnnouncement, useElapsedSeconds, useStickToBottom } from '../cha
 import { AssistantTurnDetails, turnSteps } from './AssistantTurnDetails';
 import { assistantSession, type AssistantSession, type SessionAssistantMessage } from '../session/assistantSession';
 import { assistantPanelLayout, draggedAssistantWidth, type AssistantPanelLayout } from '../panelLayout';
-import { assistantBadge } from '../panelState';
+import { assistantBadge, assistantPanelBlock } from '../panelState';
 import { useQuotationsFeature } from '../../application/quotationsFeature';
 import type { LlmClient } from '../../../services/llm/types';
 import '../chat.css';
@@ -109,7 +109,7 @@ function AssistantPanel({ projectId, belowToolbar, layout }: { projectId?: strin
   const scroll = useStickToBottom(log, [ai.messages.length, liveLength, ai.busy, open]);
   const elapsed = useElapsedSeconds(ai.busy);
   const now = useNowWhile(state.pendingAgentActions.some((a) => a.status === 'pending'));
-  const live = { agentActivity: state.agentActivity, pendingAgentActions: state.pendingAgentActions, now };
+  const live = { agentActivity: state.agentActivity, pendingAgentActions: state.pendingAgentActions, projects: state.projects, now };
   const project = state.projects.find((p) => p.id === projectId);
   const announcement = useChatAnnouncement(ai.busy, () => {
     const reply = ai.messages[ai.messages.length - 1];
@@ -119,23 +119,19 @@ function AssistantPanel({ projectId, belowToolbar, layout }: { projectId?: strin
   useEffect(() => {
     if (open) input.current?.focus();
   }, [open]);
+  const docked = open && layout.mode === 'docked';
   // Un modal o la papelera ocultan el panel; el turno sigue (las herramientas revalidan permisos y conflictos al aplicar).
-  const blocked =
-    state.isSettingsModalOpen ||
-    state.isAIInvoiceModalOpen ||
-    state.isAIDatasheetModalOpen ||
-    state.isAIPriceCatalogModalOpen ||
-    state.isNewProjectModalOpen ||
-    !!state.activeConflict ||
-    state.isTrashActive;
+  // Acoplado, con un modal encima se reserva la columna vacía: el contenido no salta de ancho al abrir y cerrar el modal.
+  const block = assistantPanelBlock(state, docked);
+  const blocked = block !== null;
   // «Autocompletar con factura» pidió el selector de archivos: se abre en cuanto el panel (y su compositor) están montados.
   useEffect(() => {
     if (!open || blocked || !ai.filePickerRequested || !picker.current) return;
     session.consumeFilePickerRequest();
     picker.current();
   }, [open, blocked, ai.filePickerRequested, session]);
-  if (blocked) return null;
-  const docked = open && layout.mode === 'docked';
+  if (block === 'hide') return null;
+  if (block === 'reserve') return <div className="assistant-widget assistant-docked" style={{ width: layout.width }} aria-hidden="true" data-pdf-chrome="" />;
   const badge = assistantBadge(ai);
   const openSettings = () => state.openSettingsModal('ai');
   const composer = assistantComposerState({ draft: ai.draft, hasApiKey: !!state.geminiApiKey, loadingFiles: ai.loadingFiles });

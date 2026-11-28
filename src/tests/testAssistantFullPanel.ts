@@ -25,9 +25,9 @@ import { closedTurnProblems, runAgentLoop } from '../features/assistant/session/
 import { ChatComposer } from '../features/assistant/components/ChatComposer';
 import { createAssistantSession, type AssistantSession, type SessionMessage } from '../features/assistant/session/assistantSession';
 import {
-  ASSISTANT_PANEL_DEFAULT_PX, ASSISTANT_PANEL_MAX_PX, ASSISTANT_PANEL_MIN_PX, DOCK_MIN_CONTENT_PX, assistantPanelLayout, parameterSidebarPx,
+  ASSISTANT_PANEL_DEFAULT_PX, ASSISTANT_PANEL_MAX_PX, ASSISTANT_PANEL_MIN_PX, DOCK_MIN_CONTENT_PX, PDF_PAGE_CONTENT_PX, assistantPanelLayout, parameterSidebarPx,
 } from '../features/assistant/panelLayout';
-import { assistantBadge, createdProposalCard, turnChangeCards, turnUndoTargets } from '../features/assistant/panelState';
+import { assistantBadge, assistantPanelBlock, createdProposalCard, turnChangeCards, turnUndoTargets } from '../features/assistant/panelState';
 import { ASSISTANT_ENTRY_PROMPTS, openAssistant } from '../features/assistant/assistantEntry';
 import { AssistantTurnDetails, type TurnDetailsLive } from '../features/assistant/components/AssistantTurnDetails';
 import { composerEscapeAction } from '../features/assistant/chatUi';
@@ -53,8 +53,18 @@ assert.equal(parameterSidebarPx(500, 600), 280, 'sin bajar de 280');
   assert.equal(assistantPanelLayout({ view: 'simulator', viewportWidth: 1440, parameterSidebarWidth: 600 }).mode, 'floating', 'un dock de parámetros más ancho también cuenta');
   assert.equal(assistantPanelLayout({ view: 'simulator', viewportWidth: 960, parameterSidebarWidth: 380 }).mode, 'floating', 'pantalla dividida: flotante');
   assert.equal(assistantPanelLayout({ view: 'project-hub', viewportWidth: 1280 }).mode, 'docked', 'resumen en 1280: 576 px libres');
-  assert.equal(assistantPanelLayout({ view: 'pdf-preview', viewportWidth: 1024 }).width, 320, 'vista previa en 1024: el máximo que deja 640 px');
+  // Vista previa del PDF (segunda ronda): descuenta su barra de controles (min(340, 40 %)) y deja la página entera (850 px +
+  // el margen del lienzo) sin scroll horizontal; antes acoplaba en 1024 y recortaba la página.
+  assert.equal(assistantPanelLayout({ view: 'pdf-preview', viewportWidth: 1024 }).mode, 'floating', 'vista previa en 1024: la página no cabe con la columna');
   assert.equal(assistantPanelLayout({ view: 'pdf-preview', viewportWidth: 960 }).mode, 'floating');
+  assert.equal(assistantPanelLayout({ view: 'pdf-preview', viewportWidth: 1440 }).mode, 'floating', '1440 − 64 − 340 − 914 < 280');
+  {
+    const at1600 = assistantPanelLayout({ view: 'pdf-preview', viewportWidth: 1600 });
+    assert.equal(at1600.mode, 'docked');
+    assert.equal(at1600.maxWidth, 1600 - 64 - 340 - PDF_PAGE_CONTENT_PX, 'en 1600 la columna no recorta la página');
+    assert.equal(at1600.width, at1600.maxWidth, 'el ancho de fábrica (380) se acota para no recortar');
+  }
+  assert.equal(assistantPanelLayout({ view: 'pdf-preview', viewportWidth: 1920 }).maxWidth, 1920 - 64 - 340 - PDF_PAGE_CONTENT_PX);
   // El ancho elegido se acota a [280, máximo].
   assert.equal(assistantPanelLayout({ view: 'project-hub', viewportWidth: 1280, panelWidth: 900 }).width, 576);
   assert.equal(assistantPanelLayout({ view: 'project-hub', viewportWidth: 1920, panelWidth: 900 }).width, 720);
@@ -383,7 +393,7 @@ const details = (session: AssistantSession, live?: TurnDetailsLive) =>
     message: assistants(session).at(-1)!, busy: false, live,
     actions: { confirmPending() {}, rejectPending() {}, undo() {}, undoTurn() {}, continueTurn() {} },
   }));
-const liveNow = (now = Date.now()): TurnDetailsLive => ({ agentActivity: s().agentActivity, pendingAgentActions: s().pendingAgentActions, now });
+const liveNow = (now = Date.now()): TurnDetailsLive => ({ agentActivity: s().agentActivity, pendingAgentActions: s().pendingAgentActions, projects: s().projects, now });
 {
   // 7.1 Esc en el compositor: en modo cola (el asistente único) no detiene; Detener queda solo en su botón.
   assert.equal(composerEscapeAction({ busy: true, queueWhileBusy: false, isComposing: false }), 'stop', 'sin cola (modal antiguo), Esc detiene como siempre');
@@ -557,13 +567,139 @@ reset();
   await session.send('cero');
   const st = session.getState();
   assert.equal(st.draft, 'uno\n\ndos\n\nescribiendo otra', 'el orden en que se escribió');
-  assert.deepEqual(st.files.map((f) => f.name), ['a.pdf', 'b.pdf', 'c.pdf'], 'vuelven los de la cola (los que caben)');
-  assert.match(st.composerError, /Máximo tres archivos/, 'y se avisa de lo que no cupo');
+  // Segunda ronda: Stop no descarta nada. Vuelven los de la cola delante de los que se quedaron en el compositor (los cinco),
+  // y no se envía hasta quitar los que sobran.
+  assert.deepEqual(st.files.map((f) => f.name), ['a.pdf', 'b.pdf', 'c.pdf', 'd.pdf', 'e.pdf'], 'ningún adjunto se pierde con Stop');
+  assert.match(st.composerError, /Máximo tres archivos.*quita 2/i, 'y se pide quitar los que sobran');
+  llm.assertDone();
+  await session.send('enviar con cinco');
+  assert.equal(llm.calls.length, 1, 'con más de tres adjuntos no se envía');
+  assert.equal(session.getState().draft, 'uno\n\ndos\n\nescribiendo otra', 'y el borrador sigue ahí');
+  assert.match(session.getState().composerError, /quita 2/i);
+  session.removeFile(session.getState().files[4].id);
+  session.removeFile(session.getState().files[3].id);
+  assert.equal(session.getState().composerError, '', 'al quitarlos el aviso se va');
+  llm.push({ text: 'Recibidos.' });
+  await session.send();
+  assert.equal(llm.calls.length, 2, 'con tres ya se envía');
 }
 {
   // 7.10 El comentario de cabecera ya no dice que el asistente viene apagado de fábrica.
   const text = readFileSync(new URL('../store/persistence/appAssistantEnablement.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(text, /Hoy `appAssistantEnabled` es `false` de fábrica/);
+}
+
+// ── 8. Segunda ronda (revisión y QA en navegador) ────────────────────────────────────────────────────────────────────────
+const journalSteps = () => s().undoHistory.journals[base.id]?.undo.length ?? 0;
+const coverage = (id: string, pct: number, title = `Cobertura ${pct}`) =>
+  ({ functionCalls: [{ id, name: 'edit_proposal', args: { proposalId: base.id, title, ops: [{ op: 'set', path: 'rates.targetCoveragePct', valueJson: String(pct) }] } }] });
+reset();
+s().activateUndoJournal(s().getActiveProject());
+{
+  // 8.1 El Deshacer de la tarjeta va por el mismo camino que undo_change: por el diario (como Ctrl+Z), así que un Ctrl+Z
+  // después no vuelve a aplicar el cambio del asistente.
+  const session = newSession(new ScriptedLlm([coverage('fc-j1', 85), { text: 'Hecho.' }]));
+  await session.send('Cobertura al 85 %');
+  assert.equal(projectOf().rates.targetCoveragePct, 85);
+  assert.equal(journalSteps(), 1, 'un paso en el diario');
+  const [card] = turnChangeCards(assistants(session).at(-1)!, liveNow());
+  assert.equal(session.undoActivity(card.input.activityId!).success, true);
+  assert.equal(projectOf().rates.targetCoveragePct, base.rates.targetCoveragePct);
+  assert.equal(journalSteps(), 0, 'por el diario: sin paso de restauración nuevo');
+  assert.equal(s().canRedo, true, 'pasa a rehacer, como Ctrl+Z');
+  s().undo();
+  assert.equal(projectOf().rates.targetCoveragePct, base.rates.targetCoveragePct, 'Ctrl+Z después no reaplica el cambio');
+  assert.equal(turnChangeCards(assistants(session).at(-1)!, liveNow())[0].input.status, 'undone');
+}
+reset();
+s().activateUndoJournal(s().getActiveProject());
+{
+  // 8.1b «Deshacer todo el turno» también: después, un Ctrl+Z no reaplica nada.
+  const session = newSession(new ScriptedLlm([margin(31, 'fc-j2'), coverage('fc-j3', 85), { text: 'Dos.' }]));
+  await session.send('margen y cobertura');
+  assert.equal(journalSteps(), 2);
+  assert.equal(session.undoTurn(assistants(session).at(-1)!.id).success, true);
+  assert.equal(journalSteps(), 0);
+  s().undo();
+  assert.equal(projectOf().rates.targetCoveragePct, base.rates.targetCoveragePct);
+  assert.equal(projectOf().specs.saleMarginMultiplier, base.specs.saleMarginMultiplier);
+}
+reset();
+{
+  // 8.2 Un fallo pasajero (cuenta de solo lectura) muestra el motivo y mantiene Deshacer; al reintentar, funciona y el aviso se va.
+  const session = newSession(new ScriptedLlm([coverage('fc-p1', 85), { text: 'Hecho.' }]));
+  await session.send('Cobertura al 85 %');
+  const [card] = turnChangeCards(assistants(session).at(-1)!);
+  const id = card.input.activityId!;
+  store.setState({ workspaceScope: 'cloud' });
+  const failed = session.undoActivity(id);
+  assert.equal(failed.success, false);
+  assert.match(failed.error ?? '', /solo puede consultar/);
+  const [shown] = turnChangeCards(assistants(session).at(-1)!, liveNow());
+  assert.equal(shown.input.activityId, id, 'el Deshacer se sigue ofreciendo');
+  assert.equal(shown.input.error?.message, failed.error);
+  assert.match(details(session, liveNow()), /role="alert"[^>]*>[^<]*solo puede consultar/);
+  assert.match(details(session, liveNow()), />Deshacer</);
+  store.setState({ workspaceScope: 'local' });
+  assert.equal(session.undoActivity(id).success, true, 'al volver, el reintento funciona');
+  const [done] = turnChangeCards(assistants(session).at(-1)!, liveNow());
+  assert.equal(done.input.status, 'undone');
+  assert.equal(done.input.error, undefined, 'sin el aviso viejo');
+}
+reset();
+{
+  // 8.3 «Deshacer todo el turno» que falla: el motivo se pinta junto al botón (role=alert); si el fallo es permanente, el
+  // botón se retira (no hay clic mudo).
+  const session = newSession(new ScriptedLlm([margin(31, 'fc-q1'), coverage('fc-q2', 85), { text: 'Dos.' }]));
+  await session.send('margen y cobertura');
+  const reply = () => assistants(session).at(-1)!;
+  // Pasajero: solo lectura.
+  store.setState({ workspaceScope: 'cloud' });
+  const transient = session.undoTurn(reply().id);
+  assert.equal(transient.success, false);
+  let html = details(session, liveNow());
+  assert.match(html, /Deshacer todo el turno/, 'pasajero: el botón sigue');
+  assert.match(html, /class="assistant-turn-undo-error" role="alert"/, 'con su motivo al lado');
+  store.setState({ workspaceScope: 'local' });
+  // Permanente: la propuesta cambió después en lo que tocó el asistente.
+  s().updateRates({ targetCoveragePct: 70 });
+  s().updateSpecs({ saleMarginMultiplier: 1.5 });
+  const permanent = session.undoTurn(reply().id);
+  assert.equal(permanent.success, false, JSON.stringify(permanent));
+  html = details(session, liveNow());
+  assert.doesNotMatch(html, /Deshacer todo el turno/, 'permanente: sin botón que falle en silencio');
+  // La cobertura (la que falló) deja de ofrecerlo; el margen no se llegó a intentar y conserva el suyo.
+  assert.equal(html.split('>Deshacer<').length - 1, 1, 'solo el Deshacer del cambio que no se intentó');
+  assert.match(html.split('Cambios aplicados: Cobertura 85')[1], /role="alert"[^>]*>La propuesta cambió después/);
+  assert.doesNotMatch(html.split('Cambios aplicados: Cobertura 85')[1], />Deshacer</);
+}
+reset({ activeView: 'dashboard', activeProjectId: '' });
+{
+  // 8.4 La tarjeta «Propuesta creada» se pone al día: deshecha la creación (a la papelera), sin cifras.
+  const session = newSession(new ScriptedLlm([{ functionCalls: [{ id: 'fc-c1', name: 'create_proposal', args: {} }] }, { text: 'Creada.' }]));
+  await session.send('Crea una propuesta');
+  const reply = assistants(session).at(-1)!;
+  const activityId = reply.turn.tools[reply.createdProposals![0].callId]?.activityId ?? '';
+  assert.ok(activityId, 'la creación deja actividad');
+  const proposalId = reply.createdProposals![0].card.proposalId;
+  assert.equal(s().undoAgentActivity(activityId).success, true, 'deshacer la creación (Ajustes → Agentes)');
+  assert.equal(s().projects.find((p) => p.id === proposalId)?.isDeleted, true);
+  const html = details(session, liveNow());
+  assert.match(html, /data-created-proposal="undone"/);
+  assert.match(html, /Creación deshecha/);
+  assert.doesNotMatch(html.split('data-created-proposal')[1].split('</section>')[0], /\$\d|kWp|años/, 'sin cifras de una propuesta en la papelera');
+  // Solo en la papelera (sin deshacer la actividad): también sin cifras.
+  const trashed: TurnDetailsLive = { agentActivity: [], pendingAgentActions: [], projects: s().projects, now: Date.now() };
+  assert.match(details(session, trashed), /data-created-proposal="trashed"/);
+}
+{
+  // 8.5 Con un modal encima, la columna acoplada se reserva (sin salto de layout); la papelera la oculta; flotante, nada.
+  const none = { isSettingsModalOpen: false, isAIInvoiceModalOpen: false, isAIDatasheetModalOpen: false, isAIPriceCatalogModalOpen: false, isNewProjectModalOpen: false, activeConflict: null, isTrashActive: false };
+  assert.equal(assistantPanelBlock(none, true), null);
+  assert.equal(assistantPanelBlock({ ...none, isNewProjectModalOpen: true }, true), 'reserve', 'Nueva simulación encima: la columna se queda');
+  assert.equal(assistantPanelBlock({ ...none, isSettingsModalOpen: true }, true), 'reserve');
+  assert.equal(assistantPanelBlock({ ...none, isNewProjectModalOpen: true }, false), 'hide', 'flotante: se oculta como antes');
+  assert.equal(assistantPanelBlock({ ...none, isTrashActive: true }, true), 'hide');
 }
 
 console.log('PASS: panel completo del asistente (acoplado/flotante, cola mientras trabaja, Stop con cola, tres entradas, ChangeCard real, insignia, correcciones de la revisión).');

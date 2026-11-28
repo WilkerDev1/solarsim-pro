@@ -385,12 +385,39 @@ function undoOne(entry: AgentActivityEntry): { success: boolean; error?: string 
   const s = store();
   const journal = s.undoHistory.journals[entry.targetId];
   const top = journal?.undo[journal.undo.length - 1];
-  if (entry.editKey && s.activeProjectId === entry.targetId && s.undoHistory.activeId === entry.targetId && top?.coalesceKey === entry.editKey) {
+  // El diario no revalida permisos: si la propuesta no admite cambios, va por la actividad, que da el motivo.
+  let editable = true;
+  try { requireEditableProject(entry.targetId); } catch { editable = false; }
+  if (editable && entry.editKey && s.activeProjectId === entry.targetId && s.undoHistory.activeId === entry.targetId && top?.coalesceKey === entry.editKey) {
     s.undo();
     useSimulationStore.setState((state) => ({ agentActivity: state.agentActivity.map((a) => (a.id === entry.id ? { ...a, status: 'undone' as const } : a)) }));
     return { success: true };
   }
   return s.undoAgentActivity(entry.id);
+}
+
+/**
+ * Deshacer desde el panel (la tarjeta y «Deshacer todo el turno»): el mismo camino que `undo_change` (`undoOne`), así el
+ * panel y Ctrl+Z no se contradicen (por el diario, el cambio pasa a rehacer en vez de sumar un paso de restauración que un
+ * Ctrl+Z desharía). `permanent` dice si el fallo no tiene arreglo (la propuesta cambió después en lo que tocó el cambio, o
+ * ya no existe): el panel deja de ofrecerlo. Un fallo pasajero (solo lectura, conflicto, papelera) se puede reintentar.
+ */
+export function undoAssistantActivity(activityId: string): { success: boolean; error?: string; permanent?: boolean } {
+  const entry = store().agentActivity.find((a) => a.id === activityId);
+  if (!entry || entry.status !== 'applied' || !entry.undo) return { success: false, error: 'Este cambio no se puede deshacer.', permanent: true };
+  const result = undoOne(entry);
+  if (result.success) return result;
+  return { ...result, permanent: undoIsStale(entry) };
+}
+
+/** ¿El deshacer ya no puede funcionar nunca? La propuesta no existe, o cambió después en las secciones que guarda el cambio. */
+function undoIsStale(entry: AgentActivityEntry): boolean {
+  if (entry.targetType !== 'project') return false;
+  const current = store().projects.find((p) => p.id === entry.targetId);
+  if (!current) return true;
+  if (entry.undo?.op === 'trash' || entry.undo?.op === 'restore') return false;
+  const fields = entry.undo!.fields || Object.keys(entry.undo!.before);
+  return fingerprint(pickFields(current, fields)) !== entry.undo!.afterFingerprint;
 }
 
 const undoChange: NativeHandler = (args) => {

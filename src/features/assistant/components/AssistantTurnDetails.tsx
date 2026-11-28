@@ -7,7 +7,7 @@
 import React from 'react';
 import { ArrowRight, Undo2 } from 'lucide-react';
 import { ChangeCard } from '../../assistantFeedback/ChangeCard';
-import { pendingValidUntil, turnChangeCards, turnUndoTargets, type CreatedProposalCardView, type TurnDetailsLive } from '../panelState';
+import { createdProposalStatus, pendingValidUntil, turnChangeCards, turnUndoTargets, type CreatedProposalCardView, type TurnDetailsLive } from '../panelState';
 
 export type { TurnDetailsLive } from '../panelState';
 import type { SessionAssistantMessage } from '../session/assistantSession';
@@ -39,8 +39,21 @@ export interface TurnDetailsActions {
   continueTurn(): void;
 }
 
-/** Tarjeta «Propuesta creada»: equipos y, solo si está completa, las cifras del motor (nunca ceros de una incompleta). */
-function CreatedProposalCard({ card }: { card: CreatedProposalCardView }) {
+/**
+ * Tarjeta «Propuesta creada»: equipos y, solo si está completa, las cifras del motor (nunca ceros de una incompleta). Si la
+ * creación se deshizo o la propuesta está en la papelera, lo dice y no muestra cifras.
+ */
+function CreatedProposalCard({ card, status }: { card: CreatedProposalCardView; status: 'live' | 'undone' | 'trashed' }) {
+  if (status !== 'live')
+    return (
+      <section className="assistant-created-card" data-created-proposal={status} aria-label={`Propuesta creada: ${card.name}`}>
+        <h3>{status === 'undone' ? 'Creación deshecha' : 'Propuesta en la papelera'} <small>{card.name}</small></h3>
+        <p className="assistant-created-pending">
+          {status === 'undone' ? 'La propuesta pasó a la papelera.' : 'Ya no está entre tus propuestas.'}{' '}
+          <InfoTip label="Cómo recuperarla" text="Puedes restaurarla desde la papelera de propuestas." />
+        </p>
+      </section>
+    );
   return (
     <section className="assistant-created-card" data-created-proposal={card.metrics ? 'complete' : 'incomplete'} aria-label={`Propuesta creada: ${card.name}`}>
       <h3>Propuesta creada <small>{card.name}</small></h3>
@@ -84,11 +97,11 @@ export function AssistantTurnDetails({ message, busy, actions, live }: { message
   ]);
   const missing = summary.missing.filter((reason) => !shownReasons.has(reason));
   const failed = summary.failedTools.map(assistantToolLabel);
-  const undoAll = live ? turnUndoTargets(message.id, live.agentActivity).length : 0;
+  const undoAll = live ? turnUndoTargets(message.id, live.agentActivity, message.undoBlocked).length : 0;
   if (!cards.length && !created.length && !looseAssumptions.length && !failed.length && !missing.length && !message.canContinue && !message.modelNotice) return null;
   return (
     <div className="assistant-turn-details">
-      {created.map(({ callId, card }) => <CreatedProposalCard key={callId} card={card} />)}
+      {created.map(({ callId, card }) => <CreatedProposalCard key={callId} card={card} status={createdProposalStatus(message, callId, card.proposalId, live)} />)}
       {cards.map(({ callId, input }) => {
         const until = input.status === 'pending_confirmation' && input.actionId ? pendingValidUntil(input.actionId, live) : undefined;
         return (
@@ -108,6 +121,7 @@ export function AssistantTurnDetails({ message, busy, actions, live }: { message
       {undoAll >= 2 && actions.undoTurn && (
         <div className="assistant-turn-actions">
           <button type="button" disabled={busy} onClick={() => actions.undoTurn?.(message.id)}><Undo2 size={12} aria-hidden /> Deshacer todo el turno</button>
+          {message.undoTurnError && <p className="assistant-turn-undo-error" role="alert">{message.undoTurnError}</p>}
         </div>
       )}
       {looseAssumptions.length > 0 && (

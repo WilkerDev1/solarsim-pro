@@ -32,6 +32,7 @@ import { listAssistantToolset, executeAssistantToolset, type AssistantToolRespon
 import { appAssistantToolDefinitions } from '../../agentTools/appAssistant/definitions';
 import { buildSystemInstruction } from '../../agentTools/appAssistant/instructions';
 import { setAssistantToolPorts, type ProposalView } from '../../agentTools/appAssistant/ports';
+import { undoAssistantActivity } from '../../agentTools/appAssistant/handlers';
 import {
   initialTurnState, reduceTurnEvent, toolResponseEvents, turnSummary, type AssistantTurnEvent, type TurnState,
 } from '../../agentTools/appAssistant/turnEvents';
@@ -74,8 +75,12 @@ export interface SessionAssistantMessage {
   resolutions?: Record<string, string>;
   /** Cambios deshechos desde el panel (activityId → true). */
   undone?: Record<string, boolean>;
-  /** Deshacer que falló desde el panel (activityId → motivo): la tarjeta lo muestra y deja de ofrecerlo. */
+  /** Deshacer que falló desde el panel (activityId → motivo): la tarjeta lo muestra. */
   undoErrors?: Record<string, string>;
+  /** De esos, los que fallan para siempre (la propuesta cambió después o ya no existe): no se vuelven a ofrecer. */
+  undoBlocked?: Record<string, boolean>;
+  /** Último fallo de «Deshacer todo el turno», junto al botón (se borra al deshacer algo del turno). */
+  undoTurnError?: string;
   /** Tarjetas «Propuesta creada» de las `create_proposal` aplicadas del turno. */
   createdProposals?: { callId: string; card: CreatedProposalCardView }[];
   /** Tarjetas de cambio (ChangeCard de F5a) de las respuestas de herramientas del turno, en orden de llamada. */
@@ -312,16 +317,20 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
   };
   const tooManyFiles = (kept: number, total: number) => `Máximo tres archivos por mensaje: quedan ${kept} de ${total}.`;
 
-  /** Devuelve lo encolado al compositor (Stop, apagado): primero lo encolado, que se escribió antes. */
+  /** Más adjuntos de los que caben en un mensaje (solo pasa al devolver la cola): no se envía hasta quitar los que sobran. */
+  const removeExtraFiles = (total: number) => `Máximo tres archivos por mensaje: quita ${total - CHAT_FILE_LIMITS.maxFiles} para enviar.`;
+
+  /**
+   * Devuelve lo encolado al compositor (Stop, apagado): primero lo encolado, que se escribió antes. No se descarta ningún
+   * adjunto: si entre la cola y el compositor pasan de tres, se quedan todos y el envío espera a que se quiten los que sobran.
+   */
   const returnQueueToComposer = () => {
     const queued = state.queued;
     if (!queued) return;
     const all = [...queued.files, ...state.files];
-    const kept = all.slice(0, CHAT_FILE_LIMITS.maxFiles);
-    forgetFiles(all.slice(CHAT_FILE_LIMITS.maxFiles));
     set({
-      queued: null, draft: joinText(queued.text, state.draft), files: kept,
-      ...(all.length > kept.length ? { composerError: tooManyFiles(kept.length, all.length) } : {}),
+      queued: null, draft: joinText(queued.text, state.draft), files: all,
+      ...(all.length > CHAT_FILE_LIMITS.maxFiles ? { composerError: removeExtraFiles(all.length) } : {}),
     });
   };
 
@@ -526,6 +535,7 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
         });
         return;
       }
+      if (state.files.length > CHAT_FILE_LIMITS.maxFiles) { set({ composerError: removeExtraFiles(state.files.length) }); return; }
       const myGeneration = generation;
       let next: QueuedMessage = { text, files: [...state.files] };
       let fromQueue = false;
@@ -580,7 +590,10 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
       }
     },
     removeFile(id) {
-      set({ files: state.files.filter((f) => f.id !== id) });
+      const files = state.files.filter((f) => f.id !== id);
+      // Quitados los que sobraban, el aviso de «quita N» ya no aplica.
+      const fixed = files.length <= CHAT_FILE_LIMITS.maxFiles && /^Máximo tres archivos por mensaje: quita /.test(state.composerError);
+      set({ files, ...(fixed ? { composerError: '' } : {}) });
     },
     confirmPending(actionId) {
       const message = state.messages.find((m): m is SessionAssistantMessage => m.role === 'assistant' && m.turn.pendingConfirmations.some((p) => p.actionId === actionId));
@@ -595,25 +608,41 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
       if (message) patchMessage(message.id, (m) => ({ ...m, resolutions: { ...m.resolutions, [actionId]: 'rejected' } }));
     },
     undoActivity(activityId) {
-      const result = store().undoAgentActivity(activityId);
+      const result = undoAssistantActivity(activityId);
       const message = state.messages.find((m): m is SessionAssistantMessage => m.role === 'assistant' && (
         Object.values(m.turn.tools).some((call) => call.activityId === activityId) || !!m.changeCards?.some((c) => c.input.activityId === activityId
           // Un cambio confirmado desde la tarjeta: su actividad la dice la cola de confirmaciones.
           || (!!c.input.actionId && store().pendingAgentActions.find((a) => a.id === c.input.actionId)?.activityId === activityId))));
-      // También el fallo: la tarjeta lo muestra (sin él, el botón fallaría en silencio).
-      if (message) patchMessage(message.id, (m) => (result.success
-        ? { ...m, undone: { ...m.undone, [activityId]: true } }
-        : { ...m, undoErrors: { ...m.undoErrors, [activityId]: result.error || 'No se pudo deshacer.' } }));
-      return result;
+      // También el fallo: la tarjeta lo muestra (sin él, el botón fallaría en silencio); el permanente deja de ofrecerse.
+      if (message) patchMessage(message.id, (m) => {
+        if (result.success) {
+          const { [activityId]: _e, ...undoErrors } = m.undoErrors ?? {};
+          const { [activityId]: _b, ...undoBlocked } = m.undoBlocked ?? {};
+          return { ...m, undone: { ...m.undone, [activityId]: true }, undoErrors, undoBlocked, undoTurnError: undefined };
+        }
+        return {
+          ...m, undoErrors: { ...m.undoErrors, [activityId]: result.error || 'No se pudo deshacer.' },
+          undoBlocked: result.permanent ? { ...m.undoBlocked, [activityId]: true } : m.undoBlocked,
+        };
+      });
+      return { success: result.success, ...(result.error ? { error: result.error } : {}) };
     },
     undoTurn(turnId) {
       let undone = 0;
-      for (const id of turnUndoTargets(turnId, store().agentActivity)) {
+      const message = () => state.messages.find((m): m is SessionAssistantMessage => m.role === 'assistant' && m.id === turnId);
+      const fail = (error: string | undefined) => {
+        const text = error || 'No se pudo deshacer.';
+        // El fallo queda junto al botón; si fue permanente, el cambio sale de la lista y, con menos de dos, el botón se retira.
+        if (message()) patchMessage(turnId, (m) => ({ ...m, undoTurnError: text }));
+        return { success: false, undone, error: text };
+      };
+      for (const id of turnUndoTargets(turnId, store().agentActivity, message()?.undoBlocked)) {
         const result = session.undoActivity(id);
-        if (!result.success) return { success: false, undone, error: undone ? `Se deshicieron ${undone} cambios; el resto no: ${result.error}` : result.error };
+        if (!result.success) return fail(undone ? `Se deshicieron ${undone} cambios; el resto no: ${result.error}` : result.error);
         undone++;
       }
-      return { success: undone > 0, undone, ...(undone ? {} : { error: 'No queda nada de este turno que deshacer.' }) };
+      if (!undone) return fail('No queda nada de este turno que deshacer.');
+      return { success: true, undone };
     },
     history: () => history,
     connectPorts() {
