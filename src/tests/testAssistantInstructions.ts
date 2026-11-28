@@ -85,6 +85,11 @@ const editable = PROJECT_FIELDS.filter((f) => !f.readOnly);
 assert.match(guide, new RegExp(`${editable.length} rutas editables`), 'el total de rutas sale del registro');
 for (const section of ['client', 'rates', 'specs', 'financials', 'monthlyConsumption'])
   assert.match(guide, new RegExp(`${section} \\(\\d+\\)`), `sección ${section} con su número de rutas`);
+// Revisión F3c: los encabezados no prometen sin condición cómo se aplica cada tipo, porque la política del dispositivo lo
+// cambia (borradores con confirmación, protegidas permitidas, precio manual): manda el estado de cada resultado.
+assert.doesNotMatch(guide, /se aplican al momento;|piden la confirmación del usuario en la app\)/, 'sin promesas absolutas por tipo');
+assert.match(guide, /normalmente se aplican al momento/i);
+assert.match(guide, /según la política del dispositivo/i);
 // Un conjunto sin edit_proposal no habla de rutas.
 assert.doesNotMatch(toolGuideLayer('app-assistant', [findAgentTool('search_projects')!]), /rutas editables/);
 
@@ -93,7 +98,12 @@ const conduct = appAssistantConductLayer();
 for (const source of ASSUMPTION_SOURCES) assert.ok(conduct.includes(ASSUMPTION_SOURCE_LABELS[source]), `la lista cerrada nombra «${ASSUMPTION_SOURCE_LABELS[source]}»`);
 assert.match(conduct, /solo de esta lista/i, 'la lista es cerrada');
 assert.match(conduct, new RegExp(`${String(NEW_PROPOSAL_DEFAULTS.monthlyConsumptionKWh).replace(/\B(?=(\d{3})+(?!\d))/g, '\\.')} kWh`), 'el consumo de fábrica sale de NEW_PROPOSAL_DEFAULTS');
-assert.match(conduct, new RegExp(`${DEFAULT_TARGET_MARGIN_PCT} %`), 'el margen de fábrica sale de Ajustes de fábrica');
+// Revisión F3c: el margen de fábrica no vale para todas las instalaciones (las que guardaron Ajustes conservan el anterior),
+// así que la conducta no da la cifra; dice que se informe el que devuelve la herramienta o el de Ajustes.
+assert.doesNotMatch(conduct, new RegExp(`\\b${DEFAULT_TARGET_MARGIN_PCT} %`), 'sin cifra de margen de fábrica');
+assert.match(conduct, /margen objetivo/i, 'pero sí dice que informe el margen usado');
+// La base del mes pico es la de las propuestas NUEVAS (lo guardado sin el campo usa la heredada).
+assert.match(conduct, /propuestas nuevas/i, 'la base citada es la de las propuestas nuevas');
 assert.match(conduct, new RegExp(`${String(SIZING_ASSUMPTIONS.targetDcAcRatio).replace('.', ',')}`), 'la relación DC/AC sale de SIZING_ASSUMPTIONS');
 assert.match(conduct, new RegExp(`${Math.round(SIZING_ASSUMPTIONS.battery.peakDailyFraction * 100)} %`), 'la regla de baterías también');
 assert.match(conduct, /no te rindes|no te rindas/i, 'no se rinde');
