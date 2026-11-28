@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { buildProjectFromDraft } from '../store/slices/aiSlice';
+import type { ExtractedInvoiceData } from '../types/aiInvoice';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { DEFAULT_LOCAL_COMPANY } from '../types/companyProfile';
 import { documentLogo, webHeaderLogo } from '../utils/documentLogo';
@@ -46,7 +47,7 @@ const restored = { ...store(), ...JSON.parse(JSON.stringify(serializeSimulationS
 hydrateSimulationStore(restored);
 assert.equal(restored.documentTemplatesByCompany[issuerA.id].companyFooterText, original.customization?.companyFooterText);
 await new Promise(resolve => setTimeout(resolve, 5));
-const aiDraft = { clientName: 'Cliente IA', monthlyConsumptionKWh: Array(12).fill(1000), distributor: 'EDEESTE', tariffCode: 'BTD', annualConsumptionKWh: 12000, averageMonthlyKWh: 1000, confidenceScore: 1 };
+const aiDraft: ExtractedInvoiceData = { clientName: 'Cliente IA', monthlyConsumptionKWh: Array(12).fill(1000), distributor: 'EDEESTE', tariffCode: 'BTD', annualConsumptionKWh: 12000, averageMonthlyKWh: 1000, confidenceScore: 1 };
 const aiBuilt = buildProjectFromDraft(store(), aiDraft, true);
 assert.ok('project' in aiBuilt);
 assert.equal('project' in aiBuilt && aiBuilt.project.customization?.companyFooterText, original.customization?.companyFooterText);
