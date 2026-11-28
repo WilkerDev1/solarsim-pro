@@ -71,7 +71,10 @@ export function readExportedProjects(json: unknown): ExportedProjects {
     const active = one('persisted_state', keep(json.state.projects), settingsOf(json.state));
     // Los otros espacios de trabajo (local u organización) se archivan en `organizationWorkspaces` con sus propuestas y ajustes.
     const archive = isRecord(json.state.organizationWorkspaces) ? json.state.organizationWorkspaces : {};
+    // La copia archivada del espacio ACTIVO es una foto vieja (la app la conserva con carpetas privadas de otro miembro): se salta.
+    const activeScope = typeof json.state.workspaceScope === 'string' ? json.state.workspaceScope : null;
     for (const [scope, space] of Object.entries(archive)) {
+      if (scope === activeScope) continue;
       if (!isRecord(space) || !Array.isArray(space.projects)) continue;
       active.workspaces.push({ scope, projects: keep(space.projects), ...(settingsOf(space) ? { settings: settingsOf(space) } : {}) });
     }

@@ -120,6 +120,19 @@ assert.deepEqual(withArchive.margin, { installations: 3, saved28: 1, saved40: 1,
 assert.equal(readExportedProjects(archived).workspaces.length, 3);
 assert.ok(formatIncompleteCount(withArchive).includes('espacios de trabajo'), 'el informe habla de espacios de trabajo');
 
+// La copia archivada del espacio ACTIVO es una foto vieja: no se cuenta como un espacio más.
+const staleActive = {
+  state: {
+    workspaceScope: 'https://x.invalid::org-1', projects: [complete], defaultSimulationSettings: { ...DEFAULT_SIMULATION_SETTINGS, defaultTargetMarginPct: 40 },
+    organizationWorkspaces: { 'https://x.invalid::org-1': { projects: [complete, zeroInherited], defaultSimulationSettings: { ...DEFAULT_SIMULATION_SETTINGS, defaultTargetMarginPct: 28 } } },
+  },
+  version: 0,
+};
+const stale = countIncompleteProposals([{ name: 'activo.json', json: staleActive }]);
+assert.equal(stale.evaluated, 1, 'solo el espacio activo');
+assert.equal(stale.incomplete, 0);
+assert.deepEqual(stale.margin, { installations: 1, saved28: 0, saved40: 1, other: 0, unknown: 0 });
+
 // Varias instalaciones suman; un archivo ilegible se cuenta aparte y no tumba el resto.
 const many = countIncompleteProposals([{ name: 'a.json', json: persisted([complete, zeroInherited], 28) }, { name: 'b.json', json: persisted([zeroInheritedNew], 40) }, { name: 'rota.json', json: { hola: 1 } }]);
 assert.equal(many.evaluated, 3);

@@ -108,7 +108,7 @@ export const EVAL_CASES: EvalCase[] = [
   {
     id: 'distribuidora', turns: ['cambia la distribuidora a EDENORTE'], setup: 'proposal',
     assertion: 'La distribuidora de la propuesta es EDENORTE y su tarifa es una de EDENORTE (no queda la de otra distribuidora).',
-    check: onActive('La distribuidora no es EDENORTE', (p) => p.rates.distributor === 'EDENORTE' && !!p.rates.tariffCode && p.rates.tariffCode in (DEFAULT_RD_TARIFF_MATRIX.schedules.EDENORTE.tariffs as Record<string, unknown>)),
+    check: onActive('La distribuidora no es EDENORTE', (p) => p.rates.distributor === 'EDENORTE' && p.rates.billingTariff?.distributor === 'EDENORTE' && !!p.rates.tariffCode && p.rates.tariffCode in (DEFAULT_RD_TARIFF_MATRIX.schedules.EDENORTE.tariffs as Record<string, unknown>)),
   },
   {
     id: 'margen-35', turns: ['pon el margen en 35 %'], setup: 'proposal',

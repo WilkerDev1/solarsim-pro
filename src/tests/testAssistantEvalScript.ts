@@ -107,12 +107,15 @@ for (const wanted of ['crea una propuesta', 'ponle baterías', 'sube la cobertur
     'deshaz-eso': [edit('Cobertura', [{ op: 'set', path: 'rates.targetCoveragePct', valueJson: '90' }]), said('Cobertura al 90 %.'), said('Ya está deshecho.')],
     'cuanto-cuesta': [call('get_proposal_state', () => ({ proposalId: proposal() })), said('Cuesta 1 dólar.')],
     'sin-precios': [call('create_proposal', {}), said('Creada.')],
+    // Misma tarifa de código (BTS1 existe en las tres distribuidoras): solo cambia el nombre, la fila y el precio siguen siendo de otra.
+    distribuidora: [edit('Distribuidora', [{ op: 'set', path: 'rates.distributor', valueJson: '"EDENORTE"' }, { op: 'set', path: 'rates.tariffCode', valueJson: '"BTS2"' }, { op: 'set', path: 'rates.billingTariff', valueJson: '{"distributor":"EDEESTE","tariffCode":"BTS2"}' }]), said('Ahora es EDENORTE.')],
   };
   const done = await run(wrong).report;
   const status = Object.fromEntries(done.results.map((r) => [r.caseId, r.status]));
   assert.equal(status['cobertura-90'], 'fail', 'la cobertura equivocada no aprueba aunque el texto diga 90 %');
   assert.equal(status['deshaz-eso'], 'fail', 'decir «deshecho» sin deshacer no aprueba');
   assert.equal(status['cuanto-cuesta'], 'fail', 'un precio que no es el del motor no aprueba');
+  assert.equal(status.distribuidora, 'fail', 'cambiar solo el nombre de la distribuidora, dejando la fila de otra, no aprueba');
   assert.equal(status.baterias, 'pass', 'los demás siguen aprobando');
   assert.ok(done.results.find((r) => r.caseId === 'deshaz-eso')!.failure!.length > 10);
 }
