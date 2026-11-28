@@ -9,6 +9,10 @@ import { serializeSimulationStore } from '../store/persistence/serializeSimulati
 import { useSimulationStore } from '../store/useSimulationStore';
 import { SyncService } from '../services/syncService';
 import { GeminiRequestError, type GeminiTransport } from '../../shared/geminiTransport';
+import { LlmError } from '../services/llm/errors';
+import { clientFromTransport } from './support/clientFromTransport';
+
+const clientFor = (transport: GeminiTransport) => clientFromTransport(transport, undefined, 'synthetic-test-key');
 
 const document = {
   resolutionCode: 'QA-PLIEGO-2026', effectiveDate: '2026-10-01', publishedBy: 'Entidad QA',
@@ -61,10 +65,12 @@ const unauthorized: GeminiTransport = async (url, _body, headers) => {
   assert.equal(headers['x-goog-api-key'], 'synthetic-test-key');
   throw new GeminiRequestError('Invalid credentials', 401);
 };
-await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key', transport: unauthorized }), /Invalid credentials/);
+// El puerto traduce el 401 a un error tipado en español; el mensaje del servidor se conserva en `serverMessage`.
+await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key', client: clientFor(unauthorized) }),
+  (error: unknown) => error instanceof LlmError && error.kind === 'invalid_key' && error.serverMessage === 'Invalid credentials' && /API Key/.test(error.message));
 assert.equal(calls, 1, 'Never cascade requests on invalid authentication');
 const answered: GeminiTransport = async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(document) }] } }] });
-const parsed = await GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key', currentMatrix: current, transport: answered });
+const parsed = await GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key', currentMatrix: current, client: clientFor(answered) });
 assert.equal(parsed.schedules.CEPM.tariffs['RBT-1'].baseEnergyRateDOP, 24.1);
 
 let state: any = { sessionGeneration: 1, syncSettings: { authToken: 'synthetic-token', serverUrl: 'https://example.invalid', currentUser: { organizationId: 'qa' } } };
@@ -176,7 +182,7 @@ assert.equal(getReferenceEnergyRateUSD(updatedCEPM,'CEPM','BTS1',900,60),.5,'Leg
     assert.match(JSON.stringify(body), /fixedChargeTiersDOP/, 'la instrucción pide el cargo fijo por rango');
     return { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(phase5) }] } }] };
   };
-  const viaService = await GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key', transport: phase5Transport });
+  const viaService = await GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key', client: clientFor(phase5Transport) });
   assert.equal(viaService.schedules.EDESUR.gridUseChargeDOPPerKWh, 3.9);
   assert.deepEqual(viaService.schedules.EDESUR.tariffs.BTS1.fixedChargeTiersDOP, bts1.fixedChargeTiersDOP);
 }

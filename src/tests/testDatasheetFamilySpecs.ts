@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { parseDatasheetWithGemini, DATASHEET_RESPONSE_SCHEMA } from "../services/geminiDatasheetService";
 import { normalizeDatasheetResponse, planDatasheetImport, datasheetTitle, estimateMaxPvPowerKW, refreshMaxPvEstimate } from "../utils/datasheetImport";
 import type { GeminiTransport } from "../../shared/geminiTransport";
+import { clientFromTransport } from "./support/clientFromTransport";
 
 // Fichas de familia con transporte sintético: cada variante recibe sus valores; los comunes se reparten.
 let reply = "{}";
@@ -12,7 +13,7 @@ const transport: GeminiTransport = async (_url, body) => {
   return { candidates: [{ finishReason: "STOP", content: { parts: [{ text: reply }] } }] };
 };
 const scan = (name: string) =>
-  parseDatasheetWithGemini("QQ==", "application/pdf", name, "synthetic-key", undefined, undefined, undefined, transport);
+  parseDatasheetWithGemini("QQ==", "application/pdf", name, "synthetic-key", undefined, undefined, undefined, clientFromTransport(transport));
 
 // Esquema: valores comunes de la familia y razón FV/AC.
 const props = DATASHEET_RESPONSE_SCHEMA.properties as Record<string, any>;
@@ -220,7 +221,7 @@ const variantProps = (DATASHEET_RESPONSE_SCHEMA.properties as any).variants.item
 for (const key of ["efficiencyPct", "isc", "imp", "maxAcPowerKW", "maxPvPowerKW", "maxPvPowerPct"]) {
   assert(variantProps.properties[key].description, `${key} tiene descripción`);
   assert(variantProps.required.includes(key), `${key} es obligatorio (null si no está)`);
-  assert.equal(variantProps.properties[key].nullable, true);
+  assert(variantProps.properties[key].type.includes("null"), `${key} admite null (JSON Schema: type [number, null])`);
 }
 assert(/Max\. AC Output Power|Max\. AC/i.test(variantProps.properties.maxAcPowerKW.description));
 
@@ -302,7 +303,7 @@ assert.equal(refreshMaxPvEstimate({ ...base, mpptMaxCurrentA: 16 }, "inverter").
 
 // Revisión 3: esquema anulable y obligatorio para las entradas DC.
 for (const key of ["mpptMaxCurrentA", "dcRatedVoltageV"]) {
-  assert.equal(variantProps.properties[key].nullable, true, `${key} anulable`);
+  assert(variantProps.properties[key].type.includes("null"), `${key} anulable (type [number, null])`);
   assert(variantProps.required.includes(key));
 }
 

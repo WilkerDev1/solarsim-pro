@@ -1,6 +1,6 @@
 # ADR 0008: Puerto LlmClient propio sobre el SDK oficial @google/genai
 
-Estado: aceptado (2026-11-27). Primera fase (F1a) del asistente único: puerto, adaptador, doble de pruebas y listado de modelos. Los escáneres (F1b) y el bucle del asistente (F4) se migran después; `shared/geminiTransport.ts` sigue vivo para `electron/ai` hasta F6.
+Estado: aceptado (2026-11-27). Primera fase (F1a) del asistente único: puerto, adaptador, doble de pruebas y listado de modelos. Los escáneres (F1b) ya usan el puerto; el bucle del asistente (F4) se migra después; `shared/geminiTransport.ts` sigue vivo para `electron/ai` hasta F6.
 
 ## Contexto
 
@@ -33,5 +33,6 @@ Estado: aceptado (2026-11-27). Primera fase (F1a) del asistente único: puerto, 
 
 - El bundle del renderer crece con el SDK web; las cifras de cada cambio van en su PR.
 - `shared/geminiTransport.ts` y su excepción en AGENTS.md siguen hasta F6, que retira `electron/ai`, el IPC `parse-invoice-with-ai`, `list-gemini-models` y `geminiInvoiceService.ts` en el mismo cambio.
+- Los escáneres (F1b: tarifas, fichas y listas de precios) piden la salida estructurada por `LlmClient.structured` con un esquema JSON cada uno. Modelo de reserva, recuperación de MAX_TOKENS, reintento de JSON mal formado y plazo global no están en el adaptador sino en `src/services/llm/structuredPolicy.ts` (`requestStructured`), reutilizable sobre el puerto y probada con `ScriptedLlm`; el adaptador se carga bajo demanda (`scannerClient.ts`) y no engorda el bundle principal ([escáneres](../AI_SCANNERS_SPECIFICATION.md#transporte-cancelación-y-credenciales)).
 - Ajustes → IA lista los modelos por el puerto (todas las páginas) en Electron y en web.
 - `scripts/qa/checkToolDeclarations.ts` comprueba a mano, con una clave real y fuera de CI, que la API acepta todas las declaraciones de `shared/agentTools/definitions.ts` ([QA](../QA.md#ensayos-fuera-de-npm-test)).

@@ -157,6 +157,7 @@ export class ScriptedLlm implements LlmClient {
     const response = this.responseFrom(request.model, step);
     if ('data' in step) return { data: structuredClone(step.data) as T, response };
     if (response.finishReason !== 'stop') throw new LlmError('malformed_response', { finishReason: response.finishReason });
+    if (!response.text.trim()) throw new LlmError('malformed_response', { finishReason: response.finishReason, emptyOutput: true });
     try {
       const data = JSON.parse(response.text);
       if (data && typeof data === 'object' && !Array.isArray(data)) return { data: data as T, response };

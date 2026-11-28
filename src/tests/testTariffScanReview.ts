@@ -3,6 +3,7 @@ import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { GeminiTariffService } from '../services/geminiTariffService';
 import { applyTariffScanReview, assertDominicanTariffOrigin, describeTariffSource, humanizeTariffNotes, PENDING_TARIFF_SOURCE, prepareTariffScanReview, summarizeTariffScan } from '../utils/tariffExtraction';
 import type { GeminiTransport } from '../../shared/geminiTransport';
+import { clientFromTransport } from './support/clientFromTransport';
 
 /**
  * Escáner de resoluciones: cuadros de la distribuidora sin resolución citada (revisión con procedencia pedida, nada se aplica
@@ -266,21 +267,21 @@ assert.throws(() => assertDominicanTariffOrigin({ ...edesurCuadro, country: 'AR'
     return { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(payload) }] } }] };
   };
   const base = { fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key', currentMatrix: DEFAULT_RD_TARIFF_MATRIX };
-  await assert.rejects(GeminiTariffService.scanTariffDocument({ ...base, transport: answer(argentina) }), originError);
+  await assert.rejects(GeminiTariffService.scanTariffDocument({ ...base, client: clientFromTransport(answer(argentina)) }), originError);
   assert.match(prompt, /country/);
   assert.match(prompt, /regulator/);
   assert.match(prompt, /currency/);
-  const review = await GeminiTariffService.scanTariffDocument({ ...base, userPromptNotes: 'Cuadro EDESUR noviembre', transport: answer(edesurCuadro) });
+  const review = await GeminiTariffService.scanTariffDocument({ ...base, userPromptNotes: 'Cuadro EDESUR noviembre', client: clientFromTransport(answer(edesurCuadro)) });
   assert.equal(review.provenanceRequired, true);
   assert.equal(review.priceChanges, false);
   // La ruta estricta (sin revisión) sigue exigiendo la resolución del documento.
-  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, transport: answer(edesurCuadro) }), /resolución/);
-  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, transport: answer(argentina) }), originError);
+  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, client: clientFromTransport(answer(edesurCuadro)) }), /resolución/);
+  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, client: clientFromTransport(answer(argentina)) }), originError);
   // …y el emisor: sin publishedBy rechaza como antes, aunque traiga resolución y fecha.
   const cited = { ...edesurCuadro, resolutionCode: 'SIE-130-2026-TF' };
-  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, transport: answer({ ...cited, publishedBy: null }) }), /entidad emisora/);
-  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, transport: answer({ ...cited, publishedBy: '   ' }) }), /entidad emisora/);
-  const strict = await GeminiTariffService.extractTariffMatrixFromDocument({ ...base, transport: answer(cited) });
+  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, client: clientFromTransport(answer({ ...cited, publishedBy: null })) }), /entidad emisora/);
+  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, client: clientFromTransport(answer({ ...cited, publishedBy: '   ' })) }), /entidad emisora/);
+  const strict = await GeminiTariffService.extractTariffMatrixFromDocument({ ...base, client: clientFromTransport(answer(cited)) });
   assert.equal(strict.schedules.EDESUR.tariffs['BTS-VE'], undefined);
 }
 

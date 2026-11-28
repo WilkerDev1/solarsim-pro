@@ -73,7 +73,7 @@ El modal requiere contraste explícito con el documento antes de aplicar. Cambia
 
 ## Transporte y persistencia
 
-El escáner comparte `shared/geminiTransport.ts`: clave por `x-goog-api-key`, identificador de modelo validado, timeout/AbortSignal y como máximo dos intentos solo ante errores transitorios; no encadena peticiones con 401/403/429. Modelos y deprecaciones se contrastan con [Google](https://ai.google.dev/gemini-api/docs/deprecations/); se retiró la cascada antigua 1.5/2.0 de este servicio.
+El escáner usa el puerto `LlmClient` con la política de `src/services/llm/structuredPolicy.ts` ([detalle](AI_SCANNERS_SPECIFICATION.md#transporte-cancelación-y-credenciales)): clave por `x-goog-api-key`, identificador de modelo validado, plazo global de 90 s con `AbortSignal`, esquema JSON de salida (`TARIFF_RESPONSE_SCHEMA`), 12 000 tokens de salida con una recuperación de truncado, y como máximo dos intentos solo ante errores transitorios; no encadena peticiones con 401/403/429. Modelos y deprecaciones se contrastan con [Google](https://ai.google.dev/gemini-api/docs/deprecations/); se retiró la cascada antigua 1.5/2.0 de este servicio.
 
 JSON transforma `Infinity` en `null`; `normalizeStoredTariffMatrix` restaura exclusivamente el bloque final sin límite con validación. Hidratación y descarga usan ese adaptador para conservar cálculos de consumos superiores a 700 kWh. Una matriz local inválida se conserva con aviso para revisión, sin borrar silenciosamente personalizaciones. El cero explícito se respeta al resolver la tasa de referencia. Las etiquetas de tarifas no incluyen precios estáticos que contradigan una matriz actualizada.
 

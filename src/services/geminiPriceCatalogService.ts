@@ -7,43 +7,41 @@ import {
   EquipmentType,
 } from "../types/equipment";
 
-import {
-  MAX_INLINE_FILE_BASE64,
-  requestGeminiStructured,
-  type GeminiTransport,
-} from "../../shared/geminiTransport";
+import { MAX_INLINE_FILE_BASE64, requestStructured } from "./llm/structuredPolicy";
+import { createScannerClient } from "./llm/scannerClient";
+import type { LlmClient } from "./llm/types";
 
 /** USD and DOP are converted locally; any other currency is reported (with its ISO code) and never converted. */
 const CURRENCIES = ["USD", "DOP", "OTHER"];
 
-const NULLABLE_STRING = { type: "STRING", nullable: true } as const;
-/** Structured output for supplier price lists; prices and matches are re-validated locally. */
+const NULLABLE_STRING = { type: ["string", "null"] } as const;
+/** Structured output (JSON Schema) for supplier price lists; prices and matches are re-validated locally. */
 export const PRICE_CATALOG_RESPONSE_SCHEMA = {
-  type: "OBJECT",
+  type: "object",
   properties: {
-    detectedSupplierName: { type: "STRING" },
+    detectedSupplierName: { type: "string" },
     matchedExistingSupplier: NULLABLE_STRING,
-    supplierMatchConfidence: { type: "NUMBER" },
-    documentDate: { type: "STRING" },
-    documentTitle: { type: "STRING" },
-    currencyDetected: { type: "STRING", enum: CURRENCIES },
-    currencyCode: { type: "STRING", description: "Código ISO 4217 de la moneda principal del documento (EUR, CNY…)." },
+    supplierMatchConfidence: { type: "number" },
+    documentDate: { type: "string" },
+    documentTitle: { type: "string" },
+    currencyDetected: { type: "string", enum: CURRENCIES },
+    currencyCode: { type: "string", description: "Código ISO 4217 de la moneda principal del documento (EUR, CNY…)." },
     items: {
-      type: "ARRAY",
+      type: "array",
       items: {
-        type: "OBJECT",
+        type: "object",
         properties: {
-          extractedModelName: { type: "STRING" },
-          brand: { type: "STRING" },
-          equipmentType: { type: "STRING", enum: ["panel", "inverter", "battery"] },
-          originalCurrency: { type: "STRING", enum: CURRENCIES },
-          originalCurrencyCode: { type: "STRING", description: "Código ISO 4217 cuando originalCurrency es OTHER." },
-          originalPrice: { type: "NUMBER" },
-          sku: { type: "STRING" },
-          notes: { type: "STRING" },
+          extractedModelName: { type: "string" },
+          brand: { type: "string" },
+          equipmentType: { type: "string", enum: ["panel", "inverter", "battery"] },
+          originalCurrency: { type: "string", enum: CURRENCIES },
+          originalCurrencyCode: { type: "string", description: "Código ISO 4217 cuando originalCurrency es OTHER." },
+          originalPrice: { type: "number" },
+          sku: { type: "string" },
+          notes: { type: "string" },
           matchedEquipmentId: NULLABLE_STRING,
           matchedDisplayName: NULLABLE_STRING,
-          matchConfidence: { type: "NUMBER" },
+          matchConfidence: { type: "number" },
         },
         required: ["extractedModelName", "equipmentType", "originalCurrency", "originalPrice"],
       },
@@ -102,7 +100,8 @@ export interface ScanPriceCatalogOptions {
   dopExchangeRate?: number;
   onProgress?: (status: string) => void;
   signal?: AbortSignal;
-  transport?: GeminiTransport;
+  /** Cliente del puerto (pruebas); por defecto el adaptador de Gemini, cargado bajo demanda. */
+  client?: LlmClient;
 }
 
 export function findBestSupplierMatch(
@@ -226,41 +225,29 @@ ${JSON.stringify(referenceCatalogCondensed)}
 
 Extrae todos los modelos de paneles, inversores y baterías con sus precios unitarios de compra, e identifica el proveedor cotejándolo con los ya registrados en la base de datos.`;
 
-    const requestBody = {
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: promptText,
-            },
-            { inlineData: { mimeType, data: cleanBase64 } },
-          ],
-        },
-      ],
-      systemInstruction: {
-        parts: [
-          {
-            text: PRICE_CATALOG_SYSTEM_INSTRUCTION,
-          },
-        ],
-      },
-      generationConfig: {
-        temperature: 0.1,
-        responseSchema: PRICE_CATALOG_RESPONSE_SCHEMA,
-      },
-    };
-
     onProgress?.("Analizando precios y referencias del catálogo…");
     // Structured output: prose around the JSON or a truncated payload is rejected (one bounded retry), never repaired.
-    const result = await requestGeminiStructured({
-      apiKey,
-      model: customModel,
-      body: requestBody,
+    const client = options.client ?? await createScannerClient(apiKey);
+    const result = await requestStructured({
+      client,
       signal: options.signal,
       invalidMessage:
         "Gemini devolvió una lista incompleta o JSON inválido. No se aplicó ningún precio.",
-    }, options.transport);
+      request: {
+        model: customModel,
+        systemInstruction: PRICE_CATALOG_SYSTEM_INSTRUCTION,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { type: "text", text: promptText },
+              { type: "inlineData", mimeType, data: cleanBase64 },
+            ],
+          },
+        ],
+        schema: PRICE_CATALOG_RESPONSE_SCHEMA,
+      },
+    });
     if (result.modelWarning) onProgress?.(result.modelWarning);
     const parsed: any = result.data;
 
