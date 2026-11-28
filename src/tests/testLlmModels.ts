@@ -60,4 +60,12 @@ assert.deepEqual(mapGeminiModels({ models: models.map((m) => ({ name: m.name, di
   assert(!requests[0].url.includes('synthetic-key'));
 }
 
+// Sin dependencias inyectadas carga el adaptador bajo demanda y usa el fetch global (que en pruebas lanza: sin red).
+{
+  const result = await listAvailableGeminiModels('synthetic-key');
+  assert.equal(result.success, false);
+  assert.match(result.error!, /conectar/, 'the lazily loaded adapter maps the failed fetch to a network error');
+  assert.equal(result.models, DEFAULT_POPULAR_MODELS);
+}
+
 console.log('Model listing through the LlmClient port (filters, presets, errors, legacy re-export) passed.');
