@@ -23,6 +23,7 @@ import { buildSystemInstruction } from '../features/agentTools/appAssistant/inst
 import { assistantToolPorts, resetAssistantToolPorts } from '../features/agentTools/appAssistant/ports';
 import { closedTurnProblems } from '../features/assistant/session/agentLoop';
 import { createAssistantSession, type AssistantSession, type SessionMessage } from '../features/assistant/session/assistantSession';
+import { assistantComposerState } from '../features/assistant/assistantScope';
 import { normalizeInvoiceExtraction } from '../features/assistant/session/invoiceExtraction';
 import type { ProjectSimulation } from '../types';
 import { createElement } from 'react';
@@ -328,6 +329,11 @@ reset({ geminiApiKey: '' });
   assert.match(reply.error?.message ?? '', /Ajustes → IA/);
   assert.match(reply.error?.message ?? '', /API Key de (Google )?Gemini/, 'el panel lo reconoce como «falta la clave»');
   assert.deepEqual(session.history(), [], 'no entra nada en el historial');
+  // QA 2.ª ronda: sin clave, Enviar no se queda mudo; el intento llega a la sesión y el hilo muestra el mensaje de arriba.
+  assert.deepEqual(assistantComposerState({ draft: 'crea una propuesta', hasApiKey: false, loadingFiles: 0 }), { canSend: true, disabledReason: '' },
+    'sin clave se puede pulsar Enviar: la sesión responde con el camino a Ajustes en la conversación');
+  assert.equal(assistantComposerState({ draft: '  ', hasApiKey: false, loadingFiles: 0 }).canSend, false);
+  assert.equal(assistantComposerState({ draft: 'hola', hasApiKey: true, loadingFiles: 1 }).canSend, false);
 }
 
 // ── 6. Límite de pasos: cierre con resumen y «Continuar» sin reenviar el mensaje ──────────────────────────────────────────
@@ -492,6 +498,33 @@ reset();
   assert.deepEqual(session.getState().messages.map((m) => m.role), ['user', 'assistant']);
 }
 
+// ── 9d. «Incompleta» es de la propuesta y solo se marca cuando el turno la deja así (no en cada turno) ──────────────────
+reset({ equipmentCatalog: structuredClone(DEFAULT_EQUIPMENT_CATALOG).map((item) => ({ ...item, supplierPrices: [] })) });
+{
+  const llm = new ScriptedLlm();
+  const session = newSession(llm);
+  llm.push(
+    () => ({ functionCalls: [{ id: 'fc-inc-create', name: 'create_proposal', args: {} }] }),
+    (call) => { assert.equal(frOf(call).response.status, 'applied', JSON.stringify(frOf(call).response.error)); return { text: 'Creada.' }; },
+  );
+  await session.send('Crea una propuesta');
+  const created = lastAssistant(session);
+  assert.ok((created.turn.summary?.missing ?? []).length > 0, 'crear sin precios deja la propuesta incompleta y el turno lo dice');
+  const createdHtml = details(created);
+  assert.match(createdHtml, /Propuesta incompleta/, 'la marca dice que es de la propuesta, no del turno');
+  assert.ok(!/Falta: Falta/.test(createdHtml), 'sin el prefijo «Falta:» duplicado');
+  const proposalId = s().activeProjectId;
+  llm.push(
+    () => ({ functionCalls: [{ id: 'fc-inc-edit', name: 'edit_proposal', args: { proposalId, title: 'Cobertura 90', ops: [{ op: 'set', path: 'rates.targetCoveragePct', valueJson: '90' }] } }] }),
+    (call) => { assert.equal(frOf(call).response.status, 'applied', JSON.stringify(frOf(call).response.error)); return { text: 'Cobertura al 90 %.' }; },
+  );
+  await session.send('cobertura 90');
+  llm.assertDone();
+  const edited = lastAssistant(session);
+  assert.deepEqual(edited.turn.summary?.missing, [], 'un turno que no cambia lo que falta no repite la marca');
+  assert.ok(!/ncompleta/.test(details(edited)), 'sin «Incompleta» en un turno que solo cambia la cobertura');
+}
+
 // ── 10. Frontera: la sesión y el bucle no usan el transporte ni el bucle antiguos; el panel pinta la sesión nueva ─────────
 const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8');
 for (const file of ['../features/assistant/session/agentLoop.ts', '../features/assistant/session/assistantSession.ts', '../features/assistant/session/invoiceExtraction.ts']) {
@@ -501,6 +534,7 @@ for (const file of ['../features/assistant/session/agentLoop.ts', '../features/a
 }
 assert.ok(/subscribe\(\(\) => \{[^}]*syncOwner\(\)[^}]*syncEnabled\(\)/.test(read('../features/assistant/session/assistantSession.ts')), 'la sesión única sigue al interruptor del asistente');
 const panel = read('../features/assistant/components/AppAssistant.tsx');
+assert.ok(/canSend=\{composer\.canSend\}/.test(panel), 'el compositor usa assistantComposerState (no bloquea Enviar por falta de clave)');
 assert.ok(/from '\.\.\/session\/assistantSession'/.test(panel) && !/from '\.\.\/(useAppAssistant|service)'/.test(panel), 'el panel flotante pinta la sesión nueva');
 
 console.log('PASS: assistant session outside React (create & open, failing tool, stop, pending, no key, step limit, owner).');

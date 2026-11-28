@@ -109,7 +109,7 @@ export function AssistantTurnDetails({ message, busy, actions }: { message: Sess
       )}
       {(summary.missing.length > 0 || failed.length > 0 || message.modelNotice) && (
         <p className="assistant-turn-notes">
-          {summary.missing.length > 0 && <span>Incompleta <InfoTip label="Qué falta" text={`Falta: ${summary.missing.join(' ')}`} /></span>}
+          {summary.missing.length > 0 && <span>Propuesta incompleta <InfoTip label="Qué falta en la propuesta" text={summary.missing.join(' ')} /></span>}
           {failed.length > 0 && <span>Sin completar: {failed.join(', ')}</span>}
           {message.modelNotice && <span>Modelo de respaldo <InfoTip label="Modelo de respaldo" text={message.modelNotice} /></span>}
         </p>

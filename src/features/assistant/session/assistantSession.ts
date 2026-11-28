@@ -282,6 +282,7 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     set({ messages: [...state.messages, userMessage, assistant], busy: true, draft: '', files: [], composerError: '' });
     // Lo que el turno aplicó o dejó incompleto, para el resumen (`missing`) y para decidir si se ofrece reintentar.
     const incomplete = new Map<string, string[]>();
+    const knownBefore = new Map<string, Set<string>>();
     let toolCount = 0;
     let turnRef: { client: LlmClient; model: string } | undefined;
     try {
@@ -355,8 +356,13 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
               ...(response.proposal ? { proposal: { ...response.proposal, open: true } } : {}),
             };
           }
-          const after = response.results?.after;
-          if (response.proposalId && after) incomplete.set(response.proposalId, after.complete ? [] : after.reasons.map((r) => r.message));
+          const { before, after } = response.results ?? { before: null, after: null };
+          if (response.proposalId && after) {
+            // Lo que ya faltaba antes del turno no es de este turno: se marca solo lo que el turno deja pendiente.
+            if (!knownBefore.has(response.proposalId)) knownBefore.set(response.proposalId, new Set(before && !before.complete ? before.reasons.map((r) => r.message) : []));
+            const already = knownBefore.get(response.proposalId)!;
+            incomplete.set(response.proposalId, after.complete ? [] : after.reasons.map((r) => r.message).filter((m) => !already.has(m)));
+          }
           const project = response.proposalId ? store().projects.find((p) => p.id === response.proposalId) : undefined;
           reduce(toolResponseEvents(call.callId, response, { ...(project ? { project } : {}), args: call.args }));
           // Las tarjetas son de la interfaz: el modelo recibe la forma común sin ellas.

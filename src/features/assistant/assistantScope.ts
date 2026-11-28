@@ -17,3 +17,13 @@ export const assistantProjectId = (view: string, activeProjectId?: string): stri
  * es de F5b (se invierte en F5b).
  */
 export const assistantPanelKey = (owner: string, projectId?: string): string => `${owner}|${projectId || 'global'}`;
+
+/**
+ * Estado del botón Enviar del flotante. La falta de clave NO lo bloquea: el intento llega a la sesión, que responde en la
+ * conversación con el camino a Ajustes (y el aviso discreto del compositor sigue ahí). Solo se bloquea sin texto o mientras
+ * se leen adjuntos.
+ */
+export const assistantComposerState = ({ draft, loadingFiles }: { draft: string; hasApiKey: boolean; loadingFiles: number }): { canSend: boolean; disabledReason: string } =>
+  loadingFiles > 0 ? { canSend: false, disabledReason: 'Leyendo archivos adjuntos…' }
+    : !draft.trim() ? { canSend: false, disabledReason: 'Escribe un mensaje.' }
+      : { canSend: true, disabledReason: '' };

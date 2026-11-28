@@ -76,11 +76,11 @@ Guion manual del criterio de aceptación de F4 ([ADR 0011](adr/0011-sesion-y-buc
 
 1. En **Inicio**, abrir el asistente («Asistente», abajo a la derecha) y escribir «Crea una propuesta». Mientras trabaja se ve «Pensando…» y luego el paso «Crear propuesta».
 2. Sin tocar nada, la app pasa al **simulador** con la propuesta nueva (código y cliente en la cabecera del chat) y el chat sigue abierto con su conversación.
-3. El turno termina con texto visible (lo que supuso: 1.000 kWh/mes estimados, tarifa de referencia; lo que falta: una factura) y, debajo, la lista de cambios o lo que falta como ⓘ discreto. El botón vuelve a «Enviar».
+3. El turno termina con texto visible (lo que supuso: 1.000 kWh/mes estimados, tarifa de referencia; lo que falta: una factura) y, debajo, la lista de cambios y, si el turno deja la propuesta incompleta, «Propuesta incompleta ⓘ» con lo que falta. Un turno posterior que no cambia lo que falta (p. ej. «cobertura 90») no repite esa marca. El botón vuelve a «Enviar».
 4. Cambiar a **Inicio** y volver, cerrar y abrir el panel: la conversación sigue entera.
 5. Escribir «Ponle baterías» (con clave real) o «cobertura 90» (fixture): el cambio se aplica al momento y aparece «Deshacer …»; pulsarlo revierte. Con Ajustes → Agentes e IA en «confirmar», el cambio queda como tarjeta con Confirmar/Descartar y el turno termina igual.
 6. **Detener**: enviar un mensaje y pulsar el cuadrado mientras trabaja. El turno se cierra («Detenido…»), no se reenvía nada y el siguiente mensaje funciona.
-7. **Sin clave** (borrarla en Ajustes → IA): el compositor avisa «Configura Gemini para conversar» con el botón a Ajustes; no queda ningún turno colgado.
+7. **Sin clave** (borrarla en Ajustes → IA): el compositor avisa «Configura Gemini para conversar» con el botón a Ajustes. Escribir «crea una propuesta» y pulsar Enter: el hilo muestra el mensaje del usuario y la respuesta de error «Configura una API Key de Google Gemini en Ajustes → IA…» con el botón a Ajustes; no se llama al modelo ni queda ningún turno colgado.
 8. Con clave real, adjuntar una factura PDF y pedir «Crea una propuesta con esta factura»: el modelo llama a «Leer factura» y luego a «Crear propuesta» con la referencia; la propuesta nace con el cliente y el consumo de la factura (o su promedio, avisado).
 
 Los resultados de una ejecución concreta se registran en el PR o commit correspondiente, no en documentos fechados.

@@ -3,7 +3,7 @@ import { MessageCircle, X, Maximize2, Minimize2, RotateCcw, Settings } from 'luc
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { assistantOwner } from '../tools';
-import { assistantPanelKey, assistantProjectId, assistantVisibleIn } from '../assistantScope';
+import { assistantComposerState, assistantPanelKey, assistantProjectId, assistantVisibleIn } from '../assistantScope';
 import { ChatMessage } from './ChatMessage';
 import { ChatComposer, ChatSuggestions, ChatThinking, ScrollToLatest } from './ChatComposer';
 import { useChatAnnouncement, useElapsedSeconds, useStickToBottom } from '../chatUi';
@@ -57,6 +57,7 @@ function AssistantPanel({ projectId, belowToolbar }: { projectId?: string; below
     state.isTrashActive;
   if (blocked) return null;
   const openSettings = () => state.openSettingsModal('ai');
+  const composer = assistantComposerState({ draft: ai.draft, hasApiKey: !!state.geminiApiKey, loadingFiles: ai.loadingFiles });
   const actions = {
     confirmPending: (actionId: string) => { session.confirmPending(actionId); },
     rejectPending: (actionId: string) => session.rejectPending(actionId),
@@ -163,8 +164,8 @@ function AssistantPanel({ projectId, belowToolbar }: { projectId?: string; below
             onCancel={session.cancel}
             onPickFiles={(files) => void session.addFiles(files)}
             busy={ai.busy}
-            canSend={!!ai.draft.trim() && !!state.geminiApiKey && ai.loadingFiles === 0}
-            disabledReason={!state.geminiApiKey ? 'Configura Gemini para conversar.' : ai.loadingFiles ? 'Leyendo archivos adjuntos…' : 'Escribe un mensaje.'}
+            canSend={composer.canSend}
+            disabledReason={composer.disabledReason}
             placeholder={project ? 'Pide un cambio o pregunta…' : 'Pide una propuesta o pregunta…'}
             accept="application/pdf,image/png,image/jpeg,image/webp"
             attachments={ai.files.map((f) => ({ key: f.id, name: f.name, onRemove: () => session.removeFile(f.id) }))}
