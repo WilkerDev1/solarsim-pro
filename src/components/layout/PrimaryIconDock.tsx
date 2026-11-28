@@ -37,7 +37,6 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
     sidebarTheme,
     toggleSidebarTheme,
     openNewProjectModal,
-    openAIInvoiceModal,
     openAIDatasheetModal,
     openAIPriceCatalogModal,
     openUpdateModal,
@@ -51,7 +50,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
     setIsTrashActive,
     projects,
     geminiModel,
-  } = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, sidebarTheme: s.sidebarTheme, toggleSidebarTheme: s.toggleSidebarTheme, openNewProjectModal: s.openNewProjectModal, openAIInvoiceModal: s.openAIInvoiceModal, openAIDatasheetModal: s.openAIDatasheetModal, openAIPriceCatalogModal: s.openAIPriceCatalogModal, openUpdateModal: s.openUpdateModal, openSettingsModal: s.openSettingsModal, isSettingsModalOpen: s.isSettingsModalOpen, closeSettingsModal: s.closeSettingsModal, updateInfo: s.updateInfo, setActiveFolderId: s.setActiveFolderId, setActiveTeamMemberFilter: s.setActiveTeamMemberFilter, isTrashActive: s.isTrashActive, setIsTrashActive: s.setIsTrashActive, projects: s.projects, geminiModel: s.geminiModel })));
+  } = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, sidebarTheme: s.sidebarTheme, toggleSidebarTheme: s.toggleSidebarTheme, openNewProjectModal: s.openNewProjectModal, openAIDatasheetModal: s.openAIDatasheetModal, openAIPriceCatalogModal: s.openAIPriceCatalogModal, openUpdateModal: s.openUpdateModal, openSettingsModal: s.openSettingsModal, isSettingsModalOpen: s.isSettingsModalOpen, closeSettingsModal: s.closeSettingsModal, updateInfo: s.updateInfo, setActiveFolderId: s.setActiveFolderId, setActiveTeamMemberFilter: s.setActiveTeamMemberFilter, isTrashActive: s.isTrashActive, setIsTrashActive: s.setIsTrashActive, projects: s.projects, geminiModel: s.geminiModel })));
 
   const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
   const aiMenuRef = useRef<HTMLDivElement>(null);
@@ -303,12 +302,13 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
                   </button>
                 </div>
 
-                {/* Opción 1: Smart Proposal Studio / Facturas EDE */}
+                {/* Opción 1: el asistente único (F5b; antes abría el modal del asistente de propuestas, que se retira en F6) */}
                 <button
                   onClick={() => {
+                    beforeNavigate?.();
                     if (isSettingsModalOpen) closeSettingsModal();
                     setIsAIMenuOpen(false);
-                    openAIInvoiceModal();
+                    void import("../../features/assistant/assistantEntry").then(({ openAssistant }) => openAssistant('dock-menu'));
                   }}
                   className="w-full p-2.5 rounded-lg hover:bg-[#202734] transition-all flex items-center gap-3 text-left group cursor-pointer border border-transparent hover:border-purple-500/30"
                 >
@@ -317,14 +317,11 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-bold text-white group-hover:text-purple-300 flex items-center justify-between">
-                      <span>Asistente de propuestas</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-mono">
-                        Borrador
-                      </span>
+                      <span>Asistente</span>
                     </div>
                     <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5 leading-snug">
-                      Describe el proyecto, adjunta documentos y revisa los
-                      equipos antes de crear.
+                      Crea propuestas, lee facturas y edita la propuesta
+                      abierta, con deshacer.
                     </p>
                   </div>
                 </button>

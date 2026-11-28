@@ -311,8 +311,10 @@ reset({ agentPolicy: { ...DEFAULT_AGENT_POLICY, appAssistantProfile: 'confirm' }
   assert.equal(result.success, true, result.error);
   assert.equal(s().projects.find((p) => p.id === base.id)!.specs.hasBattery, true, 'confirmar aplica el cambio');
   assert.equal(lastAssistant(session).resolutions?.[pending[0].actionId], 'applied');
-  assert.match(details(lastAssistant(session)), /Aplicado\./);
-  assert.doesNotMatch(details(lastAssistant(session)), /Confirmar/);
+  // F5b: la tarjeta es ChangeCard (F5a): tras confirmar, «Cambios aplicados» y sin botón de confirmar.
+  assert.match(details(lastAssistant(session)), /data-change-card="applied"/);
+  assert.match(details(lastAssistant(session)), /Cambios aplicados/);
+  assert.doesNotMatch(details(lastAssistant(session)), />Confirmar</);
   assert.equal(session.confirmPending(pending[0].actionId).success, false, 'una confirmación ya resuelta no se repite');
 }
 

@@ -67,7 +67,7 @@ const cover = renderToStaticMarkup(React.createElement(PDFCoverPage, { project, 
 assert.match(cover, /10 × 600W \+ 4 × 500W/, 'la portada describe la configuración real');
 assert.doesNotMatch(cover.replace(/data:[^"]*/g, ''), /undefined|NaN/);
 
-const energy = renderToStaticMarkup(React.createElement(EnergyAnalysisTab, { project, summary, openAIInvoiceModal: () => {}, updateMonthlyConsumption: () => {} }));
+const energy = renderToStaticMarkup(React.createElement(EnergyAnalysisTab, { project, summary, updateMonthlyConsumption: () => {} }));
 assert.match(energy, /10 × 600W \+ 4 × 500W/);
 assert.match(energy, />8</, 'kWp del resumen');
 assert.doesNotMatch(energy.replace(/data:[^"]*/g, ''), /undefined|NaN/);

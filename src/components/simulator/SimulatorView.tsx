@@ -29,7 +29,6 @@ export const SimulatorView: React.FC = () => {
     updateMonthlyConsumption,
     updateAllMonthlyConsumption,
     setMonthlyConsumption,
-    openAIInvoiceModal,
     syncSettings,
     sidebarWidth,
     setSidebarWidth,
@@ -41,7 +40,7 @@ export const SimulatorView: React.FC = () => {
     canRedo,
     undo,
     redo,
-  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId, getActiveProject: s.getActiveProject, getFinancialSummary: s.getFinancialSummary, commitProjectEdits: s.commitProjectEdits, updateSpecs: s.updateSpecs, updateMonthlyConsumption: s.updateMonthlyConsumption, updateAllMonthlyConsumption: s.updateAllMonthlyConsumption, setMonthlyConsumption: s.setMonthlyConsumption, openAIInvoiceModal: s.openAIInvoiceModal, syncSettings: s.syncSettings, sidebarWidth: s.sidebarWidth, setSidebarWidth: s.setSidebarWidth, restoreProject: s.restoreProject, hardDeleteProject: s.hardDeleteProject, setActiveView: s.setActiveView, setIsTrashActive: s.setIsTrashActive, canUndo: s.canUndo, canRedo: s.canRedo, undo: s.undo, redo: s.redo, energyMode: energyCalculationMode(effectiveFeatureSettings(s)) })));
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId, getActiveProject: s.getActiveProject, getFinancialSummary: s.getFinancialSummary, commitProjectEdits: s.commitProjectEdits, updateSpecs: s.updateSpecs, updateMonthlyConsumption: s.updateMonthlyConsumption, updateAllMonthlyConsumption: s.updateAllMonthlyConsumption, setMonthlyConsumption: s.setMonthlyConsumption, syncSettings: s.syncSettings, sidebarWidth: s.sidebarWidth, setSidebarWidth: s.setSidebarWidth, restoreProject: s.restoreProject, hardDeleteProject: s.hardDeleteProject, setActiveView: s.setActiveView, setIsTrashActive: s.setIsTrashActive, canUndo: s.canUndo, canRedo: s.canRedo, undo: s.undo, redo: s.redo, energyMode: energyCalculationMode(effectiveFeatureSettings(s)) })));
 
   const project = getActiveProject();
   const summary = getFinancialSummary();
@@ -319,7 +318,6 @@ export const SimulatorView: React.FC = () => {
               project={project}
               summary={summary}
               completeness={completeness}
-              openAIInvoiceModal={openAIInvoiceModal}
               updateMonthlyConsumption={updateMonthlyConsumption}
               updateAllMonthlyConsumption={updateAllMonthlyConsumption}
               setMonthlyConsumption={setMonthlyConsumption}

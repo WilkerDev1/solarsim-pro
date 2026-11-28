@@ -14,6 +14,9 @@
  *  5. Sin reintentos del SDK ni continuación automática: la tabla de motivos de fin la decide este bucle.
  *  6. Presupuesto de pasos (llamadas a herramientas) y de tiempo por turno, con cierre limpio y resumen.
  *  7. Stop cierra el turno y no envía nada más.
+ *  9. Si el usuario escribió durante el turno (`shouldYield`), el turno cede al terminar el paso en curso (las llamadas de
+ *     la respuesta ya ejecutadas con su resultado real) y se cierra como `yielded` con un texto local: así el mensaje nuevo
+ *     va en el turno siguiente sin dejar un functionCall huérfano ni mezclar texto con las respuestas de herramientas.
  *  8. Las llamadas de una respuesta se ejecutan en orden, una a una: una escritura nunca va en paralelo con otra ni con una
  *     lectura que dependa de ella.
  * Una herramienta que falla (o lanza) devuelve su error al modelo como functionResponse para que cambie de estrategia.
@@ -48,7 +51,7 @@ export interface LoopToolCall {
   modelCallId?: string;
 }
 
-export type LoopOutcome = 'finished' | 'cancelled' | 'step_limit' | 'time_limit' | 'failed';
+export type LoopOutcome = 'finished' | 'cancelled' | 'step_limit' | 'time_limit' | 'failed' | 'yielded';
 
 export type LoopEvent =
   /** Empieza una petición (también un reintento): lo transmitido antes en la misma ronda se descarta. */
@@ -80,6 +83,8 @@ export interface AgentLoopOptions {
   onEvent?(event: LoopEvent): void;
   signal: AbortSignal;
   limits?: Partial<LoopLimits>;
+  /** ¿Hay un mensaje nuevo del usuario esperando? Se consulta al terminar cada paso con herramientas (regla 9). */
+  shouldYield?(): boolean;
   /** Texto con que se cierra el turno en el historial cuando el modelo no dio respuesta final (Stop, límite, error). */
   closingText?(outcome: LoopOutcome, error?: LoopError): string;
   /** Opciones de razonamiento según el modelo (p. ej. resúmenes de pensamiento solo donde la familia los admite). */
@@ -162,6 +167,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     return result;
   };
   const cancelled = () => options.signal.aborted;
+  const yieldNow = () => { try { return options.shouldYield?.() === true; } catch { return false; } };
 
   for (let round = 1; round <= limits.maxRounds; round++) {
     if (cancelled()) return close('cancelled');
@@ -270,6 +276,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     turn.push({ role: 'user', parts: responses });
     if (stop) return close(stop.outcome, stop.error);
     if (cancelled()) return close('cancelled');
+    if (yieldNow()) return close('yielded');
   }
   return close('step_limit', { code: 'step_limit', message: 'Se agotó el número de rondas del turno.' });
 }
@@ -289,6 +296,7 @@ function defaultClosing(outcome: LoopOutcome, error?: LoopError): string {
     case 'step_limit': return 'Turno cerrado: se alcanzó el límite de pasos.';
     case 'time_limit': return 'Turno cerrado: se agotó el tiempo.';
     case 'failed': return `Turno cerrado por un error${error ? `: ${error.message}` : '.'}`;
+    case 'yielded': return 'Turno pausado: el usuario escribió un mensaje nuevo, que sigue a continuación.';
     default: return 'Listo.';
   }
 }

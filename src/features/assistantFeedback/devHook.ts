@@ -1,6 +1,7 @@
 /**
  * Gancho SOLO de desarrollo (F5a): `window.solarsimFeedbackQA`, para ver el resaltado del dock y la tarjeta de cambio a mano
- * mientras el panel nuevo (F5b) no las monta. Se instala únicamente con `import.meta.env.DEV` (`main.tsx`); en producción ni se
+ * sin pasar por el modelo (desde F5b el panel del asistente ya las monta con los datos reales de cada turno). Se instala
+ * únicamente con `import.meta.env.DEV` (`main.tsx`); en producción ni se
  * importa. Uso y ejemplos: docs/QA.md («Feedback en vivo del asistente»).
  *
  *   solarsimFeedbackQA.edit([{ path: 'rates.targetCoveragePct', value: 85 }])  // lote con origen asistente: destaca + tarjeta

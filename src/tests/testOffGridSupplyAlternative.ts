@@ -368,7 +368,7 @@ assert.deepEqual(validateAssistantEdits([{ section: 'rates', field: 'generatorCo
     assert.equal(labels.savedColumnNote, null);
   }
   assert.deepEqual([energyTableLabels(true, true).savedColumn, energyTableLabels(true, true).showMoney, energyTableLabels(true, false).savedColumn], ['AHORRO FACTURABLE', true, 'AHORRO ENERG. (KWH)'], 'tarifa: igual que siempre');
-  const energyHtml = (project: ProjectSimulation) => renderToStaticMarkup(React.createElement(EnergyAnalysisTab, { project, summary: summaryOf(project), openAIInvoiceModal: () => {}, updateMonthlyConsumption: () => {} }));
+  const energyHtml = (project: ProjectSimulation) => renderToStaticMarkup(React.createElement(EnergyAnalysisTab, { project, summary: summaryOf(project), updateMonthlyConsumption: () => {} }));
   const html = energyHtml(island({ supplyAlternative: 'no_comparison' }));
   assert.ok(/ENERGÍA SERVIDA \(KWH\)/.test(html) && /Resumen Mensual de Energía Entregada/.test(html));
   assert.ok(!/AHORRO|Ahorro|\$\d/.test(html), (html.match(/AHORRO|Ahorro|\$\d/) ?? [''])[0]);

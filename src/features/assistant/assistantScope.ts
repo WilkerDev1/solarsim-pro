@@ -1,22 +1,29 @@
 // Dónde aparece el asistente general y qué propuesta considera abierta.
+import type { AppView } from '../../store/types';
 
-/** Vistas con el chat flotante. La vista del documento (PDF, modo edición) lo incluye para editar sus textos. */
-const ASSISTANT_VIEWS = ['simulator', 'project-hub', 'pdf-preview', 'dashboard'];
+/**
+ * Vistas de trabajo con el asistente (F5b: todas). La vista del documento (PDF, modo edición) lo incluye para editar sus
+ * textos; el chat lleva `data-pdf-chrome` y nunca se imprime.
+ */
+const ASSISTANT_VIEWS: readonly AppView[] = ['dashboard', 'simulator', 'pdf-preview', 'project-hub', 'companies-hub', 'clients-hub', 'quotations-hub', 'quotation-editor', 'quotation-library'];
+/** Vistas del módulo de cotizaciones: si la organización lo oculta, el asistente tampoco aparece ahí. */
+const QUOTATION_VIEWS: readonly string[] = ['quotations-hub', 'quotation-editor', 'quotation-library'];
 /** Vistas en las que hay una propuesta abierta. */
 const PROJECT_VIEWS = ['simulator', 'project-hub', 'pdf-preview'];
 
-export const assistantVisibleIn = (view: string): boolean => ASSISTANT_VIEWS.includes(view);
+/** ¿Se monta el asistente en esta vista? `quotations: false` cuando la política efectiva oculta las cotizaciones. */
+export const assistantVisibleIn = (view: string, features: { quotations?: boolean } = {}): boolean =>
+  (ASSISTANT_VIEWS as readonly string[]).includes(view) && (features.quotations !== false || !QUOTATION_VIEWS.includes(view));
 
 export const assistantProjectId = (view: string, activeProjectId?: string): string | undefined =>
   PROJECT_VIEWS.includes(view) && activeProjectId ? activeProjectId : undefined;
 
 /**
- * Clave React del panel del asistente: espacio de trabajo/sesión (`owner`) y propuesta abierta (`global` sin ninguna).
- * Todavía cambia al abrir o crear otra propuesta y remonta el panel; desde F4 eso ya no aborta el turno ni vacía la
- * conversación, que viven en la sesión fuera de React (`session/assistantSession.ts`). Dejarla solo por espacio/sesión
- * es de F5b (se invierte en F5b).
+ * Clave React del panel del asistente: solo el espacio de trabajo y la sesión (`owner`). Abrir o crear otra propuesta, o
+ * cambiar de vista, no remonta el panel (F5b); la conversación y el turno viven en la sesión fuera de React
+ * (`session/assistantSession.ts`), que se descarta al cambiar de espacio o de sesión.
  */
-export const assistantPanelKey = (owner: string, projectId?: string): string => `${owner}|${projectId || 'global'}`;
+export const assistantPanelKey = (owner: string): string => `assistant|${owner}`;
 
 /**
  * Estado del botón Enviar del flotante. La falta de clave NO lo bloquea: el intento llega a la sesión, que responde en la

@@ -1,5 +1,6 @@
 import { SimulationSlice, UISlice } from '../types';
 import { proposalActionBlock } from '../../domain/proposalCompleteness';
+import { APP_ASSISTANT_ON_BY_DEFAULT } from '../persistence/appAssistantEnablement';
 
 export const createUISlice: SimulationSlice<UISlice> = (set, get) => ({
   activeQuotationId: null,
@@ -25,7 +26,9 @@ export const createUISlice: SimulationSlice<UISlice> = (set, get) => ({
   closeQuotationLibrary: () => set((s) => ({
     activeView: s.activeQuotationId && s.quotations.some((q) => q.id === s.activeQuotationId) ? 'quotation-editor' : 'quotations-hub',
   })),
-  appAssistantEnabled: false,
+  // De fábrica, encendido (F5b). La marca queda en 0: así un estado guardado antiguo, que hereda este valor al fusionarse,
+  // todavía pasa por la migración de una sola vez (appAssistantEnablement.ts).
+  appAssistantEnabled: APP_ASSISTANT_ON_BY_DEFAULT,
   appAssistantEnabledChosenByUser: false,
   appAssistantDefaultsVersion: 0,
   // Usar el interruptor es una elección: la migración del encendido (appAssistantEnablement.ts) nunca la pisa.

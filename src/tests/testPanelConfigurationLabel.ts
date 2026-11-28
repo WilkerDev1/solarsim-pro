@@ -31,7 +31,7 @@ const strip = (html: string) => html.replace(/data:[^"]*/g, '');
 const cover = strip(renderToStaticMarkup(React.createElement(PDFCoverPage, { project, summary, activeTheme: theme as never, currentDateStr: '7 octubre 2026' })));
 assert.match(cover, /10 × 600W \+ 4 × 500W/);
 assert.doesNotMatch(cover, /14 Módulos Tier-1 \(600W\)/);
-const energy = strip(renderToStaticMarkup(React.createElement(EnergyAnalysisTab, { project, summary, openAIInvoiceModal: () => {}, updateMonthlyConsumption: () => {} })));
+const energy = strip(renderToStaticMarkup(React.createElement(EnergyAnalysisTab, { project, summary, updateMonthlyConsumption: () => {} })));
 assert.match(energy, /10 × 600W \+ 4 × 500W/);
 assert.doesNotMatch(energy, /14 módulos × 600W/);
 

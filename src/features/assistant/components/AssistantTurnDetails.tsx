@@ -1,8 +1,11 @@
-// Panel mínimo de F4: lo que hizo un turno, como listas de texto sencillas (la tarjeta de diff rica, las anclas y el resaltado
-// del dock son de F5a). Lee el estado del turno de la sesión (`TurnState` de F3c) y llama a la sesión para confirmar,
-// rechazar o deshacer.
+// Lo que hizo un turno en el panel del asistente (F5b): una tarjeta de cambio (ChangeCard de F5a) por respuesta de herramienta,
+// con los datos reales de la respuesta (diff, resultados del motor antes/después, avisos y supuestos), y Deshacer,
+// Confirmar y Rechazar conectados a la sesión. Debajo, lo que no es de una tarjeta: supuestos sueltos, qué falta, qué falló,
+// el modelo de respaldo y «Continuar». Lee el estado del turno de la sesión (`TurnState` de F3c y `changeCards`).
 import React from 'react';
-import { ArrowRight, Check, Undo2, X } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { ChangeCard } from '../../assistantFeedback/ChangeCard';
+import { turnChangeCards } from '../panelState';
 import type { SessionAssistantMessage } from '../session/assistantSession';
 import { assistantToolLabel } from '../session/assistantSession';
 import { assistantValueLabel } from '../labels';
@@ -22,8 +25,6 @@ export function formatChangeValue(value: unknown): string {
   const label = assistantValueLabel(value);
   return label.length > 80 ? `${label.slice(0, 77)}…` : label;
 }
-
-const MAX_CHANGES = 8;
 
 export interface TurnDetailsActions {
   confirmPending(actionId: string): void;
@@ -45,65 +46,30 @@ export function AssistantTurnDetails({ message, busy, actions }: { message: Sess
   const { turn } = message;
   const summary = turn.summary;
   if (!summary) return null;
-  const changes = summary.changes;
-  const undoable = turn.toolOrder.map((id) => turn.tools[id]).filter((call) => call.status === 'applied' && call.activityId && call.changes.length);
+  const cards = turnChangeCards(message);
+  // Los supuestos que ya muestra una tarjeta no se repiten abajo.
+  const inCards = new Set(cards.flatMap(({ input }) => (input.assumptions ?? []).map((a) => `${a.source}:${a.key}`)));
+  const looseAssumptions = summary.assumptions.filter((a) => !inCards.has(`${a.source}:${a.key}`));
   const failed = summary.failedTools.map(assistantToolLabel);
-  const empty = !changes.length && !summary.pendingConfirmations.length && !summary.assumptions.length && !undoable.length;
-  if (empty && !failed.length && !summary.missing.length && !message.canContinue && !message.modelNotice) return null;
+  if (!cards.length && !looseAssumptions.length && !failed.length && !summary.missing.length && !message.canContinue && !message.modelNotice) return null;
   return (
     <div className="assistant-turn-details">
-      {changes.length > 0 && (
-        <section aria-label="Cambios aplicados">
-          <h3>Cambios</h3>
-          <ul className="assistant-turn-list">
-            {changes.slice(0, MAX_CHANGES).map((change, index) => (
-              <li key={`${change.proposalId ?? ''}:${change.path}:${index}`}>
-                <span className="assistant-turn-label">{change.label}</span>{' '}
-                <span>{formatChangeValue(change.before)} → {formatChangeValue(change.after)}</span>
-                {change.derived && <span className="assistant-turn-muted"> (recalculado)</span>}
-              </li>
-            ))}
-            {changes.length > MAX_CHANGES && <li className="assistant-turn-muted">y {changes.length - MAX_CHANGES} más</li>}
-          </ul>
-        </section>
-      )}
-      {undoable.length > 0 && (
-        <div className="assistant-turn-actions">
-          {undoable.map((call) => message.undone?.[call.activityId!]
-            ? <span key={call.callId} className="assistant-turn-muted"><Check size={12} aria-hidden /> {assistantToolLabel(call.name)}: deshecho</span>
-            : (
-              <button key={call.callId} type="button" disabled={busy} onClick={() => actions.undo(call.activityId!)}>
-                <Undo2 size={12} aria-hidden /> Deshacer {assistantToolLabel(call.name).toLowerCase()}
-              </button>
-            ))}
-        </div>
-      )}
-      {summary.pendingConfirmations.map((pending) => {
-        const resolution = message.resolutions?.[pending.actionId];
-        return (
-          <section key={pending.actionId} className="assistant-turn-pending" aria-label="Cambio por confirmar">
-            <h3>{pending.title}</h3>
-            {pending.changes.length > 0 && (
-              <ul className="assistant-turn-list">
-                {pending.changes.slice(0, MAX_CHANGES).map((change, index) => <li key={index}><span className="assistant-turn-label">{change.label}</span> {change.value}</li>)}
-              </ul>
-            )}
-            {resolution ? (
-              <p className="assistant-turn-muted">{resolution === 'applied' ? 'Aplicado.' : resolution === 'rejected' ? 'Descartado.' : resolution}</p>
-            ) : (
-              <div className="assistant-turn-actions">
-                <button type="button" disabled={busy} onClick={() => actions.confirmPending(pending.actionId)}><Check size={12} aria-hidden /> Confirmar</button>
-                <button type="button" disabled={busy} onClick={() => actions.rejectPending(pending.actionId)}><X size={12} aria-hidden /> Descartar</button>
-              </div>
-            )}
-          </section>
-        );
-      })}
-      {summary.assumptions.length > 0 && (
+      {cards.map(({ callId, input }) => (
+        <ChangeCard
+          key={callId}
+          input={input}
+          // Deshacer espera a que el turno termine (el modelo podría estar usando ese cambio); confirmar o rechazar no.
+          busy={busy && input.status === 'applied'}
+          onUndo={input.activityId ? () => actions.undo(input.activityId!) : undefined}
+          onConfirm={input.actionId ? () => actions.confirmPending(input.actionId!) : undefined}
+          onReject={input.actionId ? () => actions.rejectPending(input.actionId!) : undefined}
+        />
+      ))}
+      {looseAssumptions.length > 0 && (
         <section aria-label="Supuestos">
           <h3>Supuse</h3>
           <ul className="assistant-turn-list">
-            {summary.assumptions.map((a) => <li key={`${a.source}:${a.key}`}>{a.label}: {formatChangeValue(a.value)}</li>)}
+            {looseAssumptions.map((a) => <li key={`${a.source}:${a.key}`}>{a.label}: {formatChangeValue(a.value)}</li>)}
           </ul>
         </section>
       )}

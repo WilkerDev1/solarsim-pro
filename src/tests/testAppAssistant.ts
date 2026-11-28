@@ -20,8 +20,8 @@ const project = {
 const equipment = structuredClone(DEFAULT_EQUIPMENT_CATALOG);
 assert.equal(
   state.getState().appAssistantEnabled,
-  false,
-  'experimental assistant defaults off'
+  true,
+  'F5b: el asistente único está encendido de fábrica (antes, experimental y apagado)'
 );
 state.setState({
   appAssistantEnabled: true,

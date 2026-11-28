@@ -141,7 +141,7 @@ export function hydrateSimulationStore(state: SimulationStore | undefined, optio
     }
   }
   if (state) {
-    // F3b: encendido de una sola vez detrás de APP_ASSISTANT_ON_BY_DEFAULT (apagada hasta F4/F5b); hoy, solo `true` enciende.
+    // Encendido de una sola vez (F3b, encendido en F5b con APP_ASSISTANT_ON_BY_DEFAULT): lo no elegido se enciende una vez.
     Object.assign(state, migrateAppAssistantEnabled(state, { onByDefault: options.appAssistantOnByDefault }));
     if (!state.equipmentCatalog || !Array.isArray(state.equipmentCatalog) || state.equipmentCatalog.length === 0) {
       state.equipmentCatalog = DEFAULT_EQUIPMENT_CATALOG.filter((equipment) => !(state.deletedEquipmentIds || []).includes(equipment.id));
