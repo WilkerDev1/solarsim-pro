@@ -5,9 +5,10 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import {
   EMPTY_UNDO_HISTORY, MAX_UNDO_ENTRIES, MAX_UNDO_JOURNALS, UNDO_COALESCE_WINDOW_MS, UNDO_SECTIONS,
-  activateJournal, dropJournal, recordUndo, redoStep, undoAvailability, undoStep, type UndoHistory,
+  activateJournal, dropJournal, recordUndo, redoStep, renameJournal, undoAvailability, undoStep, type UndoHistory,
 } from '../store/undo/projectUndoJournal';
 import type { ProjectSimulation } from '../types';
+import { SyncService } from '../services/syncService';
 
 const base = (id: string): ProjectSimulation => ({ ...structuredClone(BENCHMARK_PROJECT), id, syncStatus: 'local_only' });
 const withCoverage = (p: ProjectSimulation, value: number): ProjectSimulation => ({ ...p, rates: { ...p.rates, targetCoveragePct: value } });
@@ -106,6 +107,33 @@ const edit = { source: 'user' as const, coalesceKey: 'edit' };
   assert.equal(Object.keys(many.journals).length, MAX_UNDO_JOURNALS, 'los diarios menos recientes se olvidan');
   assert.equal(many.journals.p0, undefined);
   assert.ok(many.journals[`p${MAX_UNDO_JOURNALS + 2}`], 'el activo nunca se olvida');
+
+  // Deshacer sobre el contenido ACTUAL: solo vuelven las rutas del paso; lo que cambió fuera del diario se conserva.
+  let r = activateJournal(EMPTY_UNDO_HISTORY, a);
+  r = recordUndo(r, withName(a, 'Manual'), { ...edit, now: 0 });
+  const remote = withCoverage(withName(a, 'Manual'), 33); // un pull que no pasa por el diario
+  const back = undoStep(r, 'a', remote)!;
+  assert.equal((back.snapshot.client as ProjectSimulation['client']).name, a.client.name);
+  assert.equal(back.snapshot.rates.targetCoveragePct, 33, 'el cambio remoto en otra sección no se deshace');
+  assert.equal(back.history.journals.a.head.rates.targetCoveragePct, 33, 'la base absorbe el contenido actual');
+  const forward = redoStep(back.history, 'a', { ...remote, client: back.snapshot.client })!;
+  assert.equal((forward.snapshot.client as ProjectSimulation['client']).name, 'Manual');
+  assert.equal(forward.snapshot.rates.targetCoveragePct, 33);
+
+  // Cambio de id (fork del servidor): el diario se traslada al id nuevo con sus pasos.
+  let f = activateJournal(EMPTY_UNDO_HISTORY, a);
+  f = recordUndo(f, a80, { ...edit, now: 0 });
+  f = activateJournal(f, b);
+  f = activateJournal(f, a80);
+  const moved = renameJournal(f, 'a', 'a2');
+  assert.equal(moved.journals.a, undefined);
+  assert.equal(moved.activeId, 'a2');
+  assert.equal(moved.journals.a2.projectId, 'a2');
+  assert.deepEqual(moved.journals.a2.undo.map((entry) => entry.projectId), ['a2']);
+  assert.deepEqual(moved.order, ['b', 'a2']);
+  assert.equal(renameJournal(f, 'zzz', 'q'), f);
+  assert.equal(renameJournal(f, 'a', 'a'), f);
+  assert.deepEqual(undoAvailability(moved, 'a2'), { canUndo: true, canRedo: false });
 }
 
 // ── 2. Store: crear, duplicar y volver a la propuesta ─────────────────────────────────────────────────────────────────────
@@ -176,6 +204,13 @@ async function openWithHistory() {
   await openWithHistory();
   const other = base('journal-other');
   store.setState({ projects: [...s().projects, structuredClone(other)], activeProjectId: other.id });
+  assert.equal(s().canUndo, true, 'sin activar, el indicador aún es el de A');
+  s().activateUndoJournal(s().getActiveProject()); // lo que hace «Actualizar» en la vista del PDF tras su setState
+  assert.equal(s().canUndo, false, 'activar el diario de la nueva activa corrige los indicadores');
+  store.setState({ activeProjectId: original.id });
+  s().activateUndoJournal(s().getActiveProject());
+  assert.equal(s().canUndo, true, 'A conserva su historial');
+  store.setState({ activeProjectId: other.id });
   s().undo();
   assert.equal(coverageOf(other.id), BENCHMARK_PROJECT.rates.targetCoveragePct, 'la otra no recibe el contenido de A');
   assert.equal(coverageOf(original.id), 70, 'y A no se toca');
@@ -199,6 +234,62 @@ async function openWithHistory() {
   s().restoreProject(original.id);
   assert.equal(s().activeProjectId, original.id);
   assert.equal(s().canUndo, false, 'restaurar no recupera pasos anteriores a la papelera');
+}
+
+{ // Importar sobrescribiendo la propuesta abierta descarta su diario: Ctrl+Z no revierte la importación.
+  await openWithHistory();
+  const target = s().getActiveProject();
+  const incoming = withCoverage(withName(structuredClone(target), 'Importado'), 99);
+  store.setState({ pendingImportConflict: { incomingProject: incoming, conflictingProject: target, reason: 'mismo id' } });
+  s().resolveImportConflict('overwrite');
+  assert.equal(s().activeProjectId, original.id);
+  assert.equal(s().canUndo, false, 'sobrescribir descarta el diario');
+  s().undo();
+  assert.equal(nameOf(original.id), 'Importado');
+  assert.equal(coverageOf(original.id), 99, 'la importación no se revierte');
+}
+
+{ // Un cambio remoto en otra sección de la propuesta abierta sobrevive al Ctrl+Z del usuario.
+  await openWithHistory();
+  s().updateClient({ name: 'Manual' });
+  store.setState({ projects: s().projects.map((p) => (p.id === original.id ? withCoverage(p, 33) : p)) });
+  s().undo();
+  assert.equal(nameOf(original.id), BENCHMARK_PROJECT.client.name, 'el paso del usuario se deshace');
+  assert.equal(coverageOf(original.id), 33, 'el cambio remoto no se pierde');
+  s().redo();
+  assert.equal(nameOf(original.id), 'Manual');
+  assert.equal(coverageOf(original.id), 33);
+}
+
+{ // El servidor bifurca la propuesta abierta (fork con id nuevo): Ctrl+Z sigue funcionando en ella.
+  const serverUrl = 'https://undo-fork.invalid';
+  const user = { id: 'undo-fork-user', name: 'Sintético', email: 'test@example.invalid', role: 'EDITOR' as const, organizationId: 'undo-fork-org' };
+  const originals = { pull: SyncService.pullProjects, push: SyncService.pushProjects };
+  SyncService.pullProjects = async () => ({ success: true, projects: [], deletedIds: [], serverTimestamp: '2026-11-27T00:00:00Z' });
+  SyncService.pushProjects = async (_url, _token, items) => ({ success: true, results: items.map((item) => {
+    const forked = { ...structuredClone(item), id: 'journal-forked', version: 1, baseVersion: 1, syncStatus: 'synced' as const };
+    return { id: forked.id, originalId: item.id, status: 'forked' as const, version: 1, project: forked };
+  }) });
+  try {
+    s().setSyncSettings({ serverUrl, authToken: 'synthetic-token', currentUser: user, autoSyncEnabled: false });
+    store.setState({ projects: [structuredClone(original)].map((p) => ({ ...p, organizationId: user.organizationId, syncServerUrl: serverUrl, baseVersion: 1, version: 1, syncStatus: 'pending' })),
+      isSyncing: false, projectDeletionQueue: [], syncFoldersWithServer: async () => ({ success: true, message: '' }), syncEquipmentWithServer: async () => ({ success: true, message: '' }),
+      syncOrganizationCompanyProfile: async () => undefined, syncPriceObservations: async () => undefined } as never);
+    // Cambiar de sesión vacía los diarios: se vuelve a abrir la propuesta y se edita.
+    s().setActiveProject(original.id, 'simulator');
+    s().updateRates({ targetCoveragePct: 80 });
+    await settle();
+    s().updateRates({ targetCoveragePct: 70 });
+    assert.equal(s().canUndo, true);
+    await s().syncProjectsWithServer(true);
+    assert.equal(s().activeProjectId, 'journal-forked');
+    assert.equal(s().undoHistory.journals[original.id], undefined, 'el diario no queda con el id viejo');
+    assert.equal(s().canUndo, true, 'la propuesta bifurcada conserva su Ctrl+Z');
+    s().undo();
+    assert.equal(coverageOf('journal-forked'), 80);
+  } finally {
+    SyncService.pullProjects = originals.pull; SyncService.pushProjects = originals.push;
+  }
 }
 
 console.log('PASS: project undo journal: per-proposal LIFO, explicit coalescing, never crosses proposals, lifecycle.');

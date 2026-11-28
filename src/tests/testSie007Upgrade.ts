@@ -212,10 +212,12 @@ const UNDO_DEBOUNCE_MS = 700; // el diario agrupa las ediciones seguidas en una 
     assert.deepEqual(restored.rates, savedRates, 'deshacer devuelve las tarifas exactas');
     assert.equal('netMeteringRegime' in restored.rates, false, 'sin el campo de régimen');
     assert.equal('gridUseChargeDOPPerKWh' in restored.rates, false, 'ni el cargo');
-    // El historial guarda instantáneas JSON (sin claves `undefined`), igual que el resto de ediciones.
+    // Deshacer solo restaura las rutas del paso (aquí, las tarifas): el resto queda tal cual estaba, sin pasar por JSON.
     const asJson = <T>(value: T): T => JSON.parse(JSON.stringify(value));
-    assert.deepEqual(restored.specs, asJson(saved.specs), 'specs intactas');
-    assert.deepEqual(restored.financials, asJson(saved.financials), 'finanzas intactas');
+    assert.deepEqual(asJson(restored.specs), asJson(saved.specs), 'specs intactas');
+    assert.deepEqual(restored.specs, upgraded.specs, 'deshacer no toca las specs');
+    assert.deepEqual(asJson(restored.financials), asJson(saved.financials), 'finanzas intactas');
+    assert.deepEqual(restored.financials, upgraded.financials, 'ni las finanzas');
     assert.deepEqual(restored.monthlyConsumption, saved.monthlyConsumption, 'consumo intacto');
   } finally {
     store.setState(original, true);

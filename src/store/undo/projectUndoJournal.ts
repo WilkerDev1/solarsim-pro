@@ -144,14 +144,16 @@ export function recordUndo(history: UndoHistory, project: ProjectSimulation, opt
   return withJournal(history, { ...journal, head: head as UndoSnapshot, undo, redo: [], coalesceOpen: true });
 }
 
-function step(history: UndoHistory, projectId: string, direction: 'undo' | 'redo') {
+function step(history: UndoHistory, projectId: string, direction: 'undo' | 'redo', current?: ProjectSimulation) {
   const journal = history.journals[projectId];
   if (!journal || history.activeId !== projectId) return null;
   const from = direction === 'undo' ? journal.undo : journal.redo;
   const entry = from[from.length - 1];
   if (!entry) return null;
-  const head = { ...journal.head } as Record<string, unknown>;
-  for (const change of entry.paths) head[change.path] = direction === 'undo' ? change.before : change.after;
+  // Sobre el contenido ACTUAL: solo vuelven las rutas del paso. Lo que cambió fuera del diario (un pull, el estado) se conserva
+  // y pasa a la base, para que el siguiente registro no lo cuente como del usuario.
+  const head = (current?.id === projectId ? snapshotOf(current) : { ...journal.head }) as Record<string, unknown>;
+  for (const change of entry.paths) head[change.path] = clone(direction === 'undo' ? change.before : change.after);
   const next: ProjectUndoJournal = direction === 'undo'
     ? { ...journal, head: head as UndoSnapshot, undo: journal.undo.slice(0, -1), redo: [...journal.redo, entry], coalesceOpen: false }
     : { ...journal, head: head as UndoSnapshot, redo: journal.redo.slice(0, -1), undo: [...journal.undo, entry], coalesceOpen: false };
@@ -159,10 +161,24 @@ function step(history: UndoHistory, projectId: string, direction: 'undo' | 'redo
   return { history: withJournal(history, next), snapshot: clone(next.head), entry };
 }
 
-/** Deshace el último paso de la propuesta activa. `null` si no hay paso o el diario activo es de otra propuesta. */
-export const undoStep = (history: UndoHistory, projectId: string) => step(history, projectId, 'undo');
+/** Deshace el último paso de la propuesta activa sobre `current` (su contenido actual). `null` si no hay paso o el diario activo es de otra propuesta. */
+export const undoStep = (history: UndoHistory, projectId: string, current?: ProjectSimulation) => step(history, projectId, 'undo', current);
 /** Rehace el último paso deshecho de la propuesta activa. */
-export const redoStep = (history: UndoHistory, projectId: string) => step(history, projectId, 'redo');
+export const redoStep = (history: UndoHistory, projectId: string, current?: ProjectSimulation) => step(history, projectId, 'redo', current);
+
+/** Traslada el diario de `oldId` a `newId` (el servidor bifurcó la propuesta con un id nuevo), con sus pasos. */
+export function renameJournal(history: UndoHistory, oldId: string, newId: string): UndoHistory {
+  const journal = history.journals[oldId];
+  if (!journal || oldId === newId) return history;
+  const retag = (entries: UndoEntry[]) => entries.map((entry) => ({ ...entry, projectId: newId }));
+  const journals = { ...history.journals };
+  delete journals[oldId];
+  journals[newId] = { ...journal, projectId: newId, undo: retag(journal.undo), redo: retag(journal.redo) };
+  return {
+    activeId: history.activeId === oldId ? newId : history.activeId, journals,
+    order: history.order.filter((id) => id !== newId).map((id) => (id === oldId ? newId : id)),
+  };
+}
 
 /** Olvida el diario de una propuesta (papelera, borrado). */
 export function dropJournal(history: UndoHistory, projectId: string): UndoHistory {

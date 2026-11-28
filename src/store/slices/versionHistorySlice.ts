@@ -11,12 +11,12 @@ import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { restoreProjectContent } from '../sync/projectMutation';
 import { equipmentTotals, readEquipment } from '../../../shared/equipment';
 import { SimulationSlice, VersionHistorySlice } from '../types';
-import { DEFAULT_EDIT_COALESCE_KEY, EMPTY_UNDO_HISTORY, activateJournal, dropJournal, recordUndo, redoStep, undoAvailability, undoStep, UNDO_SECTIONS, type UndoHistory, type UndoSnapshot } from '../undo/projectUndoJournal';
+import { DEFAULT_EDIT_COALESCE_KEY, EMPTY_UNDO_HISTORY, activateJournal, dropJournal, recordUndo, redoStep, undoAvailability, undoStep, type UndoHistory, type UndoSnapshot } from '../undo/projectUndoJournal';
 import { ProjectSimulation, ProjectSnapshot, DiffFieldChange, ProjectConflictInfo } from '../../types';
 
-/** Toda sección del diario se restaura, también las que valían `undefined` (la instantánea JSON no tiene esa clave). */
-const asRestoreSource = (project: ProjectSimulation, snapshot: UndoSnapshot): ProjectSimulation =>
-  ({ ...project, ...Object.fromEntries(UNDO_SECTIONS.map((section) => [section, snapshot[section]])) });
+/** Solo vuelven las rutas del paso, también las que valían `undefined` (la instantánea JSON no tiene esa clave); el resto queda como está. */
+const asRestoreSource = (project: ProjectSimulation, snapshot: UndoSnapshot, paths: string[]): ProjectSimulation =>
+  ({ ...project, ...Object.fromEntries(paths.map((path) => [path, (snapshot as Record<string, unknown>)[path]])) });
 
 /** Indicadores de los botones para la propuesta activa: solo su propio diario cuenta. */
 const flags = (history: UndoHistory, activeProjectId: string) => undoAvailability(history, activeProjectId);
@@ -31,12 +31,12 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     let history = get().undoHistory;
     // La activa cambió sin pasar por activateUndoJournal (p. ej. un setState directo): se activa SU diario, nunca el de otra.
     if (history.activeId !== activeProjectId) history = activateJournal(history, current);
-    const result = direction === 'undo' ? undoStep(history, activeProjectId) : redoStep(history, activeProjectId);
+    const result = direction === 'undo' ? undoStep(history, activeProjectId, current) : redoStep(history, activeProjectId, current);
     if (!result) return commit(history);
     set((state) => ({
       undoHistory: result.history,
       ...flags(result.history, activeProjectId),
-      projects: state.projects.map((p) => (p.id === activeProjectId ? restoreProjectContent(p, asRestoreSource(p, result.snapshot), get().syncSettings) : p)),
+      projects: state.projects.map((p) => (p.id === activeProjectId ? restoreProjectContent(p, asRestoreSource(p, result.snapshot, result.entry.paths.map((change) => change.path)), get().syncSettings) : p)),
     }));
     get().triggerAutoSync();
   };

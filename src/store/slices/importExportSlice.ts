@@ -369,8 +369,10 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       pendingImportConflict: null,
       saveFeedbackMessage: toastMsg,
     });
+    // Sobrescribir cambia el contenido: el diario anterior se descarta (también si era la propuesta abierta).
+    if (strategy === 'overwrite') get().forgetUndoJournal(targetActiveId);
     const imported = get().projects.find((p) => p.id === targetActiveId);
-    if (imported) get().activateUndoJournal(imported); // sobrescribir cambia el contenido: el diario anterior se descarta
+    if (imported) get().activateUndoJournal(imported);
 
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
       get().triggerAutoSync(true);
