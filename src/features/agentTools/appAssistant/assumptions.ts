@@ -3,7 +3,8 @@
  *
  * Lista CERRADA de fuentes: un supuesto solo puede salir de
  *  - `settings`: los Ajustes del usuario (`DefaultSimulationSettings`), que siembran las propuestas nuevas;
- *  - `factory`: los valores de fábrica de una propuesta nueva sin datos (`NEW_PROPOSAL_DEFAULTS`, ADR 0009);
+ *  - `factory`: los valores de fábrica de una propuesta nueva sin datos (`NEW_PROPOSAL_DEFAULTS`, ADR 0009) y los valores por
+ *    defecto del motor cuando el dato falta (`ASSUMPTION_RULES` de `shared/assumptions.ts`, p. ej. la cobertura objetivo);
  *  - `sizing`: los supuestos del dimensionado (`SIZING_ASSUMPTIONS`, `src/domain/sizing.ts`);
  *  - `proposal`: un dato de la propia propuesta, por su ruta del registro de campos (`projectFields.ts`).
  * Nada más («lo habitual», «según mi experiencia», un precio de internet): eso no es un supuesto, es una cifra inventada.
@@ -17,6 +18,7 @@ import { DEFAULT_SIMULATION_SETTINGS } from '../../../store/defaultSimulationSet
 import { NEW_PROPOSAL_DEFAULTS } from '../../../domain/newProposal';
 import { SIZING_ASSUMPTIONS, type SizingAssumptionUsed } from '../../../domain/sizing';
 import { findProjectField, parseFieldPath, readPath } from '../../../domain/projectFields';
+import { ASSUMPTION_RULES, isValidAssumption, type AssumptionKey } from '../../../../shared/assumptions';
 
 export const ASSUMPTION_SOURCES = ['settings', 'factory', 'sizing', 'proposal'] as const;
 export type AssumptionSource = (typeof ASSUMPTION_SOURCES)[number];
@@ -72,11 +74,14 @@ export function validateDeclaredAssumption(input: unknown, refs: AssumptionRefer
     return { ok: false, reason: `La fuente «${String(source)}» no está en la lista cerrada (${ASSUMPTION_SOURCES.join(', ')}).` };
   if (typeof key !== 'string' || !key) return { ok: false, reason: 'Falta la clave del supuesto.' };
   if (typeof label !== 'string' || !label.trim()) return { ok: false, reason: 'Falta la etiqueta del supuesto para el usuario.' };
+  // Sin valor no hay supuesto: undefined coincidiría con cualquier dato vacío.
+  if (!('value' in input) || input.value === undefined) return { ok: false, reason: `Falta el valor del supuesto «${key}».` };
   const accepted = (k: string): AssumptionValidation => ({ ok: true, assumption: { source: source as AssumptionSource, key: k, label: label.trim(), value } });
   switch (source as AssumptionSource) {
     case 'factory': {
-      if (!Object.prototype.hasOwnProperty.call(NEW_PROPOSAL_DEFAULTS, key)) return { ok: false, reason: `«${key}» no es un valor de fábrica de la propuesta nueva.` };
-      const truth = NEW_PROPOSAL_DEFAULTS[key as keyof typeof NEW_PROPOSAL_DEFAULTS];
+      const own = (record: object) => Object.prototype.hasOwnProperty.call(record, key);
+      if (!own(NEW_PROPOSAL_DEFAULTS) && !own(ASSUMPTION_RULES)) return { ok: false, reason: `«${key}» no es un valor de fábrica de la propuesta nueva.` };
+      const truth = own(NEW_PROPOSAL_DEFAULTS) ? NEW_PROPOSAL_DEFAULTS[key as keyof typeof NEW_PROPOSAL_DEFAULTS] : ASSUMPTION_RULES[key as AssumptionKey].default;
       return same(truth, value) ? accepted(key) : { ok: false, reason: `${JSON.stringify(value)} no es el valor de fábrica de «${key}» (${JSON.stringify(truth)}).` };
     }
     case 'sizing': {
@@ -111,6 +116,11 @@ const PROPOSAL_SIZING_KEYS: Readonly<Record<string, string>> = {
   targetCoveragePct: 'rates.targetCoveragePct',
 };
 
+/** Supuesto de `shared/assumptions` que resuelve el dato de la propuesta cuando falta (0 o fuera de rango cuenta como ausente). */
+const PROPOSAL_SIZING_RULES: Readonly<Record<string, AssumptionKey>> = {
+  targetCoveragePct: 'targetCoveragePct',
+};
+
 /** Argumento de la llamada que, si viene, fija el supuesto citado: entonces es lo que pidió el usuario, no un supuesto. */
 const SIZING_KEY_ARGUMENTS: Readonly<Record<string, string>> = {
   targetCoveragePct: 'coveragePct',
@@ -126,7 +136,8 @@ export interface SizingCitationContext {
 /**
  * Un supuesto que cita `sizing.ts` (`SizingAssumptionUsed`) como supuesto declarado: lo de SIZING_ASSUMPTIONS con fuente
  * `sizing`; lo de la propuesta con fuente `proposal`, solo si es el valor que guarda la propuesta (sin ella no se declara);
- * una base que falta en la propuesta es la heredada (`sizing`/`legacyBasis`). Lo que vino como argumento de la llamada es
+ * una base que falta en la propuesta es la heredada (`sizing`/`legacyBasis`), y una cobertura guardada que cuenta como ausente
+ * (`zeroIsMissing`, fuera de rango) es el valor por defecto del motor (`factory`). Lo que vino como argumento de la llamada es
  * lo que pidió el usuario, no un supuesto; y lo que no está en la lista, nada.
  */
 export function assumptionFromSizing(used: SizingAssumptionUsed, context: SizingCitationContext = {}): DeclaredAssumption | undefined {
@@ -139,6 +150,10 @@ export function assumptionFromSizing(used: SizingAssumptionUsed, context: Sizing
     candidate = { source: 'proposal', key: proposalPath, label: used.label, value: used.value };
     if (used.key === 'sizingBasis' && context.project.specs?.sizingBasis === undefined)
       candidate = { source: 'sizing', key: 'legacyBasis', label: used.label, value: used.value };
+    const rule = PROPOSAL_SIZING_RULES[used.key];
+    const tokens = parseFieldPath(proposalPath);
+    if (rule && tokens && !isValidAssumption(rule, readPath(context.project, tokens)))
+      candidate = { source: 'factory', key: rule, label: used.label, value: used.value };
   }
   const result = validateDeclaredAssumption(candidate, { project: context.project });
   return result.ok ? result.assumption : undefined;

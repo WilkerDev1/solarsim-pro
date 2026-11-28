@@ -12,6 +12,7 @@ import type { AssistantToolResponse } from '../features/agentTools/appAssistant/
 import { NEW_PROPOSAL_DEFAULTS } from '../domain/newProposal';
 import { SIZING_ASSUMPTIONS } from '../domain/sizing';
 import { DEFAULT_SIMULATION_SETTINGS } from '../store/defaultSimulationSettings';
+import { ASSUMPTION_RULES } from '../../shared/assumptions';
 
 // ── 1. Supuestos: lista cerrada (Ajustes, fábrica, SIZING_ASSUMPTIONS, datos de la propuesta) ─────────────────────────────
 assert.deepEqual([...ASSUMPTION_SOURCES], ['settings', 'factory', 'sizing', 'proposal']);
@@ -67,6 +68,20 @@ assert.equal(assumptionFromSizing({ key: 'targetCoveragePct', label: 'Cobertura 
 assert.equal(assumptionFromSizing({ key: 'targetCoveragePct', label: 'Cobertura objetivo (%)', value: 80 }, { project: sizedProject, args: { coveragePct: 80 } }), undefined);
 // Una cobertura que no es la de la propuesta (p. ej. la resuelta por defecto) no se hace pasar por dato de la propuesta.
 assert.equal(assumptionFromSizing({ key: 'targetCoveragePct', label: 'Cobertura objetivo (%)', value: 80 }, { project: sizedProject }), undefined);
+// Una cobertura guardada que cuenta como ausente (0, o fuera de rango; zeroIsMissing en shared/assumptions) hace que el
+// dimensionado use el valor por defecto: se declara como valor de fábrica, no se pierde ni pasa por dato de la propuesta
+// (revisión F3c, 2.ª ronda).
+for (const stored of [0, undefined, 999]) {
+  const missingCoverage = { rates: { targetCoveragePct: stored }, specs: { sizingBasis: 'peak_month' } } as never;
+  assert.deepEqual(assumptionFromSizing({ key: 'targetCoveragePct', label: 'Cobertura objetivo (%)', value: ASSUMPTION_RULES.targetCoveragePct.default }, { project: missingCoverage }),
+    { source: 'factory', key: 'targetCoveragePct', label: 'Cobertura objetivo (%)', value: ASSUMPTION_RULES.targetCoveragePct.default }, `guardada ${stored}`);
+  assert.equal(assumptionFromSizing({ key: 'targetCoveragePct', label: 'Cobertura objetivo (%)', value: 42 }, { project: missingCoverage }), undefined, 'otro valor no entra');
+}
+ok({ source: 'factory', key: 'targetCoveragePct', label: 'Cobertura', value: ASSUMPTION_RULES.targetCoveragePct.default });
+rejected({ source: 'factory', key: 'targetCoveragePct', label: 'Cobertura', value: 50 }, /no es el valor de fábrica/);
+// Un supuesto sin valor no entra (antes, una ruta vacía de la propuesta lo dejaba pasar: undefined === undefined).
+rejected({ source: 'proposal', key: 'rates.usdExchangeRate', label: 'x' }, /valor/, { project: { rates: {} } as never });
+rejected({ source: 'settings', key: 'defaultTargetMarginPct', label: 'Margen' }, /valor/, { settings: DEFAULT_SIMULATION_SETTINGS });
 // Una propuesta guardada sin base usa la heredada: es el supuesto de dimensionado legacyBasis, no un dato de la propuesta.
 assert.deepEqual(assumptionFromSizing({ key: 'sizingBasis', label: 'Consumo real del año', value: 'average' }, { project: { rates: {}, specs: {} } as never }),
   { source: 'sizing', key: 'legacyBasis', label: 'Consumo real del año', value: SIZING_ASSUMPTIONS.legacyBasis });
@@ -223,5 +238,39 @@ const declared = (events: AssistantTurnEvent[]) => events.flatMap((e) => (e.type
 assert.deepEqual(declared(toolResponseEvents('s', response(coverageCited(80)), { project: sizedProject, args: { coveragePct: 80 } })), []);
 assert.deepEqual(declared(toolResponseEvents('s', response(coverageCited(95)))), [], 'sin la propuesta no se declara');
 assert.deepEqual(declared(toolResponseEvents('s', response(coverageCited(95)), { project: sizedProject })), ['rates.targetCoveragePct']);
+// Un callId reutilizado con otros argumentos (idempotency_conflict) no borra la llamada ya terminada (revisión F3c, 2.ª ronda):
+// conserva su diff y su confirmación pendiente; el conflicto queda solo como error recuperable.
+const conflict = response({ status: 'error', proposalId: undefined, changes: [], error: { code: 'idempotency_conflict', message: 'Esta llamada del turno ya se usó con otros argumentos.' } });
+const afterApplied = reduceTurnEvents(initialTurnState('t'), [
+  ...toolResponseEvents('c1', response({ activityId: 'a1' })), ...toolResponseEvents('c1', conflict), { type: 'turn_finished', summary: {} },
+]);
+assert.equal(afterApplied.tools.c1.status, 'applied');
+assert.deepEqual(afterApplied.summary?.changes, [{ proposalId: 'p1', ...change }], 'el diff aplicado sigue en el resumen');
+assert.deepEqual(afterApplied.summary?.failedTools, []);
+assert.deepEqual(afterApplied.summary?.proposalIds, ['p1']);
+assert.deepEqual(afterApplied.errors.map((e) => e.code), ['idempotency_conflict'], 'el conflicto se registra como error recuperable');
+const pendingResponse = response({ status: 'pending_confirmation', actionId: 'q1', cards: [{ type: 'pending-action', id: 'q1', title: 'Precios', actionId: 'q1', changes: [{ label: 'Precio', after: '100' }] }] });
+const afterPending = reduceTurnEvents(initialTurnState('t'), [...toolResponseEvents('c1', pendingResponse), ...toolResponseEvents('c1', conflict), { type: 'turn_finished', summary: {} }]);
+assert.equal(afterPending.tools.c1.status, 'pending_confirmation');
+assert.deepEqual(afterPending.summary?.pendingConfirmations.map((p) => p.actionId), ['q1'], 'la acción sigue en la cola: sigue pendiente');
+// Un error posterior (sin conflicto) tampoco borra lo ya aplicado.
+const appliedThenError = reduceTurnEvents(initialTurnState('t'), [
+  { type: 'tool_call_finished', callId: 'a', name: 'edit_proposal', status: 'applied', proposalId: 'p1', changes: [change] },
+  { type: 'tool_call_finished', callId: 'a', name: 'edit_proposal', status: 'error', changes: [], error: { code: 'x', message: 'y' } },
+]);
+assert.equal(appliedThenError.tools.a.status, 'applied');
+assert.deepEqual(appliedThenError.tools.a.changes, [change]);
+// La transición legítima pendiente → aplicada / error (el estado real de la acción, withActionStatus) sí se registra.
+const pendingThenApplied = reduceTurnEvents(initialTurnState('t'), [
+  ...toolResponseEvents('c1', pendingResponse), ...toolResponseEvents('c1', response({ activityId: 'a1', duplicate: true })), { type: 'turn_finished', summary: {} },
+]);
+assert.equal(pendingThenApplied.tools.c1.status, 'applied');
+assert.deepEqual(pendingThenApplied.summary?.pendingConfirmations, []);
+assert.deepEqual(pendingThenApplied.summary?.changes, [{ proposalId: 'p1', ...change }]);
+const pendingThenRejected = reduceTurnEvents(initialTurnState('t'), [
+  ...toolResponseEvents('c1', pendingResponse), ...toolResponseEvents('c1', response({ status: 'error', error: { code: 'action_rejected', message: 'El usuario rechazó este cambio.' } })),
+]);
+assert.equal(pendingThenRejected.tools.c1.status, 'error');
+assert.deepEqual(pendingThenRejected.pendingConfirmations, []);
 
 console.log('PASS: eventos del turno: tipos, reducción pura y reproducible, supuestos de la lista cerrada y respuesta común → eventos.');

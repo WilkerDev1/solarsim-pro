@@ -4,7 +4,8 @@
  *
  * Un turno es la secuencia de eventos desde el mensaje del usuario hasta el cierre. La reducción es reproducible (los
  * mismos eventos dan el mismo estado, paso a paso o de golpe) y no muta su entrada; `turn_finished` y un error no
- * recuperable cierran el turno igual (llamadas en curso `interrupted` y resumen), y luego los eventos tardíos se ignoran.
+ * recuperable cierran el turno igual (llamadas en curso `interrupted` y resumen), y luego los eventos tardíos se ignoran. Una
+ * llamada aplicada no se sobrescribe, y un `idempotency_conflict` no sustituye a la llamada ya terminada de su callId.
  *
  * Los supuestos solo entran si salen de la lista cerrada (`assumptions.ts`); uno inventado queda como error recuperable
  * `assumption_rejected`, que el bucle devuelve al modelo para que lo corrija.
@@ -153,6 +154,15 @@ export function reduceTurnEvent(state: TurnState, event: AssistantTurnEvent, ref
       return withTool(state, { callId: event.callId, name: event.name, status: 'running', changes: [] });
     }
     case 'tool_call_finished': {
+      // Una llamada ya terminada no se pierde: una respuesta posterior del mismo callId solo cuenta si es la transición real
+      // de una confirmación (pendiente → aplicada o error, el estado de la acción en la cola). Un idempotency_conflict (el
+      // callId se reutilizó con otros argumentos) nunca sustituye a la llamada: queda como error recuperable, que el mismo
+      // toolResponseEvents emite. Tampoco un error posterior borra lo aplicado.
+      const known = state.tools[event.callId];
+      if (known && known.status !== 'running') {
+        if (event.error?.code === 'idempotency_conflict') return state;
+        if (known.status === 'applied') return state;
+      }
       const next = withTool(state, {
         callId: event.callId, name: event.name, status: event.status, changes: [...event.changes],
         ...(event.proposalId ? { proposalId: event.proposalId } : {}), ...(event.activityId ? { activityId: event.activityId } : {}),
