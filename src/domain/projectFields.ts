@@ -92,6 +92,8 @@ const rule = (key: keyof typeof ASSUMPTION_RULES) => {
   return { min: 0, max: r.max, exclusiveMin: r.zeroIsMissing, integer: r.integer };
 };
 const nonEmpty = (value: unknown) => Array.isArray(value) && value.length > 0;
+const isSet = (value: unknown) => value !== undefined;
+const nonBlank = (value: unknown) => typeof value === 'string' && value.trim() !== '';
 const NEEDS_BATTERY: FieldRequirement = { path: 'specs.hasBattery', value: true, resolve: 'activate' };
 const NEEDS_DIRECT_PRICE: FieldRequirement = { path: 'specs.pricingMode', value: 'direct_watt', resolve: 'activate' };
 const NEEDS_OFF_GRID: FieldRequirement = { path: 'rates.gridConnection', value: 'off_grid', resolve: 'reject' };
@@ -143,6 +145,8 @@ function equipmentGroup(list: 'panels' | 'inverters' | 'batteries'): Def[] {
   const noun = { panels: 'panel', inverters: 'inversor', batteries: 'batería' }[list];
   const plural = { panels: 'Paneles', inverters: 'Inversores', batteries: 'Baterías' }[list];
   const requires = list === 'batteries' ? [NEEDS_BATTERY] : undefined;
+  // Borrar un dato opcional de la batería (costo, profundidad, eficiencia) no la incluye: solo un valor escrito.
+  const requiresWhenSet = list === 'batteries' ? [{ ...NEEDS_BATTERY, when: isSet }] : undefined;
   const at = (field: string) => `specs.${list}[].${field}`;
   const magnitude: Def = list === 'panels'
     ? num(at('powerW'), 'Potencia del panel (W)', 'equipment', 'control', { min: 0, max: 2000, exclusiveMin: true, anchorNote: GROUP_IN_SECTION, anchor: 'dock-equipment' })
@@ -158,12 +162,12 @@ function equipmentGroup(list: 'panels' | 'inverters' | 'batteries'): Def[] {
     text(at('brandModel'), `Marca y modelo del ${noun}`, 'equipment', 'control', { minLength: 1, requires, anchor: 'dock-equipment', anchorNote: GROUP_IN_SECTION }),
     magnitude,
     num(at('count'), `Cantidad de ${plural.toLowerCase()}`, 'equipment', 'control', { min: 1, max: 10000, integer: true, requires, anchor: 'dock-equipment', anchorNote: GROUP_IN_SECTION }),
-    num(at('unitPriceUSD'), `Costo unitario del ${noun} (USD)`, 'costs', 'control', { min: 0, max: 1_000_000, optional: true, requires, anchor: `pd-cost-${kind}-{i}` }),
+    num(at('unitPriceUSD'), `Costo unitario del ${noun} (USD)`, 'costs', 'control', { min: 0, max: 1_000_000, optional: true, requires: requiresWhenSet, anchor: `pd-cost-${kind}-{i}` }),
     ...groupInternals(list, noun),
   ];
   if (list === 'batteries') defs.push(
-    num(at('dodPct'), 'Profundidad de descarga', 'equipment', 'control', { ...BATTERY_PCT_RANGE, optional: true, requires, anchor: 'dock-battery-dod', note: 'El dock edita la del grupo principal.' }),
-    num(at('efficiencyPct'), 'Eficiencia de carga', 'equipment', 'control', { ...BATTERY_PCT_RANGE, optional: true, requires, anchor: 'dock-battery-efficiency', note: 'El dock edita la del grupo principal.' }),
+    num(at('dodPct'), 'Profundidad de descarga', 'equipment', 'control', { ...BATTERY_PCT_RANGE, optional: true, requires: requiresWhenSet, anchor: 'dock-battery-dod', note: 'El dock edita la del grupo principal.' }),
+    num(at('efficiencyPct'), 'Eficiencia de carga', 'equipment', 'control', { ...BATTERY_PCT_RANGE, optional: true, requires: requiresWhenSet, anchor: 'dock-battery-efficiency', note: 'El dock edita la del grupo principal.' }),
   );
   return defs;
 }
@@ -199,7 +203,7 @@ export const PROJECT_FIELDS: readonly ProjectFieldDefinition[] = [
   choice('client.province', 'Provincia', 'client', 'control', RD_PROVINCES.map((province) => province.name), {
     anchor: 'pd-cli-province', note: 'El dock borra a la vez la radiación propia (customMonthlyHSP); esa regla sigue en el dock (F2b).',
   }),
-  text('client.coordinates', 'Coordenadas (latitud, longitud)', 'client', 'control', { maxLength: 60, optional: true, anchor: 'pd-cli-coords', requires: [{ path: 'client.solarSourceMode', value: 'gps', resolve: 'activate' }] }),
+  text('client.coordinates', 'Coordenadas (latitud, longitud)', 'client', 'control', { maxLength: 60, optional: true, anchor: 'pd-cli-coords', requires: [{ path: 'client.solarSourceMode', value: 'gps', resolve: 'activate', when: nonBlank }] }),
   { path: 'client.customMonthlyHSP', label: 'Radiación mensual propia (HSP)', section: 'client', type: 'numberList', origin: 'action', length: 12, min: 0, max: 12, optional: true, leaf: true, itemLabels: MONTHS, anchorNote: '«Obtener radiación» (consulta a NASA, botón sin id).' },
   text('client.projectId', 'ID proyecto', 'client', 'control', { minLength: 1, maxLength: 60, anchor: 'pd-cli-id' }),
   text('client.quoteNumber', 'Cotización', 'client', 'control', { maxLength: 60, optional: true, anchor: 'pd-cli-quote' }),
@@ -365,7 +369,13 @@ export const readProjectField = (project: ProjectSimulation, path: string): unkn
 /** Etiqueta legible de una ruta concreta: la del registro, con el número del grupo o el mes. */
 export function fieldLabel(path: string): string {
   const def = findProjectField(path);
-  if (!def) return path;
+  if (!def) {
+    // Un elemento entero de una lista de registros (grupo añadido o quitado, `specs.panels[1]`): la etiqueta de la lista
+    // con el número del elemento («Paneles (#2)»).
+    const element = /^(.*)\[(\d+)\]$/.exec(path);
+    const list = element ? findProjectField(element[1]) : undefined;
+    return list?.type === 'list' ? `${list.label} (#${Number(element![2]) + 1})` : path;
+  }
   const indexes = [...path.matchAll(/\[(\d+)\]/g)].map((match) => Number(match[1]));
   if (!indexes.length) return def.label;
   if (def.path === 'monthlyConsumption[]') return `Consumo de ${MONTHS[indexes[0]] ?? `mes ${indexes[0] + 1}`} (kWh)`;

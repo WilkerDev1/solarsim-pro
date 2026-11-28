@@ -39,15 +39,16 @@ function sampleProject(): ProjectSimulation {
   return p;
 }
 
-/** Proyecto que cumple las dependencias que se rechazan (régimen, aislado…) de una definición. */
+/**
+ * Proyecto que cumple las dependencias que se rechazan (régimen, aislado…) de una definición. Todas en UN lote estricto
+ * (revisión de F2a2): fijarlas de una en una ocultaba que la validación leía el lote sin normalizar la conexión.
+ */
 function projectFor(def: ProjectFieldDefinition): ProjectSimulation {
-  let p = sampleProject();
-  for (const requirement of def.requires ?? []) {
-    const result = applyProjectEdits(p, [{ path: requirement.path, value: requirement.value }], ctx);
-    assert.ok(result.ok, `${def.path}: su dependencia ${requirement.path} se puede fijar`);
-    p = result.project;
-  }
-  return p;
+  const p = sampleProject();
+  if (!def.requires?.length) return p;
+  const result = applyProjectEdits(p, def.requires.map((requirement) => ({ path: requirement.path, value: requirement.value })), ctx);
+  assert.ok(result.ok, `${def.path}: sus dependencias se pueden fijar en un solo lote: ${!result.ok && JSON.stringify(result.errors)}`);
+  return result.project;
 }
 
 /** Un valor válido distinto del actual, deducido del tipo y del rango (o el `sample` de la definición). */

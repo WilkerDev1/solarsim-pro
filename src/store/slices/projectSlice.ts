@@ -12,7 +12,7 @@ import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { SimulationSlice, ProjectSlice, SimulationStore, type CommitProjectEditsResult } from '../types';
-import { applyProjectEdits } from '../../domain/projectEditTransaction';
+import { applyProjectEdits, editBatchFingerprint } from '../../domain/projectEditTransaction';
 import { ProjectSimulation, SystemSpecs } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
@@ -233,7 +233,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   commitProjectEdits: (projectId, edits, options) => {
     const reject = (message: string): CommitProjectEditsResult => ({ ok: false, errors: [{ path: '', message }], warnings: [] });
     const key = options.idempotencyKey ? `${projectId}\u0000${options.idempotencyKey}` : undefined;
-    const fingerprint = JSON.stringify(edits);
+    const fingerprint = editBatchFingerprint(edits);
     const previous = key ? committedEdits.get(key) : undefined;
     if (previous) {
       if (previous.fingerprint !== fingerprint) return reject('Esta clave de idempotencia ya se usó con otro lote de cambios; usa una clave nueva.');

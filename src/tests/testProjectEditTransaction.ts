@@ -323,6 +323,19 @@ const AFTER = { systemCapacityKWp: 5.9, annualProductionKWh: 9783.6, energyCover
   assert.equal(reused.ok, false, 'la misma clave con otro lote es un error, no una aplicación');
   probe.stop();
 
+  // Revisión de F2a2: la huella del lote es la del lote canónico. Un reintento con las ediciones en otro orden, o con un
+  // `value: undefined` omitido, es el mismo lote: repetido, no «otro lote».
+  const batch: ProjectFieldEdit[] = [{ path: 'specs.saleMarginMultiplier', value: 1.3 }, { path: 'rates.targetCoveragePct', value: 75 }, { path: 'client.quoteDate', value: undefined }];
+  const retry = { source: 'assistant' as const, idempotencyKey: 'turn-8:call-1' };
+  const original = store.getState().commitProjectEdits(project.id, batch, retry);
+  assert.ok(original.ok && original.written, JSON.stringify(!original.ok && original.errors));
+  const reordered = store.getState().commitProjectEdits(project.id, [...batch].reverse(), retry);
+  assert.ok(reordered.ok && reordered.duplicate, `el mismo lote en otro orden es un reintento: ${JSON.stringify(!reordered.ok && reordered.errors)}`);
+  const omitted = store.getState().commitProjectEdits(project.id, [batch[1], { path: 'client.quoteDate' } as ProjectFieldEdit, batch[0]], retry);
+  assert.ok(omitted.ok && omitted.duplicate, 'undefined explícito u omitido dan la misma huella');
+  const nested = store.getState().commitProjectEdits(project.id, [{ path: 'specs.saleMarginMultiplier', value: 1.31 }, batch[1], batch[2]], retry);
+  assert.equal(nested.ok, false, 'un valor distinto sigue siendo otro lote');
+
   store.getState().moveToTrash(project.id);
   const trashed = store.getState().commitProjectEdits(project.id, [{ path: 'rates.targetCoveragePct', value: 50 }], { source: 'assistant' });
   assert.equal(trashed.ok, false, 'la papelera es de solo lectura');
@@ -385,6 +398,79 @@ const AFTER = { systemCapacityKWp: 5.9, annualProductionKWh: 9783.6, energyCover
 
   // editsFromPatch: un parche de sección es una lista de ediciones por ruta, sin perder las claves que valen undefined.
   assert.deepEqual(editsFromPatch('client', { province: 'X', customMonthlyHSP: undefined }), [{ path: 'client.province', value: 'X' }, { path: 'client.customMonthlyHSP', value: undefined }]);
+}
+
+// ── 7. Hallazgos de la revisión de F2a2 ─────────────────────────────────────────────────────
+{
+  // (a) Las dependencias que se rechazan se comprueban contra el estado ya normalizado: pasar a aislado y elegir el
+  // generador y su costo en UN lote estricto es válido en cualquier orden (antes, el lote se leía sin derivar
+  // `isZeroExport` y «Conexión a la red» seguía resolviéndose como conectada).
+  const base = baseProject('tx-offgrid');
+  const offGrid: ProjectFieldEdit[] = [
+    { path: 'rates.gridConnection', value: 'off_grid' },
+    { path: 'rates.supplyAlternative', value: 'generator' },
+    { path: 'rates.generatorCostPerKWh', value: 0.35 },
+  ];
+  let expected: string | undefined;
+  for (const order of permutations(offGrid)) {
+    const result = applyProjectEdits(base, order, ctx);
+    assert.ok(result.ok, `aislado + generador + costo en un lote: ${JSON.stringify(!result.ok && result.errors)}`);
+    assert.equal(result.project.rates.gridConnection, 'off_grid');
+    assert.equal(result.project.rates.isZeroExport, true);
+    assert.equal(result.project.rates.supplyAlternative, 'generator');
+    assert.equal(result.project.rates.generatorCostPerKWh, 0.35);
+    expected ??= sectionsJson(result.project);
+    assert.equal(sectionsJson(result.project), expected, 'en cualquier orden');
+  }
+  // Sin aislado, el generador sigue rechazándose; el mensaje dice qué hacer según lo que trae el lote.
+  const missing = applyProjectEdits(base, [{ path: 'rates.supplyAlternative', value: 'generator' }], ctx);
+  assert.ok(!missing.ok && /inclúyelo en el mismo lote/.test(missing.errors[0].message), JSON.stringify(!missing.ok && missing.errors));
+  const contradicted = applyProjectEdits(base, [{ path: 'rates.supplyAlternative', value: 'generator' }, { path: 'rates.gridConnection', value: 'zero_export' }], ctx);
+  assert.ok(!contradicted.ok && /el lote lo deja en/.test(contradicted.errors[0].message) && !/mismo lote/.test(contradicted.errors[0].message), JSON.stringify(!contradicted.ok && contradicted.errors));
+
+  // (b) Añadir o quitar un grupo: el diff informa el elemento con la etiqueta de su lista, no con la ruta cruda.
+  const panel0 = readEquipment(base.specs).panels[0];
+  const added = ok(applyProjectEdits(base, [{ path: 'specs.panels', value: [panel0, { ...panel0, id: 'pan-2', count: 4 }] }], ctx));
+  const addedGroup = added.changes.find((c) => c.path === 'specs.panels[1]');
+  assert.equal(addedGroup?.label, 'Paneles (#2)', JSON.stringify(added.changes.map((c) => [c.path, c.label])));
+  const removed = ok(applyProjectEdits(added.project, [{ path: 'specs.panels', value: [readEquipment(added.project.specs).panels[0]] }], ctx));
+  assert.equal(removed.changes.find((c) => c.path === 'specs.panels[1]')?.label, 'Paneles (#2)');
+  const extra = ok(applyProjectEdits(base, [{ path: 'financials.customItems', value: [{ id: 'it-9', description: 'Estructura', quantity: 1, unitPriceUSD: 50, exonerateITBIS: false }] }], ctx));
+  for (const c of [...added.changes, ...removed.changes, ...extra.changes]) assert.notEqual(c.label, c.path, `${c.path} tiene etiqueta en español`);
+
+  // (c) Borrar un dato opcional no activa su dependencia: vaciar las coordenadas no pasa a GPS; borrar el costo o la
+  // profundidad de descarga de una batería no enciende «Incluir batería».
+  const cleared = ok(applyProjectEdits(base, [{ path: 'client.coordinates', value: '' }], ctx));
+  assert.equal(cleared.project.client.solarSourceMode, base.client.solarSourceMode, 'vaciar las coordenadas no cambia la fuente de radiación');
+  assert.deepEqual(cleared.derivedEdits, []);
+  const undefinedCoords = ok(applyProjectEdits(base, [{ path: 'client.coordinates', value: undefined }], ctx));
+  assert.deepEqual(undefinedCoords.derivedEdits, []);
+  const gps = ok(applyProjectEdits(base, [{ path: 'client.coordinates', value: '18.5, -69.9' }], ctx));
+  assert.equal(gps.project.client.solarSourceMode, 'gps', 'unas coordenadas escritas sí activan GPS');
+  const storedBattery = { ...base, specs: { ...base.specs, ...editEquipmentGroup(base.specs, 'battery', { type: 'add', item: battery }), hasBattery: false } };
+  const offBattery = ok(applyProjectEdits(storedBattery, [{ path: 'specs.batteries[0].unitPriceUSD', value: undefined }, { path: 'specs.batteries[0].dodPct', value: undefined }], ctx));
+  assert.equal(offBattery.project.specs.hasBattery, false, 'borrar un dato opcional de la batería no la incluye');
+  assert.deepEqual(offBattery.derivedEdits, []);
+  const priced = ok(applyProjectEdits(storedBattery, [{ path: 'specs.batteries[0].unitPriceUSD', value: 1800 }], ctx));
+  assert.equal(priced.project.specs.hasBattery, true, 'darle precio a la batería sí la incluye');
+
+  // (d) Un lote que no es una lista es un error que dice qué esperaba, no un lote vacío.
+  for (const bad of [{}, null, 'specs.count', { path: 'rates.targetCoveragePct', value: 80 }]) {
+    const result = applyProjectEdits(base, bad as never, ctx);
+    assert.ok(!result.ok && /lista de \{path, value\}/.test(result.errors[0].message), `${JSON.stringify(bad)}: ${JSON.stringify(result)}`.slice(0, 200));
+  }
+
+  // (e) El diff no serializa la personalización entera cuando cambia el cliente (puede llevar logos en base64 y el dock
+  // confirma por tecla): compara clave por clave y lo que no cambió se descarta por referencia.
+  let serialized = 0;
+  const heavy = { toJSON: () => { serialized++; return 'logo'; } };
+  const withLogo = { ...base, customization: { ...(base.customization ?? {}), companyLogo: heavy } } as unknown as ProjectSimulation;
+  const named = ok(applyProjectEdits(withLogo, [{ path: 'client.name', value: 'Cliente nuevo' }], ctx));
+  assert.equal(serialized, 0, 'la personalización sin cambios no se serializa');
+  assert.deepEqual(named.changes.map((c) => c.path), ['client.name']);
+  const phoned = ok(applyProjectEdits(withLogo, [{ path: 'client.contactPhone', value: '809-555-0142' }], ctx));
+  assert.equal(serialized, 0);
+  assert.deepEqual(phoned.changes.map((c) => [c.path, c.derived]).sort(), [['client.contactPhone', false], ['customization.clientPhone', true]]);
 }
 
 console.log('PASS: transacción de edición: independiente del orden, validación todo o nada, motor igual a F0, deshacer con derivadas, idempotencia y dock por la transacción.');

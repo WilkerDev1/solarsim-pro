@@ -5,7 +5,8 @@
  * 1. valida cada ruta (que exista, que no sea de solo lectura, tipo y rango) y rechaza el lote ENTERO si alguna falla,
  *    con la lista completa de errores (todo o nada: un lote a medias dejaría la propuesta en un estado que nadie pidió);
  * 2. resuelve las dependencias declaradas: activa lo que haga falta («Incluir batería» al elegir una batería) como cambio
- *    derivado y avisado, o rechaza lo que no aplica (el cargo SIE-007 en el régimen anterior);
+ *    derivado y avisado, o rechaza lo que no aplica (el cargo SIE-007 en el régimen anterior), comprobado contra la
+ *    propuesta ya aplicada (paso 3) para leer el estado efectivo y no el lote crudo;
  * 3. ordena las ediciones por ruta y las agrupa en un plan por sección, relativo a la base del lote, y lo aplica con
  *    `applyProjectEditPlan`: las reglas de `projectEdit.ts` corren UNA vez contra la base, así que el resultado no
  *    depende del orden de las ediciones;
@@ -96,6 +97,25 @@ const shown = (value: unknown): string => {
 };
 const isPrefix = (prefix: readonly PathToken[], tokens: readonly PathToken[]) =>
   prefix.length <= tokens.length && prefix.every((token, i) => token === tokens[i]);
+
+/** JSON con las claves ordenadas; las que valen `undefined` se omiten (como `JSON.stringify` en objetos). */
+const canonicalJson = (value: unknown): string | undefined => JSON.stringify(value, (_key, v: unknown) =>
+  (isRecord(v) ? Object.fromEntries(Object.keys(v).sort().map((key) => [key, v[key]])) : v));
+
+/**
+ * Huella del lote para la idempotencia: la del lote canónico (ordenado por ruta, claves ordenadas, `value: undefined`
+ * explícito u omitido por igual). El orden no cuenta en la transacción, así que tampoco en la huella: un reintento con las
+ * ediciones en otro orden es el mismo lote. Un lote que no es lista se serializa tal cual (lo rechaza la transacción).
+ */
+export function editBatchFingerprint(edits: unknown): string {
+  if (!Array.isArray(edits)) return `!${canonicalJson(edits) ?? String(edits)}`;
+  const entries = edits.map((edit) => {
+    const record: Record<string, unknown> = isRecord(edit) ? edit : { value: edit };
+    // `undefined` (explícito u omitido) no es `null`: la transacción los trata distinto.
+    return JSON.stringify([typeof record.path === 'string' ? record.path : canonicalJson(record.path) ?? null, canonicalJson(record.value) ?? '\u0000undefined']);
+  });
+  return `[${entries.sort().join(',')}]`;
+}
 
 /** Un parche de sección del store (`updateSpecs({...})`) como ediciones por ruta; conserva las claves que valen `undefined`. */
 export function editsFromPatch(section: 'client' | 'specs' | 'rates' | 'financials', patch: object | null | undefined): ProjectFieldEdit[] {
@@ -255,8 +275,10 @@ const DIFF_SECTIONS = ['client', 'specs', 'rates', 'financials', 'monthlyConsump
 const orAbsent = (value: unknown) => ((isRecord(value) && Object.keys(value).every((key) => value[key] === undefined)) || (Array.isArray(value) && !value.length) ? undefined : value);
 
 function collectChanges(before: unknown, after: unknown, tokens: PathToken[], out: Array<{ tokens: PathToken[]; before: unknown; after: unknown }>) {
-  // Misma referencia: sin serializar (la personalización puede llevar logos en base64 y el dock confirma por tecla).
-  if (before === after || sameJson(before, after) || sameJson(orAbsent(before), orAbsent(after))) return;
+  // Misma referencia: sin serializar. Los objetos y listas de registros se recorren clave por clave ANTES de serializar
+  // nada, así lo que no cambió se descarta por referencia: la personalización puede llevar logos en base64, cada edición
+  // de cliente la copia (espejo de contacto) y el dock confirma por tecla. Solo se serializan las hojas que difieren.
+  if (before === after) return;
   const def = findProjectField(formatFieldPath(tokens));
   const leaf = !!def?.leaf || def?.type === 'numberList';
   if (!leaf && isRecord(before) && isRecord(after)) {
@@ -269,6 +291,7 @@ function collectChanges(before: unknown, after: unknown, tokens: PathToken[], ou
     for (let i = 0; i < Math.max(before.length, after.length); i++) collectChanges(before[i], after[i], [...tokens, i], out);
     return;
   }
+  if (sameJson(before, after) || sameJson(orAbsent(before), orAbsent(after))) return;
   out.push({ tokens, before: clone(before), after: clone(after) });
 }
 
@@ -302,9 +325,14 @@ export function applyProjectEdits(project: ProjectSimulation, edits: readonly Pr
   const errors: ProjectEditError[] = [];
   const warnings: string[] = [];
 
+  // 0. El lote es una lista (una llamada de herramienta mal formada puede mandar un objeto): no es un lote vacío.
+  if (!Array.isArray(edits)) {
+    return { ok: false, errors: [{ path: '', message: `El lote debe ser una lista de {path, value}; recibió ${shown(edits)}.` }], warnings };
+  }
+
   // 1. Rutas, tipos y rangos.
   const parsed: ParsedEdit[] = [];
-  for (const edit of Array.isArray(edits) ? edits : []) {
+  for (const edit of edits) {
     const path = typeof edit?.path === 'string' ? edit.path : '';
     const tokens = parseFieldPath(path);
     if (!tokens) { errors.push({ path, message: `Ruta mal formada ${shown(path)}: usa sección.campo, con [n] para elementos de una lista.` }); continue; }
@@ -353,24 +381,44 @@ export function applyProjectEdits(project: ProjectSimulation, edits: readonly Pr
     }
     if (!added) break;
   }
-  const finalState = preview(project, all());
-  for (const edit of all()) for (const requirement of edit.def.requires ?? []) {
-    if (requirement.when && !requirement.when(edit.value)) continue;
-    const current = effective(requirement.path, finalState);
-    if (sameJson(current, requirement.value)) continue;
-    const def = findProjectField(requirement.path)!;
-    const message = requirement.resolve === 'activate'
-      ? `«${fieldLabel(edit.path)}» exige «${def.label}» = ${shown(requirement.value)}, pero el lote lo fija en ${shown(current)}.`
-      : `«${fieldLabel(edit.path)}» solo aplica cuando «${def.label}» es ${shown(requirement.value)}; cámbialo en el mismo lote.`;
-    if (requirement.resolve === 'activate' || strict) errors.push({ path: edit.path, message });
-    else warnings.push(message);
-  }
+  /**
+   * Comprueba las dependencias de un tipo contra `state`. Las que se activan, contra el lote escrito tal cual (lo que
+   * pidió el llamador contradice o no la activación). Las que se rechazan, contra la propuesta ya aplicada: las reglas
+   * normalizan lo que el lote escribe a medias (pasar a aislado deriva `isZeroExport`, sin el cual «Conexión a la red»
+   * se seguiría resolviendo como conectada) y la dependencia vale por el estado efectivo, no por el valor crudo.
+   */
+  const checkRequirements = (resolve: 'activate' | 'reject', state: ProjectSimulation) => {
+    for (const edit of all()) for (const requirement of edit.def.requires ?? []) {
+      if (requirement.resolve !== resolve || (requirement.when && !requirement.when(edit.value))) continue;
+      const current = effective(requirement.path, state);
+      if (sameJson(current, requirement.value)) continue;
+      const def = findProjectField(requirement.path)!;
+      const inBatch = all().some((other) => other.path === requirement.path);
+      const message = resolve === 'activate'
+        ? `«${fieldLabel(edit.path)}» exige «${def.label}» = ${shown(requirement.value)}, pero el lote lo fija en ${shown(current)}.`
+        : inBatch
+          ? `«${fieldLabel(edit.path)}» solo aplica cuando «${def.label}» es ${shown(requirement.value)}; el lote lo deja en ${shown(current)}.`
+          : `«${fieldLabel(edit.path)}» solo aplica cuando «${def.label}» es ${shown(requirement.value)} (ahora es ${shown(current)}); inclúyelo en el mismo lote.`;
+      if (resolve === 'activate' || strict) errors.push({ path: edit.path, message });
+      else warnings.push(message);
+    }
+  };
+  checkRequirements('activate', preview(project, all()));
 
-  if (errors.length) return { ok: false, errors, warnings };
-
-  // 4. Una sola aplicación de las reglas contra la base.
+  // 4. Una sola aplicación de las reglas contra la base; después, las dependencias que se rechazan sobre el resultado.
+  // `all()` solo lleva rutas válidas con valores de su tipo, así que se aplica aunque ya haya errores: la lista de errores
+  // sigue completa (las dependencias rechazadas se informan junto con las de ruta, tipo y rango). Si con errores las
+  // reglas no pueden aplicarse (p. ej. un elemento de lista mal formado), se devuelven los que ya hay.
   const ordered = all().sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
-  const next = applyProjectEditPlan(project, planOf(project, ordered), ctx);
+  let next: ProjectSimulation;
+  try {
+    next = applyProjectEditPlan(project, planOf(project, ordered), ctx);
+  } catch (error) {
+    if (!errors.length) throw error;
+    return { ok: false, errors, warnings };
+  }
+  checkRequirements('reject', next);
+  if (errors.length) return { ok: false, errors, warnings };
   const changes = diffProjects(project, next, requested);
   const result: Extract<ProjectEditsResult, { ok: true }> = {
     ok: true, project: next, changes, warnings,
