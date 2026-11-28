@@ -11,7 +11,7 @@ import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppAssistant } from '../useAppAssistant';
 import { assistantOwner } from '../tools';
-import { assistantProjectId, assistantVisibleIn } from '../assistantScope';
+import { assistantPanelKey, assistantProjectId, assistantVisibleIn } from '../assistantScope';
 import { ChatMessage } from './ChatMessage';
 import { ChatComposer, ChatSuggestions, ChatThinking, ScrollToLatest } from './ChatComposer';
 import { reusableUserText, useChatAnnouncement, useElapsedSeconds, useResend, useStickToBottom } from '../chatUi';
@@ -276,7 +276,7 @@ export function AppAssistant({
     return null;
   return (
     <AssistantPanel
-      key={`${assistantOwner()}|${projectId || 'global'}`}
+      key={assistantPanelKey(assistantOwner(), projectId)}
       projectId={projectId}
       belowToolbar={state.activeView === 'pdf-preview'}
       transport={transport}
