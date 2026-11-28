@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } fro
 import { dockHighlightStore } from '../../../store/dockHighlightStore';
 import { dockHighlightView, nextExpiry, type DockHighlightView } from '../../../domain/dockHighlight';
 import type { DockSectionKey, SimulatorTabKey } from '../../../domain/fieldAnchors';
-import { presentInDock, syncChangedMarks, type MarkRoot } from './dockHighlightDom';
+import { presentInDock, collapsedInDock, syncChangedMarks, type MarkRoot } from './dockHighlightDom';
 
 const EMPTY: DockHighlightView = { controls: [], sections: {}, tabs: {} };
 const sameView = (a: DockHighlightView, b: DockHighlightView) => JSON.stringify(a) === JSON.stringify(b);
@@ -36,7 +36,7 @@ export function useDockHighlight(projectId: string, open: Readonly<Record<DockSe
   useEffect(() => {
     const root = rootRef.current as unknown as MarkRoot | null;
     const next = root && state.marks.length
-      ? dockHighlightView(state, Date.now(), { projectId, open, isPresent: (target) => presentInDock(root, target) })
+      ? dockHighlightView(state, Date.now(), { projectId, open, isPresent: (target) => presentInDock(root, target), isCollapsed: (target) => collapsedInDock(root, target) })
       : EMPTY;
     if (root && (marked.current || next.controls.length)) syncChangedMarks(root, next.controls);
     marked.current = next.controls.length > 0;

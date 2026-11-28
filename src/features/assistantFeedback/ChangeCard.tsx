@@ -6,7 +6,7 @@
  * pensada para la superficie oscura del chat (misma paleta que `chat.css`).
  *
  * Uso desde el panel: `changeCardInputFromResponse(response, { assumptions })` convierte la respuesta de una herramienta
- * (o el evento `tool_call_finished`) en la entrada; `null` = no hay tarjeta que mostrar.
+ * (la `AssistantToolResponse` completa, no el evento `tool_call_finished`, que no trae resultados) en la entrada; `null` = no hay tarjeta que mostrar.
  */
 import React from 'react';
 import { buildChangeCardView, type ChangeCardInput, type ChangeRowView, type ChangeCardView } from './changeCardModel';

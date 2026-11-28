@@ -1,6 +1,6 @@
 /**
  * Modelo de la tarjeta de cambio del asistente (F5a): TODO el formateo, en funciones puras (sin React, sin store, sin reloj).
- * Recibe los datos en la forma común de F3a/F3c (`AssistantToolResponse` / `tool_call_finished`: cambios por ruta con etiqueta,
+ * Recibe los datos en la forma común de F3a/F3c (`AssistantToolResponse` completa; el evento `tool_call_finished` no trae resultados ni avisos y no basta: cambios por ruta con etiqueta,
  * antes, después y derivados; resultados del motor antes y después, o los motivos de «incompleta»; avisos; supuestos) y
  * devuelve lo que `ChangeCard.tsx` solo tiene que pintar.
  *

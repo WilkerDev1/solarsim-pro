@@ -23,7 +23,15 @@ export interface MarkRoot {
 const SAFE_ANCHOR = /^[a-z0-9-]+$/;
 
 /** ¿Hay en el dock un elemento con esa ancla? (un control que oculta la organización o el modo no lo hay). */
-export const presentInDock = (root: MarkRoot, target: string): boolean => SAFE_ANCHOR.test(target) && root.querySelector(`[${ANCHOR_ATTR}="${target}"]`) != null;
+export const presentInDock = (root: MarkRoot, target: string): boolean =>
+  SAFE_ANCHOR.test(target) && root.querySelector(`[${ANCHOR_ATTR}="${target}"]`) != null && !collapsedInDock(root, target);
+
+/** Atributo que pone `AdvancedDisclosure` a su cuerpo mientras está plegado (sigue montado, pero no se ve). */
+export const COLLAPSED_ATTR = 'data-dock-collapsed';
+
+/** ¿Está el control dentro de un «Avanzado» plegado? */
+export const collapsedInDock = (root: MarkRoot, target: string): boolean =>
+  SAFE_ANCHOR.test(target) && root.querySelector(`[${COLLAPSED_ATTR}="true"] [${ANCHOR_ATTR}="${target}"]`) != null;
 
 /**
  * Deja marcados exactamente los controles de `targets`: pone la marca a los que faltan y la quita a los que ya no tocan

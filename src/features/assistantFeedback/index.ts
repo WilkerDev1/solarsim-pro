@@ -2,7 +2,7 @@
  * Feedback en vivo del asistente (F5a): lo que F5b monta en el panel nuevo.
  *
  * - Tarjeta de cambio: `ChangeCard` (presentación) + `changeCardInputFromResponse` (de la respuesta de una herramienta o del
- *   evento `tool_call_finished` a la entrada de la tarjeta; `null` = no hay tarjeta) + `buildChangeCardView` / `formatFieldValue`
+ *   respuesta `AssistantToolResponse` completa a la entrada de la tarjeta; `null` = no hay tarjeta) + `buildChangeCardView` / `formatFieldValue`
  *   (formateo puro).
  * - Resaltado del dock: no hay nada que montar. Se dispara solo cuando `commitProjectEdits` recibe `source: 'assistant'`
  *   (`dockHighlightStore.publish`); `publishAssistantHighlight` es para lo que no pasa por un lote por ruta (p. ej. destacar

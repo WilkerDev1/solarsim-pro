@@ -84,7 +84,9 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 const sources = [...walk(path.join(root, 'src/components/simulator/sidebar')), ...walk(path.join(root, 'src/components/simulator/params'))].map((file) => readFileSync(file, 'utf8')).join('\n');
 const present = new Set<string>();
-for (const match of sources.matchAll(/\b(?:id|htmlFor|labelId)=["']((?:pd|dock)-[a-z0-9-]+)["']/g)) present.add(match[1]);
+for (const match of sources.matchAll(/\b(?:htmlFor|labelId)=["']((?:pd|dock)-[a-z0-9-]+)["']/g)) present.add(match[1]);
+// `id=` a secas NO basta (un `<input id>` suelto no genera `data-dock-anchor`): solo el de UnitCostRow, que lo expone él mismo.
+for (const match of sources.matchAll(/<UnitCostRow[^>]*?\bid=["']((?:pd|dock)-[a-z0-9-]+)["']/g)) present.add(match[1]);
 for (const kind of ['panel', 'inverter', 'battery']) present.add(`pd-cost-${kind}-0`);
 const ROW_PREFIXES = ['dock-equipment-panel-', 'dock-equipment-inverter-', 'dock-equipment-battery-', 'dock-financials-item-', 'dock-financials-discount-'];
 for (const def of PROJECT_FIELDS) {

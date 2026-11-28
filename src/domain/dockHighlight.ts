@@ -100,6 +100,8 @@ export interface DockHighlightContext {
   open: Readonly<Record<DockSectionKey, boolean>>;
   /** ¿Hay en pantalla un elemento con ese `data-dock-anchor`? (consulta al DOM; lo ocultan la organización o el modo). */
   isPresent: (target: string) => boolean;
+  /** ¿Está el control en el DOM pero dentro de un desplegable «Avanzado» plegado? Cae en la sección, con esa nota. */
+  isCollapsed?: (target: string) => boolean;
   /** Pestaña que se está viendo: la de Energía no necesita indicador si ya está a la vista. */
   activeTab?: string;
 }
@@ -115,6 +117,8 @@ export interface DockHighlightView {
 
 const EMPTY_VIEW: DockHighlightView = { controls: [], sections: {}, tabs: {} };
 const HIDDEN_CONTROL_NOTE = 'sin control visible ahora: lo oculta la organización o el modo';
+
+const COLLAPSED_NOTE = 'en Avanzado, plegado';
 
 function hintText(labels: readonly string[], note?: string): string {
   const shown = labels.slice(0, MAX_HINT_LABELS).join(', ');
@@ -133,11 +137,11 @@ export function dockHighlightView(state: DockHighlightState, now: number, ctx: D
   const marks = activeMarks(state, now);
   if (!marks.length) return EMPTY_VIEW;
   const controls = new Set<string>();
-  const hints = new Map<DockSectionKey, { labels: string[]; missing: boolean }>();
+  const hints = new Map<DockSectionKey, { labels: string[]; missing: boolean; note?: string }>();
   const tabs: DockHighlightView['tabs'] = {};
-  const hint = (section: DockSectionKey, labels: readonly string[], missing: boolean) => {
+  const hint = (section: DockSectionKey, labels: readonly string[], missing: boolean, note?: string) => {
     const known = hints.get(section) ?? { labels: [], missing: false };
-    hints.set(section, { labels: [...new Set([...known.labels, ...labels])], missing: known.missing || missing });
+    hints.set(section, { labels: [...new Set([...known.labels, ...labels])], missing: known.missing || missing, note: known.note ?? note });
   };
   for (const mark of marks) {
     if (mark.place.surface === 'tab') {
@@ -148,11 +152,13 @@ export function dockHighlightView(state: DockHighlightState, now: number, ctx: D
     if (mark.target && ctx.isPresent(mark.target)) {
       controls.add(mark.target);
       if (!ctx.open[section]) hint(section, mark.labels, false);
+    } else if (mark.target && ctx.isCollapsed?.(mark.target)) {
+      hint(section, mark.labels, false, COLLAPSED_NOTE);
     } else {
       hint(section, mark.labels, !!mark.target);
     }
   }
   const sections: DockHighlightView['sections'] = {};
-  for (const [section, { labels, missing }] of hints) sections[section] = hintText(labels, missing ? HIDDEN_CONTROL_NOTE : undefined);
+  for (const [section, { labels, missing, note }] of hints) sections[section] = hintText(labels, missing ? HIDDEN_CONTROL_NOTE : note);
   return { controls: [...controls], sections, tabs };
 }

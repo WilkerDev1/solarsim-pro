@@ -18,7 +18,7 @@ import {
 } from '../domain/dockHighlight';
 import { dockHighlightStore } from '../store/dockHighlightStore';
 import { assistantEditForQa } from '../features/assistantFeedback/devActions';
-import { syncChangedMarks, presentInDock, type MarkRoot } from '../components/simulator/sidebar/dockHighlightDom';
+import { syncChangedMarks, presentInDock, collapsedInDock, type MarkRoot } from '../components/simulator/sidebar/dockHighlightDom';
 import { anchorForPath, type DockSectionKey } from '../domain/fieldAnchors';
 
 const ALL_OPEN: Record<DockSectionKey, boolean> = { client: true, rates: true, equipment: true, costs: true, financials: true };
@@ -60,6 +60,13 @@ assert.match(shown.sections.rates!, /Cobertura objetivo/);
 assert.match(shown.sections.rates!, /Cargo uso de red/);
 assert.match(shown.sections.equipment!, /Cantidad de paneles \(#2\)/);
 assert.deepEqual(shown.sections.financials, undefined, 'una sección abierta con su control a la vista no lleva indicador');
+// Control dentro de «Avanzado» plegado: está en el DOM pero no se ve; la sección abierta lleva el indicador, con la nota.
+const adv = addHighlights(EMPTY_HIGHLIGHTS, { projectId: 'p1', now: T0, changes: [{ path: 'specs.batteries[0].dodPct', label: 'Profundidad de descarga' }] });
+const advTarget = adv.marks[0].target!;
+const advView = dockHighlightView(adv, T0, { projectId: 'p1', open: ALL_OPEN, isPresent: () => false, isCollapsed: (t) => t === advTarget, activeTab: 'cotizacion' });
+assert.deepEqual(advView.controls, [], 'un control plegado no se marca');
+assert.match(advView.sections.equipment ?? '', /Profundidad de descarga.*Avanzado/, 'la sección abierta indica que cambió dentro de Avanzado');
+assert.doesNotMatch(advView.sections.equipment ?? '', /organización/, 'y no culpa a la organización');
 // Un indicador largo se acorta con «y N más».
 const many = addHighlights(EMPTY_HIGHLIGHTS, { projectId: 'p1', now: T0, changes: ['client.name', 'client.location', 'client.address', 'client.contactPhone', 'client.contactPerson'].map((path) => ({ path, label: `Campo ${path}` })) });
 const folded = dockHighlightView(many, T0, { projectId: 'p1', open: { ...ALL_OPEN, client: false }, isPresent: () => true, activeTab: 'cotizacion' });
@@ -100,10 +107,19 @@ const matches = (e: FakeEl, selector: string) => {
 };
 const root: MarkRoot = {
   querySelectorAll: (selector) => els.filter((e) => matches(e, selector)),
-  querySelector: (selector) => els.find((e) => matches(e, selector)) ?? null,
+  // Selector descendiente de «Avanzado» plegado: ningún elemento de esta raíz lo está.
+  querySelector: (selector) => selector.startsWith('[data-dock-collapsed') ? null : els.find((e) => matches(e, selector)) ?? null,
 };
 assert.equal(presentInDock(root, 'pd-rates-kwh'), true);
 assert.equal(presentInDock(root, 'pd-no-esta'), false);
+// «Avanzado» plegado: la raíz de prueba sabe de los ancestros marcados (`data-dock-collapsed`).
+const hiddenRoot: MarkRoot = {
+  querySelectorAll: () => [],
+  querySelector: (selector) => selector.startsWith('[data-dock-collapsed="true"] ') ? (selector.includes('"pd-folded"') ? {} : null) : (selector.includes('"pd-folded"') || selector.includes('"pd-open"') ? {} : null),
+};
+assert.equal(collapsedInDock(hiddenRoot, 'pd-folded'), true);
+assert.equal(presentInDock(hiddenRoot, 'pd-folded'), false, 'en el DOM pero plegado: no se ve');
+assert.equal(presentInDock(hiddenRoot, 'pd-open'), true);
 syncChangedMarks(root, ['pd-rates-coverage', 'dock-equipment-panel-1']);
 assert.deepEqual(els.map((e) => e.attrs.get('data-assistant-changed') ?? null), ['control', null, 'control', null], 'destaca los controles pedidos y nada más');
 syncChangedMarks(root, ['pd-rates-kwh']);
