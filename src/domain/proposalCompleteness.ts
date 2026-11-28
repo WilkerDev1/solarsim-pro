@@ -5,9 +5,11 @@
  * - consumo: doce meses finitos ≥ 0 con algo de consumo;
  * - un panel y un inversor con potencia y cantidad;
  * - tarifa o precio de la energía (con red): un precio del kWh > 0 o la fila de la tarifa guardada;
- * - precio en cada equipo en uso (matriz de costos; en precio directo $/W los costos unitarios no fijan el precio). Un 0
- *   escrito a mano (`priceSource: 'manual'`: equipo que aporta el cliente, cortesía) es un precio dado; un 0 sin esa
- *   procedencia (lo heredado, lo que dejó un catálogo sin precio, una oferta a 0) cuenta como «sin precio».
+ * - precio en cada equipo en uso (matriz de costos; en precio directo $/W los costos unitarios no fijan el precio, con la
+ *   misma regla que el motor: `isDirectWattPricing`, que incluye una Simple sin `pricingMode`). Un 0 escrito a mano
+ *   (`priceSource: 'manual'`: equipo que aporta el cliente, cortesía) es un precio dado; un 0 sin esa procedencia (lo escrito
+ *   antes de 2.9.0, lo que dejó un catálogo sin precio, una oferta a 0) cuenta como «sin precio», con un motivo propio que
+ *   dice cómo confirmarlo (el campo ya muestra 0).
  * Mientras esté incompleta, los resultados se muestran vacíos con su motivo (nunca en cero) y no se exporta el PDF, no se
  * comparte ni se convierte a cotización. Una propuesta completa no cambia en nada: `proposalResults` da el resumen del motor tal cual.
  */
@@ -16,7 +18,8 @@ import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
 import { readEquipment } from '../../shared/equipment';
 import { proposalBillingTariff } from '../../shared/tariffBilling';
 import { resolveGridConnection } from '../../shared/gridConnection';
-import { calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { calculateProjectFinancialSummary, isDirectWattPricing } from '../engine/financeEngine';
+import { commercialState } from '../../shared/proposalCommercial';
 
 export type IncompleteReasonCode = 'missing_consumption' | 'missing_panel' | 'missing_inverter' | 'missing_energy_price' | 'missing_equipment_price';
 
@@ -64,18 +67,23 @@ export function proposalCompleteness(project: ProjectSimulation): ProposalComple
   if (resolveGridConnection(rates) !== 'off_grid' && !positive(rates.energyCostPerKWh) && !billedByBlocks) {
     reasons.push({ code: 'missing_energy_price', path: 'rates.energyCostPerKWh', message: 'Falta el precio de la energía: elige la tarifa de la distribuidora o escribe el precio del kWh.' });
   }
-  if (project.specs?.pricingMode !== 'direct_watt') {
-    const unpriced: { path: string; name: string }[] = [];
+  if (!isDirectWattPricing(project.specs ?? {})) {
+    const unpriced: { path: string; name: string; zero: boolean }[] = [];
     for (const list of ['panels', 'inverters', 'batteries'] as const) {
       equipment[list].forEach((group, index) => {
-        if (positive(group.count) && !priced(group)) unpriced.push({ path: `specs.${list}[${index}].unitPriceUSD`, name: group.brandModel?.trim() || LIST_LABEL[list] });
+        if (positive(group.count) && !priced(group)) {
+          unpriced.push({ path: `specs.${list}[${index}].unitPriceUSD`, name: group.brandModel?.trim() || LIST_LABEL[list], zero: group.unitPriceUSD === 0 });
+        }
       });
     }
     if (unpriced.length) {
-      reasons.push({
-        code: 'missing_equipment_price', path: unpriced[0].path,
-        message: `Falta el precio de ${unpriced.map((entry) => entry.name).join(', ')}: elige una oferta de proveedor o escribe el costo unitario.`,
-      });
+      const names = (zero: boolean) => unpriced.filter((entry) => entry.zero === zero).map((entry) => entry.name).join(', ');
+      // Un 0 sin procedencia (p. ej. tecleado antes de 2.9.0): el campo ya muestra 0 y volver a teclearlo no cambia nada.
+      const parts = [
+        names(false) && `Falta el precio de ${names(false)}: elige una oferta de proveedor o escribe el costo unitario.`,
+        names(true) && `El costo de ${names(true)} está en 0 sin confirmar: si el cliente aporta el equipo o es cortesía, borra el campo y escribe 0 de nuevo; si no, elige una oferta o escribe su costo.`,
+      ].filter(Boolean);
+      reasons.push({ code: 'missing_equipment_price', path: unpriced[0].path, message: parts.join(' ') });
     }
   }
   return { incomplete: reasons.length > 0, reasons };
@@ -105,9 +113,12 @@ export const shownMetric = (completeness: ProposalCompleteness, text: string): s
 /**
  * Precio de contrato que suma en los totales de ventas (cliente, panel de ventas): el del motor, o 0 si está incompleta
  * (su contrato es un relleno: solo la mano de obra, equipos a 0…). La propuesta sigue contando en los conteos por decisión.
+ * Con la decisión comercial ya tomada (aprobada o rechazada), siempre el del motor: es lo que se vendió o se ofreció, y los
+ * importes históricos no cambian porque hoy salga incompleta (un 0 tecleado antes de 2.9.0, ADR 0009).
  */
 export function contractPriceForTotals(project: ProjectSimulation, calculationMode: EnergyCalculationMode = 'legacy'): number {
-  return proposalCompleteness(project).incomplete ? 0 : calculateProjectFinancialSummary(project, calculationMode).contractPriceUSD;
+  const decided = ['approved', 'rejected'].includes(commercialState(project).status);
+  return !decided && proposalCompleteness(project).incomplete ? 0 : calculateProjectFinancialSummary(project, calculationMode).contractPriceUSD;
 }
 
 /** Texto corto de los motivos, para un tooltip o un aviso. */

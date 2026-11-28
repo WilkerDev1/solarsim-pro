@@ -142,7 +142,8 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
 
       <div className="flex items-baseline justify-between pt-1">
         <span className="text-[13px] text-pd-muted">Total de venta</span>
-        <span className="font-mono text-lg font-semibold text-pd-accent">${usd(summary?.grossInvestmentUSD || 0)}</span>
+        {/* Incompleta: «—» como el resto del bloque (la cifra parcial, sin los equipos sin precio, parecería un resultado). */}
+        <span className="font-mono text-lg font-semibold text-pd-accent">{shownMetric(completeness, `$${usd(summary?.grossInvestmentUSD || 0)}`)}</span>
       </div>
     </div>
   );

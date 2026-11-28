@@ -2,8 +2,10 @@
 // para calcular, `proposalCompleteness` dice por qué (en español), los resultados no se muestran (nunca en cero) y no se
 // puede exportar el PDF, compartir ni convertir a cotización. Una propuesta completa no cambia en nada.
 import assert from 'node:assert/strict';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
-import { calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { migrateLegacySpecs } from '../../shared/equipment';
+import { calculateProjectFinancialSummary, isDirectWattPricing } from '../engine/financeEngine';
+import { salesPerformance } from '../features/proposals/commercial';
 import { contractPriceForTotals, PENDING_VALUE, proposalActionBlock, proposalCompleteness, proposalResults, shownMetric } from '../domain/proposalCompleteness';
 import { proposalDocumentSections } from '../utils/pdfLayout';
 import { DEFAULT_PDF_SECTION_ORDER } from '../constants/pdfSections';
@@ -99,6 +101,62 @@ assert.equal(PENDING_VALUE, '—');
 // Totales de ventas: una incompleta no suma su contrato de relleno (hallazgo 6).
 assert.equal(contractPriceForTotals(complete), computed.contractPriceUSD);
 assert.equal(contractPriceForTotals(incomplete), 0);
+
+// ── Segunda revisión de F2b ─────────────────────────────────────────────────────────────────
+// 7. El precio directo lo decide la misma regla que el motor (`isDirectWattPricing`): una propuesta Simple sin `pricingMode`
+// (un .json importado, una pasada a «Catálogo» antes de bc40d92, un borrador de IA antes de e63e173) la cotiza el motor
+// por $/W y su contrato no depende del precio de los equipos, así que no es incompleta por ellos.
+const simpleNoMode = (patch: Record<string, unknown>, kind: 'panel' | 'inverter' = 'panel') => without((p) => {
+  const { pricingMode: _mode, ...rest } = p.specs;
+  p.specs = { ...rest, isDetailed: false, ...editEquipmentGroup(rest, kind, { type: 'update', index: 0, patch }) };
+});
+for (const [label, project] of [
+  ['grupos simple sin pricingMode, panel a 0', simpleNoMode({ unitPriceUSD: 0 })],
+  ['grupos simple sin pricingMode, precio undefined', simpleNoMode({ unitPriceUSD: undefined })],
+  ['grupos simple sin pricingMode, inversor a 0', simpleNoMode({ unitPriceUSD: 0 }, 'inverter')],
+] as const) {
+  assert.equal(isDirectWattPricing(project.specs), true, `${label}: el motor la cotiza por $/W`);
+  assert.deepEqual(codes(project), [], `${label}: completa (el contrato no depende del precio de los equipos)`);
+}
+// El espejo 2.6 (sin listas de grupos) en Simple sin pricingMode, con el panel a 0: igual.
+const mirrorSpecs = { ...BENCHMARK_LEGACY_SPECS, isDetailed: false, panelUnitPriceUSD: 0 } as ProjectSimulation['specs'];
+for (const [label, specs] of [['espejo tal cual', mirrorSpecs], ['espejo migrado (hidratación)', migrateLegacySpecs(mirrorSpecs)]] as const) {
+  const mirror = without((p) => { p.specs = specs as ProjectSimulation['specs']; });
+  assert.equal(isDirectWattPricing(mirror.specs), true, label);
+  assert.deepEqual(codes(mirror), [], `${label}: simple sin pricingMode con el panel a 0, completa`);
+}
+// Las otras combinaciones siguen la regla del motor.
+assert.equal(isDirectWattPricing({ ...complete.specs, isDetailed: false, pricingMode: 'cost_matrix' }), false, 'Simple con matriz explícita: matriz');
+assert.equal(isDirectWattPricing({ ...complete.specs, isDetailed: true, pricingMode: undefined }), false, 'Detallado sin modo: matriz');
+assert.equal(isDirectWattPricing({ ...complete.specs, isDetailed: true, pricingMode: 'direct_watt' }), true);
+
+// 8. Un 0 sin procedencia (lo escrito a mano antes de 2.9.0, d73c119) dice cómo confirmarlo: teclear el mismo 0 en el campo no
+// lo cambia, hay que borrarlo y escribirlo de nuevo.
+const legacyZero = proposalCompleteness(without((p) => { p.specs = { ...p.specs, ...editEquipmentGroup(p.specs, 'inverter', { type: 'update', index: 0, patch: { unitPriceUSD: 0, priceSource: undefined } }) }; }));
+assert.deepEqual(legacyZero.reasons.map((r) => r.code), ['missing_equipment_price']);
+assert.match(legacyZero.reasons[0].message, /Inversor Lux Power.*en 0 sin confirmar/, 'el motivo dice que el 0 está sin confirmar');
+assert.match(legacyZero.reasons[0].message, /borra el campo y escribe 0/, 'y cómo confirmarlo');
+assert.doesNotMatch(legacyZero.reasons[0].message, /Falta el precio/, 'no dice que falta: el campo ya muestra 0');
+assert.equal(legacyZero.reasons[0].path, 'specs.inverters[0].unitPriceUSD');
+// Sin precio y con un 0 sin confirmar a la vez: los dos textos, cada equipo en el suyo.
+const both = proposalCompleteness(without((p) => {
+  p.specs = { ...p.specs, ...editEquipmentGroup(p.specs, 'panel', { type: 'update', index: 0, patch: { unitPriceUSD: undefined } }) };
+  p.specs = { ...p.specs, ...editEquipmentGroup(p.specs, 'inverter', { type: 'update', index: 0, patch: { unitPriceUSD: 0, priceSource: undefined } }) };
+}));
+assert.equal(both.reasons.length, 1, 'un solo motivo de precio');
+assert.match(both.reasons[0].message, /^Falta el precio de Módulos CANADIAN[^:]*: .*El costo de Inversor Lux Power.* está en 0 sin confirmar/);
+
+// 9. Una propuesta con la decisión comercial tomada (aprobada o rechazada) suma el contrato del motor, aunque hoy salga
+// incompleta: es lo que se vendió, y los importes históricos (monto aprobado del cliente, panel de ventas) no cambian.
+const soldIncomplete = { ...structuredClone(incomplete), commercial: { status: 'approved' as const, note: '' } };
+assert.equal(proposalCompleteness(soldIncomplete).incomplete, true, 'sigue incompleta (el bloqueo de exportar se queda)');
+assert.equal(contractPriceForTotals(soldIncomplete), calculateProjectFinancialSummary(soldIncomplete).contractPriceUSD, 'aprobada: el contrato del motor');
+assert.ok(contractPriceForTotals(soldIncomplete) > 0);
+const rejectedIncomplete = { ...structuredClone(incomplete), commercial: { status: 'rejected' as const, note: '' } };
+assert.equal(contractPriceForTotals(rejectedIncomplete), calculateProjectFinancialSummary(rejectedIncomplete).contractPriceUSD, 'rechazada: el contrato del motor');
+assert.equal(contractPriceForTotals({ ...structuredClone(incomplete), commercial: { status: 'pending' as const, note: '' } }), 0, 'pendiente e incompleta: 0');
+assert.equal(salesPerformance([soldIncomplete], (p) => contractPriceForTotals(p)).sellers[0].amountUSD, calculateProjectFinancialSummary(soldIncomplete).contractPriceUSD, 'el panel de ventas suma lo vendido');
+
 // Documento (vista del PDF y visor de la cotización, hallazgo 2): incompleta ⇒ solo las páginas sin cifras, más el motivo.
 const visibility = Object.fromEntries(DEFAULT_PDF_SECTION_ORDER.map((id) => [id, true])) as Record<(typeof DEFAULT_PDF_SECTION_ORDER)[number], boolean>;
 assert.deepEqual(proposalDocumentSections(DEFAULT_PDF_SECTION_ORDER, visibility, false), { sections: DEFAULT_PDF_SECTION_ORDER, pending: false }, 'completa: el documento de siempre');
@@ -114,7 +172,8 @@ const uses: Record<string, string[]> = {
   'src/components/pdf/PDFProposalView.tsx': ['proposalResults(', 'proposalDocumentSections('],
   'src/components/quotations/editor/ProposalViewer.tsx': ['proposalResults('],
   'src/components/quotations/editor/ProposalViewerDocument.tsx': ['proposalDocumentSections('],
-  'src/components/simulator/sidebar/PricingParamsSection.tsx': ['shownMetric('],
+  // «Total de venta» también (QA de F2b: mostraba la cifra parcial sin los equipos sin precio).
+  'src/components/simulator/sidebar/PricingParamsSection.tsx': ['shownMetric(', 'shownMetric(completeness, `$${usd(summary?.grossInvestmentUSD'],
   'src/components/simulator/params/sections/pricing/DirectPrice.tsx': ['shownMetric('],
   'src/components/simulator/sidebar/BatteryEquipmentSection.tsx': ['shownMetric('],
   'src/components/clients/ClientDetailPanel.tsx': ['contractPriceForTotals('],
