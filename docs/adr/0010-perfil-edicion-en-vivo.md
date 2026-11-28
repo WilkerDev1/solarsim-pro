@@ -55,19 +55,19 @@ El perfil es un campo nuevo y persistido de la política, `agentPolicy.appAssist
 - **Lo que la organización oculta** (el régimen de medición neta con su selector apagado) sigue rechazándose con su motivo.
 - **La revalidación al confirmar** (huella del diff mostrado) sigue para el perfil `confirm` y para los agentes externos.
 
-### 4. Encendido del asistente flotante: migración escrita y apagada
+### 4. Encendido del asistente flotante: migración de una sola vez
 
 `appAssistantEnabled` es `false` de fábrica y se guarda siempre, así que en cada instalación ya está escrito: cambiar el valor de fábrica no enciende a nadie. `migrateAppAssistantEnabled` (`src/store/persistence/appAssistantEnablement.ts`) lo resuelve con dos campos persistidos: `appAssistantEnabledChosenByUser` (el interruptor de Ajustes lo marca desde F3b) y la marca `appAssistantDefaultsVersion`. Con la bandera `APP_ASSISTANT_ON_BY_DEFAULT` encendida, la hidratación enciende **una vez** a quien nunca eligió y estampa la marca; después, un apagado cuenta.
 
-Limitación: quien apagó el asistente **antes** de F3b lo hizo sin el interruptor que registra la elección, así que su `false` no se distingue del de fábrica y se encenderá una vez cuando la bandera se encienda (después, su apagado ya cuenta). F4/F5b debe avisarlo en las notas de la versión.
+Limitación: quien apagó el asistente **antes** de F3b lo hizo sin el interruptor que registra la elección, así que su `false` no se distingue del de fábrica y se enciende una vez con la bandera (después, su apagado ya cuenta). Las notas de la 2.11.0 deben avisarlo.
 
 La hidratación acepta la bandera como opción (`hydrateSimulationStore(state, { appAssistantOnByDefault })`, solo para pruebas) y `testAssistantLiveEditProfile` fija el ciclo completo con ella encendida: guardado antiguo con `false` → encendido y marca → apagado con el interruptor → guardar → rehidratar → sigue apagado.
 
-La bandera queda **apagada** en F3b: encender hoy el asistente expondría a todos al flotante actual (bucle antiguo, `propose_project_update`, sin el panel nuevo). La encienden F4/F5b, junto con el registro del asistente en `shared/applicationFeatures.ts` (mejora M6 de la revisión). Mientras tanto la hidratación hace lo de siempre (solo `true` enciende) y no estampa la marca.
+La bandera quedó **apagada** en F3b y F4 (encenderla antes del panel completo exponía a todos a un asistente a medias). **F5b la enciende** ([ADR 0012](0012-panel-completo-del-asistente.md#7-encendido-por-defecto)): un estado guardado antiguo arranca encendido y queda la marca; el valor de fábrica del store también es `true` con la marca en 0, para que lo heredado al fusionarse siga pasando por la migración. El registro en `shared/applicationFeatures.ts` que pedía la revisión (M6) no se hace: `shared/` no se toca para que la 2.11.0 sea solo de cliente, y el encendido es una preferencia de este equipo, no una política de la organización. Con la bandera en `false` (`{ onByDefault: false }`, solo pruebas) la hidratación vuelve a lo de antes: solo `true` enciende y no estampa la marca.
 
 ## Consecuencias
 
 - El criterio de aceptación del plan se cumple: la misma llamada `edit_proposal` con un precio se aplica en vivo desde el asistente de la app y queda pendiente desde un agente externo; lo compartido se confirma en ambas; `propose_project_update` y las copias doradas (`AGENT_RULES_ES`, las 12 herramientas remotas) no cambian. Lo fija `testAssistantLiveEditProfile`.
 - Hasta F4 nada declara el conjunto nuevo al modelo: el asistente flotante de hoy sigue con `propose_project_update` y confirma precios como siempre.
-- Ajustes → Agentes no muestra todavía un selector del perfil: el campo existe y se guarda, y lo expone F5b con el panel nuevo (con su ⓘ). El resaltado en vivo del cambio (F5a) ya está: [docs/QA.md](../QA.md#feedback-en-vivo-del-asistente-f5a).
+- Ajustes → Agentes → Asistentes de la aplicación muestra el selector del perfil («Edición en vivo, con deshacer» / «Pedir confirmación para precios») con su ⓘ desde F5b. El resaltado en vivo del cambio (F5a) y la tarjeta de cambio en el panel (F5b) ya están: [docs/QA.md](../QA.md#asistente-panel-completo-f5b).
 - Un plan nuevo que solo cambie una propuesta y tenga deshacer puede pasar `scope: 'proposal'` a `runNativeTool`; nada más cambia de decisión sin pasar por `permissionProfile.ts`.

@@ -25,7 +25,7 @@ Red de seguridad de la unificación de los asistentes de IA: fija el comportamie
 
 ### Feedback en vivo del asistente (F5a)
 
-Los cambios que aplica el asistente se ven en el simulador sin que la interfaz navegue: el control afectado se destaca unos segundos y lo que no se ve en un control lleva un indicador discreto «Cambió aquí». Es de F5a; el panel que monta la tarjeta es de F5b ([API para F5b](#api-para-f5b)).
+Los cambios que aplica el asistente se ven en el simulador sin que la interfaz navegue: el control afectado se destaca unos segundos y lo que no se ve en un control lleva un indicador discreto «Cambió aquí». Es de F5a; desde F5b el panel del asistente monta la tarjeta con cada cambio real ([API que monta el panel](#api-que-monta-el-panel-f5b), [guion del panel](#asistente-panel-completo-f5b)).
 
 - **Anclas** (`src/domain/fieldAnchors.ts`, puro): `anchorForPath(ruta)` dice dónde se ve cada ruta del registro de campos: el control (`data-dock-anchor` = su id: `pd-rates-coverage`), la fila de una lista (`dock-equipment-panel-1`, `dock-financials-item-0`) o la sección del dock / la pestaña. `testFieldAnchors` recorre TODAS las rutas de control del registro y falla si una queda sin ancla y sin exención con su motivo (`ANCHOR_EXEMPTIONS`, hoy vacía), si un id no existe en el dock o si un componente no expone el atributo.
 - **Resaltado** (`src/domain/dockHighlight.ts` puro, `src/store/dockHighlightStore.ts` fuera de React, `useDockHighlight`): `commitProjectEdits` lo alimenta solo cuando el origen del lote es `assistant` (el asistente flotante de hoy escribe así su `propose_project_update` confirmado o aplicado en vivo; un agente externo, el dock y el usuario no destacan nada). Dura 6 s, no abre secciones, no desplaza y no mueve el foco; con `prefers-reduced-motion` queda el contorno fijo, sin pulso. Una sección plegada, un control que no está en pantalla (lo oculta la organización o el modo, p. ej. el régimen de medición neta) y lo que ningún control edita (RNC, NIC…) llevan el indicador en la cabecera de la sección con el detalle en su tooltip; los controles dentro de un «Avanzado» plegado (eficiencia, coeficiente de temperatura, degradación, DoD, eficiencia y reemplazo de batería) caen en el indicador de su sección con la nota «en Avanzado, plegado»; el consumo mensual lo lleva en la pestaña de Energía si no es la que se ve, y si la pestaña de Energía ya está a la vista el consumo solo se actualiza, sin destacado (la tabla no tiene ancla).
@@ -43,7 +43,7 @@ solarsimFeedbackQA.close()
 
 El gancho (`src/features/assistantFeedback/devHook.ts`) solo existe con `import.meta.env.DEV`. Con el asistente flotante encendido (Ajustes → Funciones), pedirle un cambio de cobertura o de descuento también destaca el control. Comprobar: el control se perfila en verde unos segundos; plegar la sección de Tarifas y repetir deja un punto en su cabecera con «Cambió aquí: …»; editar a mano en el dock no destaca nada; con el sistema en «reducir movimiento» no hay pulso.
 
-#### API para F5b
+#### API que monta el panel (F5b)
 
 ```ts
 import { ChangeCard, changeCardInputFromResponse, publishAssistantHighlight } from '../assistantFeedback';
@@ -102,7 +102,7 @@ Las capturas de QA se guardan localmente en `docs/qa/` (ignorado por Git) y cont
 
 ### Asistente: «crea una propuesta» (F4)
 
-Guion manual del criterio de aceptación de F4 ([ADR 0011](adr/0011-sesion-y-bucle-del-asistente.md)). Sin clave, con la fixture: `npm run dev` y abrir `/scripts/qa/fixtures/appAssistant.html` (modelo falso en el puerto, sin red; las palabras clave «crea», «90» y «equipo» eligen la herramienta). Con clave real, en la app (`npm run electron:dev` o `npm run dev`): Ajustes → IA con tu API Key; Ajustes → Funciones de la aplicación → encender el asistente (sigue apagado por defecto).
+Guion manual del criterio de aceptación de F4 ([ADR 0011](adr/0011-sesion-y-bucle-del-asistente.md)). Sin clave, con la fixture: `npm run dev` y abrir `/scripts/qa/fixtures/appAssistant.html` (modelo falso en el puerto, sin red; las palabras clave «crea», «90» y «equipo» eligen la herramienta). Con clave real, en la app (`npm run electron:dev` o `npm run dev`): Ajustes → IA con tu API Key; el asistente está encendido por defecto desde F5b (Ajustes → Funciones de la aplicación lo apaga).
 
 1. En **Inicio**, abrir el asistente («Asistente», abajo a la derecha) y escribir «Crea una propuesta». Mientras trabaja se ve «Pensando…» y luego el paso «Crear propuesta».
 2. Sin tocar nada, la app pasa al **simulador** con la propuesta nueva (código y cliente en la cabecera del chat) y el chat sigue abierto con su conversación.
@@ -112,6 +112,21 @@ Guion manual del criterio de aceptación de F4 ([ADR 0011](adr/0011-sesion-y-buc
 6. **Detener**: enviar un mensaje y pulsar el cuadrado mientras trabaja. El turno se cierra («Detenido…»), no se reenvía nada y el siguiente mensaje funciona.
 7. **Sin clave** (borrarla en Ajustes → IA): el compositor avisa «Configura Gemini para conversar» con el botón a Ajustes. Escribir «crea una propuesta» y pulsar Enter: el hilo muestra el mensaje del usuario y la respuesta de error «Configura una API Key de Google Gemini en Ajustes → IA…» con el botón a Ajustes; no se llama al modelo ni queda ningún turno colgado.
 8. Con clave real, adjuntar una factura PDF y pedir «Crea una propuesta con esta factura»: el modelo llama a «Leer factura» y luego a «Crear propuesta» con la referencia; la propuesta nace con el cliente y el consumo de la factura (o su promedio, avisado).
+
+### Asistente: panel completo (F5b)
+
+Guion manual de F5b ([ADR 0012](adr/0012-panel-completo-del-asistente.md)); lo automático lo fija `testAssistantFullPanel`. Con la fixture (`npm run dev` y `/scripts/qa/fixtures/appAssistant.html`, modelo falso) o en la app con clave real (`npm run electron:dev`).
+
+1. **Encendido por defecto.** Con un perfil guardado antiguo (o borrando `appAssistantEnabledChosenByUser` y `appAssistantDefaultsVersion` de `solarsim-pro-storage` en el almacenamiento local): al arrancar aparece el botón «Asistente», sin modales ni avisos. Ajustes → Funciones → apagarlo, recargar: sigue apagado. Sin clave de API, abrir el panel muestra solo el aviso discreto «Configura Gemini para conversar» con el botón a Ajustes.
+2. **Todas las vistas.** El botón aparece en Inicio, simulador, resumen, PDF, Clientes, Empresas y Cotizaciones (con la función de cotizaciones apagada, no en esas vistas).
+3. **Acoplado.** Ventana de 1440 px o más, abrir una propuesta en el simulador y abrir el asistente: se acopla como columna a la derecha (sin sombra) y el contenido se estrecha sin quedar tapado; el dock de parámetros no cambia. Arrastrar el borde izquierdo de la columna (o Tab hasta él y ←/→; Inicio vuelve al ancho de fábrica): entre 280 y 720 px, sin dejar al contenido por debajo de 640 px. En el resumen y el PDF, igual. A 1280 px en el simulador, o en pantalla dividida, vuelve a flotar; en Inicio flota siempre. Pasar de acoplado a flotante (estrechar la ventana) conserva lo escrito en el compositor y la conversación. Acoplado, Esc no cierra la columna; flotante, Esc la cierra.
+4. **Clave del panel.** Con una conversación abierta, cambiar de propuesta desde el dock o crear una nueva: el panel no parpadea ni pierde el borrador.
+5. **Escribir mientras trabaja.** Pedir «Ponle baterías» y, mientras trabaja, escribir «y la cobertura al 90 %» y Enter: el campo no se bloquea, aparece la burbuja «En cola, al terminar el paso: …» con «Editar», y al terminar el paso en curso el turno se cierra («Pausé aquí para leer tu mensaje…») y el mensaje se entrega como turno nuevo. «Editar» devuelve el texto al compositor sin detener el turno.
+6. **Detener con cola.** Repetir el punto 5 y pulsar Detener (el cuadrado, aparte del botón de enviar): el turno se cierra «Detenido…», no se envía nada más y el texto encolado vuelve al compositor.
+7. **Cerrar no cancela; insignia.** Enviar una petición y cerrar el panel: el botón «Asistente» muestra un punto claro que respira (sin animación con «reducir movimiento»); al terminar, un punto ámbar. Abrir el panel lo quita y la respuesta está entera.
+8. **Tarjeta de cambio.** «cobertura 90» (fixture) o «Ponle baterías»: el turno pinta la tarjeta con «Cambios aplicados», antes → después, «Se ajustó solo», los resultados del motor (kWp, precio, ahorro, retorno) y los avisos como ⓘ; el control del dock se destaca unos segundos. «Deshacer» revierte y la tarjeta pasa a «Cambio deshecho». Con Ajustes → Agentes → «Pedir confirmación para precios», «Margen 30 %» deja la tarjeta «Espera tu confirmación» con Confirmar/Rechazar, que se pueden pulsar aunque el asistente siga trabajando. En una propuesta incompleta la tarjeta no muestra cifras, solo «Resultados pendientes».
+9. **Las tres entradas.** (a) Menú de IA del dock → «Asistente»: abre el panel (no el modal antiguo). (b) Nueva simulación → escribir un nombre → «Crear con el asistente de IA»: se cierra el modal y el compositor queda con «Crea una propuesta llamada «…»», sin enviarlo. (c) Simulador → Energía → «Autocompletar con factura (asistente)»: se abre el panel con el borrador sugerido y el selector de archivos del sistema. Con el asistente apagado en Ajustes, cualquiera de las tres lo enciende.
+10. **Ajustes → Agentes.** En «Asistentes de la aplicación», el selector «Cambios dentro de una propuesta (asistente general)» con su ⓘ; cambiarlo a «Pedir confirmación» y repetir el punto 8.
 
 Los resultados de una ejecución concreta se registran en el PR o commit correspondiente, no en documentos fechados.
 
