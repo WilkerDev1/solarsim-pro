@@ -10,6 +10,7 @@ import { normalizeBrandName, inferBrandFromText } from '../../utils/equipmentBra
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 import { migrateDefaultSimulationSettings } from '../defaultSimulationSettings';
 import { normalizeAgentPolicy } from '../slices/agentSlice';
+import { migrateAppAssistantEnabled } from './appAssistantEnablement';
 import { migrateLegacySpecs } from '../../../shared/equipment';
 import { migrateStoredGeminiModel } from '../slices/aiSlice';
 import { normalizePriceState } from '../slices/equipmentPriceSlice';
@@ -33,7 +34,12 @@ function isLegacyServerUrl(url: string | undefined): boolean {
   return !!url && url.startsWith('http://10.') && serverUrlFingerprint(url) === RETIRED_LAN_SERVER_FINGERPRINT;
 }
 
-export function hydrateSimulationStore(state: SimulationStore | undefined): void {
+export interface HydrateOptions {
+  /** Solo para pruebas: la bandera del encendido del asistente (por defecto, APP_ASSISTANT_ON_BY_DEFAULT). */
+  appAssistantOnByDefault?: boolean;
+}
+
+export function hydrateSimulationStore(state: SimulationStore | undefined, options: HydrateOptions = {}): void {
   // `activeView` se guarda pero `activeQuotationId` no: reabrir en el editor dejaría una vista sin cotización.
   if (state?.activeView === 'quotation-editor') state.activeView = 'quotations-hub';
   if (state && state.projects && Array.isArray(state.projects)) {
@@ -135,7 +141,8 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
     }
   }
   if (state) {
-    state.appAssistantEnabled = state.appAssistantEnabled === true;
+    // F3b: encendido de una sola vez detrás de APP_ASSISTANT_ON_BY_DEFAULT (apagada hasta F4/F5b); hoy, solo `true` enciende.
+    Object.assign(state, migrateAppAssistantEnabled(state, { onByDefault: options.appAssistantOnByDefault }));
     if (!state.equipmentCatalog || !Array.isArray(state.equipmentCatalog) || state.equipmentCatalog.length === 0) {
       state.equipmentCatalog = DEFAULT_EQUIPMENT_CATALOG.filter((equipment) => !(state.deletedEquipmentIds || []).includes(equipment.id));
     } else {

@@ -4,8 +4,8 @@
  * de «incompleta»), avisos y sus datos. `toolset.ts` le añade el estado y el resumen vivo de la propuesta.
  *
  * Las escrituras son planes (`NativePlan`) que pasan por `runNativeTool`, con los permisos de siempre (política por fuente,
- * rol actual, confirmación; F3b decide el perfil «edición en vivo»). `execute` revalida todo: la confirmación puede llegar
- * minutos después.
+ * rol actual, confirmación y el perfil «edición en vivo» de F3b: `toolset.ts` dice qué planes se quedan dentro de una propuesta).
+ * `execute` revalida todo: la confirmación puede llegar minutos después, y un cambio en vivo también se revalida al aplicarse.
  */
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { effectiveFeatureSettings } from '../../application/featurePolicy';
@@ -359,6 +359,21 @@ function undoTargets(proposalId: string, args: Record<string, unknown>): AgentAc
 export function undoNeedsConfirmation(args: Record<string, unknown>): boolean {
   if (typeof args.proposalId !== 'string') return false;
   return undoTargets(args.proposalId, args).some((entry) => entry.kind === 'guarded' || entry.undo?.op === 'trash' || entry.undo?.op === 'restore');
+}
+
+/** Herramientas cuyos cambios se quedan DENTRO de una propuesta (F3b): su deshacer también. Lista blanca, no negra. */
+const PROPOSAL_SCOPED_TOOLS = new Set(['edit_proposal']);
+
+/**
+ * ¿El deshacer se queda DENTRO de la propuesta (F3b)? Solo si TODOS los cambios que revierte los hizo una herramienta de
+ * alcance propuesta (`edit_proposal`) y ninguno manda a la papelera ni restaura. Deshacer el estado técnico, la decisión
+ * comercial, una creación o cualquier otra herramienta compartida se confirma también con el perfil «edición en vivo»: lo que
+ * se confirmó al hacerlo se confirma al deshacerlo.
+ */
+export function undoStaysInProposal(args: Record<string, unknown>): boolean {
+  if (typeof args.proposalId !== 'string') return false;
+  const targets = undoTargets(args.proposalId, args);
+  return targets.length > 0 && targets.every((entry) => PROPOSAL_SCOPED_TOOLS.has(entry.tool) && entry.undo?.op !== 'trash' && entry.undo?.op !== 'restore');
 }
 
 /**
