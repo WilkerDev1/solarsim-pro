@@ -1,3 +1,4 @@
+import type { UndoHistory, UndoRecordOptions } from './undo/projectUndoJournal';
 import { StateCreator } from 'zustand';
 import {
   ProjectSimulation,
@@ -354,8 +355,9 @@ export interface CompanyProfileSlice {
 }
 
 export interface VersionHistorySlice {
-  undoStack: ProjectSimulation[];
-  redoStack: ProjectSimulation[];
+  /** Diario de deshacer por propuesta, solo en memoria (src/store/undo/projectUndoJournal.ts; ADR 0004). */
+  undoHistory: UndoHistory;
+  /** Si la propuesta activa tiene pasos que deshacer o rehacer en su propio diario. */
   canUndo: boolean;
   canRedo: boolean;
   snapshotsByProject: Record<string, ProjectSnapshot[]>;
@@ -363,7 +365,12 @@ export interface VersionHistorySlice {
   projectConflicts: Record<string, ProjectConflictInfo>;
   openProjectConflict: (projectId: string) => Promise<{ success: boolean; error?: string }>;
 
-  recordUndoState: (project: ProjectSimulation) => void;
+  /** Registra el estado actual de la propuesta activa en su diario (sin opciones: fuente `user`, agrupado con la clave por defecto). */
+  recordUndoState: (project: ProjectSimulation, options?: UndoRecordOptions) => void;
+  /** Activa el diario de la propuesta que acaba de quedar activa (abrir, crear, duplicar…): siembra su base, nunca hereda otra. */
+  activateUndoJournal: (project: ProjectSimulation) => void;
+  /** Olvida el diario de una propuesta (papelera, borrado). */
+  forgetUndoJournal: (projectId: string) => void;
   undo: () => void;
   redo: () => void;
   createSnapshot: (projectId: string, label: string, notes?: string, type?: 'auto' | 'manual') => ProjectSnapshot;

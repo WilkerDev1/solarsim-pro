@@ -151,6 +151,9 @@ export const PDFProposalView: React.FC = () => {
         onOpenShareModal={openShareModal}
         onRefresh={() => {
           useSimulationStore.setState({ activeProjectId: project.id });
+          // Los botones de deshacer pasan al diario de ESTA propuesta (sin él mostrarían los de la anterior).
+          const { activateUndoJournal, getActiveProject } = useSimulationStore.getState();
+          activateUndoJournal(getActiveProject());
         }}
         updateSpecs={updateSpecs}
         updateDocumentCustomization={updateDocumentCustomization}

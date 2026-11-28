@@ -16,6 +16,7 @@ import { editEquipmentGroup } from '../utils/equipmentGroups';
 import { useSimulationStore as store } from '../store/useSimulationStore';
 import type { ProjectSimulation } from '../types';
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipment';
+import { EMPTY_UNDO_HISTORY } from '../store/undo/projectUndoJournal';
 
 /**
  * Edición de proyecto (ADR 0004). La misma matriz de escenarios corre contra dos adaptadores:
@@ -384,14 +385,15 @@ runSupplierPriceMatrix(viaModule, 'módulo');
 
 // ── Mirar no escribe (decisión c) y deshacer (decisión b): contra el store ───────────────────
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const UNDO_DEBOUNCE_MS = 700; // recordUndoState agrupa en 600 ms
+const UNDO_DEBOUNCE_MS = 700; // el diario agrupa las ediciones seguidas en una ventana de 600 ms
+const undoSteps = () => store.getState().undoHistory.journals[store.getState().activeProjectId]?.undo.length ?? 0;
 
 /** Instala `project` como activo con el historial de deshacer vacío, ejecuta `body` y restaura el store. */
 async function inStore<T>(project: ProjectSimulation, body: () => Promise<T>): Promise<T> {
   await wait(UNDO_DEBOUNCE_MS); // deja correr el temporizador de deshacer de la prueba anterior
   const original = store.getState();
   try {
-    store.setState({ projects: [structuredClone(project)], activeProjectId: project.id, equipmentCatalog: CATALOG, undoStack: [], redoStack: [], canUndo: false, canRedo: false });
+    store.setState({ projects: [structuredClone(project)], activeProjectId: project.id, equipmentCatalog: CATALOG, undoHistory: EMPTY_UNDO_HISTORY, canUndo: false, canRedo: false });
     store.getState().setActiveProject(project.id, 'simulator'); // abrir la propuesta: inicia la base del historial
     return await body();
   } finally {
@@ -435,11 +437,11 @@ async function main() {
       assert.equal(after.projects, before.projects, '(c) ver el proyecto no escribe: el arreglo de proyectos es el mismo');
       assert.equal(after.projects[0], project, '(c) ni reemplaza la propuesta');
       assert.equal(autoSyncCalls, 0, '(c) ni dispara sincronización');
-      assert.equal(after.undoStack, before.undoStack, '(c) ni registra deshacer');
-      assert.equal(after.undoStack.length, 1, 'solo la base que inicia al abrir la propuesta');
+      assert.equal(after.undoHistory, before.undoHistory, '(c) ni registra deshacer');
+      assert.equal(undoSteps(), 0, 'solo la base que siembra abrir la propuesta, sin pasos');
       after.setActiveProject(project.id, 'simulator'); // reabrir la misma propuesta
       await wait(UNDO_DEBOUNCE_MS);
-      assert.equal(store.getState().undoStack.length, 1, '(c) reabrir la misma propuesta tampoco agrega entradas de deshacer');
+      assert.equal(undoSteps(), 0, '(c) reabrir la misma propuesta tampoco agrega entradas de deshacer');
       assert.equal(store.getState().canUndo, false);
       // La siguiente edición real sí reconcilia con el catálogo.
       after.updateRates({ energyCostPerKWh: 0.3 });
@@ -453,12 +455,12 @@ async function main() {
     // (Antes: «aplicar un precio no deja entrada de deshacer».)
     const p = baseProject((q) => { q.id = 'proj-edit-undo'; });
     await inStore(p, async () => {
-      assert.equal(store.getState().undoStack.length, 1);
+      assert.equal(undoSteps(), 0);
       store.getState().applySupplierPriceToProject('panel', CATALOG[1].supplierPrices![0], CATALOG[1]);
       assert.match(store.getState().saveFeedbackMessage ?? '', /Precio aplicado: Beta \(\$130 USD\)/, 'el mensaje de confirmación se conserva');
       await wait(UNDO_DEBOUNCE_MS);
       const applied = store.getState();
-      assert.equal(applied.undoStack.length, 2, '(b) el precio deja una entrada de deshacer');
+      assert.equal(undoSteps(), 1, '(b) el precio deja una entrada de deshacer');
       assert.equal(applied.canUndo, true);
       assert.equal(panelsOf(applied.projects[0])[0].selectedSupplierInfo?.supplierName, 'Beta');
       applied.undo();

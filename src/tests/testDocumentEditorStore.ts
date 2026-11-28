@@ -12,6 +12,7 @@ import { canEditDocument, documentTextContextFor } from '../components/pdf/edito
 import { resolveDocumentText } from '../../shared/documentTexts';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { OptionalTextRow } from '../components/pdf/editor/OptionalTextRow';
+import { EMPTY_UNDO_HISTORY, activateJournal, recordUndo, undoAvailability, undoStep } from '../store/undo/projectUndoJournal';
 
 const store = () => useSimulationStore.getState();
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -84,7 +85,14 @@ assert.equal(before.isDeleted, true);
 store().setDocumentTexts({ 'quotation.warranty.inverter': 'No debe guardarse' });
 assert.deepEqual(trashed().customization, before.customization);
 // History is read-only for trashed proposals too (undo/redo cannot rewrite them).
-useSimulationStore.setState({ undoStack: [structuredClone(before), { ...structuredClone(before), client: { ...before.client, name: 'Otro nombre' } }], redoStack: [structuredClone(before)], canUndo: true, canRedo: true });
+{ // Un diario con un paso que deshacer y otro que rehacer sobre la propuesta en la papelera.
+  const named = { ...structuredClone(before), client: { ...before.client, name: 'Otro nombre' } };
+  let history = recordUndo(activateJournal(EMPTY_UNDO_HISTORY, structuredClone(before)), named, { source: 'user', now: 0 });
+  history = recordUndo(history, { ...named, client: { ...named.client, name: 'Tercero' } }, { source: 'user', now: 1 });
+  history = undoStep(history, trashedId)!.history;
+  assert.deepEqual(undoAvailability(history, trashedId), { canUndo: true, canRedo: true });
+  useSimulationStore.setState({ undoHistory: history, canUndo: true, canRedo: true });
+}
 store().undo();
 store().redo();
 assert.deepEqual(trashed().client, before.client, 'Deshacer/rehacer no modifican la papelera');

@@ -17,6 +17,7 @@ import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../engine/financeEngine';
 import { projectMutationMetadata } from '../sync/projectMutation';
+import { DEFAULT_EDIT_COALESCE_KEY, activateJournal, recordUndo, undoAvailability } from '../undo/projectUndoJournal';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 import { canEditDocument } from '../../components/pdf/editor/documentEditorState';
 import { normalizeDocumentLayout } from '../../../shared/documentLayout';
@@ -74,17 +75,33 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     return !!active && canEditDocument({ project: active, user: state.syncSettings.currentUser });
   };
 
+  /**
+   * Diario de deshacer de la propuesta activa tras pasar de `before` a `after` (F2a1): si su diario no estaba activo se siembra
+   * con el estado ANTERIOR, así el primer cambio también se deshace; luego se registra el nuevo, agrupado con la clave por
+   * defecto. Va en el mismo `set` que la edición: una escritura del store, como antes.
+   */
+  const undoAfterEdit = (state: SimulationStore, before: ProjectSimulation, after: ProjectSimulation) => {
+    const undoHistory = recordUndo(activateJournal(state.undoHistory, before), after, { source: 'user', coalesceKey: DEFAULT_EDIT_COALESCE_KEY, now: Date.now() });
+    return undoHistory === state.undoHistory ? {} : { undoHistory, ...undoAvailability(undoHistory, state.activeProjectId) };
+  };
+
   /** Applies an edit to the active project, stamps mutation metadata, then auto-syncs and records undo. */
   const updateActiveProject = (edit: (project: ProjectSimulation, state: SimulationStore) => Partial<ProjectSimulation>) => {
     if (isActiveProjectTrashed()) return;
-    set((state) => ({
-      projects: state.projects.map((p) => p.id === state.activeProjectId
-        ? { ...p, ...edit(p, state), ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString() }
-        : p),
-    }));
+    set((state) => {
+      const before = state.projects.find((p) => p.id === state.activeProjectId);
+      if (!before) return {};
+      const after = { ...before, ...edit(before, state), ...projectMutationMetadata(before, get().syncSettings), updatedAt: new Date().toISOString() };
+      return { projects: state.projects.map((p) => (p === before ? after : p)), ...undoAfterEdit(state, before, after) };
+    });
     get().triggerAutoSync(false);
-    const active = get().getActiveProject();
-    if (active) get().recordUndoState(active);
+  };
+
+  /** La papelera y el borrado olvidan el diario de deshacer de esas propuestas y activan el de la que queda abierta. */
+  const activateAfterRemoval = (ids: string[]) => {
+    ids.forEach((id) => get().forgetUndoJournal(id));
+    const active = get().projects.find((p) => p.id === get().activeProjectId);
+    if (active && !active.isDeleted) get().activateUndoJournal(active);
   };
 
   /** ADR 0004: las reglas de la edición viven en `applyProjectEdit`; aquí solo se persiste, sincroniza y deshace. */
@@ -108,9 +125,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   setActiveProject: (id, targetView = 'project-hub') => {
     set({ activeProjectId: id, activeView: targetView });
     const p = get().projects.find((proj) => proj.id === id);
-    if (p) {
-      get().recordUndoState(p);
-    }
+    if (p) get().activateUndoJournal(p);
   },
   setSearchQuery: (query) => set({ searchQuery: query }),
   setStatusFilter: (filter) => set({ statusFilter: filter }),
@@ -187,16 +202,16 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   updateProjectById: (id, edit, options) => {
     const target = get().projects.find((p) => p.id === id);
     if (!target || target.isDeleted || target.deletedAt) return false;
-    set((state) => ({
-      projects: state.projects.map((p) => {
-        if (p.id !== id) return p;
-        const next = { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p) };
-        // A restored snapshot is already a consistent project: merging it with the groups being undone would keep new data.
-        return options?.restore ? next : normalizeProjectEquipment(p, next);
-      }),
-    }));
+    set((state) => {
+      const before = state.projects.find((p) => p.id === id);
+      if (!before) return {};
+      const next = { ...before, ...projectMutationMetadata(before, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(before) };
+      // A restored snapshot is already a consistent project: merging it with the groups being undone would keep new data.
+      const after = options?.restore ? next : normalizeProjectEquipment(before, next);
+      // Solo la propuesta activa registra deshacer (como antes); una editada por id estando cerrada vuelve a sembrarse al abrirla.
+      return { projects: state.projects.map((p) => (p === before ? after : p)), ...(id === state.activeProjectId ? undoAfterEdit(state, before, after) : {}) };
+    });
     get().triggerAutoSync(false);
-    if (id === get().activeProjectId) get().recordUndoState(get().getActiveProject());
     return true;
   },
 
@@ -288,6 +303,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       isNewProjectModalOpen: false,
       saveFeedbackMessage: '¡Nueva propuesta creada con éxito! ✨',
     }));
+    get().activateUndoJournal(newProj); // su propia base: Ctrl+Z nunca escribe en ella el contenido de otra propuesta
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
 
@@ -340,6 +356,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       ...(options?.activate === false ? {} : { activeProjectId: newId }),
       saveFeedbackMessage: `¡Proyecto duplicado como versión ${dupIdentifiers.versionSuffix}! ✨`,
     }));
+    get().activateUndoJournal(cloned); // solo si la copia quedó activa (si no, no hace nada)
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
 
@@ -380,6 +397,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       activeProjectId: state.activeProjectId === id ? nextActiveId : state.activeProjectId,
       saveFeedbackMessage: 'Proyecto movido a la papelera. 🗑️',
     }));
+    activateAfterRemoval([id]);
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
 
@@ -420,6 +438,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       activeProjectId: id,
       saveFeedbackMessage: `Proyecto "${target.client?.name || 'Solar'}" restaurado exitosamente. ✨`,
     });
+    const restored = get().projects.find((p) => p.id === id);
+    if (restored) get().activateUndoJournal(restored); // base nueva: los pasos de antes de la papelera se olvidaron
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
 
@@ -446,6 +466,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       activeProjectId: state.activeProjectId === id ? nextActiveId : state.activeProjectId,
       saveFeedbackMessage: 'Proyecto eliminado definitivamente.',
     }));
+    activateAfterRemoval([id]);
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
 
@@ -463,6 +484,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     const trashedCount = get().projects.filter((p) => p.isDeleted).length;
     if (trashedCount === 0) return;
 
+    const trashedIds = get().projects.filter((p) => p.isDeleted).map((p) => p.id);
     get().projects.filter((p) => p.isDeleted).forEach((project) => get().queueProjectDeletion(project));
     const nextProjects = get().projects.filter((p) => !p.isDeleted);
     const nextActiveId = nextProjects.length > 0 ? nextProjects[0].id : '';
@@ -474,6 +496,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
         : state.activeProjectId,
       saveFeedbackMessage: `Se vació la papelera (${trashedCount} propuesta(s) eliminada(s)).`,
     }));
+    activateAfterRemoval(trashedIds);
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
 

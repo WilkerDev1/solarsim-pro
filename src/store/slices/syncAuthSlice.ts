@@ -9,6 +9,7 @@ import { reuseRecord } from '../sync/structuralSharing';
 import { SyncService, registerTokenRenewedListener, registerSessionInvalidatedListener, clearInvalidToken } from '../../services/syncService';
 import { acknowledgeQueuedProjectDeletions, createProjectDeletion, ProjectDeletionCommand } from '../sync/projectDeletion';
 import type { ProjectConflictInfo, ProjectSimulation } from '../../types';
+import { renameJournal } from '../undo/projectUndoJournal';
 
 let autoSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -352,14 +353,17 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
             if (!activeConflict) activeConflict = info;
           }
           const snapshotsByProject = { ...state.snapshotsByProject };
+          let undoHistory = state.undoHistory;
           for (const [oldId, newId] of Object.entries(reconciled.idChanges)) {
             if (oldId !== newId) delete projectConflicts[scope + '|' + oldId];
+            // El fork del servidor cambia el id: el diario de deshacer viaja con la propuesta.
+            undoHistory = renameJournal(undoHistory, oldId, newId);
             if (oldId !== newId && snapshotsByProject[oldId]) {
               snapshotsByProject[newId] = snapshotsByProject[oldId].map((snapshot) => ({ ...snapshot, projectId: newId, data: { ...snapshot.data, id: newId } }));
               delete snapshotsByProject[oldId];
             }
           }
-          return { projects: reconciled.projects, projectDeletionQueue: acknowledgeQueuedProjectDeletions(state.projectDeletionQueue, push.results!, scope, sent), activeProjectId: reconciled.idChanges[state.activeProjectId] || state.activeProjectId, activeConflict, projectConflicts, snapshotsByProject };
+          return { projects: reconciled.projects, projectDeletionQueue: acknowledgeQueuedProjectDeletions(state.projectDeletionQueue, push.results!, scope, sent), activeProjectId: reconciled.idChanges[state.activeProjectId] || state.activeProjectId, activeConflict, projectConflicts, snapshotsByProject, undoHistory };
         });
         if (push.results.length !== sent.length) throw new Error('El servidor no confirmó todos los documentos enviados.');
       }
