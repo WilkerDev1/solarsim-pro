@@ -1,0 +1,251 @@
+// LEGADO: se elimina en F6 junto con applyExtractedInvoice (aiSlice) y el borrador escalar selected* del asistente de propuestas.
+// Lo que de testAISmartProposal (TEST 2, 3, 5 y 9) solo prueba el punto de entrada applyExtractedInvoice con el borrador de selección única; el dimensionamiento del motor sigue en la suite de origen.
+// Parte de una suite mixta partida en F0 (red de seguridad del asistente único): la lógica que sobrevive sigue en la suite de origen.
+import { useSimulationStore } from '../store/useSimulationStore';
+import { calculateRecommendedPanelCount } from '../engine/solarEngine';
+import { ExtractedInvoiceData } from '../types/aiInvoice';
+// --- TEST 1: Sizing Calculation with 95% Default Target Coverage ---
+console.log('--- TEST 1: Sizing with 95% Target Coverage ---');
+const monthlyConsumption = [
+  1500, 1450, 1600, 1550, 1650, 1700, 1750, 1600, 1550, 1500, 1450, 1540,
+]; // ~18,840 kWh/year
+const panelPowerW = 615;
+const targetCoveragePct = 95;
+const systemLossesPct = 25.0;
+const province = 'Santo Domingo / Distrito Nacional';
+
+const sizingResult = calculateRecommendedPanelCount(
+  province,
+  monthlyConsumption,
+  panelPowerW,
+  targetCoveragePct,
+  systemLossesPct
+);
+
+console.log(`Annual Consumption: ${monthlyConsumption.reduce((a, b) => a + b, 0)} kWh`);
+console.log(`Recommended Panels (615W): ${sizingResult.recommendedPanelCount}`);
+console.log(`Recommended Capacity: ${sizingResult.recommendedCapacityKWp} kWp`);
+
+if (sizingResult.recommendedPanelCount <= 0 || sizingResult.recommendedCapacityKWp <= 0) {
+  throw new Error('❌ Sizing failed: panel count or capacity is <= 0');
+}
+console.log(' ✅ PASS: Dimensionamiento calculado correctamente para 95% de cobertura\n');
+
+// --- TEST 2: Creation of New Project via applyExtractedInvoice ---
+console.log('--- TEST 2: Apply AI Invoice as New Project (Clean Specs) ---');
+const store = useSimulationStore.getState();
+
+const mockExtractedData: ExtractedInvoiceData = {
+  clientName: 'Juan Pérez Automotriz SRL',
+  distributor: 'EDESUR',
+  tariffCode: 'BTS2',
+  nic: '7333529',
+  province: 'Santo Domingo / Distrito Nacional',
+  monthlyConsumptionKWh: monthlyConsumption,
+  annualConsumptionKWh: monthlyConsumption.reduce((a, b) => a + b, 0),
+  averageMonthlyKWh: Math.round(monthlyConsumption.reduce((a, b) => a + b, 0) / 12),
+  targetCoveragePct: 95,
+  recommendedPanelCount: sizingResult.recommendedPanelCount,
+  recommendedCapacityKWp: sizingResult.recommendedCapacityKWp,
+  selectedPanelWatts: 615,
+  selectedPanelModel: 'Canadian Solar CS6.1-72TB-615 (615W)',
+  selectedInverterPowerKW: 8.0,
+  selectedInverterCount: 2,
+  selectedInverterModel: 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
+  hasBattery: true,
+  selectedBatteryCapacityKWh: 16.08,
+  selectedBatteryCount: 2,
+  selectedBatteryModel: 'HinaESS PowerGem Max 16.08kWh',
+  targetMarginPct: 40,
+  confidenceScore: 98,
+  specialTechnicalNotes:
+    'Incluye 1 limitador de potencia / CT inteligente para inyección cero y balance de fases. Configuración de 2 inversores LuxPower de 8 kW en paralelo.',
+};
+
+store.applyExtractedInvoice(mockExtractedData, true);
+
+const updatedStore = useSimulationStore.getState();
+const activeProj = updatedStore.getActiveProject();
+
+console.log(`Created Project Name: "${activeProj.client.name}"`);
+console.log(`Target Coverage in Rates: ${activeProj.rates.targetCoveragePct}%`);
+console.log(`Installation Description: "${activeProj.specs.installationServicesDesc}"`);
+
+if (activeProj.rates.targetCoveragePct !== 95) {
+  throw new Error(`❌ Expected targetCoveragePct to be 95, got ${activeProj.rates.targetCoveragePct}`);
+}
+
+if (activeProj.specs.installationServicesDesc?.includes('Notas del Sistema:')) {
+  throw new Error('❌ installationServicesDesc should NOT contain "Notas del Sistema:"');
+}
+
+console.log(' ✅ PASS: Nuevo proyecto creado con cobertura al 95% y descripción de instalación limpia\n');
+
+// --- TEST 3: Sanitization of Polluted installationServicesDesc on Active Project ---
+console.log('--- TEST 3: Sanitization of Bloated installationServicesDesc ---');
+// Simular que el proyecto tenía la super descripción concatenada
+const pollutedDesc =
+  'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.). Notas del Sistema: Incluye 1 limitador de potencia / CT inteligente para inyección cero y balance de fases. Configuración de 2 inversores LuxPower de 8 kW en paralelo. Notas del Sistema: Incluye 1 limitador de potencia...';
+
+store.updateSpecs({
+  installationServicesDesc: pollutedDesc,
+});
+
+// Verificar que se haya asignado el texto sucio para la prueba
+if (!useSimulationStore.getState().getActiveProject().specs.installationServicesDesc?.includes('Notas del Sistema:')) {
+  throw new Error('Setup failed: polluted desc was not applied');
+}
+
+// Aplicar al proyecto activo (applyExtractedInvoice con isNew=false)
+store.applyExtractedInvoice(mockExtractedData, false);
+
+const sanitizedProj = useSimulationStore.getState().getActiveProject();
+console.log(`Sanitized Installation Desc: "${sanitizedProj.specs.installationServicesDesc}"`);
+
+if (sanitizedProj.specs.installationServicesDesc?.includes('Notas del Sistema:')) {
+  throw new Error('❌ Failed to sanitize installationServicesDesc; still contains "Notas del Sistema:"');
+}
+
+if (!sanitizedProj.specs.installationServicesDesc?.startsWith('Instalación y Accesorios')) {
+  throw new Error('❌ installationServicesDesc does not start with "Instalación y Accesorios"');
+}
+
+console.log(' ✅ PASS: Descripción contaminada fue sanitizada exitosamente al valor conciso base\n');
+
+// --- TEST 5: Proposal with Equipment without Assigned Supplier Prices ---
+console.log('--- TEST 5: Apply Extracted Invoice with Unpriced Equipment (e.g. WeCo) ---');
+const unpricedExtractedData: ExtractedInvoiceData = {
+  clientName: 'Josia Moscoso',
+  distributor: 'EDEESTE',
+  tariffCode: 'BTS1',
+  province: 'Santo Domingo / Distrito Nacional',
+  monthlyConsumptionKWh: Array(12).fill(1216),
+  annualConsumptionKWh: 1216 * 12,
+  averageMonthlyKWh: 1216,
+  targetCoveragePct: 95,
+  recommendedPanelCount: 18,
+  recommendedCapacityKWp: 11.07,
+  selectedPanelWatts: 615,
+  selectedPanelModel: 'Módulos Canadian Solar CS6.1-72TB-615 (615W)',
+  selectedInverterPowerKW: 8.0,
+  selectedInverterCount: 1,
+  selectedInverterModel: 'Inversor WeCo XT-8K (8.0Kw)',
+  selectedInverterUnitPriceUSD: undefined, // Sin precio de distribuidor
+  hasBattery: true,
+  selectedBatteryCapacityKWh: 16.06,
+  selectedBatteryCount: 2,
+  selectedBatteryModel: 'Batería WeCo 16K0-LV (16.06kWh)',
+  selectedBatteryUnitPriceUSD: undefined, // Sin precio de distribuidor
+  targetMarginPct: 40,
+  confidenceScore: 98,
+  equipmentSubstitutions: [],
+};
+
+store.applyExtractedInvoice(unpricedExtractedData, true);
+const unpricedProj = useSimulationStore.getState().getActiveProject();
+
+console.log(`Client: "${unpricedProj.client.name}"`);
+console.log(`Inverter Selected: "${unpricedProj.specs.inverters?.[0]?.brandModel}" (unitPrice: $${unpricedProj.specs.inverters?.[0]?.unitPriceUSD})`);
+console.log(`Battery Selected: "${unpricedProj.specs.batteries?.[0]?.brandModel}" (unitPrice: $${unpricedProj.specs.batteries?.[0]?.unitPriceUSD})`);
+
+if (unpricedProj.client.name !== 'Josia Moscoso') {
+  throw new Error(`❌ Expected client name "Josia Moscoso", got "${unpricedProj.client.name}"`);
+}
+
+if (!unpricedProj.specs.inverters?.[0]?.brandModel?.includes('WeCo')) {
+  throw new Error(`❌ Expected inverter to contain WeCo, got "${unpricedProj.specs.inverters?.[0]?.brandModel}"`);
+}
+
+if (!unpricedProj.specs.batteries?.[0]?.brandModel?.includes('WeCo')) {
+  throw new Error(`❌ Expected battery to contain WeCo, got "${unpricedProj.specs.batteries?.[0]?.brandModel}"`);
+}
+
+console.log(' ✅ PASS: Propuesta creada exitosamente con equipos sin precio asignado (WeCo)\n');
+
+// --- TEST 9: Project Isolation: Create As New Project vs Update Active Project ---
+console.log('--- TEST 9: Project Isolation (Create As New vs Update Active) ---');
+const preState = useSimulationStore.getState();
+const existingActive = preState.getActiveProject();
+const existingProjectCount = preState.projects.length;
+const existingProjectId = existingActive.id;
+const existingProjectCode = existingActive.client.projectId;
+const existingClientName = existingActive.client.name;
+
+console.log(`Original Active Project: ${existingProjectCode} (${existingClientName}) [ID: ${existingProjectId}]`);
+
+// 1. Aplicar como proyecto nuevo (createNewProject = true)
+const newScannedInvoice: ExtractedInvoiceData = {
+  clientName: 'MATOS GALAN, RAMON ALFONSO',
+  distributor: 'EDESUR',
+  tariffCode: 'BTS1',
+  province: 'Santo Domingo / Distrito Nacional',
+  monthlyConsumptionKWh: Array(12).fill(2453),
+  annualConsumptionKWh: 2453 * 12,
+  averageMonthlyKWh: 2453,
+  targetCoveragePct: 95,
+  recommendedPanelCount: 18,
+  recommendedCapacityKWp: 11.07,
+  selectedPanelWatts: 615,
+  selectedPanelModel: 'Canadian Solar CS6.1-72TB-615 (615W)',
+  confidenceScore: 98,
+};
+
+preState.applyExtractedInvoice(newScannedInvoice, true);
+
+const postNewState = useSimulationStore.getState();
+const newActiveProj = postNewState.getActiveProject();
+
+console.log(`Post-Create Active Project: ${newActiveProj.client.projectId} (${newActiveProj.client.name}) [ID: ${newActiveProj.id}]`);
+console.log(`Total Projects: ${postNewState.projects.length} (was ${existingProjectCount})`);
+
+if (postNewState.projects.length !== existingProjectCount + 1) {
+  throw new Error(`❌ Expected project count to increase by 1 (${existingProjectCount + 1}), got ${postNewState.projects.length}`);
+}
+
+if (newActiveProj.id === existingProjectId) {
+  throw new Error(`❌ New project should have a distinct ID from the previous active project!`);
+}
+
+if (newActiveProj.client.name !== 'MATOS GALAN, RAMON ALFONSO') {
+  throw new Error(`❌ New project client name should be "MATOS GALAN, RAMON ALFONSO", got "${newActiveProj.client.name}"`);
+}
+
+// Verificar que el proyecto original NO fue modificado ni destruido
+const foundOriginal = postNewState.projects.find((p) => p.id === existingProjectId);
+if (!foundOriginal) {
+  throw new Error(`❌ Original project ${existingProjectCode} was lost from projects array!`);
+}
+
+if (foundOriginal.client.name !== existingClientName) {
+  throw new Error(`❌ CRITICAL BUG: Original project was overwritten! Expected "${existingClientName}", got "${foundOriginal.client.name}"`);
+}
+
+console.log(` ✅ PASS: "Crear como Proyecto Nuevo" preservó intacto el proyecto original ${existingProjectCode} (${existingClientName})`);
+
+// 2. Aplicar actualización intencional (createNewProject = false) sobre el proyecto nuevo
+const updateScannedData: ExtractedInvoiceData = {
+  ...newScannedInvoice,
+  clientName: 'MATOS GALAN, RAMON ALFONSO (MODIFICADO)',
+};
+
+postNewState.applyExtractedInvoice(updateScannedData, false);
+const postUpdateState = useSimulationStore.getState();
+const updatedActive = postUpdateState.getActiveProject();
+
+if (postUpdateState.projects.length !== existingProjectCount + 1) {
+  throw new Error(`❌ Updating active project should not change the total project count`);
+}
+
+if (updatedActive.client.name !== 'MATOS GALAN, RAMON ALFONSO (MODIFICADO)') {
+  throw new Error(`❌ Active project was not updated as expected`);
+}
+
+// Verificar que el proyecto original más viejo sigue intacto
+const stillIntactOriginal = postUpdateState.projects.find((p) => p.id === existingProjectId);
+if (stillIntactOriginal?.client?.name !== existingClientName) {
+  throw new Error(`❌ Updating current project affected the wrong project!`);
+}
+
+console.log(' ✅ PASS: "Actualizar Proyecto Abierto" actualizó el proyecto en memoria sin afectar otros proyectos\n');
+
+console.log('PASS (legado): applyExtractedInvoice crea, actualiza y aísla proyectos con el borrador de selección única.');

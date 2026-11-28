@@ -60,7 +60,7 @@ La clave configurada se persiste con preferencias en almacenamiento local. **loc
 
 ## Evidencia y límites de QA
 
-Las regresiones `testGeminiTransport.ts`, `testGeminiModels.ts`, `testGeminiScanners.ts`, `testAIProposalCommercial.ts`, `testAIProposalPipeline.ts`, `testAIWorkspaceInputs.ts`, `testDatasheetImport.ts`, `testPriceCatalogImport.ts`, `testAITariffSafety.ts` y `testTariffScanReview.ts` verifican normalización, revisión, grupos multi-modelo, transporte simulado, lotes y persistencia. La revisión independiente ejecutó las tres suites de importación/tarifas con salida 0 y reprodujo ID real incorrecto frente a nombre exacto y un segundo merge parcial después de JSON con procedencia por campo intacta.
+Las regresiones `testGeminiTransport.ts`, `testGeminiModels.ts`, `testGeminiScanners.ts`, `testAIProposalCommercial.ts`, `testAIProposalPipeline.ts`, `testLegacyProposalAssistantWorkspaceInputs.ts`, `testDatasheetImport.ts`, `testPriceCatalogImport.ts`, `testAITariffSafety.ts` y `testTariffScanReview.ts` verifican normalización, revisión, grupos multi-modelo, transporte simulado, lotes y persistencia. La revisión independiente ejecutó las tres suites de importación/tarifas con salida 0 y reprodujo ID real incorrecto frente a nombre exacto y un segundo merge parcial después de JSON con procedencia por campo intacta.
 
 Se registraron dos llamadas reales de prueba de propuestas en esta tarea. Son evidencia de esos casos, no una certificación de exactitud general. La prueba real de extracción/importación de datasheet permanece pendiente; la cobertura sintética no la sustituye. Las pruebas automatizadas no escriben en producción.
 

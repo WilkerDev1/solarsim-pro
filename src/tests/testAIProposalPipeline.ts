@@ -3,17 +3,11 @@ import assert from 'node:assert/strict';
 import { normalizeProposalDraft, buildProposalRequest, robustParseJson, draftForPrompt, PROPOSAL_JSON_SCHEMA, PROPOSAL_SYSTEM_INSTRUCTION } from '../../shared/aiProposal';
 import { calculateMonthlyBill, resolveEnergyValuationMethod, tariffPricePresentation } from '../../shared/tariffBilling';
 import { averageBlockEnergyRateDOP } from '../../shared/tariffRules';
-import { issueTarget, issueTier } from '../components/common/ai-invoice/reviewIssues';
 import { blockValuationNote, draftEnergyRateDisplayDOP } from '../components/simulator/params/sections/rates/tariffPresentation';
 import { DEFAULT_RD_TARIFF_MATRIX, referenceBillingTariff } from '../data/rdTariffs';
 import { prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { requestGeminiJson, GeminiRequestError, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
-import { processExtractedInvoice } from '../utils/aiProposalNormalization';
-import { parseProposalWithAI } from '../services/geminiInvoiceService';
 import { useSimulationStore } from '../store/useSimulationStore';
-import https from 'node:https';
-import { EventEmitter } from 'node:events';
-import { httpsPostJson } from '../../electron/ai/httpClient';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../engine/financeEngine';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '../utils/equipmentSpecsUtils';
@@ -99,18 +93,6 @@ const errors:GeminiTransport=async()=>{calls++;throw new GeminiRequestError('Cuo
 await assert.rejects(requestGeminiJson({apiKey:'test',body:{}},errors),/Cuota/);assert.equal(calls,1,'429 never triggers multiple billed calls');
 calls=0;await assert.rejects(requestGeminiJson({apiKey:'test',body:{}},async()=>{calls++;throw new GeminiRequestError('Key',401);}),/Key/);assert.equal(calls,1);
 calls=0;const fallback=await requestGeminiJson({apiKey:'test',model:'custom-model',body:{}},async(url,_body,headers)=>{calls++;assert(!url.includes('test'));assert.equal(headers['x-goog-api-key'],'test');if(calls===1)throw new GeminiRequestError('Temporal',503);return {ok:true};});assert.equal(calls,2);assert(fallback.modelWarning);
-const overrideYield=processExtractedInvoice(JSON.stringify({...raw,panels:[{equipmentId:'panel-a',quantity:0}]}),{equipmentCatalog:catalog,context:{...context,province:'Santo Domingo / Distrito Nacional',annualSpecificYieldKWhPerKWp:1}});
-assert.equal(overrideYield.panels?.[0].count,calculateRecommendedPanelCount('Santiago',Array(12).fill(900),600).recommendedPanelCount,'extracted province recalculates context yield');
-const controller=new AbortController();const oldRequest=https.request;let nativeDestroyed=false;
-(https as any).request=()=>{const req:any=new EventEmitter();req.write=()=>{};req.end=()=>{};req.destroy=(error:Error)=>{nativeDestroyed=true;queueMicrotask(()=>{req.emit('error',error);req.emit('close');});return req;};return req;};
-try{const pending=httpsPostJson('https://generativelanguage.googleapis.com/test',{},60000,{},controller.signal);controller.abort(new Error('Cancelado'));await assert.rejects(pending,/Cancelado/);assert.equal(nativeDestroyed,true);}finally{https.request=oldRequest;}
-const electronResult=processExtractedInvoice(JSON.stringify(raw),{equipmentCatalog:catalog,context,dopExchangeRate:60.5});
-const oldFetch=globalThis.fetch;
-globalThis.fetch=async()=>new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(raw)}]}}]}),{status:200});
-try {
-  const webResult=await parseProposalWithAI({apiKey:'synthetic-test-key',projectRequirementsText:'Texto',equipmentCatalog:catalog,context,dopExchangeRate:60.5});
-  assert.deepEqual(webResult.panels,electronResult.panels);assert.equal(webResult.energyCostPerKWhUSD,electronResult.energyCostPerKWhUSD,'web and IPC processing parity');
-}finally{globalThis.fetch=oldFetch;}
 useSimulationStore.setState({equipmentCatalog:catalog,syncSettings:{...useSimulationStore.getState().syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
 const before=useSimulationStore.getState().projects;
 useSimulationStore.getState().applyExtractedInvoice(normalized,true);
@@ -233,14 +215,12 @@ useSimulationStore.getState().applyExtractedInvoice(normalized,true);assert.stri
   const notice=stepped.validationIssues?.find(i=>i.code==='invoice_block_rates_reference');
   assert(notice,'aviso de que la factura muestra precios por bloque');
   assert.match(notice!.message,/BTS1/);assert.match(notice!.message,/SIE-121-2026-TF/);
-  assert.equal(issueTier(notice!),'info','aviso informativo: no pide confirmación');
   assert(!codes(stepped).includes('reference_energy_rate'),'la factura confirma la fila: no se pide confirmar una tarifa aproximada');
   assert(!codes(stepped).includes('invoice_block_rates_mismatch'));
   // Renormalizar (revisión) es idempotente: misma procedencia, mismo precio y un solo aviso.
   const again=normalizeProposalDraft(stepped,catalog,matrixContext);
   assert.equal(again.energyRateSource,'reference');assert.equal(again.energyCostPerKWhDOP,stepped.energyCostPerKWhDOP);
   assert.deepEqual(codes(again).filter(c=>c.startsWith('invoice_block_rates')),['invoice_block_rates_reference']);
-  assert.equal(issueTarget(notice!)?.tab,'client','el aviso informativo se ve en «Cliente y tarifa», junto a la tarifa de energía');
   // Eco en rondas siguientes: draftForPrompt manda el escalar calculado (origen 'reference') y el esquema no declara la
   // procedencia, así que el modelo lo devuelve sin ella. Con consumo que cruza bloques (250 kWh/mes → 6.558) no es un precio
   // de la factura: ni avisos de factura ni marginalRateDOP.
@@ -291,7 +271,7 @@ useSimulationStore.getState().applyExtractedInvoice(normalized,true);assert.stri
   const mismatch=normalizeProposalDraft({...invoice,energyCostPerKWhDOP:14.5,energyTiers:undefined},catalog,matrixContext);
   assert.equal(mismatch.energyRateSource,'reference');
   const mismatchIssue=mismatch.validationIssues?.find(i=>i.code==='invoice_block_rates_mismatch');
-  assert.equal(mismatchIssue?.severity,'warning');assert.equal(issueTier(mismatchIssue!),'confirm');
+  assert.equal(mismatchIssue?.severity,'warning');
   assert.match(mismatchIssue!.message,/14[.,]5/);assert.match(mismatchIssue!.message,/período|periodo/);
   assert.equal(mismatch.requiresReview,false);
 

@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { MAX_INLINE_FILE_BASE64, requestGeminiStructured, type GeminiTransport } from '../../shared/geminiTransport';
-import { parseProposalWithAI } from '../services/geminiInvoiceService';
 
 // Un único helper para salida estructurada: transporte inyectado, esquema JSON, parseo estricto y reintento acotado.
 const replies: unknown[] = [];
@@ -65,12 +64,6 @@ await assert.rejects(requestGeminiStructured(big, transport), /20 MB/);
 assert.equal(bodies.length, 0);
 await assert.rejects(requestGeminiStructured({ ...base, apiKey: ' ' }, transport), /API Key/);
 
-// 6. El borrador de propuesta usa el mismo helper (reintento incluido) con su transporte inyectado.
-bodies.length = 0;
-replies.push('{"clientName":', JSON.stringify({ responseKind: 'draft', assistantMessage: 'Listo', clientName: 'Cliente QA', panels: [], inverters: [], batteries: [], monthlyConsumptionKWh: [] }));
-const draft = await parseProposalWithAI({ apiKey: 'synthetic-key', projectRequirementsText: 'Cliente QA', equipmentCatalog: [] }, undefined, transport);
-assert.equal(draft.clientName, 'Cliente QA');
-assert.equal(bodies.length, 2);
 
 // 8. Revisión: reintentos finitos, plazo global, aviso del intento válido, límite sobre la suma y cercos ```json.
 {

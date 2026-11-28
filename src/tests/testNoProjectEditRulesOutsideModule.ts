@@ -26,6 +26,9 @@ const ENGINE = 'src/engine/solarEngine.ts';
 const DRAFT_PIPELINE = new Set([
   'src/store/slices/aiSlice.ts',
   'src/utils/proposalDraftProject.ts',
+]);
+/** LEGADO (F6 los elimina junto con el modal): su existencia la comprueba testLegacyProposalAssistantEditRules, no esta guarda. */
+const LEGACY_DRAFT_PIPELINE = new Set([
   'src/utils/aiProposalNormalization.ts',
   'src/components/common/ai-invoice/hooks/useAIInvoiceScanner.ts',
   'src/components/common/ai-invoice/components/ProposalConsumptionReview.tsx',
@@ -87,7 +90,7 @@ const effects: string[] = [];
 const direct: string[] = [];
 for (const { file, source } of files) {
   if (file !== MODULE && /\bwithRecommendedPanels\b/.test(source)) sizing.push(file);
-  if (![MODULE, ENGINE].includes(file) && !DRAFT_PIPELINE.has(file) && /\bcalculateRecommendedPanelCount\b/.test(source)) recommendation.push(file);
+  if (![MODULE, ENGINE].includes(file) && !DRAFT_PIPELINE.has(file) && !LEGACY_DRAFT_PIPELINE.has(file) && /\bcalculateRecommendedPanelCount\b/.test(source)) recommendation.push(file);
   if ((file.startsWith('src/store/slices/') || file.startsWith('src/features/agentTools/'))
     && ['updateActiveProject', 'updateProjectById'].some((name) => callBodies(source, name).some(directWrite))) direct.push(file);
   if (file.startsWith('src/components/simulator/') && effectBodies(source).some((body) => WRITERS.test(body))) effects.push(file);

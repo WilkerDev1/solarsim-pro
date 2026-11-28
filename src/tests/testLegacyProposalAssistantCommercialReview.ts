@@ -1,3 +1,6 @@
+// LEGADO: se elimina en F6 junto con la revisión comercial del modal ai-invoice (ProposalCommercialReview, commercialRows).
+// Antes testProposalCommercialReview: solo ejerce la pantalla de revisión comercial del asistente de propuestas.
+// Renombrada en F0 (red de seguridad del asistente único) sin cambiar una sola aserción.
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';

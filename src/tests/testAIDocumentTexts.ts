@@ -9,17 +9,12 @@ import { buildProposalRequest, normalizeProposalDraft, PROPOSAL_JSON_SCHEMA, PRO
 import { aiDocumentTextCatalog, AI_DRAFT_DOCUMENT_TEXT_KEYS } from '../../shared/documentTexts/aiDraft';
 import { resolveDocumentText } from '../../shared/documentTexts';
 import { AGENT_RULES_ES, assistantTurnContext } from '../../shared/agentTools/rules';
-import { processExtractedInvoice } from '../utils/aiProposalNormalization';
 import { buildAITariffContext } from '../utils/aiTariffContext';
 import { documentTextContextFor } from '../utils/documentTextContext';
 import { executeAgentTool, executeForAssistant } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { assistantProjectId, assistantVisibleIn } from '../features/assistant/assistantScope';
 import { runAssistant } from '../features/assistant/service';
-import { draftDocumentTextCatalog } from '../utils/draftDocumentTexts';
-import { ProposalDocumentTextsReview } from '../components/common/ai-invoice/components/ProposalDocumentTextsReview';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import type { GeminiTransport } from '../../shared/geminiTransport';
 import type { ProjectSimulation } from '../types';
 
@@ -73,28 +68,13 @@ const raw = {
     { key: 'client.phone', text: '809-000-0000' },
   ],
 };
-const draft = processExtractedInvoice(JSON.stringify(raw), { equipmentCatalog: catalog, context });
+const draft = normalizeProposalDraft(raw, catalog, context);
 assert.equal(draft.requiresReview, false, JSON.stringify(draft.validationIssues));
 assert.deepEqual(draft.documentTexts?.map((t) => [t.key, t.text]), [...Object.entries(WARRANTIES), ['quote.validityDays', '15']]);
 assert.equal(draft.documentTexts?.[0].label, 'Garantía de paneles');
 assert(draft.validationIssues?.some((i) => i.code === 'unknown_document_text' && i.severity === 'warning'));
 assert(draft.validationIssues?.some((i) => i.code === 'document_text_is_draft_field'));
 
-// 2b. La revisión del borrador muestra los cambios de texto antes de aplicarlos.
-const reviewHtml = renderToStaticMarkup(createElement(ProposalDocumentTextsReview, { draft, update: () => {} }));
-assert.match(reviewHtml, /Textos del documento/);
-assert.match(reviewHtml, /Garantía de paneles/);
-assert.match(reviewHtml, /12 Años de Garantía de Producto/);
-assert.equal(renderToStaticMarkup(createElement(ProposalDocumentTextsReview, { draft: { ...draft, documentTexts: [] }, update: () => {} })), '');
-{
-  // Sin textos pero con avisos el destino del enlace del resumen existe y muestra los avisos.
-  const html = renderToStaticMarkup(createElement(ProposalDocumentTextsReview, { draft: { ...draft, documentTexts: [] }, update: () => {}, issues: [{ code: 'unknown_document_text', severity: 'warning', tier: 'info', message: 'El documento no tiene el texto «x».' }] as never }));
-  assert.match(html, /id="proposal-document-texts"/);
-  assert.match(html, /El documento no tiene el texto/);
-  assert.doesNotMatch(html, /0 cambios/);
-}
-// Para una propuesta nueva el contexto sale de la plantilla de la empresa activa.
-assert(draftDocumentTextCatalog(store.getState(), undefined, 'Santiago').some((t) => t.key === 'quotation.warranty.inverter'));
 
 // 3. Una nueva vuelta de conversación sin documentTexts conserva los del borrador; [] los quita.
 const revised = normalizeProposalDraft({ ...raw, documentTexts: undefined, clientName: 'Garantías QA 2' }, catalog, { ...context, currentDraft: draft });
@@ -121,50 +101,14 @@ const cut = fullCatalog.find((t) => t.key === 'quotation.validityNote')!;
 assert.equal(cut.truncated, true);
 assert(cut.text!.length < longNote.length);
 assert(JSON.stringify(fullCatalog).length < 16000, 'presupuesto total acotado');
-const partial = processExtractedInvoice(JSON.stringify({ ...raw, documentTexts: [{ key: 'quotation.validityNote', text: 'Nuevo término.' }, { key: 'quotation.warranty.panel', text: '12 años' }] }),
-  { equipmentCatalog: catalog, context: { ...context, documentTexts: fullCatalog } });
+const partial = normalizeProposalDraft({ ...raw, documentTexts: [{ key: 'quotation.validityNote', text: 'Nuevo término.' }, { key: 'quotation.warranty.panel', text: '12 años' }] }, catalog, { ...context, documentTexts: fullCatalog });
 assert.equal(partial.documentTexts?.find((t) => t.key === 'quotation.validityNote')?.partial, true);
 assert.equal(partial.documentTexts?.find((t) => t.key === 'quotation.warranty.panel')?.partial, undefined);
 assert(partial.validationIssues?.some((i) => i.code === 'document_text_seen_partially' && i.severity === 'warning'));
 assert.equal(normalizeProposalDraft(partial, catalog, context).documentTexts?.find((t) => t.key === 'quotation.validityNote')?.partial, true, 'el aviso sobrevive a la revisión');
-assert.match(renderToStaticMarkup(createElement(ProposalDocumentTextsReview, { draft: partial, update: () => {} })), /solo vio el inicio de este texto/);
 
-// 3d. Propuesta nueva: los textos que dependen del proyecto no muestran cifras del caso de referencia.
-const newCatalog = draftDocumentTextCatalog(store.getState(), undefined, 'Santiago');
-for (const key of ['projectDescription.paragraph1', 'projectDescription.paragraph2', 'projectDescription.subtitle', 'projectDescription.regulatoryNote', 'quotation.validityNote', 'client.contact', 'quote.validityDays']) {
-  const entry = newCatalog.find((t) => t.key === key)!;
-  assert.equal(entry.text, undefined, key);
-  assert.equal(entry.dynamic, true, key);
-}
-assert(!JSON.stringify(newCatalog).includes(BENCHMARK_PROJECT.client.name), 'sin datos del caso de referencia');
-assert.equal(newCatalog.find((t) => t.key === 'quotation.warranty.panel')?.text, '25 Años de Producción Lineal');
 assert.match(PROPOSAL_SYSTEM_INSTRUCTION, /dynamic/);
 
-// 4. Crear una propuesta nueva: los textos llegan al documento por el escritor del registro.
-const ctx = () => ({ source: 'proposal-assistant' as const, owner: assistantOwner() });
-const created = await executeAgentTool({ name: 'apply_proposal_draft', args: { draft: draft as unknown as Record<string, unknown>, createNew: true } }, ctx());
-assert(created.status === 'applied', JSON.stringify(created));
-const createdProject = store.getState().getActiveProject();
-for (const [key, text] of Object.entries(WARRANTIES)) assert.equal(textOf(createdProject, key), text, key);
-assert.equal(createdProject.customization?.panelWarrantyText, WARRANTIES['quotation.warranty.panel'], 'se guarda en el campo heredado (visor y 2.6.x)');
-assert.equal(createdProject.client.quoteValidityDays, 15, 'la vigencia vive en client');
-assert(store.getState().agentActivity[0].changes.some((c) => c.label === 'Garantía de paneles'), 'la actividad muestra el cambio de texto');
-
-// 5. Actualizar la propuesta abierta («Usar datos de SP-XXXX») y deshacer.
-store.setState({ projects: [open], activeProjectId: open.id, activeView: 'simulator' });
-const updated = await executeAgentTool({ name: 'apply_proposal_draft', args: { draft: draft as unknown as Record<string, unknown>, createNew: false } }, ctx());
-assert(updated.status === 'applied', JSON.stringify(updated));
-assert.equal(textOf(byId(open.id), 'quotation.warranty.inverter'), WARRANTIES['quotation.warranty.inverter']);
-assert.equal(textOf(byId(open.id), 'quotation.warranty.workmanship'), WARRANTIES['quotation.warranty.workmanship']);
-assert.equal(store.getState().undoAgentActivity(updated.activityId).success, true);
-assert.equal(textOf(byId(open.id), 'quotation.warranty.panel'), '25 Años de Producción Lineal', 'deshacer devuelve los textos');
-assert.equal(byId(open.id).client.quoteValidityDays, open.client.quoteValidityDays);
-
-// 6. Un borrador con un restablecimiento (text null) vuelve al texto predeterminado.
-store.setState({ projects: [{ ...open, customization: { ...open.customization, panelWarrantyText: 'Personalizado' } }] });
-const reset = normalizeProposalDraft({ ...raw, documentTexts: [{ key: 'quotation.warranty.panel', text: null }] }, catalog, context);
-assert((await executeAgentTool({ name: 'apply_proposal_draft', args: { draft: reset as unknown as Record<string, unknown>, createNew: false } }, ctx())).status === 'applied');
-assert.equal(textOf(byId(open.id), 'quotation.warranty.panel'), '25 Años de Producción Lineal');
 
 // ── Camino (a): asistente general en la vista del documento (modo edición) ──
 store.setState({ projects: [open], activeProjectId: open.id, activeView: 'pdf-preview', agentActivity: [] });

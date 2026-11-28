@@ -1,3 +1,6 @@
+// LEGADO: se elimina en F6 junto con el modal ai-invoice (reviewIssues y su resumen de avisos).
+// Antes testProposalReviewIssues: solo ejerce la clasificación y el destino de los avisos de la revisión del asistente de propuestas.
+// Renombrada en F0 (red de seguridad del asistente único) sin cambiar una sola aserción.
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
