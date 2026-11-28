@@ -14,19 +14,18 @@ import type { AgentCard } from '../../../../shared/agentCards';
 import { validateJsonSchema } from '../../../../shared/agentTools/jsonSchema';
 import { agentPolicyKey } from '../../../store/slices/agentSlice';
 import { diffProjectFields } from '../../../domain/projectEditTransaction';
-import { parseFieldPath } from '../../../domain/projectFields';
 import { engineResults, proposalStateSummary, type ProposalStateSummary } from '../../../domain/proposalSnapshot';
-import type { ProposalOperation } from '../../../domain/proposalOperations';
 import { energyCalculationMode } from '../../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../application/featurePolicy';
-import { touchesPricingEdits } from '../../assistant/pricingFields';
+import { operationsTouchPricing } from './pricingOps';
 import { visibleAssistantProjects } from '../../assistant/tools';
 import { executeAgentTool, runNativeTool } from '../registry';
 import { store, type AgentToolContext, type NativeHandler } from '../nativeTools';
-import { APP_ASSISTANT_HANDLERS, type ToolPayload } from './handlers';
+import { APP_ASSISTANT_HANDLERS, undoNeedsConfirmation, type ToolPayload } from './handlers';
 import { appAssistantToolDefinitions } from './definitions';
 
 export { APP_ASSISTANT_TOOLSET, appAssistantToolDefinitions } from './definitions';
+export { operationsTouchPricing } from './pricingOps';
 
 export interface AssistantToolResponse extends Required<Pick<ToolPayload, 'changes' | 'results' | 'warnings'>> {
   status: 'ok' | 'applied' | 'pending_confirmation' | 'error';
@@ -49,21 +48,6 @@ export interface AssistantToolResponse extends Required<Pick<ToolPayload, 'chang
 export function listAssistantToolset(): AgentToolDefinition[] {
   const policy = store().agentPolicy[agentPolicyKey('app-assistant')];
   return appAssistantToolDefinitions().filter((definition) => policy[definition.kind] !== 'deny');
-}
-
-const PRICING_OPERATIONS = new Set<ProposalOperation['op']>([
-  'select_equipment', 'add_equipment', 'remove_equipment', 'set_storage', 'set_margin_pct', 'best_supplier', 'suggest_direct_price',
-  'upsert_item', 'remove_item', 'upsert_discount', 'remove_discount',
-]);
-/** Como hoy: los precios son sensibles venga de la herramienta que venga; un lote que los toca se trata entero como protegido. */
-export function operationsTouchPricing(ops: unknown): boolean {
-  if (!Array.isArray(ops)) return false;
-  return ops.some((op: ProposalOperation) => {
-    if (PRICING_OPERATIONS.has(op?.op)) return true;
-    if (op?.op !== 'set' || typeof op.path !== 'string') return false;
-    const [section, field] = parseFieldPath(op.path) ?? [];
-    return typeof section === 'string' && typeof field === 'string' && touchesPricingEdits([{ section, field }]);
-  });
 }
 
 /** Herramientas compartidas cuyo `id` es el de una propuesta. */
@@ -99,7 +83,9 @@ async function runOwn(handler: NativeHandler, definition: AgentToolDefinition, a
   const errors = validateJsonSchema(definition.inputSchema, args);
   if (errors.length) return failed(name, 'invalid_arguments', errors.slice(0, 5).join(' '));
   if (ctx.signal?.aborted) return failed(name, 'cancelled', 'Solicitud cancelada.');
-  const effective: AgentToolDefinition = name === 'edit_proposal' && operationsTouchPricing(args.ops) ? { ...definition, kind: 'guarded' } : definition;
+  // Precios ⇒ protegida entera (como touchesPricing hoy); deshacer un cambio protegido o una creación, también.
+  const guarded = (name === 'edit_proposal' && operationsTouchPricing(args.ops)) || (name === 'undo_change' && undoNeedsConfirmation(args));
+  const effective: AgentToolDefinition = guarded ? { ...definition, kind: 'guarded' } : definition;
   let preview: ToolPayload | undefined;
   const capture: NativeHandler = async (a, c) => {
     const result = await handler(a, c);
@@ -141,6 +127,26 @@ async function runShared(call: AgentToolCall, args: Record<string, unknown>, ctx
 const completed = new Map<string, { fingerprint: string; response: AssistantToolResponse }>();
 const MAX_COMPLETED = 200;
 
+/**
+ * Una respuesta «pendiente» repetida dice el estado real de su acción en la cola: si el usuario ya la confirmó, aplicada; si la
+ * rechazó, caducó o falló, error con ese motivo; solo si sigue esperando, otra vez pendiente.
+ */
+function withActionStatus(cached: AssistantToolResponse): AssistantToolResponse {
+  if (cached.status !== 'pending_confirmation' || !cached.actionId) return cached;
+  const action = store().pendingAgentActions.find((a) => a.id === cached.actionId);
+  const expired = action?.status === 'pending' && Date.parse(action.expiresAt) < Date.now();
+  if (action?.status === 'pending' && !expired) return cached;
+  if (action?.status === 'applied') return { ...cached, status: 'applied', ...(action.activityId ? { activityId: action.activityId } : {}) };
+  const status = expired ? 'expired' : action?.status ?? 'missing';
+  const message = {
+    rejected: 'El usuario rechazó este cambio: no lo repitas sin que lo pida de nuevo.',
+    expired: 'La confirmación de este cambio caducó: prepáralo de nuevo si el usuario aún lo quiere.',
+    failed: `El cambio no se pudo aplicar al confirmarlo: ${action?.error ?? 'error desconocido'}.`,
+    missing: 'Ese cambio ya no está en la cola de confirmación.',
+  }[status as 'rejected' | 'expired' | 'failed' | 'missing'] ?? 'Ese cambio ya no está pendiente.';
+  return { ...cached, status: 'error', error: { code: `action_${status}`, message } };
+}
+
 /** Ejecuta una herramienta del conjunto del asistente de la app. Ver el encabezado del módulo. */
 export async function executeAssistantToolset(call: AgentToolCall, ctx: AgentToolContext): Promise<AssistantToolResponse> {
   const definition = appAssistantToolDefinitions().find((d) => d.name === call.name);
@@ -151,7 +157,7 @@ export async function executeAssistantToolset(call: AgentToolCall, ctx: AgentToo
   const previous = key ? completed.get(key) : undefined;
   if (previous) {
     if (previous.fingerprint !== fingerprint) return failed(call.name, 'idempotency_conflict', 'Esta llamada del turno ya se usó con otros argumentos.');
-    return { ...previous.response, duplicate: true };
+    return { ...withActionStatus(previous.response), duplicate: true };
   }
   const handler = APP_ASSISTANT_HANDLERS[definition.name];
   const result = handler ? await runOwn(handler, definition, args, ctx) : await runShared(call, args, ctx);

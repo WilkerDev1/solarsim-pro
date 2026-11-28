@@ -6,6 +6,10 @@
  * resolvedor único, «+», quitar) y las intenciones con nombre de F2b (`editIntents.ts`: margen en %, tarifa oficial, «Mejor
  * proveedor», «Sugerir de costos»).
  *
+ * Modo de precio: el asistente cotiza siempre en Simple con matriz de costos (`AUTOMATED_PRICING`): las rutas del precio directo
+ * y del modo manual se rechazan aquí y el llamador (`appAssistant/handlers.ts`) fuerza `AUTOMATED_PRICING` en los lotes que
+ * tocan precios, como `propose_project_update`.
+ *
  * Precios: nunca se inventan. Elegir del catálogo toma la oferta de proveedor (preferida o la más barata utilizable); sin
  * oferta, el precio genérico, que se avisa como tal; sin ninguno, el equipo queda sin precio y la propuesta, incompleta.
  */
@@ -15,6 +19,9 @@ import { LIST_KEY, editEquipment, migrateLegacySpecs, type EquipmentKind } from 
 import { resolveAssumption } from '../../shared/assumptions';
 import { resolveSystemLossesPct } from '../../shared/projectDefaults';
 import { NET_METERING_REGIMES } from '../../shared/netMetering';
+import { preserveHiddenInQuotation } from '../../shared/quotationItems';
+import { tariffMatrixKey } from '../../shared/tariffRules';
+import type { GlobalTariffMatrix } from '../types/tariffs';
 import { projectIntentEdits, type IntentContext, type ProjectIntent } from './editIntents';
 import { groupAddPatch, groupRemovePatch, groupSelectPatch } from './rules/equipmentRules';
 import {
@@ -26,7 +33,7 @@ import type { ProjectEditError, ProjectFieldEdit } from './projectEditTransactio
 /** Operaciones de `edit_proposal`. El orden es el de la declaración de la herramienta. */
 export const PROPOSAL_OPERATIONS = [
   'set', 'select_equipment', 'add_equipment', 'remove_equipment', 'set_storage', 'set_tariff', 'set_net_metering', 'set_radiation',
-  'set_consumption', 'set_margin_pct', 'apply_official_tariff', 'best_supplier', 'suggest_direct_price',
+  'set_consumption', 'set_margin_pct', 'apply_official_tariff', 'best_supplier',
   'upsert_item', 'remove_item', 'upsert_discount', 'remove_discount',
 ] as const;
 export type ProposalOperationKind = (typeof PROPOSAL_OPERATIONS)[number];
@@ -81,6 +88,19 @@ const positive = (value: unknown): value is number => typeof value === 'number' 
 /** Precio dado: positivo, o un 0 escrito a mano (la misma regla que `proposalCompleteness`). */
 const priced = (group: { unitPriceUSD?: number; priceSource?: string } | undefined) =>
   !!group && (positive(group.unitPriceUSD) || (group.unitPriceUSD === 0 && group.priceSource === 'manual'));
+/** Rutas del precio directo y del modo manual: el asistente no las cambia (AUTOMATED_PRICING; son del dock). */
+export const DIRECT_PRICING_PATHS: ReadonlySet<string> = new Set(['specs.pricingMode', 'specs.isDetailed', 'specs.pricePerWattUSD', 'specs.pricePerKWpUSD', 'specs.directPriceSurplusTarget']);
+const DIRECT_PRICING_MESSAGE = 'El asistente cotiza siempre en modo Simple (Catálogo IA) con matriz de costos: el precio directo $/W y el modo manual no se cambian desde aquí; hazlo en el dock (Costos).';
+
+/** Error del código tarifario si la matriz cargada no lo tiene para esa distribuidora (lista los válidos); sin matriz, nada. */
+export function tariffCodeError(matrix: GlobalTariffMatrix | null | undefined, distributor: unknown, code: unknown): string | null {
+  const key = String(distributor ?? '').toUpperCase();
+  const tariffs = (matrix?.schedules as Record<string, { tariffs?: Record<string, unknown> }> | undefined)?.[key]?.tariffs;
+  if (!tariffs || !Object.keys(tariffs).length) return null;
+  if (typeof code === 'string' && tariffs[tariffMatrixKey(key, code)]) return null;
+  return `El código tarifario «${String(code)}» no existe para ${key}: usa uno de ${Object.keys(tariffs).join(', ')}.`;
+}
+
 export const HIDDEN_REGIME_MESSAGE = 'La organización oculta el régimen de medición neta en el simulador: el asistente no lo cambia. Si hace falta, pídelo a un administrador (Ajustes → Funciones).';
 
 /** Texto de un precio elegido, para avisar al usuario (nunca se presenta un genérico como oferta). */
@@ -93,7 +113,9 @@ function priceWarning(item: SolarEquipmentItem, genericFor: IntentContext['gener
 
 /**
  * La batería que «ponle baterías» usa: la pedida por id; la actual si ya tiene precio; si no, la que elige el catálogo con el
- * resolvedor de precios (oferta preferida → más barata en stock → genérica). Sin baterías en el catálogo, la actual sin precio.
+ * resolvedor de precios (oferta preferida → más barata en stock → genérica; sin ningún precio, el modelo del catálogo más
+ * cercano a la actual, sin precio, para que la propuesta quede incompleta y no con un precio inventado). Sin baterías en el
+ * catálogo, la actual sin precio.
  */
 export function storageChoice(specs: SystemSpecs, ctx: IntentContext, catalogItemId?: string):
   { item?: SolarEquipmentItem; keep: boolean; error?: string; reason: string } {
@@ -106,9 +128,10 @@ export function storageChoice(specs: SystemSpecs, ctx: IntentContext, catalogIte
   }
   const current = migrateLegacySpecs(specs).batteries?.[0];
   if (current && priced(current)) return { keep: true, reason: 'La batería actual ya tiene precio' };
-  const choice = chooseCatalogEquipment(catalog, 'battery', { genericFor: ctx.genericPriceFor });
+  const choice = chooseCatalogEquipment(catalog, 'battery', { genericFor: ctx.genericPriceFor, preferredMagnitude: current?.capacityKWh });
   if (choice.item) return { item: choice.item, keep: false, reason: choice.reason };
-  return { keep: true, reason: catalog.length ? 'Sin baterías en el catálogo' : 'El catálogo de equipos no está cargado' };
+  if (!catalog.length) return { keep: true, reason: 'El catálogo de equipos no está cargado' };
+  return { keep: true, reason: catalog.some((entry) => entry.type === 'battery') ? 'Ninguna batería del catálogo tiene oferta de proveedor ni precio genérico' : 'Sin baterías en el catálogo' };
 }
 
 /** Traduce las operaciones a un lote por ruta. Los errores llevan la ruta (`ops[i].campo` o la del registro). */
@@ -158,23 +181,52 @@ export function operationsToEdits(project: ProjectSimulation, ops: readonly Prop
     if (warning) warnings.push(warning);
   };
   const intent = (value: ProjectIntent) => projectIntentEdits(project, value, ctx).forEach((edit) => push(edit.path, edit.value));
+  // Consumo de trabajo: «ponle baterías» dimensiona con el consumo del propio lote, en cualquier orden (se calcula al final).
+  let consumption: number[] = project.monthlyConsumption;
+  const takeConsumption = (value: unknown) => {
+    if (Array.isArray(value) && value.length === 12 && value.every((n) => typeof n === 'number' && Number.isFinite(n))) consumption = value as number[];
+  };
+  let autoBatteryCount = false;
+  // Contradicciones de baterías en el mismo lote: el índice de la operación que las incluye o las quita.
+  let storage: { index: number; enabled: boolean } | undefined;
+  let batteryAdded: number | undefined;
+  const contradiction = (at: string, other: number) => fail(at, `${at} contradice ops[${other}]: indica solo una de las dos.`);
+  // Tarifa pedida: se valida al final contra la matriz, con la distribuidora resultante del lote.
+  let tariffAsk: { at: string; code: unknown } | undefined;
+  let distributorAsk: unknown;
+  const addsBattery = (op: ProposalOperation) =>
+    ((op.op === 'select_equipment' || op.op === 'add_equipment') && op.equipment === 'battery') ||
+    (op.op === 'set' && typeof op.path === 'string' && (op.path.startsWith('specs.batteries') || (op.path === 'specs.hasBattery' && op.valueJson?.trim() === 'true')));
 
   ops.forEach((op, i) => {
     const at = `ops[${i}]`;
     const kind: EquipmentKind | undefined = op.equipment;
     const noun = kind ? NOUN[kind] : '';
     const needKind = () => { if (!kind) fail(`${at}.equipment`, 'Falta equipment: panel, inverter o battery.'); return !!kind; };
+    if (addsBattery(op)) {
+      if (storage && !storage.enabled) { contradiction(at, storage.index); return; }
+      batteryAdded ??= i;
+    }
     switch (op.op) {
       case 'set': {
-        if (typeof op.path !== 'string' || !op.path) { fail(`${at}.path`, 'Falta path: la ruta del registro (consúltalas con get_proposal_state).'); return; }
+        if (typeof op.path !== 'string' || !op.path) { fail(`${at}.path`, 'Falta path: la ruta del registro (get_proposal_state con includeEditablePaths).'); return; }
+        if (DIRECT_PRICING_PATHS.has(op.path)) { fail(`${at}.path`, DIRECT_PRICING_MESSAGE); return; }
         const parsed = parseJson(at, op.valueJson);
-        if (parsed.ok) push(op.path, parsed.value);
+        if (!parsed.ok) return;
+        let value = parsed.value;
+        // Una lista completa de extras sin «hideInQuotation» no vuelve visible lo que estaba oculto (como propose_project_update).
+        if (op.path === 'financials.customItems' && Array.isArray(value)) value = preserveHiddenInQuotation(value as CustomQuotationItem[], project.financials?.customItems);
+        if (op.path === 'monthlyConsumption') takeConsumption(value);
+        if (op.path === 'rates.tariffCode') tariffAsk = { at: `${at}.valueJson`, code: value };
+        if (op.path === 'rates.distributor') distributorAsk = value;
+        push(op.path, value);
         return;
       }
       case 'select_equipment': {
         if (!needKind()) return;
         const index = op.index ?? 0;
-        if (index > groupsOf(kind!).length) { fail(`${at}.index`, `No existe el grupo #${index + 1} de ${noun}: usa add_equipment para añadir uno.`); return; }
+        // Solo filas que existen (o la primera de una lista vacía): una fila nueva es add_equipment.
+        if (index >= Math.max(1, groupsOf(kind!).length)) { fail(`${at}.index`, `No existe el grupo #${index + 1} de ${noun}: usa add_equipment para añadir uno.`); return; }
         const item = catalogItem(at, op.catalogItemId, kind!);
         if (!item) return;
         select(kind!, index, item);
@@ -196,19 +248,28 @@ export function operationsToEdits(project: ProjectSimulation, ops: readonly Prop
         const index = op.index;
         if (index === undefined) { fail(`${at}.index`, 'Falta index: el número de fila (0 es la primera).'); return; }
         if (!groupsOf(kind!)[index]) { fail(`${at}.index`, `No existe el grupo #${index + 1} de ${noun}.`); return; }
-        specs = { ...specs, ...groupRemovePatch(kind!, specs, index) } as SystemSpecs;
+        const removed = { ...specs, ...groupRemovePatch(kind!, specs, index) } as SystemSpecs;
+        // Las reglas del dock no quitan la última fila: se dice, nunca «ya estaba así».
+        if (same(removed[LIST_KEY[kind!]], specs[LIST_KEY[kind!]])) {
+          const hint = kind === 'battery' ? 'quita las baterías con set_storage (enabled false) o cámbiala con select_equipment' : 'cámbialo con select_equipment';
+          fail(`${at}.index`, groupsOf(kind!).length <= 1 ? `No se puede quitar el único ${noun}: ${hint}.` : `No se pudo quitar el grupo #${index + 1} de ${noun}.`);
+          return;
+        }
+        specs = removed;
         return;
       }
       case 'set_storage': {
         if (typeof op.enabled !== 'boolean') { fail(`${at}.enabled`, 'Falta enabled: true incluye las baterías, false las quita.'); return; }
+        if (storage && storage.enabled !== op.enabled) { contradiction(at, storage.index); return; }
+        if (!op.enabled && batteryAdded !== undefined) { contradiction(at, batteryAdded); return; }
+        storage ??= { index: i, enabled: op.enabled };
         if (!op.enabled) { specs = { ...specs, hasBattery: false }; return; }
         const choice = storageChoice(specs, ctx, op.catalogItemId);
         if (choice.error) { fail(`${at}.catalogItemId`, choice.error); return; }
         if (choice.item) {
           select('battery', 0, choice.item);
-          const group = (specs.batteries ?? [])[0];
-          const count = op.count ?? Math.max(1, recommendBatteryCount({ unit: { capacityKWh: group.capacityKWh, dodPct: group.dodPct, efficiencyPct: group.efficiencyPct }, monthlyConsumption: project.monthlyConsumption }).count);
-          setCount('battery', 0, count);
+          if (op.count !== undefined) setCount('battery', 0, op.count);
+          else autoBatteryCount = true;
         } else {
           if (!(specs.batteries ?? []).length) { fail(`${at}`, `${choice.reason}: no hay una batería que incluir. Añade una con add_equipment (equipment battery).`); return; }
           if (!priced((specs.batteries ?? [])[0])) warnings.push(`${choice.reason}: se incluye la batería actual sin precio; la propuesta queda incompleta hasta indicar su costo.`);
@@ -219,8 +280,8 @@ export function operationsToEdits(project: ProjectSimulation, ops: readonly Prop
       }
       case 'set_tariff':
         if (op.distributor === undefined && op.tariffCode === undefined) { fail(at, 'Indica distributor, tariffCode o ambos.'); return; }
-        if (op.distributor !== undefined) push('rates.distributor', op.distributor);
-        if (op.tariffCode !== undefined) push('rates.tariffCode', op.tariffCode);
+        if (op.distributor !== undefined) { distributorAsk = op.distributor; push('rates.distributor', op.distributor); }
+        if (op.tariffCode !== undefined) { tariffAsk = { at: `${at}.tariffCode`, code: op.tariffCode }; push('rates.tariffCode', op.tariffCode); }
         return;
       case 'set_net_metering':
         if (op.regime === undefined && op.gridUseChargeDOPPerKWh === undefined) { fail(at, 'Indica regime, gridUseChargeDOPPerKWh o ambos.'); return; }
@@ -240,10 +301,15 @@ export function operationsToEdits(project: ProjectSimulation, ops: readonly Prop
         return;
       }
       case 'set_consumption': {
-        if (op.averageMonthlyKWh !== undefined) { push('monthlyConsumption', Array(12).fill(op.averageMonthlyKWh)); return; }
+        if (op.averageMonthlyKWh !== undefined) {
+          const months = Array(12).fill(op.averageMonthlyKWh);
+          takeConsumption(months);
+          push('monthlyConsumption', months);
+          return;
+        }
         if (op.valueJson === undefined) { fail(at, 'Indica averageMonthlyKWh o los doce consumos en valueJson.'); return; }
         const parsed = parseJson(at, op.valueJson);
-        if (parsed.ok) push('monthlyConsumption', parsed.value);
+        if (parsed.ok) { takeConsumption(parsed.value); push('monthlyConsumption', parsed.value); }
         return;
       }
       case 'set_margin_pct':
@@ -252,7 +318,6 @@ export function operationsToEdits(project: ProjectSimulation, ops: readonly Prop
         return;
       case 'apply_official_tariff': intent({ kind: 'applyOfficialTariff' }); return;
       case 'best_supplier': intent({ kind: 'bestSupplier' }); return;
-      case 'suggest_direct_price': intent({ kind: 'suggestDirectPrice' }); return;
       case 'upsert_item': {
         items ??= structuredClone(project.financials?.customItems ?? []);
         const existing = op.id ? items.find((item) => item.id === op.id) : undefined;
@@ -306,6 +371,17 @@ export function operationsToEdits(project: ProjectSimulation, ops: readonly Prop
         fail(`${at}.op`, `Operación desconocida «${String((op as { op?: unknown }).op)}»: usa una de ${PROPOSAL_OPERATIONS.join(', ')}.`);
     }
   });
+
+  // El banco de «ponle baterías», con el consumo final del lote y la batería final del grupo principal.
+  const bank = (specs.batteries ?? [])[0];
+  if (autoBatteryCount && bank) {
+    const unit = { capacityKWh: bank.capacityKWh, dodPct: bank.dodPct, efficiencyPct: bank.efficiencyPct };
+    setCount('battery', 0, Math.max(1, recommendBatteryCount({ unit, monthlyConsumption: consumption }).count));
+  }
+  if (tariffAsk) {
+    const message = tariffCodeError(ctx.tariffMatrix, distributorAsk ?? project.rates.distributor, tariffAsk.code);
+    if (message) fail(tariffAsk.at, message);
+  }
 
   // Las listas de equipos y los parámetros del sistema que cambiaron, una vez y enteros: lo que escribiría el dock.
   for (const kind of ['panel', 'inverter', 'battery'] as const) {

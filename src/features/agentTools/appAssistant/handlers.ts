@@ -12,7 +12,11 @@ import { effectiveFeatureSettings } from '../../application/featurePolicy';
 import { energyCalculationMode, netMeteringRegimeSelectorVisible } from '../../../../shared/applicationFeatures';
 import { effectiveGenericPrice, priceFeatureActive } from '../../../store/slices/equipmentPriceSlice';
 import { applyProjectEdits, diffProjectFields, type ProjectEditError, type ProjectFieldChange } from '../../../domain/projectEditTransaction';
-import { operationsToEdits, proposeSystemSizing, type OperationContext, type ProposalOperation } from '../../../domain/proposalOperations';
+import {
+  operationsToEdits, proposeSystemSizing, tariffCodeError, type OperationContext, type OperationTranslation, type ProposalOperation,
+} from '../../../domain/proposalOperations';
+import { AUTOMATED_PRICING } from '../../../../shared/automatedProposalPolicy';
+import { operationsTouchPricing } from './pricingOps';
 import { editableFieldPaths, engineResults, proposalWarnings, type EngineResults } from '../../../domain/proposalSnapshot';
 import { createNewProposal } from '../../../domain/newProposal';
 import { createProjectId } from '../../../utils/projectId';
@@ -77,18 +81,38 @@ export function operationContext(): OperationContext {
 const getProposalState: NativeHandler = (args) => {
   const project = findVisibleProject(args.proposalId);
   return {
-    data: { proposalId: project.id, changes: [], results: results(null, project), warnings: proposalWarnings(project), data: { editablePaths: editableFieldPaths() } } satisfies ToolPayload,
+    data: {
+      proposalId: project.id, changes: [], results: results(null, project), warnings: proposalWarnings(project),
+      // Las rutas solo si se piden: ya viajan resumidas en la descripción de edit_proposal y ocupan ~11 KB por turno.
+      ...(args.includeEditablePaths ? { data: { editablePaths: editableFieldPaths().filter((p) => !args.section || p.path === args.section || p.path.startsWith(`${args.section}.`) || p.path.startsWith(`${args.section}[`)) } } : {}),
+    } satisfies ToolPayload,
     cards: [proposalCard(project)],
   };
 };
 
 // ── edit_proposal ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * Operaciones → lote por ruta, y, si el lote toca precios, `AUTOMATED_PRICING` (Simple con matriz de costos), como
+ * `propose_project_update`: las propuestas del asistente nunca quedan en precio directo $/W ni en modo manual.
+ */
+export function translateOperations(project: ProjectSimulation, ops: readonly ProposalOperation[], opCtx: OperationContext): OperationTranslation {
+  const translation = operationsToEdits(project, ops, opCtx);
+  if (!translation.ok || !operationsTouchPricing(ops)) return translation;
+  const specs = project.specs as unknown as Record<string, unknown>;
+  const forced = Object.entries(AUTOMATED_PRICING).filter(([field, value]) => specs[field] !== value).map(([field, value]) => ({ path: `specs.${field}`, value }));
+  return { ...translation, edits: [...translation.edits, ...forced] };
+}
+
+/** Huella de lo que el usuario ve en la tarjeta: rutas, antes y después. Una confirmación con otra huella no se aplica. */
+const changesFingerprint = (changes: readonly ProjectFieldChange[]) => JSON.stringify(changes.map((c) => [c.path, c.before, c.after]));
+export const STALE_PREVIEW_MESSAGE = 'Los datos cambiaron desde la propuesta del cambio; pide al asistente que lo prepare de nuevo.';
+
 const editProposal: NativeHandler = (args, ctx) => {
   const project = requireEditableProject(args.proposalId);
   const ops = args.ops as ProposalOperation[];
   const opCtx = operationContext();
-  const translation = operationsToEdits(project, ops, opCtx);
+  const translation = translateOperations(project, ops, opCtx);
   if (!translation.ok) return { data: failure('invalid_operations', translation.errors, { proposalId: project.id, warnings: translation.warnings }) };
   const preview = applyProjectEdits(project, translation.edits, opCtx, { validation: 'strict' });
   if (!preview.ok) return { data: failure('invalid_edits', preview.errors, { proposalId: project.id, warnings: unique([...translation.warnings, ...preview.warnings]) }) };
@@ -99,6 +123,7 @@ const editProposal: NativeHandler = (args, ctx) => {
   const editKey = editKeyOf(ctx);
   const idempotencyKey = ctx.turnId && ctx.callId ? `${ctx.turnId}:${ctx.callId}` : undefined;
   const title = (typeof args.title === 'string' && args.title.trim()) || `Editar ${project.client.name}`;
+  const previewFingerprint = changesFingerprint(preview.changes);
   return {
     data: { proposalId: project.id, changes: preview.changes, results: results(project, preview.project), warnings } satisfies ToolPayload,
     plan: {
@@ -106,8 +131,14 @@ const editProposal: NativeHandler = (args, ctx) => {
       execute() {
         // Revalida contra la propuesta de AHORA (permisos, papelera, conflicto, catálogo): la confirmación puede ser tardía.
         const current = requireEditableProject(project.id);
-        const again = operationsToEdits(current, ops, operationContext());
+        // El mismo reloj que la vista previa: los ids de filas, extras y descuentos nuevos son los que el usuario vio.
+        const nowCtx = { ...operationContext(), now: opCtx.now };
+        const again = translateOperations(current, ops, nowCtx);
         if (!again.ok) throw new Error(errorsText(again.errors));
+        // Lo que se aplica es lo que el usuario vio: si una oferta, el consumo u otro dato del lote cambió, se rechaza.
+        const recheck = applyProjectEdits(current, again.edits, nowCtx, { validation: 'strict' });
+        if (!recheck.ok) throw new Error(errorsText(recheck.errors));
+        if (changesFingerprint(recheck.changes) !== previewFingerprint) throw new Error(STALE_PREVIEW_MESSAGE);
         const before = pickFields(current, PROJECT_SECTIONS);
         const committed = store().commitProjectEdits(current.id, again.edits, {
           source: 'assistant', turnId: ctx.turnId, coalesceKey: editKey, idempotencyKey, validation: 'strict',
@@ -135,7 +166,7 @@ const sizeSystem: NativeHandler = (args) => {
   const proposal = proposeSystemSizing(project, opCtx, { coveragePct: args.coveragePct, includeBatteries: args.includeBatteries, batteryCatalogItemId: args.batteryCatalogItemId });
   if (!proposal.ok) return { data: failure('cannot_size', proposal.errors, { proposalId: project.id }) };
   // Vista previa de aplicar las ops: diff y resultados, sin escribir nada.
-  const translation = operationsToEdits(project, proposal.sizing.ops, opCtx);
+  const translation = translateOperations(project, proposal.sizing.ops, opCtx);
   const preview = translation.ok ? applyProjectEdits(project, translation.edits, opCtx, { validation: 'strict' }) : undefined;
   const previewWarnings = translation.ok ? (preview && !preview.ok ? [`La vista previa no se pudo calcular: ${errorsText(preview.errors)}`] : []) : [`La vista previa no se pudo calcular: ${errorsText(translation.errors)}`];
   return {
@@ -153,9 +184,21 @@ const sizeSystem: NativeHandler = (args) => {
 // ── create_proposal ─────────────────────────────────────────────────────────────────────────
 
 const normalizeText = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-function provinceName(raw: string): string | undefined {
+/** Nombres con que se reconoce una provincia: el completo y sus partes («Santo Domingo / Distrito Nacional», «Monseñor Nouel (Bonao)»). */
+const provinceAliases = (name: string) => unique([name, ...name.split(/[/()]/)].map(normalizeText).filter(Boolean));
+/**
+ * Provincia por coincidencia exacta (del nombre o de una de sus partes) o por un prefijo único de al menos tres letras.
+ * Nunca por un fragmento cualquiera: si hay varias candidatas, o ninguna, el error las lista.
+ */
+export function resolveProvince(raw: string): { name: string } | { error: string } {
   const query = normalizeText(raw);
-  return RD_PROVINCES.find((p) => normalizeText(p.name) === query)?.name ?? RD_PROVINCES.find((p) => normalizeText(p.name).includes(query))?.name;
+  const exact = RD_PROVINCES.filter((p) => provinceAliases(p.name).includes(query));
+  if (exact.length === 1) return { name: exact[0].name };
+  const prefixed = query.length >= 3 ? RD_PROVINCES.filter((p) => provinceAliases(p.name).some((alias) => alias.startsWith(query))) : [];
+  if (!exact.length && prefixed.length === 1) return { name: prefixed[0].name };
+  const candidates = exact.length ? exact : prefixed.length ? prefixed : RD_PROVINCES.filter((p) => query && normalizeText(p.name).includes(query));
+  if (candidates.length > 1) return { error: `«${raw}» coincide con varias provincias: ${candidates.slice(0, 8).map((p) => p.name).join(', ')}. Indica cuál.` };
+  return { error: `«${raw}» no es una provincia de República Dominicana${candidates.length === 1 ? ` (¿${candidates[0].name}?)` : ''}.` };
 }
 const validMonths = (value: unknown): value is number[] =>
   Array.isArray(value) && value.length === 12 && value.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0) && value.some((n) => n > 0);
@@ -172,11 +215,19 @@ function creationInput(args: Record<string, any>, owner: string): { ok: true; in
   let province: string | undefined;
   const rawProvince = pick('province');
   if (rawProvince) {
-    province = provinceName(String(rawProvince));
-    if (!province) errors.push({ path: 'province', message: `«${rawProvince}» no es una provincia de República Dominicana.` });
+    const resolved = resolveProvince(String(rawProvince));
+    if ('name' in resolved) province = resolved.name;
+    else errors.push({ path: 'province', message: resolved.error });
   }
   const distributor = pick('distributor');
   if (distributor && !DISTRIBUTORS.includes(String(distributor).toUpperCase())) errors.push({ path: 'distributor', message: `Distribuidora desconocida: ${DISTRIBUTORS.join(', ')}.` });
+  const tariffCode = pick('tariffCode');
+  if (tariffCode) {
+    // Con la distribuidora pedida o, sin ella, la de Ajustes (la que usará la fábrica).
+    const state = store();
+    const message = tariffCodeError(state.tariffMatrix, distributor || state.defaultSimulationSettings.defaultDistributor, tariffCode);
+    if (message) errors.push({ path: 'tariffCode', message });
+  }
   let monthlyConsumption: number[] | undefined;
   if (args.monthlyConsumptionKWh !== undefined) {
     if (!validMonths(args.monthlyConsumptionKWh)) errors.push({ path: 'monthlyConsumptionKWh', message: 'monthlyConsumptionKWh necesita exactamente doce consumos (kWh, de enero a diciembre) con algún valor mayor que 0.' });
@@ -290,7 +341,7 @@ const openProposal: NativeHandler = async (args) => {
 // ── undo_change ─────────────────────────────────────────────────────────────────────────────
 
 /** Cambios del asistente que pide deshacer, del más reciente al más antiguo (la actividad ya está en ese orden). */
-function undoTargets(proposalId: string, args: Record<string, any>): AgentActivityEntry[] {
+function undoTargets(proposalId: string, args: Record<string, unknown>): AgentActivityEntry[] {
   const applied = store().agentActivity.filter((a) => a.status === 'applied' && a.targetId === proposalId && a.source === 'app-assistant' && !!a.undo);
   if (args.activityId) return applied.filter((a) => a.id === args.activityId);
   if (args.turnId) return applied.filter((a) => a.turnId === args.turnId);
@@ -298,9 +349,18 @@ function undoTargets(proposalId: string, args: Record<string, any>): AgentActivi
 }
 
 /**
+ * Deshacer es protegido si alguno de los cambios lo era (p. ej. precios) o si manda a la papelera o restaura una propuesta
+ * (lo mismo que `move_proposal_to_trash`, protegida): revertir pide la misma confirmación que el cambio original.
+ */
+export function undoNeedsConfirmation(args: Record<string, unknown>): boolean {
+  if (typeof args.proposalId !== 'string') return false;
+  return undoTargets(args.proposalId, args).some((entry) => entry.kind === 'guarded' || entry.undo?.op === 'trash' || entry.undo?.op === 'restore');
+}
+
+/**
  * Deshace un cambio. Si es el último paso del diario de deshacer de la propuesta abierta, por el diario (como Ctrl+Z: pasa a
- * rehacer); si no (propuesta cerrada, o hubo cambios después), por la actividad, que comprueba la huella y rechaza si alguien
- * cambió lo mismo después.
+ * rehacer); si no (propuesta cerrada, o hubo cambios después), por la actividad, que compara la huella de las secciones que
+ * guarda el cambio y rechaza si la propuesta cambió después en ellas (cualquier campo, no solo los que tocó el asistente).
  */
 function undoOne(entry: AgentActivityEntry): { success: boolean; error?: string } {
   const s = store();

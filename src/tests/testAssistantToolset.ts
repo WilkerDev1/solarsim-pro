@@ -314,7 +314,13 @@ assert.equal(state.results.after?.complete, false, 'incompleta');
 assert.ok(!state.results.after?.complete && state.results.after.reasons.some((r) => r.code === 'missing_equipment_price'));
 assert.equal(state.proposal?.completeness.incomplete, true);
 assert.equal(/contractPriceUSD|paybackYears|year1SavingsUSD/.test(JSON.stringify(state)), false, 'ninguna cifra del motor en el resultado');
-const editable = (state.data as { editablePaths: { path: string }[] }).editablePaths;
+// Las rutas editables viajan solo si se piden (ya van resumidas en la descripción de edit_proposal): el contexto vivo es corto.
+assert.equal((state.data as { editablePaths?: unknown } | undefined)?.editablePaths, undefined, 'sin includeEditablePaths no se vuelcan las rutas');
+assert.ok(JSON.stringify(state).length < 6_000, `get_proposal_state ocupa ${JSON.stringify(state).length} bytes`);
+const withPaths = await run('get_proposal_state', { proposalId: unpriced.proposalId!, includeEditablePaths: true });
+const editable = (withPaths.data as { editablePaths: { path: string }[] }).editablePaths;
+const ratesOnly = await run('get_proposal_state', { proposalId: unpriced.proposalId!, includeEditablePaths: true, section: 'rates' });
+assert.ok((ratesOnly.data as { editablePaths: { path: string }[] }).editablePaths.every((p) => p.path.startsWith('rates.')), 'filtro por sección');
 assert.ok(editable.some((p) => p.path === 'rates.targetCoveragePct') && !editable.some((p) => p.path === 'specs.panels[].priceSource'), 'rutas editables desde el registro de campos');
 const legacyGet = await executeAgentTool({ name: 'get_project', args: { id: unpriced.proposalId! } }, { source: 'app-assistant', owner: assistantOwner() });
 assert.equal(legacyGet.status, 'ok');
@@ -338,13 +344,171 @@ const sample: Record<string, Record<string, unknown>> = {
   list_proposal_attachments: { proposalId: base.id }, search_clients: { query: '' }, link_proposal_to_client: { proposalId: base.id, clientId: null },
   set_proposal_status: { id: base.id, status: 'Final' }, set_commercial_status: { id: base.id, status: 'approved' },
 };
+// Sin puerto conectado (F4), estas dos responden «no disponible»; el resto debe funcionar de verdad, no solo tener la forma.
+const expectedError: Record<string, string> = { extract_invoice: 'not_available', open_proposal: 'not_available' };
 for (const name of APP_ASSISTANT_TOOLSET) {
   assert.ok(sample[name], `falta un ejemplo para ${name}`);
   const result = await run(name, sample[name]);
   assertCommonShape(result, name);
+  if (expectedError[name]) assert.equal(result.error?.code, expectedError[name], `${name}: ${JSON.stringify(result.error)}`);
+  else if (name === 'undo_change') assert.ok(result.status !== 'error' || result.error?.code === 'not_found', `${name}: ${JSON.stringify(result.error)}`);
+  else assert.notEqual(result.status, 'error', `${name}: ${JSON.stringify(result.error)}`);
 }
 const unknown = await run('propose_project_update', { id: base.id, edits: [] });
 assert.equal(unknown.status, 'error');
 assert.equal(unknown.error?.code, 'unknown_tool', 'fuera del conjunto declarado');
+
+// ── 9. Hallazgos de la revisión de F3a ──────────────────────────────────────────────────────────────────────────────────
+const patchProject = (id: string, patch: (p: ProjectSimulation) => ProjectSimulation) =>
+  store.setState({ projects: s().projects.map((p) => (p.id === id ? patch(p) : p)) });
+const errorAt = (result: AssistantToolResponse, path: string, pattern: RegExp) =>
+  assert.ok(result.status === 'error' && result.error?.errors?.some((e) => e.path === path && pattern.test(e.message)), `${path}: ${JSON.stringify(result.error ?? result.status)}`);
+
+// 9a. Una confirmación tardía no aplica un cambio distinto del que el usuario vio: si la oferta o el consumo cambiaron, se rechaza.
+reset();
+const stalePending = await run('edit_proposal', { proposalId: base.id, title: 'Ponle baterías', ops: storageOps });
+assert.equal(stalePending.status, 'pending_confirmation');
+store.setState({ equipmentCatalog: s().equipmentCatalog.map((e) => (e.id === battery.id ? { ...e, supplierPrices: [{ ...e.supplierPrices![0], priceUSD: 3900 }] } : e)) });
+const userEdit = s().commitProjectEdits(base.id, [{ path: 'monthlyConsumption', value: Array(12).fill(3000) }], { source: 'user' });
+assert.equal(userEdit.ok, true);
+const staleConfirm = s().confirmAgentAction(stalePending.actionId!);
+assert.equal(staleConfirm.success, false, 'los datos cambiaron: no se aplica');
+assert.match(staleConfirm.error ?? '', /cambiaron desde la propuesta del cambio/);
+assert.equal(projectOf(base.id).specs.hasBattery, false, 'nada aplicado');
+// Un cambio ajeno al lote (el nombre del cliente) no invalida la confirmación.
+reset();
+const freshPending = await run('edit_proposal', { proposalId: base.id, title: 'Ponle baterías', ops: storageOps });
+s().commitProjectEdits(base.id, [{ path: 'client.name', value: 'Otro nombre' }], { source: 'user' });
+assert.equal(s().confirmAgentAction(freshPending.actionId!).success, true, 'un cambio ajeno no bloquea');
+assert.equal(projectOf(base.id).specs.batteries?.[0].unitPriceUSD, 2100);
+
+// 9b. Repetir una llamada ya rechazada devuelve el estado real de la acción, no otro «pendiente».
+reset();
+const rejectCtx = ctx('turn-reject', '1');
+const toReject = await run('edit_proposal', { proposalId: base.id, ops: storageOps }, rejectCtx);
+assert.equal(toReject.status, 'pending_confirmation');
+s().rejectAgentAction(toReject.actionId!);
+const retried = await run('edit_proposal', { proposalId: base.id, ops: storageOps }, rejectCtx);
+assert.equal(retried.duplicate, true);
+assert.equal(retried.status, 'error', 'rechazada: no vuelve como pendiente');
+assert.equal(retried.error?.code, 'action_rejected');
+
+// 9c. «Ponle baterías» escribe una vez y sincroniza una vez.
+reset();
+allowAll();
+let autoSyncs = 0;
+const realAutoSync = s().triggerAutoSync;
+store.setState({ triggerAutoSync: () => { autoSyncs += 1; } });
+const oneSync = await run('edit_proposal', { proposalId: base.id, ops: storageOps });
+assert.equal(oneSync.status, 'applied', JSON.stringify(oneSync.error));
+assert.equal(autoSyncs, 1, 'un solo autosync');
+store.setState({ triggerAutoSync: realAutoSync });
+
+// 9d. Deshacer un cambio protegido (precios) o la creación de una propuesta pide confirmación con la política por defecto.
+reset();
+const marginPending = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set_margin_pct', pct: 10 }] });
+assert.equal(marginPending.status, 'pending_confirmation');
+assert.equal(s().confirmAgentAction(marginPending.actionId!).success, true);
+const marginApplied = projectOf(base.id).specs.saleMarginMultiplier;
+const undoGuarded = await run('undo_change', { proposalId: base.id });
+assert.equal(undoGuarded.status, 'pending_confirmation', 'deshacer un precio confirmado también se confirma');
+assert.equal(projectOf(base.id).specs.saleMarginMultiplier, marginApplied, 'pendiente: nada revertido');
+const createdDraft = await run('create_proposal', { clientName: 'Para deshacer' });
+assert.equal(createdDraft.status, 'applied', JSON.stringify(createdDraft.error));
+const undoCreate = await run('undo_change', { proposalId: createdDraft.proposalId! });
+assert.equal(undoCreate.status, 'pending_confirmation', 'mandar a la papelera lo creado se confirma (como move_proposal_to_trash)');
+assert.equal(projectOf(createdDraft.proposalId!).isDeleted ?? false, false);
+// Un cambio que no toca precios se sigue deshaciendo sin confirmación.
+const coverage = await run('edit_proposal', { proposalId: other.id, ops: [{ op: 'set', path: 'rates.targetCoveragePct', valueJson: '85' }] });
+assert.equal(coverage.status, 'applied');
+assert.equal((await run('undo_change', { proposalId: other.id })).status, 'applied');
+// La descripción dice la verdad: se detiene si la propuesta cambió después, no solo «lo mismo».
+const undoDefinition = APP_ASSISTANT_OWN_TOOLS.find((d) => d.name === 'undo_change')!;
+assert.equal(/cambió lo mismo/.test(undoDefinition.description), false);
+assert.match(undoDefinition.description, /si la propuesta cambió después/);
+
+// 9e. Precio automático: el asistente no pasa a precio directo; un lote de precios deja la matriz de costos; los extras ocultos siguen ocultos.
+reset();
+allowAll();
+const toDirect = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set', path: 'specs.pricingMode', valueJson: '"direct_watt"' }, { op: 'set', path: 'specs.pricePerWattUSD', valueJson: '1.1' }] });
+errorAt(toDirect, 'ops[0].path', /Simple/);
+assert.equal(projectOf(base.id).specs.pricingMode ?? 'cost_matrix', 'cost_matrix');
+patchProject(base.id, (p) => ({ ...p, specs: { ...p.specs, pricingMode: 'direct_watt', isDetailed: false } }));
+const backToMatrix = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'select_equipment', equipment: 'panel', catalogItemId: panel.id }] });
+assert.equal(backToMatrix.status, 'applied', JSON.stringify(backToMatrix.error));
+assert.equal(projectOf(base.id).specs.pricingMode, 'cost_matrix', 'AUTOMATED_PRICING en los lotes de precios');
+assert.ok(backToMatrix.changes.some((c) => c.path === 'specs.pricingMode'), 'y el cambio de modo se ve en el diff');
+patchProject(base.id, (p) => ({ ...p, financials: { ...p.financials, customItems: [{ id: 'h1', description: 'Oculto', quantity: 1, unitPriceUSD: 50, exonerateITBIS: true, hideInQuotation: true }] } }));
+const fullList = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set', path: 'financials.customItems', valueJson: JSON.stringify([{ id: 'h1', description: 'Oculto', quantity: 1, unitPriceUSD: 60, exonerateITBIS: true }]) }] });
+assert.equal(fullList.status, 'applied', JSON.stringify(fullList.error));
+assert.equal(projectOf(base.id).financials.customItems?.[0].unitPriceUSD, 60);
+assert.equal(projectOf(base.id).financials.customItems?.[0].hideInQuotation, true, 'preserveHiddenInQuotation');
+const noDirectOp = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'suggest_direct_price' }] });
+assert.equal(noDirectOp.status, 'error', 'el precio directo no es una operación del asistente');
+
+// 9f. Lotes contradictorios de baterías: error por ruta, nunca lo contrario de la última instrucción.
+reset();
+allowAll();
+const onOff = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set_storage', enabled: true }, { op: 'set_storage', enabled: false }] });
+errorAt(onOff, 'ops[1]', /contradice ops\[0\]/);
+const selectThenOff = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'select_equipment', equipment: 'battery', catalogItemId: battery.id }, { op: 'set_storage', enabled: false }] });
+errorAt(selectThenOff, 'ops[1]', /contradice ops\[0\]/);
+const offThenAdd = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set_storage', enabled: false }, { op: 'add_equipment', equipment: 'battery', catalogItemId: battery.id }] });
+errorAt(offThenAdd, 'ops[1]', /contradice ops\[0\]/);
+assert.equal(projectOf(base.id).specs.hasBattery, false);
+
+// 9g. El código tarifario se valida contra la matriz de tarifas, con los válidos en el mensaje.
+reset();
+allowAll();
+const badTariff = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set_tariff', tariffCode: 'ZZZ' }] });
+errorAt(badTariff, 'ops[0].tariffCode', /BTS1/);
+const badTariffPath = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set', path: 'rates.tariffCode', valueJson: '"ZZZ"' }] });
+errorAt(badTariffPath, 'ops[0].valueJson', /no existe/);
+assert.equal(projectOf(base.id).rates.tariffCode, base.rates.tariffCode);
+const okTariff = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'set_tariff', distributor: 'EDESUR', tariffCode: 'bts 2' }] });
+assert.equal(okTariff.status, 'applied', JSON.stringify(okTariff.error));
+const badCreateTariff = await run('create_proposal', { distributor: 'EDESUR', tariffCode: 'ZZZ' });
+errorAt(badCreateTariff, 'tariffCode', /BTS1/);
+
+// 9h. Lo que las reglas no hacen no se presenta como «ya estaba así»; select_equipment no crea grupos.
+const onlyInverter = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'remove_equipment', equipment: 'inverter', index: 0 }] });
+errorAt(onlyInverter, 'ops[0].index', /único inversor/);
+const newGroup = await run('edit_proposal', { proposalId: base.id, ops: [{ op: 'select_equipment', equipment: 'panel', index: 1, catalogItemId: panel.id }] });
+errorAt(newGroup, 'ops[0].index', /add_equipment/);
+assert.equal(projectOf(base.id).specs.panels?.length, 1);
+
+// 9i. «Ponle baterías» con un consumo nuevo en el mismo lote dimensiona con ese consumo, en cualquier orden.
+for (const order of ['storage-first', 'consumption-first']) {
+  reset();
+  allowAll();
+  const ops = [{ op: 'set_storage', enabled: true }, { op: 'set_consumption', averageMonthlyKWh: 3000 }];
+  const sizedBatch = await run('edit_proposal', { proposalId: base.id, ops: order === 'storage-first' ? ops : [...ops].reverse() });
+  assert.equal(sizedBatch.status, 'applied', JSON.stringify(sizedBatch.error));
+  const want = recommendBatteryCount({ unit: { capacityKWh: battery.capacityKWh!, dodPct: battery.dodPct, efficiencyPct: battery.batteryEfficiencyPct }, monthlyConsumption: Array(12).fill(3000) }).count;
+  assert.equal(projectOf(base.id).specs.batteries?.[0].count, want, `${order}: banco dimensionado con el consumo del lote`);
+}
+
+// 9j. La provincia: coincidencia exacta (o un nombre conocido entre paréntesis) o un prefijo único; si no, error con candidatas.
+reset();
+allowAll();
+errorAt(await run('create_proposal', { province: 'a' }), 'province', /provincia/);
+errorAt(await run('create_proposal', { province: 'San' }), 'province', /San Cristóbal/);
+const dn = await run('create_proposal', { province: 'Distrito Nacional' });
+assert.equal(projectOf(dn.proposalId!).client.province, 'Santo Domingo / Distrito Nacional');
+const bonao = await run('create_proposal', { province: 'bonao' });
+assert.equal(projectOf(bonao.proposalId!).client.province, 'Monseñor Nouel (Bonao)');
+const santiago = await run('create_proposal', { province: 'Santiago' });
+assert.equal(projectOf(santiago.proposalId!).client.province, 'Santiago', 'exacta antes que prefijo');
+
+// 9k. Baterías en el catálogo pero sin oferta ni genérico: lo dice tal cual y elige un modelo del catálogo sin precio.
+reset({ catalog: structuredClone(DEFAULT_EQUIPMENT_CATALOG) });
+allowAll();
+const unpricedStorage = await run('edit_proposal', { proposalId: base.id, ops: storageOps });
+assert.equal(unpricedStorage.status, 'applied', JSON.stringify(unpricedStorage.error));
+assert.equal(unpricedStorage.warnings.some((w) => /Sin baterías en el catálogo/.test(w)), false, JSON.stringify(unpricedStorage.warnings));
+assert.ok(unpricedStorage.warnings.some((w) => /no tiene oferta de proveedor ni precio genérico/.test(w)), JSON.stringify(unpricedStorage.warnings));
+const chosenUnpriced = projectOf(base.id).specs.batteries?.[0];
+assert.ok(chosenUnpriced?.catalogItemId && DEFAULT_EQUIPMENT_CATALOG.some((e) => e.id === chosenUnpriced.catalogItemId && e.type === 'battery'), 'modelo del catálogo');
+assert.equal(unpricedStorage.results.after?.complete, false, 'sin precio: incompleta');
 
 console.log('PASS: assistant toolset: declarations, edit_proposal (batteries in one call), create_proposal, size_system, undo_change and common shape.');

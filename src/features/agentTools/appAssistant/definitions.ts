@@ -33,7 +33,7 @@ const OPERATION_HELP = [
   'set_net_metering {regime?, gridUseChargeDOPPerKWh?}',
   'set_radiation {province?, coordinates?, solarSourceMode?, valueJson? con doce HSP}',
   'set_consumption {averageMonthlyKWh | valueJson con doce consumos}',
-  'set_margin_pct {pct}; apply_official_tariff; best_supplier; suggest_direct_price',
+  'set_margin_pct {pct}; apply_official_tariff; best_supplier',
   'upsert_item {id?, description, quantity, unitPriceUSD, unit?, exonerateITBIS?, applyMargin?, hideInQuotation?} y remove_item {id}',
   'upsert_discount {id?, description, discountType, value, target?} y remove_discount {id}',
 ].join('; ');
@@ -41,8 +41,12 @@ const OPERATION_HELP = [
 export const APP_ASSISTANT_OWN_TOOLS: readonly AgentToolDefinition[] = [
   {
     name: 'get_proposal_state', title: 'Estado de la propuesta', kind: 'read', category: 'proposals', card: 'proposal', surfaces: SURFACE,
-    description: `Resumen compacto de una propuesta (cliente, tarifa, consumo, equipos con precio y procedencia, margen, extras y descuentos), sus avisos, si está completa y las rutas editables con su tipo y rango (para edit_proposal). ${RESULT_SHAPE}`,
-    inputSchema: object({ proposalId }, ['proposalId']),
+    description: `Resumen compacto de una propuesta (cliente, tarifa, consumo, equipos con precio y procedencia, margen, extras y descuentos), sus avisos y si está completa. Con includeEditablePaths, también las rutas editables con su tipo y rango (para edit_proposal; filtra con section). ${RESULT_SHAPE}`,
+    inputSchema: object({
+      proposalId,
+      includeEditablePaths: { type: 'boolean', description: 'Añadir las rutas editables con tipo y rango (solo si las necesitas: ya van resumidas en edit_proposal).' },
+      section: { type: 'string', enum: ['client', 'rates', 'specs', 'financials', 'monthlyConsumption'], description: 'Solo las rutas de esta sección.' },
+    }, ['proposalId']),
   },
   {
     name: 'create_proposal', title: 'Crear propuesta', kind: 'draft', category: 'proposals', card: 'proposal', surfaces: SURFACE,
@@ -76,7 +80,7 @@ export const APP_ASSISTANT_OWN_TOOLS: readonly AgentToolDefinition[] = [
   },
   {
     name: 'edit_proposal', title: 'Editar propuesta', kind: 'draft', category: 'proposals', card: 'proposal', surfaces: SURFACE,
-    description: `Aplica una lista de operaciones a una propuesta como UN solo cambio con un deshacer: todo o nada, con validación estricta; un error dice la ruta y cómo corregirlo. Operaciones: ${OPERATION_HELP}. ${PRICE_RULE} Lo que la organización oculta (p. ej. el régimen de medición neta) se rechaza. ${RESULT_SHAPE}`,
+    description: `Aplica una lista de operaciones a una propuesta como UN solo cambio con un deshacer: todo o nada, con validación estricta; un error dice la ruta y cómo corregirlo. Operaciones: ${OPERATION_HELP}. ${PRICE_RULE} Cotiza siempre en modo Simple con matriz de costos: un lote que toca precios la deja así y el precio directo $/W no se cambia desde aquí (es del dock). Un lote con operaciones contradictorias se rechaza. Lo que la organización oculta (p. ej. el régimen de medición neta) se rechaza. ${RESULT_SHAPE}`,
     inputSchema: object({
       proposalId,
       title: { type: 'string', maxLength: 150, description: 'Resumen breve del cambio.' },
@@ -117,7 +121,7 @@ export const APP_ASSISTANT_OWN_TOOLS: readonly AgentToolDefinition[] = [
   },
   {
     name: 'undo_change', title: 'Deshacer cambio', kind: 'draft', category: 'proposals', card: 'proposal', surfaces: SURFACE,
-    description: `Deshace un cambio del asistente (activityId) o un turno entero (turnId) en una propuesta; sin ninguno, el último cambio del asistente en ella. Revierte del más reciente al más antiguo y se detiene si el usuario cambió lo mismo después. ${RESULT_SHAPE}`,
+    description: `Deshace un cambio del asistente (activityId) o un turno entero (turnId) en una propuesta; sin ninguno, el último cambio del asistente en ella. Revierte del más reciente al más antiguo y se detiene si la propuesta cambió después del cambio del asistente (cualquier cambio, no solo el mismo campo): entonces hay que usar el historial de versiones. Deshacer un cambio de precios o la creación de una propuesta pide la misma confirmación que el cambio original. ${RESULT_SHAPE}`,
     inputSchema: object({
       proposalId,
       activityId: id('ID del cambio (activityId de un resultado).'),
