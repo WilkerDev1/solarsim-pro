@@ -11,7 +11,7 @@ export interface AgentSourcePolicy {
 /**
  * Perfil del asistente de la app (F3b, ADR 0010). `live-edit`: lo que ocurre dentro de una propuesta (campos, equipos,
  * precios, margen, descuentos y extras) se aplica al momento con diff y deshacer; `confirm`: los precios piden confirmación
- * como antes. Solo lo lee la fuente `app-assistant`; los agentes externos y el asistente de propuestas nunca lo heredan.
+ * como antes. Solo lo lee la fuente `app-assistant`; los agentes externos nunca lo heredan.
  * Lo decide `decideAgentToolPermission` (src/features/agentTools/permissionProfile.ts).
  */
 export type AppAssistantProfile = 'live-edit' | 'confirm';

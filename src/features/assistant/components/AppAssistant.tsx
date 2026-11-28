@@ -22,7 +22,6 @@ import './assistantTurn.css';
 // (`assistantPanelLayout`, puro); si no, y en el resto de vistas, flota. Acoplar o flotar es el mismo elemento con otra clase:
 // no se remonta. Se puede escribir mientras trabaja (la sesión encola y entrega al terminar el paso); cerrarlo no cancela
 // («Detener» es aparte) y el botón muestra una insignia discreta con trabajo en curso o cambios sin ver.
-// El camino antiguo (`useAppAssistant` + `service.ts`, el modal `ai-invoice`) ya no lo usa nadie desde aquí; se retira en F6.
 
 const PROJECT_SUGGESTIONS = ['Ponle baterías a esta propuesta', 'Resume esta propuesta y sus supuestos', '¿Por qué el ahorro del primer año es este?'];
 const GLOBAL_SUGGESTIONS = ['Crea una propuesta', 'Muestra mis propuestas más recientes', 'Busca baterías de litio en el inventario'];
@@ -100,7 +99,7 @@ function AssistantPanel({ projectId, belowToolbar, layout }: { projectId?: strin
   const session = assistantSession();
   const ai = useSession(session);
   const picker = useRef<(() => void) | null>(null);
-  const state = useSimulationStore(useShallow((s) => ({ projects: s.projects, isSettingsModalOpen: s.isSettingsModalOpen, isAIInvoiceModalOpen: s.isAIInvoiceModalOpen, isAIDatasheetModalOpen: s.isAIDatasheetModalOpen, isAIPriceCatalogModalOpen: s.isAIPriceCatalogModalOpen, isNewProjectModalOpen: s.isNewProjectModalOpen, activeConflict: s.activeConflict, isTrashActive: s.isTrashActive, openSettingsModal: s.openSettingsModal, geminiApiKey: s.geminiApiKey, agentActivity: s.agentActivity, pendingAgentActions: s.pendingAgentActions })));
+  const state = useSimulationStore(useShallow((s) => ({ projects: s.projects, isSettingsModalOpen: s.isSettingsModalOpen, isAIDatasheetModalOpen: s.isAIDatasheetModalOpen, isAIPriceCatalogModalOpen: s.isAIPriceCatalogModalOpen, isNewProjectModalOpen: s.isNewProjectModalOpen, activeConflict: s.activeConflict, isTrashActive: s.isTrashActive, openSettingsModal: s.openSettingsModal, geminiApiKey: s.geminiApiKey, agentActivity: s.agentActivity, pendingAgentActions: s.pendingAgentActions })));
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const open = ai.panelOpen;
@@ -259,7 +258,6 @@ function AssistantPanel({ projectId, belowToolbar, layout }: { projectId?: strin
             onCancel={session.cancel}
             onPickFiles={(files) => void session.addFiles(files)}
             pickerRef={picker}
-            queueWhileBusy
             busy={ai.busy}
             canSend={composer.canSend}
             disabledReason={composer.disabledReason}

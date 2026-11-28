@@ -7,7 +7,7 @@ import { findCatalogMatchForVariant } from "../utils/equipmentMatchingUtils";
 import { useSimulationStore } from "../store/useSimulationStore";
 import { GeminiPriceCatalogService } from "../services/geminiPriceCatalogService";
 import type { SolarEquipmentItem } from "../types/equipment";
-import type { GeminiTransport } from "../../shared/geminiTransport";
+import { type GeminiTransport } from './support/restFixture';
 import { clientFromTransport } from "./support/clientFromTransport";
 
 async function main() {

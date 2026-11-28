@@ -1,8 +1,8 @@
 // F0: copias doradas del contrato de herramientas y de las instrucciones que leen los modelos y los clientes MCP.
 //  · AGENT_RULES_ES: instrucciones del MCP local y prefijo de las del remoto y del prompt del asistente.
 //  · ASSISTANT_SYSTEM_PROMPT: prompt del asistente flotante antiguo (F3c dejó las instrucciones nuevas en tres capas,
-//    `buildSystemInstruction`, con su propia instantánea; desde F4 el flotante usa esas y este prompt queda solo para el
-//    camino antiguo, `service.ts`, hasta F6: vive en shared/ y no se toca).
+//    `buildSystemInstruction`, con su propia instantánea; desde F4 el flotante usa esas y, desde F6, nada en la app usa este
+//    prompt: vive en shared/ (contrato congelado) y su copia dorada se conserva hasta descongelar).
 //  · lista de herramientas por superficie (mcp, app-assistant, proposal-assistant) con su kind.
 //  · tools/list completo del MCP local (nombre, título, descripción, kind, categoría y esquemas).
 // Las 12 herramientas del MCP remoto y REMOTE_INSTRUCTIONS están en `mcp-remote/tests/contractGolden.test.ts`; además, el

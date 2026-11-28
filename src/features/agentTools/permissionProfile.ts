@@ -10,7 +10,7 @@
  * - Todo lo demás, en cualquier superficie, sigue la política de hoy: lo compartido o sin deshacer (catálogo, ofertas y
  *   precios genéricos, clientes, estado y decisión comercial, papelera, borrados, compartir) pide confirmación salvo el modo
  *   sin confirmación explícito (bypass), que nunca salta lo que no se deshace.
- * - Agentes externos (`mcp`) y el asistente de propuestas (`proposal-assistant`) nunca leen el perfil.
+ * - Los agentes externos (`mcp`) nunca leen el perfil.
  *
  * La política del dispositivo manda sobre el perfil: «Bloquear» bloquea y «Pedir confirmación» en borradores confirma.
  * Los permisos de la cuenta, la papelera, los conflictos y lo que oculta la organización NO se deciden aquí: los revalida
@@ -49,11 +49,7 @@ export function decideAgentToolPermission(policy: AgentPolicy, request: AgentPer
     // «En vivo» nunca es más estricto que «confirmar»: el bypass explícito de cambios sensibles sigue aplicando.
     return request.kind === 'guarded' && levels.guarded === 'allow' ? 'apply' : 'confirm';
   }
-  if (request.kind === 'draft') {
-    if (levels.draft === 'allow') return 'apply';
-    // En el asistente de propuestas el usuario ya revisó y pulsó «Aplicar»: ese clic es la confirmación.
-    return request.source === 'proposal-assistant' && levels.draft === 'confirm' ? 'apply' : 'confirm';
-  }
+  if (request.kind === 'draft') return levels.draft === 'allow' ? 'apply' : 'confirm';
   // Protegida: solo el modo sin confirmación explícito la aplica, y nunca lo que no se puede deshacer.
   return levels.guarded === 'allow' && request.undoable ? 'apply' : 'confirm';
 }

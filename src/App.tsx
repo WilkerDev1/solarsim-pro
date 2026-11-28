@@ -27,7 +27,6 @@ import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
 import { ClientOutdatedNotice } from './components/common/ClientOutdatedNotice';
 import { useAutoUpdateCheck } from './components/common/useAutoUpdateCheck';
-const AIInvoiceScannerModal = lazy(() => import('./components/common/ai-invoice/AIInvoiceScannerModal').then((module) => ({ default: module.AIInvoiceScannerModal })));
 const AIDatasheetScannerModal = lazy(() => import('./components/common/AIDatasheetScannerModal').then((module) => ({ default: module.AIDatasheetScannerModal })));
 import { ImportConflictModal } from './components/common/ImportConflictModal';
 import { ShareProposalModal } from './components/common/ShareProposalModal';
@@ -155,7 +154,6 @@ export const App: React.FC = () => {
       <NewProjectModal key={`new-project-${sessionGeneration}`} />
       <UpdateModal />
       <ClientOutdatedNotice />
-      <Suspense fallback={null}><AIInvoiceScannerModal key={`ai-invoice-${sessionGeneration}`} /></Suspense>
       <Suspense fallback={null}><AIDatasheetScannerModal key={`ai-datasheet-${sessionGeneration}`} /></Suspense>
       <ImportConflictModal key={`import-conflict-${sessionGeneration}`} />
       <ShareProposalModal key={`share-proposal-${sessionGeneration}`} />

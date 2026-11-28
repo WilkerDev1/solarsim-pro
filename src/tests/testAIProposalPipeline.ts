@@ -6,9 +6,8 @@ import { averageBlockEnergyRateDOP } from '../../shared/tariffRules';
 import { blockValuationNote, draftEnergyRateDisplayDOP } from '../components/simulator/params/sections/rates/tariffPresentation';
 import { DEFAULT_RD_TARIFF_MATRIX, referenceBillingTariff } from '../data/rdTariffs';
 import { prepareProposalDraftProject } from '../utils/proposalDraftProject';
-import { requestGeminiJson, GeminiRequestError, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
 import { useSimulationStore } from '../store/useSimulationStore';
-import { buildProjectFromDraft } from '../store/slices/aiSlice';
+import { buildProjectFromDraft } from '../domain/proposalDraft';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../engine/financeEngine';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '../utils/equipmentSpecsUtils';
@@ -74,8 +73,6 @@ assert.equal(estimated.consumptionSource,'estimated');assert.equal(normalizeProp
 const zeroRate=normalizeProposalDraft({...raw,tariffCode:'BTD',energyCostPerKWhDOP:0},catalog,context);assert.equal(zeroRate.energyCostPerKWhUSD,0);assert(!zeroRate.validationIssues?.some(i=>i.code==='missing_energy_rate'));
 const unknownTariff=normalizeProposalDraft({...raw,tariffCode:'BTS999'},catalog,context);assert.equal(unknownTariff.requiresReview,true);
 assert.throws(()=>robustParseJson('{"clientName":"truncado'),/incompleta/);
-assert.throws(()=>geminiResponseText({candidates:[{finishReason:'MAX_TOKENS',content:{parts:[{text:'{}'}]}}]}),/parciales/);
-assert.equal(geminiResponseText({candidates:[{finishReason:'STOP',content:{parts:[{text:'thinking',thought:true},{text:'{'},{text:'}'}]}}]}),'{}');
 const request=buildProposalRequest({projectRequirementsText:'Cliente prueba',equipmentCatalog:catalog,apiKey:'must-not-appear',files:[{fileBase64:'YQ==',mimeType:'image/png',fileName:'factura.png'}],context});
 assert(!JSON.stringify(request).includes('must-not-appear'));
 assert.equal(request.contents[0].parts.length,5,'catálogo, proyecto, adjunto (rótulo y datos) y la ronda');
@@ -89,14 +86,10 @@ assert.deepEqual(sentConversation.currentDraft,JSON.parse(JSON.stringify(draftFo
 assert.equal(sentConversation.currentDraft.panels.length,normalized.panels!.length);
 
 assert.throws(()=>buildProposalRequest({projectRequirementsText:'Texto',files:[{fileBase64:'YQ==',mimeType:'application/x-msdownload',fileName:'bad.exe'}]}),/Formato/);
-let calls=0;
-const errors:GeminiTransport=async()=>{calls++;throw new GeminiRequestError('Cuota',429);};
-await assert.rejects(requestGeminiJson({apiKey:'test',body:{}},errors),/Cuota/);assert.equal(calls,1,'429 never triggers multiple billed calls');
-calls=0;await assert.rejects(requestGeminiJson({apiKey:'test',body:{}},async()=>{calls++;throw new GeminiRequestError('Key',401);}),/Key/);assert.equal(calls,1);
-calls=0;const fallback=await requestGeminiJson({apiKey:'test',model:'custom-model',body:{}},async(url,_body,headers)=>{calls++;assert(!url.includes('test'));assert.equal(headers['x-goog-api-key'],'test');if(calls===1)throw new GeminiRequestError('Temporal',503);return {ok:true};});assert.equal(calls,2);assert(fallback.modelWarning);
+// (429/401 sin reintentos facturados, el modelo de reserva y los límites de salida viven en testStructuredPolicy y testLlmAdapterContract)
 useSimulationStore.setState({equipmentCatalog:catalog,syncSettings:{...useSimulationStore.getState().syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
-// El proyecto resultante se construye con buildProjectFromDraft (sobrevive a F6, pasa al dominio) y no escribe en el store: el efecto de
-// applyExtractedInvoice en el store (proyectos, activo, rechazos) se prueba en testLegacyProposalAssistantPipeline.
+// El proyecto resultante se construye con buildProjectFromDraft (el pipeline de create_proposal, en el dominio) y no escribe en el store; el efecto de
+// aplicarlo al store lo hacía el modal retirado en F6.
 const state=()=>useSimulationStore.getState();
 const build=(draft:Parameters<typeof buildProjectFromDraft>[1],createNew:boolean,from:Parameters<typeof buildProjectFromDraft>[0]=state())=>{
   const built=buildProjectFromDraft(from,draft,createNew);

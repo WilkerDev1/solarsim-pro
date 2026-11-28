@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import { AGENT_TOOL_DEFINITIONS, findAgentTool } from '../../shared/agentTools/definitions';
 import { toGeminiFunctionDeclarations, toGeminiSchema, validateJsonSchema } from '../../shared/agentTools/jsonSchema';
 import { AGENT_RULES_ES } from '../../shared/agentTools/rules';
-import { executeAgentTool, executeForAssistant, getPendingAgentAction, listAgentTools } from '../features/agentTools/registry';
-import { runAssistant } from '../features/assistant/service';
+import { executeAgentTool, listAgentTools } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { validateAssistantEdits } from '../features/assistant/validation';
 import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES, isValidGridUseCharge } from '../../shared/netMetering';
@@ -79,7 +78,7 @@ assert(badJson.status === 'error' && /JSON/.test(badJson.message));
 useSimulationStore.getState().setAgentPolicy({ internal: { read: 'allow', draft: 'confirm', guarded: 'confirm' } });
 const pending = await executeAgentTool({ name: 'propose_project_update', args: { id: project.id, title: 'Cobertura', edits: [{ section: 'rates', field: 'targetCoveragePct', valueJson: '90' }] } }, ctx);
 assert(pending.status === 'pending_confirmation');
-assert.equal(getPendingAgentAction(pending.actionId)?.edits[0].value, 90);
+assert.equal((useSimulationStore.getState().pendingAgentActions.find((a) => a.id === pending.actionId)?.plan as { edits: { value: unknown }[] }).edits[0].value, 90);
 assert.notEqual(useSimulationStore.getState().getActiveProject().rates.targetCoveragePct, 90, 'planning never mutates');
 const stale = await executeAgentTool({ name: 'search_projects', args: {} }, { ...ctx, owner: 'other-owner' });
 assert(stale.status === 'error' && /sesión cambió/.test(stale.message));
@@ -94,20 +93,7 @@ const bigRead = await executeAgentTool({ name: 'search_equipment', args: { query
 assert(bigRead.status === 'error' && bigRead.code === 'result_too_large', 'assistant read tools are capped');
 const bigNative = await executeAgentTool({ name: 'list_supplier_offers', args: { equipmentId: 'bloated' } }, ctx);
 assert(bigNative.status === 'error' && bigNative.code === 'result_too_large', 'native read tools are capped');
-const sentBodies: string[] = [];
-await runAssistant({
-  apiKey: 'synthetic', model: 'gemini-4-hydrogen', prompt: 'Ofertas', history: [], signal: new AbortController().signal,
-  execute: (call) => executeForAssistant(call, ctx),
-  transport: async (_url, body) => {
-    sentBodies.push(JSON.stringify(body));
-    return sentBodies.length === 1
-      ? { candidates: [{ finishReason: 'STOP', content: { parts: [{ functionCall: { name: 'list_supplier_offers', args: { equipmentId: 'bloated' } } }] } }] }
-      : { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'Filtra más.' }] } }] };
-  },
-});
-assert(!sentBodies[1].includes(huge), 'an oversized result is answered with an error, never appended to contents');
-assert.match(sentBodies[1], /demasiado grande/);
-
+// (que el bucle conteste un resultado enorme con un error y nunca lo añada a los contenidos lo cubre testAssistantLoop)
 
 // Fase 5: régimen y cargo por uso de la red se declaran y validan con las reglas de shared/netMetering.
 {

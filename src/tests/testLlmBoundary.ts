@@ -42,7 +42,7 @@ const sdkImporters = files.filter((f) => specifiers(f).some(isSdk)).map(rel);
 assert.deepEqual(sdkImporters.filter((f) => !f.startsWith(LLM_DIR)), [], 'only src/services/llm/ imports @google/genai');
 assert(sdkImporters.includes(`${LLM_DIR}geminiAdapter.ts`), 'the adapter is the SDK importer');
 
-// 2. electron/ no alcanza el SDK ni el adaptador, ni directa ni transitivamente.
+// 2. electron/ no alcanza el SDK, el adaptador ni nada del puerto, ni directa ni transitivamente.
 for (const entry of ['electron/main.ts', 'electron/preload.ts']) {
   const seen = new Set<string>();
   const stack = [path.join(root, entry)];
@@ -58,12 +58,10 @@ for (const entry of ['electron/main.ts', 'electron/preload.ts']) {
     }
   }
   assert(seen.size > 1, `${entry}: import graph was walked`);
-  // Hasta F6, main llega al catálogo de modelos por geminiInvoiceService: la guarda recorre ese camino de verdad.
-  if (entry === 'electron/main.ts') assert([...seen].map(rel).includes(`${LLM_DIR}models.ts`), 'main reaches the SDK-free catalog through electron/ai');
+  // Desde F6 (sin electron/ai) el proceso principal no llama a ningún modelo: no alcanza nada de src/services/llm/.
   for (const file of seen) {
     const name = rel(file);
-    assert(!name.startsWith(LLM_DIR) || name === `${LLM_DIR}models.ts` || name === `${LLM_DIR}types.ts`,
-      `${entry} reaches ${name} (via ${trail.get(file)}): only the SDK-free model catalog may be shared with electron/`);
+    assert(!name.startsWith(LLM_DIR), `${entry} reaches ${name} (via ${trail.get(file)}): las llamadas de IA viven en el renderer, no en electron/`);
   }
 }
 

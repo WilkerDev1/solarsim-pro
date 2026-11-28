@@ -7,7 +7,6 @@ import {
 } from './window/windowManager';
 import { createApplicationMenu } from './menu/appMenu';
 import { registerAutoUpdater } from './updater/autoUpdaterHandler';
-import { registerAIInvoiceHandlers } from './ai/aiInvoiceHandler';
 import { createMcpController, registerMcpIpc, watchMcpWindow } from './mcp/ipc';
 import { runMcpStdio } from './mcp/stdioMain';
 
@@ -31,7 +30,6 @@ if (stdioMode) {
   setupLinuxEnvironment();
 
   // 3. Registrar Handlers IPC
-  registerAIInvoiceHandlers();
   registerWindowIpcHandlers();
   registerAutoUpdater();
 

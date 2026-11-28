@@ -1,5 +1,5 @@
 // La IA integrada cambia datos que viven en textos del documento (garantías, vigencia, condiciones…)
-// por los dos caminos: el asistente general (function calling) y el borrador del asistente de propuestas.
+// por los dos caminos: el asistente único (function calling) y el borrador de IA (el pipeline de create_proposal).
 import assert from 'node:assert/strict';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -11,11 +11,13 @@ import { resolveDocumentText } from '../../shared/documentTexts';
 import { AGENT_RULES_ES, assistantTurnContext } from '../../shared/agentTools/rules';
 import { buildAITariffContext } from '../utils/aiTariffContext';
 import { documentTextContextFor } from '../utils/documentTextContext';
-import { executeAgentTool, executeForAssistant } from '../features/agentTools/registry';
+import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { assistantProjectId, assistantVisibleIn } from '../features/assistant/assistantScope';
-import { runAssistant } from '../features/assistant/service';
-import type { GeminiTransport } from '../../shared/geminiTransport';
+import { createAssistantSession } from '../features/assistant/session/assistantSession';
+import { resetAssistantToolPorts } from '../features/agentTools/appAssistant/ports';
+import { ScriptedLlm } from './support/scriptedLlm';
+import type { LlmRequest } from '../services/llm/types';
 import type { ProjectSimulation } from '../types';
 
 const store = useSimulationStore;
@@ -38,7 +40,7 @@ const WARRANTIES = {
   'quotation.warranty.workmanship': '2 Años en Instalación y Soporte Técnico',
 };
 
-// ── Camino (b): borrador del asistente de propuestas ─────────────────────────
+// ── Camino (b): borrador de IA (esquema compartido de shared/aiProposal) ─────────────────────────
 // 1. El modelo recibe las claves (clave, etiqueta, valor actual) y puede devolverlas en el esquema.
 assert(AI_DRAFT_DOCUMENT_TEXT_KEYS.includes('quotation.warranty.panel'));
 assert(AI_DRAFT_DOCUMENT_TEXT_KEYS.includes('quote.validityDays'), 'vigencia');
@@ -145,30 +147,38 @@ assert.match(mixed.message, /no se aplicó ningún/i);
 assert.equal(JSON.stringify(byId(open.id)), before, 'el lote no se aplica a medias');
 store.setState({ agentActivity: [] });
 
-const seen: string[] = [];
-const transport: GeminiTransport = async (_url, body: any) => {
-  // La propuesta activa y la vista cierran el turno del usuario (la instrucción de sistema es estable).
-  const turn = [...body.contents].reverse().find((c: any) => c.role === 'user' && c.parts.at(-1)?.text);
-  seen.push(turn.parts.at(-1).text);
-  const last = body.contents.at(-1).parts[0];
-  if (!last.functionResponse) {
-    return { candidates: [{ finishReason: 'STOP', content: { role: 'model', parts: [{ functionCall: { name: 'set_document_texts', args: {
+// Camino (a): el asistente único (sesión sobre LlmClient, modelo guionizado) fija garantías con set_document_texts, con deshacer.
+store.setState({ geminiApiKey: 'synthetic-key', geminiModel: 'gemini-4-hydrogen' });
+resetAssistantToolPorts();
+const llm = new ScriptedLlm();
+const session = createAssistantSession({ createClient: () => llm, newTurnId: () => 'turn-doc-texts', sleep: async () => {} });
+session.connectPorts();
+llm.push(
+  (call) => {
+    const parts = (call.request as LlmRequest).contents.at(-1)!.parts;
+    const context = JSON.parse((parts.at(-1) as { text: string }).text).appContext;
+    // La propuesta activa y la vista cierran el turno del usuario (la instrucción de sistema es estable).
+    assert.equal(context.activeProjectId, open.id, 'el modelo sabe qué propuesta está abierta');
+    assert.equal(context.viewingDocument, true, 'y que el usuario está en el documento');
+    return { functionCalls: [{ id: 'fc-warranties', name: 'set_document_texts', args: {
       proposalId: open.id, texts: Object.entries(WARRANTIES).map(([key, text]) => ({ key, text })),
-    } } }] } }] };
-  }
-  assert.equal(last.functionResponse.response.error, undefined, JSON.stringify(last.functionResponse));
-  return { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'Listo: garantías actualizadas.' }] } }] };
-};
-const reply = await runAssistant({
-  apiKey: 'synthetic-key', model: 'gemini-synthetic', prompt: 'Pon 12 años de garantía en paneles, 10 en el inversor, 8 en baterías y 2 en mano de obra',
-  history: [], activeProjectId: open.id, activeView: 'pdf-preview', signal: new AbortController().signal, transport,
-  execute: (call) => executeForAssistant(call, { source: 'app-assistant', owner: assistantOwner() }),
-});
-assert.match(seen[0], new RegExp(open.id), 'el modelo sabe qué propuesta está abierta');
-assert.match(seen[0], /viendo el documento PDF/, 'y que el usuario está en el documento');
-assert.equal(reply.applied?.length, 1, 'un solo cambio aplicado con deshacer');
+    } }] };
+  },
+  (call) => {
+    const response = (((call.request as LlmRequest).contents.at(-1)!.parts[0]) as { response: { error?: unknown; status?: string } }).response;
+    assert.equal(response.error, undefined, JSON.stringify(response));
+    assert.equal(response.status, 'applied');
+    return { text: 'Listo: garantías actualizadas.' };
+  },
+);
+await session.send('Pon 12 años de garantía en paneles, 10 en el inversor, 8 en baterías y 2 en mano de obra');
+llm.assertDone();
+const applied = store.getState().agentActivity.filter((a) => a.tool === 'set_document_texts' && a.status === 'applied');
+assert.equal(applied.length, 1, 'un solo cambio aplicado con deshacer');
+assert.equal(applied[0].source, 'app-assistant');
 for (const [key, text] of Object.entries(WARRANTIES)) assert.equal(textOf(byId(open.id), key), text, key);
-assert.equal(store.getState().undoAgentActivity(reply.applied![0].activityId).success, true);
+assert.equal(store.getState().undoAgentActivity(applied[0].id).success, true);
 assert.equal(textOf(byId(open.id), 'quotation.warranty.panel'), '25 Años de Producción Lineal');
+session.reset();
 
 console.log('PASS: la IA fija textos del documento (garantías, vigencia) en el borrador y en el chat, con revisión y deshacer.');

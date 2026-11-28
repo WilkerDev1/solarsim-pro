@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_POPULAR_MODELS, mapGeminiModels } from '../services/geminiInvoiceService';
 import { createAISlice, migrateStoredGeminiModel } from '../store/slices/aiSlice';
-import { DEFAULT_GEMINI_MODEL } from '../../shared/geminiTransport';
+import { DEFAULT_GEMINI_MODEL, DEFAULT_POPULAR_MODELS, geminiModelInfos } from '../services/llm/models';
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
 
 // Identificadores publicados en https://ai.google.dev/gemini-api/docs/models (noviembre de 2026).
@@ -31,7 +30,7 @@ assert.deepEqual(migrated('  custom-account-model ',false),{geminiModel:'custom-
 for (const empty of ['','   ',undefined]) assert.deepEqual(migrated(empty,true),{geminiModel:DEFAULT_GEMINI_MODEL,geminiModelChosenByUser:false},'empty follows the default');
 assert.deepEqual(migrated(DEFAULT_GEMINI_MODEL,true),{geminiModel:DEFAULT_GEMINI_MODEL,geminiModelChosenByUser:false});
 
-const mapped=mapGeminiModels({models:[{name:'models/gemini-real-flash',supportedGenerationMethods:['generateContent']},{name:'models/gemini-tts',supportedGenerationMethods:['generateContent']},{name:'models/gemini-embedding',supportedGenerationMethods:['embedContent']}]});
+const mapped=geminiModelInfos([{id:'gemini-real-flash',name:'models/gemini-real-flash',supportedActions:['generateContent']},{id:'gemini-tts',name:'models/gemini-tts',supportedActions:['generateContent']},{id:'gemini-embedding',name:'models/gemini-embedding',supportedActions:['embedContent']}]);
 assert.deepEqual(mapped.map(m=>m.id),['gemini-real-flash']);
 
 // Interfaz: la clave nunca viaja en la URL y no hay identificadores retirados escritos a mano.
@@ -40,4 +39,4 @@ for (const file of ['src/components/settings/sections/IntegrationsSection.tsx','
   assert(!/[?&]key=/.test(text),`${file} must send the API key in x-goog-api-key`);
   assert(!/['"]gemini-(?:2\.[05]|3\.[5-8])[a-z.-]*['"]/.test(text),`${file} must use DEFAULT_GEMINI_MODEL or the presets`);
 }
-console.log('Gemini model discovery, inherited-default migration and explicit user selection passed. Transport policy is exercised by testGeminiTransport.');
+console.log('Gemini model discovery, inherited-default migration and explicit user selection passed. La política de salida estructurada la ejercita testStructuredPolicy.');

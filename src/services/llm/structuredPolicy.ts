@@ -1,4 +1,4 @@
-// Política de salida estructurada sobre el puerto LlmClient: lo que hacía shared/geminiTransport
+// Política de salida estructurada sobre el puerto LlmClient: lo que hacía el transporte REST antiguo
 // (`requestGeminiStructured` + `requestGeminiJson`) para los escáneres, ahora fuera del adaptador (ADR 0008: el
 // adaptador no reintenta ni cambia de modelo; lo decide quien llama). No importa el SDK.
 //
@@ -14,11 +14,14 @@
 // - la cancelación de quien llama se propaga con su razón tal cual (la que puso en `signal.abort(reason)`), sin
 //   reintentos ni cambio de modelo.
 // 429, 401 y 403 nunca encadenan peticiones facturadas.
-import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL, MAX_INLINE_FILE_BASE64 } from '../../../shared/geminiTransport';
+import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from './models';
 import { LlmError } from './errors';
 import type { LlmClient, LlmContent, LlmStructuredRequest, LlmStructuredResponse, LlmThinkingLevel, LlmUsage } from './types';
 
-export { MAX_INLINE_FILE_BASE64 };
+/** Documento inline por solicitud de escáner: 20 MiB, comparado sobre su longitud en base64 (con relleno). */
+export const MAX_INLINE_FILE_BYTES = 20 * 1024 * 1024;
+export const base64LengthFor = (bytes: number) => Math.ceil(bytes / 3) * 4;
+export const MAX_INLINE_FILE_BASE64 = base64LengthFor(MAX_INLINE_FILE_BYTES);
 
 /** Petición de un escáner: sin las opciones de herramientas ni las del puerto que decide la política (modelo, nivel). */
 export interface StructuredPolicyRequest {

@@ -33,20 +33,3 @@ export function withDraftDocumentTexts(state: DraftTextState, project: ProjectSi
     ...applyDocumentClientEdit(project, { customization: next.customization as ProjectSimulation['customization'], client: next.client as ProjectSimulation['client'] }, { equipmentCatalog: state.equipmentCatalog }),
   };
 }
-
-/**
- * Contexto mínimo para el borrador (clave, etiqueta, valor actual): de la propuesta abierta o, para
- * una nueva, de la plantilla de la empresa activa sobre la base del asistente.
- */
-export function draftDocumentTextCatalog(state: SimulationStore, target: ProjectSimulation | undefined, province: string): AIDocumentTextEntry[] {
-  const mode = energyCalculationMode(effectiveFeatureSettings(state));
-  if (target) return aiDocumentTextCatalog(target, documentTextContextFor(state, target, mode));
-  const company = state.getActiveCompany();
-  const base: ProjectSimulation = {
-    ...createAIProposalBase(BENCHMARK_PROJECT, state.defaultSimulationSettings, province),
-    companyProfileId: state.activeCompanyId,
-    customization: companyDocumentCustomization(company, state.defaultDocumentCustomization, state.documentTemplatesByCompany),
-  };
-  // Los textos que dependen del proyecto se envían sin valor: los del caso de referencia no son del cliente.
-  return aiDocumentTextCatalog(base, documentTextContextFor({ ...state, activeProjectId: '' }, base, mode), { newProposal: true });
-}

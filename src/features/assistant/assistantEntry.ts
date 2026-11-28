@@ -1,6 +1,6 @@
 /**
- * Entradas del asistente único (F5b). Las tres entradas que abrían el asistente de propuestas (el modal `ai-invoice`) abren
- * ahora el panel del asistente único sobre su sesión:
+ * Entradas del asistente único (F5b). Las tres entradas que abrían el asistente de propuestas (un modal que F6 retiró) abren
+ * el panel del asistente único sobre su sesión:
  *
  * - `dock-menu`: el menú de IA del dock principal.
  * - `new-project`: el atajo «Crear con el asistente» de «Nueva simulación».
@@ -9,7 +9,7 @@
  * Sin React: abre el panel, cierra los modales que lo tapan, deja un borrador sugerido (nunca lo envía ni pisa lo que el
  * usuario ya escribió) y, para la factura, pide el selector de archivos, que el panel abre al montarse. Pedir el asistente
  * desde una entrada es una elección del usuario: si estaba apagado en Ajustes, lo enciende (el interruptor lo registra), y
- * así las entradas nunca quedan muertas. El modal antiguo y sus archivos siguen en el código hasta F6, sin estas entradas.
+ * así las entradas nunca quedan muertas.
  */
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { assistantSession, type AssistantSession } from './session/assistantSession';
@@ -37,7 +37,6 @@ export function openAssistant(entry: AssistantEntry, options: OpenAssistantOptio
   // Lo que taparía el panel (AppAssistant no se monta con estos modales abiertos).
   if (s.isNewProjectModalOpen) s.closeNewProjectModal();
   if (s.isSettingsModalOpen) s.closeSettingsModal();
-  if (s.isAIInvoiceModalOpen) s.closeAIInvoiceModal();
   // La papelera también oculta el panel: pedir el asistente sale de ella (el menú de IA se ve en la papelera).
   if (s.isTrashActive) s.setIsTrashActive(false);
   const name = options.projectName?.trim();

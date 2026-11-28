@@ -1,7 +1,7 @@
 /**
  * Fábrica única de propuesta nueva (F2b; ADR 0009). Pura: sin store, sin reloj y sin generador de ids (el llamador pasa
- * id, fecha, secuencia y usuario). La usan «Nueva simulación» (`createNewProject`), el asistente de propuestas y el
- * flotante (`createAIProposalBase` → `buildProjectFromDraft`, también `create_proposal` de los agentes) y, para la identidad
+ * id, fecha, secuencia y usuario). La usan «Nueva simulación» (`createNewProject`) y el
+ * asistente de la app (`createProposal` de `appAssistant/handlers.ts`, y `createAIProposalBase` → `buildProjectFromDraft` para `create_proposal` de los agentes) y, para la identidad
  * y los metadatos de sincronización, duplicar (`newProposalIdentity`).
  *
  * Valores que decidió el dueño, iguales por todos los caminos (`NEW_PROPOSAL_DEFAULTS`):

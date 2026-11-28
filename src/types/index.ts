@@ -595,9 +595,6 @@ declare global {
       /** Abre http(s) o mailto: permitido (shared/externalUrl.ts); `false` si el proceso principal lo rechaza. */
       openExternalUrl: (url: string) => Promise<boolean>;
       installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) => Promise<{ success: boolean; error?: string }>;
-      parseInvoiceWithAI?: (payload: import('../../shared/aiProposal').AIProposalPayload) => Promise<{ success: boolean; data?: ExtractedInvoiceData; error?: string }>;
-      cancelAIRequest?: (requestId: string) => Promise<void>;
-      listGeminiModels?: (apiKey: string) => Promise<{ success: boolean; error?: string; models?: GeminiModelInfo[] }>;
       mcp?: import('../../shared/agentTools/bridge').ElectronMcpApi;
     };
   }

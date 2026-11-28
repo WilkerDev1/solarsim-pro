@@ -265,7 +265,6 @@ export interface AISlice {
 
   setGeminiApiKey: (key: string) => void;
   setGeminiModel: (model: string) => void;
-  applyExtractedInvoice: (data: ExtractedInvoiceData, createNewProject?: boolean) => void;
 }
 
 /** Pestaña del editor de cotización. */
@@ -310,7 +309,6 @@ export interface UISlice {
   setAppAssistantEnabled: (enabled: boolean) => void;
   isNewProjectModalOpen: boolean;
   isUpdateModalOpen: boolean;
-  isAIInvoiceModalOpen: boolean;
   isAIDatasheetModalOpen: boolean;
   isAIPriceCatalogModalOpen: boolean;
   isShareModalOpen: boolean;
@@ -330,8 +328,6 @@ export interface UISlice {
   closeNewProjectModal: () => void;
   openUpdateModal: () => void;
   closeUpdateModal: () => void;
-  openAIInvoiceModal: () => void;
-  closeAIInvoiceModal: () => void;
   openAIDatasheetModal: () => void;
   closeAIDatasheetModal: () => void;
   openAIPriceCatalogModal: () => void;

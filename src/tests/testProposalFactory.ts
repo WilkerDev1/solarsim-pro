@@ -10,7 +10,7 @@ import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_SIMULATION_SETTINGS, DEFAULT_TARGET_MARGIN_PCT } from '../store/defaultSimulationSettings';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { executeAgentTool } from '../features/agentTools/registry';
-import { aiProposalFactoryOptions, buildProjectFromDraft } from '../store/slices/aiSlice';
+import { aiProposalFactoryOptions, buildProjectFromDraft } from '../domain/proposalDraft';
 import { readFileSync } from 'node:fs';
 import { targetMarginDraftValue, targetMarginOnBlur } from '../utils/saleMargin';
 import { assistantOwner } from '../features/assistant/tools';
@@ -149,7 +149,7 @@ const draft = normalizeProposalDraft({ clientName: 'Asistente de propuestas', pr
   panels: [{ equipmentId: panel.id, quantity: 12 }], inverters: [{ equipmentId: inverter.id, quantity: 1 }], batteries: [], hasBattery: false,
   commercial: { priceBasis: 'purchase', markupPct: null, marginOnSalePct: null, installationUnitPriceUSD: null, installationTotalUSD: null, customItems: [], customDiscounts: [] } },
 catalog, { province: 'Santiago', annualSpecificYieldKWhPerKWp: 1500, tariffReference: buildAITariffContext(s().tariffMatrix) });
-// El asistente de propuestas construye con buildProjectFromDraft (lo que aplica su «Aplicar»; F6 retira el modal).
+// El borrador de IA se construye con buildProjectFromDraft (el pipeline de create_proposal; lo aplicaba el modal retirado en F6).
 const fromDraft = () => { const built = buildProjectFromDraft(s(), draft, true); if ('error' in built) throw new Error(built.error); return built.project; };
 const proposalAssistant = fromDraft();
 const created = await executeAgentTool({ name: 'create_proposal', args: { clientName: 'Flotante', distributor: 'EDENORTE', tariffCode: 'BTS1', averageMonthlyKWh: 700,
@@ -160,7 +160,7 @@ const floating = s().projects.find((p) => p.id === (created.data as { proposalId
 const defaults = (p: ProjectSimulation) => ({ factor: p.specs.saleMarginMultiplier, labor: p.specs.installationUnitPriceUSD, coordinates: p.client.coordinates,
   hasBattery: p.specs.hasBattery, regime: p.rates.netMeteringRegime, source: p.rates.energyRateSource, coverage: p.rates.targetCoveragePct, sizingBasis: p.specs.sizingBasis });
 const decided = { factor: 1.4, labor: 170, coordinates: undefined, hasBattery: false, regime: 'sie007_2026', source: 'reference', coverage: 95, sizingBasis: 'peak_month' };
-for (const [label, p] of [['Nueva simulación', manual], ['asistente de propuestas', proposalAssistant], ['create_proposal', floating]] as const)
+for (const [label, p] of [['Nueva simulación', manual], ['borrador de IA', proposalAssistant], ['create_proposal', floating]] as const)
   assert.deepEqual(defaults(p), decided, `${label}: valores por defecto decididos`);
 assert.deepEqual(manual.monthlyConsumption, flat(1000));
 assert.ok(isConsumptionEstimated(manual), '«Nueva simulación» sin datos: consumo estimado');
@@ -200,14 +200,14 @@ assert.equal(isConsumptionEstimated(s().getActiveProject()), false, 'un mes real
 s().undo();
 assert.equal(isConsumptionEstimated(s().getActiveProject()), true, 'deshacer vuelve al consumo estimado');
 
-// 8. Revisión (hallazgo 7): la vista previa del modal y la aplicación arman la base con las MISMAS opciones de la fábrica
-// (catálogo, matriz y precio genérico), de un solo helper.
+// 8. Revisión (hallazgo 7): la vista previa y la aplicación del borrador arman la base con las MISMAS opciones de la fábrica
+// (catálogo, matriz y precio genérico), de un solo helper (desde F6 solo queda `buildProjectFromDraft`, que ya no tiene modal).
 reset();
 const factoryOptions = aiProposalFactoryOptions(s());
 assert.equal(factoryOptions.catalog, s().equipmentCatalog);
 assert.equal(factoryOptions.tariffMatrix, s().tariffMatrix);
 assert.equal(typeof factoryOptions.genericPriceFor, 'function', 'con el precio genérico de la tienda');
-for (const file of ['src/store/slices/aiSlice.ts', 'src/components/common/ai-invoice/hooks/useAIInvoiceScanner.ts']) {
+for (const file of ['src/domain/proposalDraft.ts']) {
   const source = readFileSync(file, 'utf8');
   const calls = source.match(/createAIProposalBase\([^;]*/g) ?? [];
   assert.ok(calls.length > 0, `${file} crea la base del borrador`);

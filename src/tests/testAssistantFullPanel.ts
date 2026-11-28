@@ -7,7 +7,7 @@
 //  5. El turno pinta ChangeCard con los datos reales de edit_proposal (Deshacer conectado) y dispara el resaltado del dock.
 //  6. Cerrar no cancela: insignia de trabajo en curso o de cambios sin ver.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { useSimulationStore } from '../store/useSimulationStore';
@@ -30,7 +30,6 @@ import {
 import { assistantBadge, assistantPanelBlock, createdProposalCard, turnChangeCards, turnUndoTargets } from '../features/assistant/panelState';
 import { ASSISTANT_ENTRY_PROMPTS, openAssistant } from '../features/assistant/assistantEntry';
 import { AssistantTurnDetails, type TurnDetailsLive } from '../features/assistant/components/AssistantTurnDetails';
-import { composerEscapeAction } from '../features/assistant/chatUi';
 import { engineResults, proposalStateSummary } from '../domain/proposalSnapshot';
 import type { ProjectSimulation } from '../types';
 
@@ -88,7 +87,7 @@ const reset = (patch: Record<string, unknown> = {}) => store.setState({
   equipmentCatalog: structuredClone(catalog), deletedEquipmentIds: [], equipmentConflicts: {}, sessionGeneration: 0,
   defaultSimulationSettings: DEFAULT_SIMULATION_SETTINGS, localFeatureSettings: { ...DEFAULT_FEATURE_SETTINGS },
   agentPolicy: DEFAULT_AGENT_POLICY, agentActivity: [], pendingAgentActions: [], undoHistory: EMPTY_UNDO_HISTORY, canUndo: false, canRedo: false,
-  geminiApiKey: 'synthetic-key', geminiModel: 'gemini-4-hydrogen', isNewProjectModalOpen: false, isSettingsModalOpen: false, isAIInvoiceModalOpen: false,
+  geminiApiKey: 'synthetic-key', geminiModel: 'gemini-4-hydrogen', isNewProjectModalOpen: false, isSettingsModalOpen: false,
   syncSettings: { ...s().syncSettings, currentUser: null, authToken: null, autoSyncEnabled: false },
   ...patch,
 });
@@ -190,14 +189,11 @@ reset();
 {
   // El compositor en modo cola: con un turno en curso el campo sigue editable y Detener es un botón aparte de Enviar.
   const props = { id: 'c', label: 'Mensaje', value: 'otra cosa', onChange() {}, onSubmit() {}, onCancel() {}, onPickFiles() {}, canSend: true, attachments: [], placeholder: '', accept: '' };
-  const queueing = renderToStaticMarkup(createElement(ChatComposer, { ...props, busy: true, queueWhileBusy: true }));
+  const queueing = renderToStaticMarkup(createElement(ChatComposer, { ...props, busy: true }));
   assert.ok(!/readonly/i.test(queueing.match(/<textarea[^>]*>/)![0]), 'se puede escribir mientras trabaja');
   assert.match(queueing, /aria-label="Detener"/);
   assert.match(queueing, /aria-label="Enviar al terminar el paso"/);
   assert.match(queueing, /Enter lo deja en cola/);
-  const classic = renderToStaticMarkup(createElement(ChatComposer, { ...props, busy: true }));
-  assert.match(classic.match(/<textarea[^>]*>/)![0], /readonly/i, 'sin cola (modal antiguo), como siempre');
-  assert.doesNotMatch(classic, /Enviar al terminar el paso/);
 }
 
 // ── 3. Stop con un mensaje en cola: no se reenvía nada y el encolado vuelve al compositor ───────────────────────────────
@@ -242,7 +238,7 @@ for (const entry of ['dock-menu', 'new-project', 'invoice'] as const) {
   openAssistant(entry, { session });
   const st = session.getState();
   assert.equal(st.panelOpen, true, `${entry}: abre el panel del asistente único`);
-  assert.equal(s().isAIInvoiceModalOpen, false, `${entry}: el modal antiguo no se abre`);
+  assert.ok(!('isAIInvoiceModalOpen' in s()) && !('openAIInvoiceModal' in s()), `${entry}: el modal antiguo ya no existe en el store (F6)`);
   assert.equal(s().appAssistantEnabled, true, `${entry}: pedirlo desde una entrada lo enciende (es una elección del usuario)`);
   assert.equal(s().isNewProjectModalOpen, false, `${entry}: ningún modal tapa el panel`);
   assert.equal(s().isSettingsModalOpen, false);
@@ -264,16 +260,17 @@ for (const entry of ['dock-menu', 'new-project', 'invoice'] as const) {
   assert.equal(other.getState().draft, 'Crea una propuesta llamada «Casa Pérez»');
 }
 {
-  // Las tres entradas del asistente de propuestas llaman a openAssistant y ya no abren el modal (sus archivos siguen hasta F6).
+  // Las tres entradas del asistente de propuestas llaman a openAssistant; el modal antiguo ya no existe (F6).
   const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8');
   for (const file of ['../components/layout/PrimaryIconDock.tsx', '../components/common/NewProjectModal.tsx', '../components/simulator/tabs/EnergyAnalysisTab.tsx', '../components/simulator/SimulatorView.tsx']) {
     const text = read(file);
-    assert.ok(!/openAIInvoiceModal/.test(text), `${file}: ya no abre el modal antiguo`);
+    assert.ok(!/AIInvoice/.test(text), `${file}: ya no nombra el modal antiguo`);
   }
   assert.match(read('../components/layout/PrimaryIconDock.tsx'), /openAssistant\('dock-menu'/);
   assert.match(read('../components/common/NewProjectModal.tsx'), /openAssistant\('new-project'/);
   assert.match(read('../components/simulator/tabs/EnergyAnalysisTab.tsx'), /openAssistant\('invoice'/);
-  assert.ok(readFileSync(new URL('../components/common/ai-invoice/AIInvoiceScannerModal.tsx', import.meta.url), 'utf8').length > 0, 'el modal antiguo no se borra en F5b');
+  assert.ok(!existsSync(new URL('../components/common/ai-invoice', import.meta.url)), 'el modal antiguo se borró en F6');
+  assert.ok(!/ai-invoice|AIInvoice/.test(read('../App.tsx')), 'App no monta el modal antiguo');
 }
 
 // ── 5. ChangeCard con los datos reales de edit_proposal, Deshacer conectado y resaltado del dock ─────────────────────────
@@ -395,13 +392,9 @@ const details = (session: AssistantSession, live?: TurnDetailsLive) =>
   }));
 const liveNow = (now = Date.now()): TurnDetailsLive => ({ agentActivity: s().agentActivity, pendingAgentActions: s().pendingAgentActions, projects: s().projects, now });
 {
-  // 7.1 Esc en el compositor: en modo cola (el asistente único) no detiene; Detener queda solo en su botón.
-  assert.equal(composerEscapeAction({ busy: true, queueWhileBusy: false, isComposing: false }), 'stop', 'sin cola (modal antiguo), Esc detiene como siempre');
-  assert.equal(composerEscapeAction({ busy: true, queueWhileBusy: true, isComposing: false }), null, 'con cola, Esc no mata el turno mientras se escribe');
-  assert.equal(composerEscapeAction({ busy: false, queueWhileBusy: true, isComposing: false }), null);
-  assert.equal(composerEscapeAction({ busy: true, queueWhileBusy: false, isComposing: true }), null, 'Esc de un IME nunca detiene');
+  // 7.1 Esc en el compositor: nunca detiene el turno (Detener queda solo en su botón; el compositor ya no maneja Esc).
   const props = { id: 'c', label: 'Mensaje', value: 'algo', onChange() {}, onSubmit() {}, onCancel() {}, onPickFiles() {}, canSend: true, attachments: [], placeholder: '', accept: '' };
-  const queueing = renderToStaticMarkup(createElement(ChatComposer, { ...props, busy: true, queueWhileBusy: true }));
+  const queueing = renderToStaticMarkup(createElement(ChatComposer, { ...props, busy: true }));
   assert.doesNotMatch(queueing, /Esc detiene/, 'la pista no promete que Esc detiene');
   assert.doesNotMatch(queueing, /title="Detener \(Esc\)"/);
 }
@@ -694,7 +687,7 @@ reset({ activeView: 'dashboard', activeProjectId: '' });
 }
 {
   // 8.5 Con un modal encima, la columna acoplada se reserva (sin salto de layout); la papelera la oculta; flotante, nada.
-  const none = { isSettingsModalOpen: false, isAIInvoiceModalOpen: false, isAIDatasheetModalOpen: false, isAIPriceCatalogModalOpen: false, isNewProjectModalOpen: false, activeConflict: null, isTrashActive: false };
+  const none = { isSettingsModalOpen: false, isAIDatasheetModalOpen: false, isAIPriceCatalogModalOpen: false, isNewProjectModalOpen: false, activeConflict: null, isTrashActive: false };
   assert.equal(assistantPanelBlock(none, true), null);
   assert.equal(assistantPanelBlock({ ...none, isNewProjectModalOpen: true }, true), 'reserve', 'Nueva simulación encima: la columna se queda');
   assert.equal(assistantPanelBlock({ ...none, isSettingsModalOpen: true }, true), 'reserve');

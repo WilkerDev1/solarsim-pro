@@ -304,7 +304,7 @@ const createProposal: NativeHandler = (args, ctx) => {
 
 const extractInvoice: NativeHandler = async (args, ctx) => {
   const port = assistantToolPorts().extractInvoice;
-  if (!port) return { data: notAvailable('La lectura de facturas todavía no está disponible en este asistente; usa el asistente de propuestas (factura) o indica los consumos.') };
+  if (!port) return { data: notAvailable('La lectura de facturas todavía no está disponible en este asistente; indica los consumos de la factura.') };
   const raw = await port({ fileId: args.fileId, signal: ctx.signal });
   const issues = [...(raw.issues ?? [])];
   const data: InvoiceExtraction = { ...raw, issues };

@@ -5,7 +5,7 @@ import { createGeminiLlmClient, GEMINI_API_VERSION, knownSdkFinishReasons, mapFi
 import { LlmError } from '../services/llm/errors';
 import type { LlmContent, LlmStreamEvent } from '../services/llm/types';
 import { sseResponse, transportAsFetch, type RecordedRequest } from './support/transportAsFetch';
-import { GeminiRequestError, type GeminiTransport } from '../../shared/geminiTransport';
+import { GeminiRequestError, type GeminiTransport } from './support/restFixture';
 
 const KEY = 'synthetic-key-for-tests';
 const BASE = 'https://generativelanguage.googleapis.com';

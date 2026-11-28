@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { GeminiTariffService } from '../services/geminiTariffService';
 import { applyTariffScanReview, assertDominicanTariffOrigin, describeTariffSource, humanizeTariffNotes, PENDING_TARIFF_SOURCE, prepareTariffScanReview, summarizeTariffScan } from '../utils/tariffExtraction';
-import type { GeminiTransport } from '../../shared/geminiTransport';
+import { type GeminiTransport } from './support/restFixture';
 import { clientFromTransport } from './support/clientFromTransport';
 
 /**
