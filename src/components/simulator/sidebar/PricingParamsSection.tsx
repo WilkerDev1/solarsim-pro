@@ -8,12 +8,12 @@ import {
   marginPctFromMultiplier,
   multiplierFromMarginInput,
   multiplierFromQuickMargin,
-  roundedWattPrice,
+  suggestedWattPrice,
   wattPricePatch,
   wholeMarginPctFromMultiplier,
 } from '../params/logic/pricingSync';
 import { resolveAssumptions } from '../../../../shared/assumptions';
-import { resolvePricePerWattUSD } from '../params/logic/dockDefaults';
+import { proposalCompleteness, shownMetric } from '../../../domain/proposalCompleteness';
 import { ChipGroup, CommitNumberField, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { DirectPrice } from '../params/sections/pricing/DirectPrice';
 import { NumberField } from '../params/sections/pricing/NumberField';
@@ -53,6 +53,8 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
   const selectedBattery = resolveProjectEquipment(equipmentCatalog, 'battery', battery?.brandModel, battery?.capacityKWh, info.battery?.supplierPriceId);
 
   const isDirect = specs.pricingMode === 'direct_watt';
+  // F2b (ADR 0009): incompleta => las cifras calculadas de las franjas son «—» (serían rellenos del motor).
+  const completeness = proposalCompleteness(project);
   const matrix = summary?.costMatrix;
   // Tasa, margen y mano de obra mostrados = los que usa la matriz de costos (supuestos efectivos del proyecto completo).
   const assumptions = resolveAssumptions(project);
@@ -63,7 +65,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
       updateSpecs({ pricingMode: 'cost_matrix' });
       return;
     }
-    const autoWp = roundedWattPrice(matrix?.salePricePerWattUSD, resolvePricePerWattUSD(specs, project.financials));
+    const autoWp = suggestedWattPrice(matrix?.salePricePerWattUSD, specs, project.financials?.pricePerWattUSD);
     updateSpecs({ pricingMode: 'direct_watt', ...wattPricePatch(autoWp) });
   };
 
@@ -83,7 +85,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
       </ParamRow>
 
       {isDirect ? (
-        <DirectPrice specs={specs} summary={summary} financialsPricePerWattUSD={project.financials?.pricePerWattUSD} updateSpecs={updateSpecs} />
+        <DirectPrice specs={specs} summary={summary} financialsPricePerWattUSD={project.financials?.pricePerWattUSD} updateSpecs={updateSpecs} completeness={completeness} />
       ) : (
         <>
           <ParamRow label="Tasa DOP/USD" htmlFor="pd-dop-rate">
@@ -126,21 +128,22 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
           />
           <StatStrip
             items={[
-              { label: 'Costo /Wp', value: dollars(costWp) },
-              { label: 'Ganancia /Wp', value: profitWp === null ? NO_VALUE : `+$${profitWp.toFixed(2)}` },
-              { label: 'Venta /Wp', value: dollars(saleWp), tone: 'accent' },
+              { label: 'Costo /Wp', value: shownMetric(completeness, dollars(costWp)) },
+              { label: 'Ganancia /Wp', value: shownMetric(completeness, profitWp === null ? NO_VALUE : `+$${profitWp.toFixed(2)}`) },
+              { label: 'Venta /Wp', value: shownMetric(completeness, dollars(saleWp)), tone: 'accent' },
             ]}
           />
           <div className="flex items-baseline justify-between text-[13px] text-pd-muted">
             <span>Venta /kWp</span>
-            <span className="font-mono text-pd-text">{saleKWp === null ? NO_VALUE : `$${usd(saleKWp)}`}</span>
+            <span className="font-mono text-pd-text">{shownMetric(completeness, saleKWp === null ? NO_VALUE : `$${usd(saleKWp)}`)}</span>
           </div>
         </>
       )}
 
       <div className="flex items-baseline justify-between pt-1">
         <span className="text-[13px] text-pd-muted">Total de venta</span>
-        <span className="font-mono text-lg font-semibold text-pd-accent">${usd(summary?.grossInvestmentUSD || 0)}</span>
+        {/* Incompleta: «—» como el resto del bloque (la cifra parcial, sin los equipos sin precio, parecería un resultado). */}
+        <span className="font-mono text-lg font-semibold text-pd-accent">{shownMetric(completeness, `$${usd(summary?.grossInvestmentUSD || 0)}`)}</span>
       </div>
     </div>
   );

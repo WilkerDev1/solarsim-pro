@@ -256,6 +256,10 @@ const AFTER = { systemCapacityKWp: 5.9, annualProductionKWh: 9783.6, energyCover
     { path: 'client.tariffCode', value: 'BTS1' },
     { path: 'rates.distributor', value: 'EDENORTE' },
     { path: 'rates.tariffCode', value: 'BTS1' },
+    // F2b: un cambio de tarifa por ruta hace lo mismo que el dock (precio de referencia con su fila y perfil recomendado).
+    // El camino antiguo del asistente conservaba el precio y el perfil; el lote equivalente lo dice explícitamente.
+    { path: 'rates.energyCostPerKWh', value: charProject.rates.energyCostPerKWh },
+    { path: 'specs.loadProfilePreset', value: undefined },
   ];
   reset(charProject);
   const probe = probeStore(store, charProject.id);
@@ -281,6 +285,16 @@ const AFTER = { systemCapacityKWp: 5.9, annualProductionKWh: 9783.6, energyCover
   await settleUndoDebounce();
   assert.deepEqual(probe.writes, [], 'nada diferido');
   probe.stop();
+
+  // F2b: sin fijar el precio ni el perfil, el mismo cambio de tarifa por ruta es el gesto del dock: precio de referencia
+  // de EDENORTE BTS1 con su fila y el perfil de carga recomendado (aviso de que el precio tecleado se sustituyó).
+  reset(charProject);
+  const asDock = store.getState().commitProjectEdits(charProject.id, batch.slice(0, -2), { source: 'assistant' });
+  assert.ok(asDock.ok);
+  assert.equal(active().rates.energyRateSource, 'reference');
+  assert.ok(active().rates.billingTariff, 'con la fila de la tarifa nueva');
+  assert.ok(active().specs.loadProfilePreset, 'perfil recomendado');
+  assert.ok(asDock.warnings.some((w) => /referencia de la tarifa nueva/.test(w)), 'avisa del precio sustituido');
 }
 
 // ── 4. Deshacer una transacción restaura también las rutas derivadas ───────────────────────────

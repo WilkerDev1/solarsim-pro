@@ -23,7 +23,9 @@ import { AITariffResolutionModal } from './AITariffResolutionModal';
 import { TariffPreferencesPanel } from './TariffPreferencesPanel';
 import { DEFAULT_PRICE_PER_WATT_USD } from '../../../../shared/projectDefaults';
 import { DEFAULT_ANNUAL_DEGRADATION_PCT, DEFAULT_ENERGY_INFLATION_PCT, DEFAULT_PROJECT_LIFESPAN_YEARS, DEFAULT_QUOTE_VALIDITY_DAYS, DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_TARGET_COVERAGE_PCT } from '../../../../shared/assumptions';
-import { DEFAULT_TARGET_MARGIN_PCT } from '../../../store/defaultSimulationSettings';
+import { DEFAULT_TARGET_MARGIN_PCT, PREVIOUS_DEFAULT_TARGET_MARGIN_PCT } from '../../../store/defaultSimulationSettings';
+import { InfoTip } from '../../simulator/params/ui';
+import { targetMarginDraftValue, targetMarginOnBlur } from '../../../utils/saleMargin';
 
 export const SimulationPreferencesSection: React.FC = () => {
   const {
@@ -32,6 +34,8 @@ export const SimulationPreferencesSection: React.FC = () => {
     equipmentCatalog,
   } = useSimulationStore(useShallow((s) => ({ defaultSimulationSettings: s.defaultSimulationSettings, updateDefaultSimulationSettings: s.updateDefaultSimulationSettings, equipmentCatalog: s.equipmentCatalog })));
   const defs = defaultSimulationSettings;
+  // «Margen Bruto Objetivo»: borrador de texto mientras se edita (puede quedar vacío); al salir, vacío ⇒ el de fábrica.
+  const [marginDraft, setMarginDraft] = useState<string | null>(null);
 
   const [isAITariffModalOpen, setIsAITariffModalOpen] = useState(false);
 
@@ -524,15 +528,26 @@ export const SimulationPreferencesSection: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
                   Margen Bruto Objetivo (%)
+                  <InfoTip label="Sobre el margen objetivo" text={`Factor de venta con que nace toda propuesta nueva, desde «Nueva simulación», el asistente o un agente. El valor de fábrica es ${DEFAULT_TARGET_MARGIN_PCT} % (factor ${(1 + DEFAULT_TARGET_MARGIN_PCT / 100).toFixed(2).replace('.', ',')}). Si esta instalación ya tenía ajustes guardados, conserva el valor que tenía, aunque nunca lo cambiaras (${PREVIOUS_DEFAULT_TARGET_MARGIN_PCT} %, el de fábrica anterior): escribe ${DEFAULT_TARGET_MARGIN_PCT} para usar el nuevo. Las propuestas ya creadas no cambian.`} />
                 </label>
                 <input
                   type="number"
                   min={0}
                   max={100}
-                  value={defs.defaultTargetMarginPct}
-                  onChange={(e) => updateDefaultSimulationSettings({ defaultTargetMarginPct: parseFloat(e.target.value) || DEFAULT_TARGET_MARGIN_PCT })}
+                  value={marginDraft ?? defs.defaultTargetMarginPct}
+                  onChange={(e) => {
+                    // Borrador: se puede vaciar para teclear desde cero; solo un número válido se escribe.
+                    setMarginDraft(e.target.value);
+                    const typed = targetMarginDraftValue(e.target.value);
+                    if (typed !== null) updateDefaultSimulationSettings({ defaultTargetMarginPct: typed });
+                  }}
+                  onBlur={() => {
+                    if (marginDraft === null) return;
+                    updateDefaultSimulationSettings({ defaultTargetMarginPct: targetMarginOnBlur(marginDraft) });
+                    setMarginDraft(null);
+                  }}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 />
               </div>

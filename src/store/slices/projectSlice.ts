@@ -1,11 +1,7 @@
-import { newProposalNetMeteringFields } from '../../../shared/netMetering';
-import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../../data/rdTariffs';
 import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
-import { withoutInheritedPanelDegradation } from '../../utils/equipmentGroups';
 import { applyDocumentClientEdit, applyProjectEdit, normalizeProjectEquipment, type ProjectEdit } from '../../domain/projectEdit';
-import { editEquipment, readEquipment } from '../../../shared/equipment';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
 import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
@@ -13,7 +9,9 @@ import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { SimulationSlice, ProjectSlice, SimulationStore, type CommitProjectEditsResult } from '../types';
 import { applyProjectEdits, editBatchFingerprint } from '../../domain/projectEditTransaction';
-import { ProjectSimulation, SystemSpecs } from '../../types';
+import { createNewProposal, newProposalIdentity } from '../../domain/newProposal';
+import { effectiveGenericPrice, priceFeatureActive } from './equipmentPriceSlice';
+import { ProjectSimulation } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../engine/financeEngine';
@@ -23,44 +21,7 @@ import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentC
 import { canEditDocument } from '../../components/pdf/editor/documentEditorState';
 import { normalizeDocumentLayout } from '../../../shared/documentLayout';
 import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
-import { DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_DOD_PCT } from '../../../shared/projectDefaults';
-import { assumptionFields, type AssumptionFields } from '../../../shared/assumptions';
 import { documentTextContextFor } from '../../utils/documentTextContext';
-
-/** Specs of a new proposal: the reference case with the user's defaults written straight into the single group of each kind. */
-function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | undefined, assumptions: AssumptionFields): SystemSpecs {
-  const directWattPrice = assumptions.specs.pricePerWattUSD;
-  let specs: SystemSpecs = {
-    ...BENCHMARK_PROJECT.specs,
-    // El $/W del caso de referencia (1.134971) no es un default: todo proyecto nuevo parte del ajuste.
-    pricePerWattUSD: directWattPrice,
-    pricePerKWpUSD: Math.round(directWattPrice * 1000 * 100) / 100,
-    isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
-    pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
-    systemLosses: assumptions.specs.systemLosses,
-    annualDegradation: assumptions.specs.annualDegradation,
-    dopExchangeRate: assumptions.specs.dopExchangeRate,
-    saleMarginMultiplier: assumptions.specs.saleMarginMultiplier,
-    installationUnitPriceUSD: assumptions.specs.installationUnitPriceUSD,
-    autoCalculatePanels: defs?.defaultAutoCalculatePanels || false,
-    hasBattery: defs?.defaultHasBattery || false,
-  };
-  specs = withoutInheritedPanelDegradation(specs); // el 0.5 % de la referencia no puede ganarle a lo configurado
-  const referencePanelModel = readEquipment(BENCHMARK_PROJECT.specs).panels[0].brandModel;
-  specs = editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { powerW: defs?.defaultPanelPowerW || 620, brandModel: defs?.defaultPanelModel || referencePanelModel } });
-  specs = editEquipment(specs, 'inverter', { type: 'update', index: 0, patch: { brandModel: defs?.defaultInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)', powerKW: defs?.defaultInverterPowerKW || 8.0, count: 1 } });
-  return editEquipment(specs, 'battery', { type: 'update', index: 0, patch: { capacityKWh: defs?.defaultBatteryCapacityKWh || DEFAULT_BATTERY_CAPACITY_KWH, dodPct: defs?.defaultBatteryDOD || DEFAULT_BATTERY_DOD_PCT } });
-}
-
-/** Precio de referencia, procedencia y fila de facturación con que nace una propuesta nueva. */
-function newProposalReferenceRates(activeMatrix: Parameters<typeof getReferenceEnergyRateUSD>[0] | undefined, distributor: string, tariffCode: string, monthlyConsumption: readonly number[], dopPerUSD: number) {
-  // Matriz aún sin cargar o sin pliegos (`{}` o `schedules` vacío): la de fábrica, la misma que usa el dock como respaldo.
-  const matrix = activeMatrix?.schedules && Object.keys(activeMatrix.schedules).length > 0 ? activeMatrix : DEFAULT_RD_TARIFF_MATRIX;
-  const billingTariff = referenceBillingTariff(matrix, distributor, tariffCode);
-  if (!billingTariff) return {};
-  const average = monthlyConsumption.length ? monthlyConsumption.reduce((a, b) => a + b, 0) / monthlyConsumption.length : 0;
-  return { energyCostPerKWh: getReferenceEnergyRateUSD(matrix, distributor, tariffCode, average, dopPerUSD), energyRateSource: 'reference' as const, billingTariff };
-}
 
 export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   /** Proposals in the trash are read-only until restored, whatever UI or tool calls the store. */
@@ -247,6 +208,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     // ADR 0004: las reglas viven en el dominio (applyProjectEdits → applyProjectEditPlan); aquí solo se persiste, sincroniza y deshace.
     const result = applyProjectEdits(before, edits, {
       equipmentCatalog: state.equipmentCatalog, tariffMatrix: state.tariffMatrix,
+      // Elegir un modelo por ruta usa el precio genérico efectivo, como el selector del dock (sin sesión, apagado).
+      genericPriceFor: (equipmentId) => (priceFeatureActive(state) ? effectiveGenericPrice(state, equipmentId) : null),
       calculationMode: energyCalculationMode(effectiveFeatureSettings(state)),
     }, { validation: options.validation, metrics: options.metrics });
     if (!result.ok) return result;
@@ -266,85 +229,30 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   },
 
   createNewProject: (payload) => {
-    const defs = get().defaultSimulationSettings;
-    // ADR 0003 (d): ajustes del usuario primero, luego las constantes compartidas; la misma fábrica que importar y la IA.
-    const assumptions = assumptionFields(undefined, defs);
-    const id = createProjectId();
-    const name = typeof payload === 'string' ? payload : (payload?.name || 'Nuevo Proyecto Solar');
-    const company = typeof payload === 'object' && payload?.company ? payload.company : 'Cliente Comercial';
-    const province = typeof payload === 'object' && payload?.province ? payload.province : (defs?.defaultProvince || 'Santo Domingo / Distrito Nacional');
-    const distributor = typeof payload === 'object' && payload?.distributor ? payload.distributor : (defs?.defaultDistributor || 'EDEESTE');
-    const tariffCode = typeof payload === 'object' && payload?.tariffCode ? payload.tariffCode : (defs?.defaultTariffCode || 'BTS2');
-    const address = typeof payload === 'object' && payload?.address ? payload.address : `${province}, República Dominicana`;
-    const seq = generateNextProjectSequence(get().projects);
-    const currentUser = get().syncSettings?.currentUser;
-
-    const newProj: ProjectSimulation = {
-      ...BENCHMARK_PROJECT,
-      id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      status: 'Draft',
-      authorId: currentUser?.id,
-      authorName: currentUser?.name || 'Ing. Solar',
-      authorEmail: currentUser?.email,
-      lastModifiedBy: currentUser?.name || 'Ing. Solar',
-      lastModifiedAt: new Date().toISOString(),
-      version: 1,
-      baseVersion: 0,
-      organizationId: currentUser?.organizationId,
-      syncServerUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
-      syncStatus: currentUser ? 'pending' : 'local_only',
+    const state = get();
+    const currentUser = state.syncSettings?.currentUser;
+    const details = typeof payload === 'object' && payload ? payload : undefined;
+    // F2b (ADR 0009): la fábrica única del dominio, la misma que usan el asistente y los agentes. Aquí solo se leen el
+    // estado (ajustes, catálogo, matriz, empresa), el reloj y el generador de ids.
+    const now = new Date().toISOString();
+    const newProj = createNewProposal({
+      source: 'menu',
+      defaults: state.defaultSimulationSettings,
+      identity: {
+        id: createProjectId(), now, sequence: generateNextProjectSequence(state.projects), user: currentUser,
+        serverUrl: currentUser ? state.syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
+      },
+      tariffMatrix: state.tariffMatrix,
+      catalog: state.equipmentCatalog,
+      genericPriceFor: (equipmentId) => (priceFeatureActive(state) ? effectiveGenericPrice(state, equipmentId) : null),
+      companyProfileId: state.activeCompanyId,
+      customization: companyDocumentCustomization(state.getActiveCompany(), state.defaultDocumentCustomization, state.documentTemplatesByCompany),
       client: {
-        ...BENCHMARK_PROJECT.client,
-        name,
-        company,
-        province,
-        location: province,
-        address,
-        distributor,
-        tariffCode,
-        contactEmail: '',
-        contactPhone: '',
-        contactPerson: company || '',
-        projectId: seq.projectId,
-        quoteNumber: seq.quoteNumber,
-        quoteValidityDays: assumptions.client.quoteValidityDays,
+        name: typeof payload === 'string' ? payload : details?.name,
+        company: details?.company, province: details?.province, distributor: details?.distributor, tariffCode: details?.tariffCode, address: details?.address,
       },
-      specs: newProjectSpecs(defs, assumptions),
-      rates: {
-        ...BENCHMARK_PROJECT.rates,
-        targetCoveragePct: assumptions.rates.targetCoveragePct,
-        isZeroExport: defs?.defaultZeroExport || false,
-        gridExportFeePct: assumptions.rates.gridExportFeePct,
-        usdExchangeRate: assumptions.rates.usdExchangeRate,
-        distributor,
-        tariffCode,
-        currency: defs?.currency || 'USD',
-        annualEnergyInflationPct: assumptions.rates.annualEnergyInflationPct,
-        // Las propuestas nuevas nacen en el régimen SIE-007-2026 con el cargo de fábrica de su distribuidora.
-        ...newProposalNetMeteringFields(distributor),
-        // …y con el precio de referencia de su tarifa y la fila de la matriz activa: se facturan por bloques
-        // (`shared/tariffBilling.ts`) hasta que el usuario teclee otro precio.
-        ...newProposalReferenceRates(get().tariffMatrix, distributor, tariffCode, BENCHMARK_PROJECT.monthlyConsumption, assumptions.specs.dopExchangeRate),
-      },
-      financials: {
-        applyLey5707: defs?.applyLey5707 !== undefined ? defs.applyLey5707 : true,
-        applyITBISExemption: defs?.applyITBISExemption !== undefined ? defs.applyITBISExemption : true,
-        pricePerWattUSD: assumptions.financials.pricePerWattUSD,
-        discountRatePct: assumptions.financials.discountRatePct,
-        projectLifespanYears: assumptions.financials.projectLifespanYears,
-        co2FactorKgPerKWh: assumptions.financials.co2FactorKgPerKWh,
-        customItems: [],
-      },
-      companyProfileId: get().activeCompanyId,
-      customization: {
-        ...companyDocumentCustomization(get().getActiveCompany(), get().defaultDocumentCustomization, get().documentTemplatesByCompany),
-        contactName: company || name,
-        clientPhone: '',
-        clientEmail: '',
-      },
-    };
+    });
+    const id = newProj.id;
 
     set((state) => ({
       projects: [newProj, ...state.projects],
@@ -374,24 +282,21 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     delete clonedFinancials.customLey5707CreditUSD;
     delete clonedFinancials.customCostUSD;
 
+    const now = new Date().toISOString();
+    // Identidad y sincronización de la copia: las mismas que una propuesta nueva (fábrica única, ADR 0009); sin sesión, la
+    // autoría de la original.
+    const identity = newProposalIdentity({
+      id: newId, now, sequence: { projectId: dupIdentifiers.projectId, quoteNumber: dupIdentifiers.quoteNumber }, user: currentUser,
+      serverUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
+    });
     const cloned: ProjectSimulation = {
       ...original,
       commercial: commercialCopy(original, currentUser || undefined),
       proposalLink: {parentId: original.id},
-      id: newId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      status: 'Draft',
+      ...identity,
       authorId: currentUser?.id || original.authorId,
       authorName: currentUser?.name || original.authorName || 'Ing. Solar',
       authorEmail: currentUser?.email || original.authorEmail,
-      lastModifiedBy: currentUser?.name || 'Ing. Solar',
-      lastModifiedAt: new Date().toISOString(),
-      version: 1,
-      baseVersion: 0,
-      organizationId: currentUser?.organizationId,
-      syncServerUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
-      syncStatus: currentUser ? 'pending' : 'local_only',
       client: {
         ...original.client,
         name: `${dupIdentifiers.cleanName} (Copia)`,

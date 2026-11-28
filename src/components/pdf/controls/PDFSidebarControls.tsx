@@ -12,6 +12,7 @@ import { ProjectSimulation, DocumentCustomization } from '../../../types';
 import { PDFSectionToggles } from './PDFSectionToggles';
 import { PDFDesignControls } from './PDFDesignControls';
 import type { DocumentLayoutState } from '../useDocumentLayout';
+import { InfoTip } from '../../simulator/params/ui';
 
 interface PDFSidebarControlsProps {
   isDark: boolean;
@@ -26,6 +27,8 @@ interface PDFSidebarControlsProps {
   handlePrint: () => void;
   onOpenShareModal?: () => void;
   onRefresh: () => void;
+  /** F2b (ADR 0009): motivo por el que la propuesta incompleta no se exporta, imprime ni comparte; `null` si está completa. */
+  blockedReason?: string | null;
   updateSpecs: (specs: Partial<ProjectSimulation['specs']>) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
   saveCurrentProjectAsDefaultDocumentTemplate?: () => void;
@@ -49,8 +52,10 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
   updateDocumentCustomization,
   saveCurrentProjectAsDefaultDocumentTemplate,
   resetDefaultDocumentCustomization,
+  blockedReason = null,
 }) => {
   const activeTheme = layout.theme;
+  const blocked = !!blockedReason;
   return (
     <aside
       className={`w-[min(340px,40vw)] min-w-[260px] flex flex-col h-full shrink-0 transition-colors z-20 ${
@@ -69,10 +74,17 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
             {activePagesCount} {activePagesCount === 1 ? 'Página' : 'Páginas'}
           </span>
         </div>
+        {blockedReason && (
+          <p role="status" data-proposal-incomplete className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-zinc-300">
+            Propuesta incompleta: no se exporta ni se comparte.
+            <InfoTip label="Qué falta" text={blockedReason} />
+          </p>
+        )}
 
         <button
           onClick={handleExportPDF}
-          disabled={isExporting}
+          disabled={isExporting || blocked}
+          title={blockedReason ?? undefined}
           className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-50"
           style={{ backgroundColor: activeTheme.primary }}
         >
@@ -88,12 +100,13 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
           <button
             type="button"
             onClick={onOpenShareModal}
-            className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border shadow-xs active:scale-[0.98] ${
+            disabled={blocked}
+            className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border shadow-xs active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
               isDark
                 ? 'bg-gradient-to-r from-emerald-950/70 via-teal-950/50 to-emerald-950/70 border-emerald-700/60 text-emerald-300 hover:border-emerald-500 hover:text-white hover:shadow-emerald-950/50'
                 : 'bg-emerald-50 border-emerald-300 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-400'
             }`}
-            title="Compartir propuesta web interactiva y temporal (Cloudflare)"
+            title={blockedReason ?? 'Compartir propuesta web interactiva y temporal (Cloudflare)'}
           >
             <Globe className="w-4 h-4 text-emerald-400" />
             <span>Compartir Propuesta Web</span>
@@ -102,7 +115,9 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
 
         <button
           onClick={handlePrint}
-          className={`w-full py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+          disabled={blocked}
+          title={blockedReason ?? undefined}
+          className={`w-full py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border disabled:opacity-50 disabled:cursor-not-allowed ${
             isDark
               ? 'bg-[#20202a] border-[#343444] text-zinc-300 hover:bg-[#282836] hover:text-white'
               : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-xs'

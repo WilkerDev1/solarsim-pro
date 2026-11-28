@@ -1,4 +1,6 @@
 import { canWrite, isWriterRole } from '../../../shared/permissions';
+import { proposalActionBlock, proposalResults, shownMetric } from '../../domain/proposalCompleteness';
+import { IncompleteNotice, PENDING_VALUE, ResultsPending } from '../simulator/ProposalStatusHints';
 import { useMemo, useState } from "react";
 import { ArrowLeft, MapPin, Share2, FileText, FilePlus2 } from "lucide-react";
 import { useSimulationStore } from "../../store/useSimulationStore";
@@ -63,6 +65,12 @@ export const ProjectHubView = () => {
       </div>
     );
   const devices = proposalDevices(project);
+  // F2b (ADR 0009): incompleta ⇒ cifras vacías con su motivo (nunca en cero) y sin compartir ni convertir a cotización.
+  // `results.summary === null` ⇒ cifras «—» y bloques «pendiente» (decisión pura del dominio).
+  const results = proposalResults(project, mode, summary);
+  const completeness = results;
+  const blockedReason = proposalActionBlock(project).reason;
+  const pending = !results.summary;
   const ownerKey = `${workspaceScope}|${sessionGeneration}|${project.id}`;
   return (
     <div className="project-summary">
@@ -99,14 +107,15 @@ export const ProjectHubView = () => {
             Ver documento
           </button>
           {quotationsEnabled && !project.isDeleted && canWrite(syncSettings.currentUser) && (
-            <button onClick={() => setConverting(true)}>
+            <button onClick={() => setConverting(true)} disabled={pending} title={blockedReason ?? undefined}>
               <FilePlus2 size={16} />
               Crear cotización
             </button>
           )}
           <button
             className="summary-primary"
-            disabled={project.isDeleted || !syncSettings.authToken}
+            disabled={project.isDeleted || !syncSettings.authToken || pending}
+            title={blockedReason ?? undefined}
             onClick={openShareModal}
           >
             <Share2 size={16} />
@@ -125,29 +134,30 @@ export const ProjectHubView = () => {
           )}
         </div>
       )}
+      {pending && <IncompleteNotice completeness={completeness} />}
       <div className="summary-metrics">
         <div>
           <span>Potencia instalada</span>
           <strong>
-            {summary.systemCapacityKWp.toFixed(2)} <small>kWp</small>
+            {pending ? PENDING_VALUE : <>{summary.systemCapacityKWp.toFixed(2)} <small>kWp</small></>}
           </strong>
         </div>
         <div>
           <span>Precio de la propuesta</span>
           <strong>
-            {money(summary.contractPriceUSD)} <small>USD</small>
+            {pending ? PENDING_VALUE : <>{money(summary.contractPriceUSD)} <small>USD</small></>}
           </strong>
         </div>
         <div>
           <span>Ahorro estimado · año 1</span>
           <strong data-savings-state={comparable ? undefined : savingsBasis} title={comparable ? undefined : noSavingsNote(savingsBasis)}>
-            {comparable ? <>{money(summary.year1SavingsUSD)} <small>USD</small></> : noSavingsLabel}
+            {pending ? PENDING_VALUE : comparable ? <>{money(summary.year1SavingsUSD)} <small>USD</small></> : noSavingsLabel}
           </strong>
         </div>
         <div>
           <span>Retorno simple estimado</span>
           <strong>
-            {paybackLabel(summary, savings)}
+            {shownMetric(completeness, paybackLabel(summary, savings))}
           </strong>
         </div>
       </div>
@@ -220,7 +230,7 @@ export const ProjectHubView = () => {
                   </table>
                 </div>
               </section>
-              <ProposalEnergyOverview summary={summary} />
+              {pending ? <ResultsPending completeness={completeness} title="Energía pendiente" /> : <ProposalEnergyOverview summary={summary} />}
               <section className="summary-section">
                 <header>
                   <h2>Cliente y suministro</h2>
@@ -255,7 +265,8 @@ export const ProjectHubView = () => {
               </section>
             </>
           )}
-          {section === "finance" && (
+          {section === "finance" && pending && <ResultsPending completeness={completeness} title="Finanzas pendientes" />}
+          {section === "finance" && !pending && (
             <>
               <section className="summary-section">
                 <header>

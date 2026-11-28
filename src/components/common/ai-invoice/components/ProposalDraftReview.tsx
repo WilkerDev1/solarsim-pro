@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ProposalConsumptionReview } from './ProposalConsumptionReview';
+import type { SizingBasis } from '../../../../domain/sizing';
 import { ProposalCommercialReview } from './ProposalCommercialReview';
 import { ProposalDocumentTextsReview } from './ProposalDocumentTextsReview';
 import type { AIProposalContext, AIProposalIssue } from '../../../../../shared/aiProposal';
@@ -32,12 +33,14 @@ interface Props {
   issueModel?: ReviewIssueModel;
   /** Pestaña controlada desde el contenedor para que el chat pueda llevar a un campo. */
   tab?: ReviewTab;
+  /** Base de dimensionado de la propuesta destino (ADR 0009) para la cantidad sugerida de paneles. */
+  sizingBasis?: SizingBasis;
   onTabChange?: (tab: ReviewTab) => void;
 }
 const usd=(n:number)=>n.toLocaleString('es-DO',{style:'currency',currency:'USD'});
 const plural=(n:number,one:string,many:string)=>`${n.toLocaleString('es-DO')} ${n===1?one:many}`;
 
-export function ProposalDraftReview({draft,catalog,matrix,context,preview,production,update,issues=[],issueViews,issueModel,tab:controlledTab,onTabChange}:Props) {
+export function ProposalDraftReview({draft,catalog,matrix,context,preview,production,update,issues=[],issueViews,issueModel,tab:controlledTab,onTabChange,sizingBasis}:Props) {
   const [ownTab,setOwnTab]=useState<ReviewTab>('consumption');
   const tab=controlledTab ?? ownTab;
   const setTab=(next:ReviewTab)=>{setOwnTab(next);onTabChange?.(next);};
@@ -109,7 +112,7 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
       : source && <p className="proposal-note">Referencia de catálogo: {source.resolutionCode} · desde {source.effectiveDate}. Confirma que corresponde al período de la factura. Los cargos fijos y de demanda no son tarifa de energía.</p>}
     {source?.fieldSources && <p className="proposal-note">Procedencia por campo: {Object.entries(source.fieldSources).map(([field,s])=>`${tariffSourceFieldLabel(field)}: ${s.resolutionCode}`).join(' · ')}</p>}
     </section>
-    </div><div role="tabpanel" id="proposal-tab-consumption" aria-labelledby="proposal-label-consumption" hidden={tab!=='consumption'}><ProposalConsumptionReview draft={draft} context={context} production={production} update={update} issues={views}/></div>
+    </div><div role="tabpanel" id="proposal-tab-consumption" aria-labelledby="proposal-label-consumption" hidden={tab!=='consumption'}><ProposalConsumptionReview draft={draft} context={context} production={production} update={update} issues={views} sizingBasis={sizingBasis}/></div>
     <div role="tabpanel" id="proposal-tab-equipment" aria-labelledby="proposal-label-equipment" hidden={tab!=='equipment'}>
     <section id={reviewAnchor.field('equipment')} tabIndex={-1}>
       <h3 title="Puedes combinar modelos. Las especificaciones vienen del inventario; la IA no crea equipos.">Equipos del catálogo</h3>

@@ -99,6 +99,8 @@ const NEEDS_DIRECT_PRICE: FieldRequirement = { path: 'specs.pricingMode', value:
 const NEEDS_OFF_GRID: FieldRequirement = { path: 'rates.gridConnection', value: 'off_grid', resolve: 'reject' };
 const NEEDS_SIE007: FieldRequirement = { path: 'rates.netMeteringRegime', value: 'sie007_2026', resolve: 'reject' };
 const NEEDS_LEGACY: FieldRequirement = { path: 'rates.netMeteringRegime', value: 'legacy_retention', resolve: 'reject' };
+/** Ids del catálogo de fábrica (`DEFAULT_EQUIPMENT_CATALOG`) con que la prueba del registro elige un modelo por ruta. */
+const CATALOG_SAMPLE = { panels: 'eq-mod-cs-595', inverters: 'eq-inv-luxpower-10k', batteries: 'eq-bat-hinaess-16k' } as const;
 const GROUP_IN_SECTION = 'Grupo de la lista: sin id estable por fila (el id del campo sale de React.useId); ancla de la sección.';
 
 type Def = ProjectFieldDefinition;
@@ -118,7 +120,11 @@ function groupInternals(list: 'panels' | 'inverters' | 'batteries', noun: string
   const at = (field: string) => `specs.${list}[].${field}`;
   const defs: Def[] = [
     derived(at('id'), `Identificador del grupo (${noun})`, 'equipment', 'string'),
-    derived(at('catalogItemId'), `Equipo del catálogo (${noun})`, 'equipment', 'string'),
+    text(at('catalogItemId'), `Equipo del catálogo (${noun})`, 'equipment', 'action', {
+      minLength: 1, maxLength: 120, optional: true, anchor: 'dock-equipment', anchorNote: 'Selector del catálogo de la fila (sin id estable por fila).',
+      sample: CATALOG_SAMPLE[list],
+      note: 'Elegir un modelo del catálogo por su id: el dominio escribe el grupo entero como el selector del dock (buildCatalogSelectionUpdate, editIntents).',
+    }),
     derived(at('manualModel'), `Modelo escrito a mano (${noun})`, 'equipment', 'boolean'),
     derived(at('requestedModel'), `Modelo pedido (${noun})`, 'equipment', 'string'),
     derived(at('priceSource'), `Procedencia del precio (${noun})`, 'costs', 'enum'),
@@ -201,7 +207,7 @@ export const PROJECT_FIELDS: readonly ProjectFieldDefinition[] = [
   text('client.contactPerson', 'Atención', 'client', 'control', { maxLength: 120, optional: true, anchor: 'pd-cli-contact', note: 'Espejo en customization.contactName.' }),
   choice('client.solarSourceMode', 'Radiación solar', 'client', 'control', ['province', 'gps'], { optional: true, anchor: 'pd-cli-source-label' }),
   choice('client.province', 'Provincia', 'client', 'control', RD_PROVINCES.map((province) => province.name), {
-    anchor: 'pd-cli-province', note: 'El dock borra a la vez la radiación propia (customMonthlyHSP); esa regla sigue en el dock (F2b).',
+    anchor: 'pd-cli-province', note: 'Cambiar de provincia borra la radiación propia (customMonthlyHSP), por el dock o por ruta (editIntents, F2b).',
   }),
   text('client.coordinates', 'Coordenadas (latitud, longitud)', 'client', 'control', { maxLength: 60, optional: true, anchor: 'pd-cli-coords', requires: [{ path: 'client.solarSourceMode', value: 'gps', resolve: 'activate', when: nonBlank }] }),
   { path: 'client.customMonthlyHSP', label: 'Radiación mensual propia (HSP)', section: 'client', type: 'numberList', origin: 'action', length: 12, min: 0, max: 12, optional: true, leaf: true, itemLabels: MONTHS, anchorNote: '«Obtener radiación» (consulta a NASA, botón sin id).' },
@@ -222,8 +228,8 @@ export const PROJECT_FIELDS: readonly ProjectFieldDefinition[] = [
   text('client.tariffCode', 'Tarifa (copia del cliente)', 'client', 'hidden', { maxLength: 20, optional: true, note: 'Duplicada con rates.tariffCode (revisión, M8; F2b).' }),
 
   // ── Tarifas ──
-  choice('rates.distributor', 'Distribuidora', 'rates', 'control', DISTRIBUTORS, { anchor: 'pd-rates-distributor', note: 'El dock mapea a la vez el código de tarifa y el perfil de carga (planDistributorChange); esa regla sigue en el dock (F2b).' }),
-  text('rates.tariffCode', 'Tarifa', 'rates', 'control', { minLength: 1, maxLength: 20, anchor: 'pd-rates-tariff', note: 'El dock recalcula a la vez el precio de referencia y el perfil (planTariffChange).' }),
+  choice('rates.distributor', 'Distribuidora', 'rates', 'control', DISTRIBUTORS, { anchor: 'pd-rates-distributor', note: 'Mapea el código de tarifa y pone el precio de referencia y el perfil de carga recomendado (planDistributorChange; por ruta, editIntents).' }),
+  text('rates.tariffCode', 'Tarifa', 'rates', 'control', { minLength: 1, maxLength: 20, anchor: 'pd-rates-tariff', note: 'Pone el precio de referencia y el perfil recomendado (planTariffChange; por ruta, editIntents), salvo que el lote fije el precio o el perfil.' }),
   num('rates.energyCostPerKWh', 'Precio kWh (USD)', 'rates', 'control', { min: 0, max: 10, anchor: 'pd-rates-kwh' }),
   choice('rates.energyRateSource', 'Procedencia del precio kWh', 'rates', 'action', ENERGY_RATE_SOURCES, { optional: true, anchorNote: 'Lo escribe «Aplicar tarifa oficial» o la regla del precio (applyProjectEdit).' }),
   { path: 'rates.billingTariff', label: 'Fila de la tarifa (bloques y cargo fijo)', section: 'rates', type: 'object', origin: 'action', optional: true, leaf: true, anchorNote: 'Lo escribe «Aplicar tarifa oficial» o el cambio de tarifa.' },
@@ -247,7 +253,7 @@ export const PROJECT_FIELDS: readonly ProjectFieldDefinition[] = [
   num('rates.annualEnergyInflationPct', 'Inflación de la energía', 'rates', 'hidden', rule('annualEnergyInflationPct')),
   num('rates.usdExchangeRate', 'Tasa RD$/US$ de la tarifa', 'rates', 'hidden', { ...rule('dopExchangeRate'), note: 'La tasa efectiva es specs.dopExchangeRate.' }),
   choice('rates.currency', 'Moneda', 'rates', 'hidden', ['USD', 'DOP'], { note: 'Sin efecto en el cálculo.' }),
-  choice('specs.loadProfilePreset', 'Perfil de carga', 'rates', 'control', ['residential', 'commercial', 'industrial', 'custom'], { optional: true, anchor: 'pd-rates-profile', note: 'El dock escribe a la vez daytimeLoadRatio y daytimeSelfConsumptionRatio (loadProfileChange).' }),
+  choice('specs.loadProfilePreset', 'Perfil de carga', 'rates', 'control', ['residential', 'commercial', 'industrial', 'custom'], { optional: true, anchor: 'pd-rates-profile', note: 'Un perfil fija a la vez daytimeLoadRatio y daytimeSelfConsumptionRatio (loadProfileChange).' }),
   num('specs.daytimeLoadRatio', 'Consumo diurno', 'rates', 'control', { min: DAYTIME_MIN, max: DAYTIME_MAX, optional: true, anchor: 'pd-rates-daytime' }),
   num('specs.daytimeSelfConsumptionRatio', 'Consumo diurno (alias)', 'rates', 'action', { min: 0, max: 100, optional: true, anchorNote: 'Lo escribe el perfil de carga junto con daytimeLoadRatio.' }),
   bool('specs.showSelfConsumptionBreakdown', 'Autoconsumo en gráficos', 'rates', 'control', { optional: true, anchor: 'pd-rates-show-label', note: 'También en la pestaña Energía (Autoconsumo/Clásico).' }),
@@ -256,6 +262,9 @@ export const PROJECT_FIELDS: readonly ProjectFieldDefinition[] = [
   bool('specs.isDetailed', 'Modo de equipamiento manual', 'equipment', 'control', { anchor: 'dock-equipment-mode' }),
   num('specs.systemLosses', 'Pérdidas del sistema', 'equipment', 'control', { ...rule('systemLossesPct'), anchor: 'dock-equipment-losses' }),
   bool('specs.autoCalculatePanels', 'Auto-calcular paneles', 'equipment', 'control', { optional: true, anchor: 'dock-equipment', anchorNote: 'Interruptor sin id; ancla de la sección.' }),
+  choice('specs.sizingBasis', 'Base de dimensionado de paneles', 'equipment', 'hidden', ['average', 'peak_month'], {
+    optional: true, note: 'Sin el campo, el consumo real del año (lo guardado); las propuestas nuevas, el mes pico como promedio (domain/sizing, ADR 0009).',
+  }),
   ...equipmentGroup('panels'),
   num('specs.panelEfficiency', 'Eficiencia del panel', 'equipment', 'control', { min: 0, max: 100, anchor: 'dock-panel-efficiency' }),
   num('specs.tempCoeff', 'Coef. de temperatura', 'equipment', 'control', { min: -5, max: 5, anchor: 'dock-panel-temp-coeff' }),
@@ -271,14 +280,14 @@ export const PROJECT_FIELDS: readonly ProjectFieldDefinition[] = [
   text('specs.installationServicesDesc', 'Descripción de la instalación', 'equipment', 'hidden', { maxLength: 2000, optional: true }),
 
   // ── Costos y margen ──
-  choice('specs.pricingMode', 'Fijación de precio', 'costs', 'control', ['cost_matrix', 'direct_watt'], { optional: true, anchor: 'pd-pricing-mode', note: 'Al pasar a Directo el dock escribe también $/W y $/kWp sugeridos.' }),
+  choice('specs.pricingMode', 'Fijación de precio', 'costs', 'control', ['cost_matrix', 'direct_watt'], { optional: true, anchor: 'pd-pricing-mode', note: 'Al pasar a Directo se escriben también $/W y $/kWp sugeridos de la matriz de costos (dock y ruta).' }),
   num('specs.dopExchangeRate', 'Tasa DOP/USD', 'costs', 'control', { ...rule('dopExchangeRate'), optional: true, anchor: 'pd-dop-rate' }),
   num('specs.saleMarginMultiplier', 'Factor de venta (margen)', 'costs', 'control', {
-    ...rule('saleMarginMultiplier'), optional: true, anchor: 'pd-margin', note: 'Factor (1,25 = 25 %). El dock muestra y teclea el margen en %; la conversión vive en el dock (pricingSync, F2b).',
+    ...rule('saleMarginMultiplier'), optional: true, anchor: 'pd-margin', note: 'Factor (1,25 = 25 %). El dock muestra y teclea el margen en %; la conversión vive en el dominio (rules/pricingRules, intención marginPct).',
   }),
   num('specs.installationUnitPriceUSD', 'Mano de obra y materiales (USD/kWp)', 'costs', 'control', { ...rule('installationUsdPerKwp'), optional: true, anchor: 'pd-cost-installation' }),
-  bool('specs.autoSupplierPricing', 'Mejor proveedor', 'costs', 'action', { optional: true, anchorNote: 'Botón «Mejor proveedor» (escribe también precio y proveedor de cada grupo principal).' }),
-  num('specs.pricePerWattUSD', 'Precio por W (USD)', 'costs', 'control', { min: 0.1, max: ASSUMPTION_RULES.pricePerWattUSD.max, anchor: 'pd-price-w', requires: [NEEDS_DIRECT_PRICE], note: 'El dock escribe a la vez $/kWp (wattPricePatch).' }),
+  bool('specs.autoSupplierPricing', 'Mejor proveedor', 'costs', 'action', { optional: true, anchorNote: 'Botón «Mejor proveedor»: true escribe también precio y proveedor de cada grupo principal (dock y ruta).' }),
+  num('specs.pricePerWattUSD', 'Precio por W (USD)', 'costs', 'control', { min: 0.1, max: ASSUMPTION_RULES.pricePerWattUSD.max, anchor: 'pd-price-w', requires: [NEEDS_DIRECT_PRICE], note: '$/kWp se escribe a la vez (wattPricePatch; por ruta, editIntents).' }),
   num('specs.pricePerKWpUSD', 'Precio por kWp (USD)', 'costs', 'control', { min: 100, max: ASSUMPTION_RULES.pricePerWattUSD.max * 1000, optional: true, anchor: 'pd-price-kwp', requires: [NEEDS_DIRECT_PRICE] }),
   choice('specs.directPriceSurplusTarget', 'Destino del excedente', 'costs', 'control', ['margin', 'labor'], { optional: true, anchor: 'pd-surplus-label', requires: [NEEDS_DIRECT_PRICE] }),
 

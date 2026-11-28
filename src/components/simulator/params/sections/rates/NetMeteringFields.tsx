@@ -49,6 +49,8 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
   const charge = assumptions.gridUseChargeDOPPerKWh;
   const isFactory = Math.abs(charge - factory.dopPerKWh) < 0.005;
   const applies = gridUseChargeApplies(rates);
+  // Sin inyección (inyección cero) el régimen no cambia el cálculo: el selector queda desactivado con su ⓘ.
+  const regimeLocked = !exportsToGrid(resolveGridConnection(rates));
   // Fase 7: actualizar una propuesta del régimen anterior. Si la organización oculta el selector, tampoco se ofrece:
   // la política decide quién cambia el régimen en el dock, y sin selector no habría vuelta atrás al régimen anterior.
   const upgrade = showRegimeSelector ? planSie007Upgrade(rates, officialReferencePatch) : null;
@@ -70,9 +72,14 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
   return (
     <>
       {showRegimeSelector && (
-        <ParamRow label="Régimen" htmlFor="pd-rates-regime">
+        <ParamRow
+          label="Régimen"
+          htmlFor="pd-rates-regime"
+          hint={regimeLocked ? <InfoTip label="Más información: Régimen" text="Inyección cero: no se inyecta energía a la red, así que el régimen de medición neta no aplica (ni retención ni cargo por uso de red)." /> : undefined}
+        >
           <SelectField
             id="pd-rates-regime"
+            disabled={regimeLocked}
             value={regime}
             options={REGIME_OPTIONS}
             onChange={(value) => updateRates({ netMeteringRegime: value as NetMeteringRegime })}

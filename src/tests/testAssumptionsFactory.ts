@@ -67,7 +67,11 @@ try {
   // Excepción deliberada (fases 2 y 3 tarifarias): el régimen de medición neta y, con él, la valoración por bloques. Lo
   // nuevo nace en SIE-007-2026 con el precio de referencia; lo importado sin el campo es del régimen anterior (escalar).
   // Todo lo demás coincide campo por campo.
-  const withoutRegime = ({ netMeteringRegime, gridUseChargeDOPPerKWh, appliedGridUseChargeDOPPerKWh, energyValuationMethod, ...rest }: ReturnType<typeof resolveAssumptions>) => rest;
+  // Segunda excepción (F2b, ADR 0009): el factor de venta de una propuesta nueva es el «Margen bruto objetivo» de Ajustes (40 %
+  // de fábrica, factor 1,40) por todos los caminos; lo importado sin el campo sigue con la constante compartida (1,25).
+  const withoutRegime = ({ netMeteringRegime, gridUseChargeDOPPerKWh, appliedGridUseChargeDOPPerKWh, energyValuationMethod, saleMarginMultiplier, ...rest }: ReturnType<typeof resolveAssumptions>) => rest;
+  assert.equal(resolveAssumptions(created).saleMarginMultiplier, 1.4, 'nuevo: el margen objetivo de Ajustes');
+  assert.equal(resolveAssumptions(imported).saleMarginMultiplier, 1.25, 'importado sin el campo: la constante compartida');
   assert.equal(resolveAssumptions(created).netMeteringRegime, 'sie007_2026', 'nuevo: régimen SIE-007-2026');
   assert.equal(resolveAssumptions(created).energyValuationMethod, 'block_billing', 'nuevo: factura por bloques');
   assert.equal(resolveAssumptions(imported).energyValuationMethod, 'flat_rate', 'importado sin el campo: precio escalar');

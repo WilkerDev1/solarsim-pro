@@ -7,6 +7,8 @@
  * 2. resuelve las dependencias declaradas: activa lo que haga falta («Incluir batería» al elegir una batería) como cambio
  *    derivado y avisado, o rechaza lo que no aplica (el cargo SIE-007 en el régimen anterior), comprobado contra la
  *    propuesta ya aplicada (paso 3) para leer el estado efectivo y no el lote crudo;
+ * 2b. completa la intención con las reglas del dock (F2b, `editIntents.ts`): «cambia la distribuidora» trae su código,
+ *    su precio de referencia y su perfil, «elige este panel del catálogo» su grupo entero… salvo lo que el lote ya fija;
  * 3. ordena las ediciones por ruta y las agrupa en un plan por sección, relativo a la base del lote, y lo aplica con
  *    `applyProjectEditPlan`: las reglas de `projectEdit.ts` corren UNA vez contra la base, así que el resultado no
  *    depende del orden de las ediciones;
@@ -20,6 +22,7 @@ import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
 import { migrateLegacySpecs } from '../../shared/equipment';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { applyProjectEditPlan, type ProjectEditContext, type ProjectEditPlan } from './projectEdit';
+import { expandEditIntents } from './editIntents';
 import {
   fieldLabel, findProjectField, formatFieldPath, parseFieldPath, readPath, PROJECT_FIELDS,
   type PathToken, type ProjectFieldDefinition,
@@ -81,7 +84,7 @@ export type ProjectEditsResult =
     ok: true;
     project: ProjectSimulation;
     changes: ProjectFieldChange[];
-    /** Ediciones que añadió la transacción para cumplir dependencias. */
+    /** Ediciones que añadió la transacción: las reglas del dock (`editIntents.ts`) y las dependencias. */
     derivedEdits: ProjectFieldEdit[];
     warnings: string[];
     metrics?: { before: ProjectEditMetrics; after: ProjectEditMetrics };
@@ -361,9 +364,23 @@ export function applyProjectEdits(project: ProjectSimulation, edits: readonly Pr
     requested.push(edit);
   }
 
-  // 3. Dependencias: activar lo necesario (derivado y avisado) hasta que no haga falta nada más; luego comprobar el resto.
+  // 3. Reglas del dock (F2b, `editIntents.ts`): lo que el lote pide como intención («cambia la distribuidora», «elige este
+  // panel del catálogo») se completa con los mismos campos que escribe el gesto del dock. Lo que el lote ya fija manda.
+  const expansion = expandEditIntents(project, preview(project, requested), requested, ctx);
+  errors.push(...expansion.errors);
+  warnings.push(...expansion.warnings);
+  const ruleEdits: ParsedEdit[] = [];
+  for (const edit of expansion.edits) {
+    const def = findProjectField(edit.path);
+    const tokens = parseFieldPath(edit.path);
+    if (!def || !tokens) throw new Error(`Regla de edición con una ruta sin registrar: ${edit.path}`);
+    ruleEdits.push({ ...edit, tokens, def });
+  }
+  const planned = [...requested.filter((edit) => !expansion.replaced.has(edit.path)), ...ruleEdits];
+
+  // 4. Dependencias: activar lo necesario (derivado y avisado) hasta que no haga falta nada más; luego comprobar el resto.
   const derivedEdits: ParsedEdit[] = [];
-  const all = () => [...requested, ...derivedEdits];
+  const all = () => [...planned, ...derivedEdits];
   const effective = (path: string, state: ProjectSimulation) => {
     const def = findProjectField(path);
     return def?.effective ? def.effective(state) : readPath(state, parseFieldPath(path) ?? []);
@@ -405,7 +422,7 @@ export function applyProjectEdits(project: ProjectSimulation, edits: readonly Pr
   };
   checkRequirements('activate', preview(project, all()));
 
-  // 4. Una sola aplicación de las reglas contra la base; después, las dependencias que se rechazan sobre el resultado.
+  // 5. Una sola aplicación de las reglas contra la base; después, las dependencias que se rechazan sobre el resultado.
   // `all()` solo lleva rutas válidas con valores de su tipo, así que se aplica aunque ya haya errores: la lista de errores
   // sigue completa (las dependencias rechazadas se informan junto con las de ruta, tipo y rango). Si con errores las
   // reglas no pueden aplicarse (p. ej. un elemento de lista mal formado), se devuelven los que ya hay.
@@ -422,7 +439,7 @@ export function applyProjectEdits(project: ProjectSimulation, edits: readonly Pr
   const changes = diffProjects(project, next, requested);
   const result: Extract<ProjectEditsResult, { ok: true }> = {
     ok: true, project: next, changes, warnings,
-    derivedEdits: derivedEdits.map(({ path, value }) => ({ path, value })),
+    derivedEdits: [...ruleEdits, ...derivedEdits].map(({ path, value }) => ({ path, value })),
   };
   if (options.metrics) result.metrics = { before: projectEditMetrics(project, ctx.calculationMode), after: projectEditMetrics(next, ctx.calculationMode) };
   return result;

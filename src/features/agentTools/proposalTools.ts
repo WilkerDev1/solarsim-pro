@@ -1,6 +1,7 @@
 import { isNetMeteringRegime, isValidGridUseCharge } from '../../../shared/netMetering';
 import { PROPOSAL_DECISIONS, commercialState, type ProposalDecision } from '../../../shared/proposalCommercial';
 import { buildProjectFromDraft } from '../../store/slices/aiSlice';
+import { NEW_PROPOSAL_DEFAULTS } from '../../domain/newProposal';
 import type { ExtractedInvoiceData, ProjectSimulation } from '../../types';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import {
@@ -36,12 +37,14 @@ function createDraft(args: Record<string, any>): ExtractedInvoiceData {
   } as unknown as ExtractedInvoiceData;
 }
 
-const createProposal: NativeHandler = (args) => {
+const createProposal: NativeHandler = (rawArgs) => {
   if (!canWriteWorkspace()) throw new Error('Tu cuenta solo puede consultar.');
-  if (!Array.isArray(args.monthlyConsumptionKWh) && args.averageMonthlyKWh === undefined)
-    throw new Error('Indica doce consumos mensuales o un consumo promedio.');
-  if (Array.isArray(args.monthlyConsumptionKWh) && args.monthlyConsumptionKWh.length !== 12)
+  if (Array.isArray(rawArgs.monthlyConsumptionKWh) && rawArgs.monthlyConsumptionKWh.length !== 12)
     throw new Error('monthlyConsumptionKWh necesita exactamente doce valores.');
+  // F2b (ADR 0009): sin consumo ya no es un error. La propuesta nace con el consumo estimado de la fábrica única, marcado
+  // como tal, y el resultado lo avisa para que el asistente pida la factura.
+  const estimatedConsumption = !Array.isArray(rawArgs.monthlyConsumptionKWh) && rawArgs.averageMonthlyKWh === undefined;
+  const args = estimatedConsumption ? { ...rawArgs, averageMonthlyKWh: NEW_PROPOSAL_DEFAULTS.monthlyConsumptionKWh } : rawArgs;
   const draft = createDraft(args);
   const preview = buildProjectFromDraft(store(), draft, true);
   if ('error' in preview) throw new Error(preview.error);
@@ -55,7 +58,9 @@ const createProposal: NativeHandler = (args) => {
         if (!canWriteWorkspace()) throw new Error('Tu cuenta solo puede consultar.');
         const built = buildProjectFromDraft(store(), createDraft(args), true);
         if ('error' in built) throw new Error(built.error);
-        const project = built.project;
+        const project = estimatedConsumption
+          ? { ...built.project, consumptionEstimate: { kind: 'factory_default' as const, monthlyKWh: NEW_PROPOSAL_DEFAULTS.monthlyConsumptionKWh } }
+          : built.project;
         insertProject(project);
         // Equipment without a supplier offer quotes at 0: say so in the result instead of leaving it to the simulation.
         const groups = [...(project.specs.panels ?? []), ...(project.specs.inverters ?? []), ...(project.specs.batteries ?? [])].filter((g) => g.count > 0);
@@ -63,6 +68,7 @@ const createProposal: NativeHandler = (args) => {
         // Precio genérico (ADR 0006): respaldo etiquetado, nunca una oferta; el resultado lo dice para que el asistente lo repita.
         const generic = groups.filter((g) => g.priceSource === 'generic' && typeof g.unitPriceUSD === 'number' && g.unitPriceUSD > 0);
         const warnings = [
+          ...(estimatedConsumption ? [`Consumo estimado: ${NEW_PROPOSAL_DEFAULTS.monthlyConsumptionKWh.toLocaleString('es-DO')} kWh/mes los doce meses (no se indicó consumo). Pide la factura o los consumos reales para afinar el dimensionado y el ahorro.`] : []),
           ...(unpriced.length ? [`Sin oferta de proveedor ni precio genérico: ${unpriced.join(', ')}. El precio de contrato no es válido hasta cargar precios en el catálogo (update_supplier_price o el editor de ofertas).`] : []),
           ...(generic.length ? [`Precio genérico, sin proveedor: ${generic.map((g) => `${g.brandModel} (US$ ${g.unitPriceUSD!.toFixed(2)})`).join(', ')}. Confirma el costo con una oferta de proveedor antes de enviar la propuesta.`] : []),
         ];

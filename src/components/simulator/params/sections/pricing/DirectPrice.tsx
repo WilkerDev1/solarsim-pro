@@ -4,8 +4,9 @@ import { Sparkles } from 'lucide-react';
 import { CommitNumberField, InfoTip, ParamRow, StatStrip, SubHeader, SubHeaderTextButton, ToggleGroup } from '../../ui';
 import type { FinancialSummaryResult, SystemSpecs } from '../../../../../types';
 import { isValidDirectPrice, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../logic/dockDefaults';
-import { kwpPricePatch, pricePerKWpFromWatt, roundedWattPrice, wattPricePatch } from '../../logic/pricingSync';
+import { kwpPricePatch, pricePerKWpFromWatt, suggestedWattPrice, wattPricePatch } from '../../logic/pricingSync';
 import { usd } from './format';
+import { shownMetric, type ProposalCompleteness } from '../../../../../domain/proposalCompleteness';
 
 interface DirectPriceProps {
   specs: SystemSpecs;
@@ -13,6 +14,8 @@ interface DirectPriceProps {
   /** `financials.pricePerWattUSD` del proyecto: segundo eslabón de la cadena de fallback del motor. */
   financialsPricePerWattUSD?: number;
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
+  /** F2b (ADR 0009): incompleta => las cifras de la franja son «—». Sin él, como siempre. */
+  completeness?: ProposalCompleteness;
 }
 
 /** Precio directo mínimo ($/Wp); el equivalente en $/kWp es 1000 veces mayor. Menos se rechaza al confirmar. */
@@ -22,7 +25,8 @@ const TIP =
   'Fija el costo llave en mano por Wp o kWp sin desglosar mano de obra. El excedente comercial se asigna a la ganancia o a mano de obra, ingeniería e instalación.';
 
 /** Modo Directo: $/W y $/kWp sincronizados, destino del excedente y resumen de margen. */
-export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, financialsPricePerWattUSD, updateSpecs }) => {
+export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, financialsPricePerWattUSD, updateSpecs, completeness }) => {
+  const shown = (text: string) => (completeness ? shownMetric(completeness, text) : text);
   const bankTotals = equipmentTotals(readEquipment(specs));
   // Ambos campos salen del mismo valor. El motor ignora un $/Wp ≤ 0 (usa financials y luego el default): la vista sigue la misma cadena.
   const wattPrice = resolvePricePerWattUSD(specs, { pricePerWattUSD: financialsPricePerWattUSD });
@@ -38,7 +42,7 @@ export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, financ
             <InfoTip text={TIP} />
             <SubHeaderTextButton
               icon={<Sparkles size={13} strokeWidth={2} aria-hidden="true" />}
-              onClick={() => updateSpecs(wattPricePatch(roundedWattPrice(matrix?.salePricePerWattUSD, wattPrice)))}
+              onClick={() => updateSpecs(wattPricePatch(suggestedWattPrice(matrix?.salePricePerWattUSD, specs, financialsPricePerWattUSD)))}
             >
               Sugerir de costos
             </SubHeaderTextButton>
@@ -64,9 +68,9 @@ export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, financ
       </ParamRow>
       <StatStrip
         items={[
-          { label: 'Potencia', value: `${(summary?.systemCapacityKWp ?? 0).toFixed(2)} kWp` },
-          { label: 'Margen', value: `${(resolveSaleMarginMultiplier(matrix?.saleMarginMultiplier)).toFixed(2)}× · +${(matrix?.markupOnCostPct || 0).toFixed(1)}%` },
-          { label: 'Ganancia neta', value: `+$${usd(matrix?.gananciaUSD || 0)}` },
+          { label: 'Potencia', value: shown(`${(summary?.systemCapacityKWp ?? 0).toFixed(2)} kWp`) },
+          { label: 'Margen', value: shown(`${(resolveSaleMarginMultiplier(matrix?.saleMarginMultiplier)).toFixed(2)}× · +${(matrix?.markupOnCostPct || 0).toFixed(1)}%`) },
+          { label: 'Ganancia neta', value: shown(`+$${usd(matrix?.gananciaUSD || 0)}`) },
         ]}
       />
       {specs.hasBattery && (

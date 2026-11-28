@@ -171,6 +171,12 @@ const renderRates = (rates: Partial<UtilityRates>) => renderToStaticMarkup(React
   const zero = renderRates({ isZeroExport: true, gridConnection: undefined, gridExportFeePct: 18 });
   assert.match(zero, /Inyección cero/);
   assert.match(zero, /id="pd-rates-export"[^>]*disabled=""/);
+  // Con inyección cero el régimen de liquidación no aplica (no se inyecta): el selector queda desactivado, con su ⓘ (QA de F2b).
+  const regimeButton = /<button[^>]*(id="pd-rates-regime"[^>]*disabled=""|disabled=""[^>]*id="pd-rates-regime")/;
+  assert.match(zero, regimeButton, 'inyección cero: régimen desactivado');
+  assert.match(zero, /Inyección cero: no se inyecta energía a la red, así que el régimen de medición neta no aplica/);
+  assert.doesNotMatch(html, regimeButton, 'con inyección a la red el régimen se elige');
+  assert.match(html, /id="pd-rates-regime"/);
   const island = renderRates({ ...gridConnectionFields('off_grid'), gridExportFeePct: 18 });
   assert.match(island, /Aislado \(modo isla\)/);
   assert.match(island, />Costo evitado kWh</, 'sin red, el precio es el costo que el sistema evita');

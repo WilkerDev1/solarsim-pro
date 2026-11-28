@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import type { FinancialSummaryResult, ProjectSimulation } from '../../../types';
-import { buildPdfLayout, normalizeSectionOrder } from '../../../utils/pdfLayout';
+import { buildPdfLayout, normalizeSectionOrder, proposalDocumentSections } from '../../../utils/pdfLayout';
 import { formatProposalDate } from '../../../utils/formatDateUtils';
 import { DocumentEditorProvider } from '../../pdf/editor/DocumentEditorContext';
 import { renderProposalSection } from '../../pdf/ProposalDocumentPages';
@@ -14,6 +14,7 @@ const PAGE_WIDTH = 850;
  * desplazables, en modo `view` y sin acciones de edición. Se carga en diferido (`React.lazy` en `ProposalViewer`): las
  * páginas y sus gráficos pesan y el editor no las necesita hasta abrir esta pestaña. Solo estado local: nunca escribe.
  */
+/** El visor (`ProposalViewer`) solo lo abre con la propuesta completa; la regla de páginas es la misma que la del PDF. */
 export const ProposalViewerDocument: React.FC<{ project: ProjectSimulation; summary: FinancialSummaryResult }> = React.memo(({ project, summary }) => {
   const company = useSimulationStore((s) => s.companies.find((c) => c.id === project.companyProfileId));
   const area = useRef<HTMLDivElement>(null);
@@ -46,9 +47,8 @@ export const ProposalViewerDocument: React.FC<{ project: ProjectSimulation; summ
         <div className="pv-doc-frame" style={{ width: PAGE_WIDTH * scale, height: height === null ? undefined : height * scale }}>
           <div ref={inner} className="pv-doc-pages" style={{ width: PAGE_WIDTH, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
             <DocumentEditorProvider project={project} summary={summary} currentDateStr={currentDateStr} company={company} mode="view" writable={false}>
-              {order.map((id) => (layout.visibility[id]
-                ? renderProposalSection(id, { project, summary, activeTheme: layout.theme, showHeadersFooters: layout.showHeadersFooters, currentDateStr, pageNumbers, totalPages: footerTotalPages, tocItems })
-                : null))}
+              {proposalDocumentSections(order, layout.visibility, false).sections.map((id) =>
+                renderProposalSection(id, { project, summary, activeTheme: layout.theme, showHeadersFooters: layout.showHeadersFooters, currentDateStr, pageNumbers, totalPages: footerTotalPages, tocItems }))}
             </DocumentEditorProvider>
           </div>
         </div>

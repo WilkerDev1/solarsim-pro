@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { ArrowUpRight, Trash2, Unlink } from 'lucide-react';
 import { CLIENT_KINDS, clientContent } from '../../../shared/clients';
 import { PROPOSAL_DECISIONS, commercialState } from '../../../shared/proposalCommercial';
-import { calculateProjectFinancialSummary } from '../../engine/financeEngine';
+import { contractPriceForTotals } from '../../domain/proposalCompleteness';
 import { useEnergyCalculationMode } from '../../features/application/useApplicationFeatures';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -24,7 +24,8 @@ export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; 
   const mode = useEnergyCalculationMode();
   const linked = useMemo(() => clientProposals(projects, client.id), [projects, client.id]);
   const summary = useMemo(
-    () => summarizeClient(projects, client.id, (p) => calculateProjectFinancialSummary(p, mode).contractPriceUSD),
+    // Una propuesta incompleta no suma su contrato de relleno (ADR 0009).
+    () => summarizeClient(projects, client.id, (p) => contractPriceForTotals(p, mode)),
     [projects, client.id, mode],
   );
   const conflict = clientChanges[client.id]?.serverClient;

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Tag } from "lucide-react";
 import type { ProjectSimulation } from "../../types";
 import { PROPOSAL_DECISIONS, type ProposalDecision } from "../../../shared/proposalCommercial";
-import { calculateProjectFinancialSummary } from "../../engine/financeEngine";
+import { contractPriceForTotals } from "../../domain/proposalCompleteness";
 import { useEnergyCalculationMode } from "../application/useApplicationFeatures";
 import { salesPerformance } from "./commercial";
 
@@ -16,7 +16,8 @@ export function useSalesPerformance(projects: ProjectSimulation[]) {
     () =>
       salesPerformance(
         projects,
-        (p) => calculateProjectFinancialSummary(p, mode).contractPriceUSD,
+        // Una propuesta incompleta no suma su contrato de relleno (ADR 0009).
+        (p) => contractPriceForTotals(p, mode),
       ),
     [projects, mode],
   );

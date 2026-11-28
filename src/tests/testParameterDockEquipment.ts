@@ -9,6 +9,7 @@ import { editEquipmentGroup, normalizeEquipmentEdit, resolveGroupCatalogItem, se
 import type { ProjectSimulation } from '../types';
 import type { GenericPriceInfo } from '../../shared/equipmentPrices';
 import { unresolvedEquipmentIds } from '../utils/proposalAnnexes';
+import { chipMagnitude } from '../utils/equipmentMatchingUtils';
 import { resolveAnnualDegradationPct } from '../engine/financeEngine';
 import { catalogPanelGroupPatch } from '../utils/catalogGroupPatch';
 import { autoPriceFields, buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
@@ -172,7 +173,20 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const added = buildNewItem('panel', multi() as LegacyProjectSpecs, catalog, 3, lookup);
   assert.deepEqual([added.catalogItemId, added.unitPriceUSD, added.priceSource, added.genericPriceInfo?.priceUSD], ['p2', 111, 'generic', 111]);
   const estimated = buildNewItem('panel', multi() as LegacyProjectSpecs, catalog, 3);
-  assert.equal(estimated.unitPriceUSD, 600 * 0.17, 'sin genérico (o sin sesión) sigue la estimación por W');
+  assert.equal(estimated.unitPriceUSD, 102, 'sin genérico (o sin sesión) sigue la estimación por W (600 W × 0,17)');
+  // Chip del selector (QA de F2b): la potencia del grupo, no la del modelo emparejado por potencia ±5 W.
+  assert.equal(chipMagnitude(620, 615), 620, 'el chip dice lo que se cotiza');
+  assert.equal(chipMagnitude(undefined, 615), 615, 'sin potencia en el grupo, la del modelo');
+  assert.equal(chipMagnitude(0, 16.08), 16.08);
+  assert.equal(chipMagnitude(undefined, undefined), undefined);
+  assert.ok(readFileSync('src/components/simulator/sidebar/SearchableEquipmentSelect.tsx', 'utf8').includes('chipMagnitude(selectedPower'), 'el selector usa chipMagnitude');
+  // A centavos (QA de F2b): 590 W × 0,17 daba 100.30000000000001 en el campo de precio.
+  const odd = buildNewItem('panel', multi() as LegacyProjectSpecs, [{ ...catalog[1], powerW: 590 }], 3);
+  assert.equal(odd.unitPriceUSD, 100.3, 'estimación por W a centavos');
+  const oddInverter = buildNewItem('inverter', multi() as LegacyProjectSpecs, [{ ...catalog[3], id: 'i9', displayName: 'Inv 3.3', powerKW: 3.3, supplierPrices: [] }], 3);
+  assert.equal(oddInverter.unitPriceUSD, 726, 'estimación por kW a centavos (3,3 kW × 220)');
+  const oddBattery = buildNewItem('battery', multi() as LegacyProjectSpecs, [{ ...catalog[3], id: 'b9', type: 'battery', displayName: 'Bat 5.12', capacityKWh: 5.12, supplierPrices: [] }], 3);
+  assert.equal(oddBattery.unitPriceUSD, 819.2, 'estimación por kWh a centavos (5,12 kWh × 160)');
   assert.equal(estimated.priceSource, undefined);
   const offered = buildNewItem('panel', { ...multi(), panels: [{ id: 'pb', brandModel: 'Panel B 600', powerW: 600, count: 4 }] } as LegacyProjectSpecs, catalog, 3, lookup);
   assert.deepEqual([offered.catalogItemId, offered.unitPriceUSD, offered.priceSource, offered.selectedSupplierInfo?.supplierName], ['p1', 90, 'supplier', 'Alfa'], 'la oferta gana en «+»');
@@ -232,10 +246,18 @@ const listProps = (kind: EquipmentKind, mode: 'catalog' | 'manual', specs: Parti
 
 // --- Sección completa: modo, pérdidas, grupos, batería y franja DC / AC / DC-AC ---
 {
-  const project = { specs: { ...multi(), isDetailed: false, autoCalculatePanels: false, systemLosses: 25 }, rates: { targetCoveragePct: 95 } } as never;
+  // Propuesta completa (consumo, precio de la energía y precio en cada equipo): las cifras se muestran (ADR 0009).
+  const base = multi();
+  const priced = <T extends { unitPriceUSD?: number }>(groups?: T[]) => groups?.map((g) => ({ ...g, unitPriceUSD: 100 }));
+  const project = { specs: { ...base, panels: priced(base.panels), inverters: priced(base.inverters), batteries: priced(base.batteries), isDetailed: false, autoCalculatePanels: false, systemLosses: 25 },
+    rates: { targetCoveragePct: 95, energyCostPerKWh: 0.2 }, monthlyConsumption: Array(12).fill(1000) } as never;
   const summary = { batteryUsableKWh: 16, batteryBackupAutonomyHours: 5.5 } as never;
   const section = (p: unknown) => render(h(EquipmentParamsSection, { project: p as never, summary, updateSpecs: noop }));
   const catalogMarkup = section(project);
+  // Incompleta (sin consumo): lo que calcula el motor es «—», nunca un relleno.
+  const incompleteMarkup = section({ ...(project as object), monthlyConsumption: [] });
+  assert.doesNotMatch(incompleteMarkup, /~5\.5 h/);
+  assert.match(incompleteMarkup, /Autonomía/);
   assert.match(catalogMarkup, /role="radiogroup"[^>]*aria-label="Modo de equipamiento"/);
   assert.match(catalogMarkup, /Catálogo/);
   assert.match(catalogMarkup, /Pérdidas del sistema/);

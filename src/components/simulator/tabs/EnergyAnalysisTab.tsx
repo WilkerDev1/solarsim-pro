@@ -1,4 +1,8 @@
 import { GRID_USE_CHARGE_ESTIMATE_NOTICE } from '../../../../shared/netMetering';
+import type { ProposalCompleteness } from '../../../domain/proposalCompleteness';
+import { isConsumptionEstimated } from '../../../domain/newProposal';
+import { EstimatedConsumptionHint, ResultsPending } from '../ProposalStatusHints';
+import { shownMetric } from '../../../domain/proposalCompleteness';
 import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React, { useState } from 'react';
 import { describePanelConfiguration, readEquipment } from '../../../../shared/equipment';
@@ -25,6 +29,8 @@ interface EnergyAnalysisTabProps {
   updateAllMonthlyConsumption?: (value: number) => void;
   setMonthlyConsumption?: (monthlyConsumption: number[], lockAutoPanels?: boolean) => void;
   updateSpecs?: (specs: Partial<SystemSpecs>) => void;
+  /** F2b (ADR 0009): incompleta ⇒ los resultados se muestran vacíos (no en cero); el consumo se sigue editando aquí. */
+  completeness?: ProposalCompleteness;
 }
 
 /**
@@ -51,7 +57,11 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
   updateAllMonthlyConsumption,
   setMonthlyConsumption,
   updateSpecs,
+  completeness,
 }) => {
+  const pending = !!completeness?.incomplete;
+  /** Una cifra calculada, o «—» mientras la propuesta esté incompleta. */
+  const shown = (text: string) => (completeness ? shownMetric(completeness, text) : text);
   const projectionEnabled = useSelfConsumptionProjection();
   const panelsLabel = describePanelConfiguration(readEquipment(project.specs));
   const showSelfConsumption = projectionEnabled && project.specs.showSelfConsumptionBreakdown !== false;
@@ -114,6 +124,8 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
           {offGridUnservedNote(summary.annualUnservedKWh, summary.annualConsumptionKWh)}
         </p>
       )}
+      {pending && completeness && <ResultsPending completeness={completeness} />}
+      {!pending && <>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] [&>*]:min-w-0 [&>*]:[overflow-wrap:anywhere] gap-3 shrink-0">
         {/* Card 1: CAPACIDAD INSTALADA */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
@@ -288,10 +300,12 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
         </div>
       </div>
 
+      </>}
+
       {/* TABLA DE DETALLE MENSUAL EDITABLE CON INGENIERÍA TRANSPARENTE */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
         <div className="bg-[#14532d] text-white px-4 py-2.5 font-bold text-xs uppercase tracking-wider flex flex-wrap justify-between items-center gap-2">
-          <span>{labels.heading}</span>
+          <span className="flex flex-wrap items-center gap-2">{labels.heading}{isConsumptionEstimated(project) && <span className="text-amber-200"><EstimatedConsumptionHint /></span>}</span>
           <button
             onClick={openAIInvoiceModal}
             className="bg-white/10 hover:bg-white/20 border border-white/30 text-amber-300 hover:text-amber-200 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
@@ -381,23 +395,23 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                             </>
                           )}
                         </button>
-                        <span className="tabular-nums">{row.productionKWh.toFixed(1)}</span>
+                        <span className="tabular-nums">{shown(row.productionKWh.toFixed(1))}</span>
                       </div>
                     ) : (
-                      <span className="tabular-nums">{row.productionKWh.toFixed(1)}</span>
+                      <span className="tabular-nums">{shown(row.productionKWh.toFixed(1))}</span>
                     )}
                   </td>
                   {showSelfConsumption && (
-                    <td className="py-2 px-3 text-right font-semibold text-blue-800">{row.solarSelfConsumedKWh.toFixed(1)}</td>
+                    <td className="py-2 px-3 text-right font-semibold text-blue-800">{shown(row.solarSelfConsumedKWh.toFixed(1))}</td>
                   )}
                   <td className="py-2 px-3 text-right font-bold text-emerald-800">
-                    <span>{(row.effectiveSavedKWh ?? (row.solarSelfConsumedKWh + (row.netExportCreditKWh || 0))).toFixed(1)}</span>
-                    {labels.showMoney && (
+                    <span>{shown((row.effectiveSavedKWh ?? (row.solarSelfConsumedKWh + (row.netExportCreditKWh || 0))).toFixed(1))}</span>
+                    {labels.showMoney && !pending && (
                       <span className="block text-[10px] text-emerald-600 font-semibold">${row.savingsUSD.toFixed(1)}</span>
                     )}
                   </td>
                   <td className="py-2 px-3 text-right text-emerald-700 font-bold">
-                    {row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100).toFixed(1) : '0.0'}%
+                    {shown(`${row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100).toFixed(1) : '0.0'}%`)}
                   </td>
                 </tr>
               ))}
@@ -406,17 +420,17 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
               <tr>
                 <td className="py-3 px-3 uppercase font-extrabold">TOTAL</td>
                 <td className="py-3 px-3 text-center font-bold">{totalConsumptionKWh.toLocaleString()} kWh</td>
-                <td className="py-3 px-3 text-right font-bold text-emerald-800">{totalProductionKWh.toFixed(1)} kWh</td>
+                <td className="py-3 px-3 text-right font-bold text-emerald-800">{shown(`${totalProductionKWh.toFixed(1)} kWh`)}</td>
                 {showSelfConsumption && (
-                  <td className="py-3 px-3 text-right font-bold text-blue-800">{totalSelfConsumedKWh.toFixed(1)} kWh</td>
+                  <td className="py-3 px-3 text-right font-bold text-blue-800">{shown(`${totalSelfConsumedKWh.toFixed(1)} kWh`)}</td>
                 )}
                 <td className="py-3 px-3 text-right font-extrabold text-emerald-900">
-                  <span>{totalEffectiveSavedKWh.toFixed(1)} kWh</span>
-                  {labels.showMoney && (
+                  <span>{shown(`${totalEffectiveSavedKWh.toFixed(1)} kWh`)}</span>
+                  {labels.showMoney && !pending && (
                     <span className="block text-[10.5px] text-emerald-700">${summary.year1SavingsUSD.toFixed(1)} USD</span>
                   )}
                 </td>
-                <td className="py-3 px-3 text-right font-extrabold text-emerald-800">{avgCoveragePct.toFixed(1)}%</td>
+                <td className="py-3 px-3 text-right font-extrabold text-emerald-800">{shown(`${avgCoveragePct.toFixed(1)}%`)}</td>
               </tr>
             </tfoot>
           </table>

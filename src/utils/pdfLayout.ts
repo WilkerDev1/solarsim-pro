@@ -68,3 +68,39 @@ export function buildPdfLayout(
 
   return { pageNumbers, activePagesCount: page, footerTotalPages: nextPage - 1, tocItems };
 }
+
+/** Páginas del documento que no imprimen cifras del motor: el índice y los textos de la empresa (ADR 0009). */
+export const SECTIONS_WITHOUT_FIGURES: readonly PDFSectionId[] = ['tableOfContents', 'aboutUs', 'benefits', 'techIntro'];
+
+/**
+ * Páginas que se dibujan del documento de una propuesta (vista del PDF y visor de la cotización). Completa: las visibles, en
+ * su orden, como siempre. Incompleta: solo las visibles sin cifras, y `pending` para que la vista ponga en su lugar los
+ * motivos («Resultados pendientes»): las demás imprimirían rellenos del motor (ADR 0009).
+ */
+export function proposalDocumentSections(
+  order: readonly PDFSectionId[],
+  visibility: Partial<Record<PDFSectionId, boolean>>,
+  incomplete: boolean,
+): { sections: PDFSectionId[]; pending: boolean } {
+  const visible = order.filter((id) => visibility[id]);
+  return incomplete
+    ? { sections: visible.filter((id) => SECTIONS_WITHOUT_FIGURES.includes(id)), pending: true }
+    : { sections: visible, pending: false };
+}
+
+/**
+ * Páginas que se dibujan y su numeración (índice, «Página N de M»): la de las páginas que se dibujan. Incompleta, el índice y
+ * los totales cuentan solo las páginas sin cifras (QA de F2b: decía «11 páginas» y apuntaba a páginas ocultas). Completa, es
+ * `buildPdfLayout` de siempre.
+ */
+export function proposalDocumentLayout(
+  order: readonly PDFSectionId[],
+  visibility: Record<PDFSectionId, boolean>,
+  incomplete: boolean,
+  extraTocItems: readonly ExtraTOCItem[] = [],
+  attachedPdfs: readonly AttachedPDFDocument[] = [],
+): PdfLayout & { sections: PDFSectionId[]; pending: boolean } {
+  const pages = proposalDocumentSections(order, visibility, incomplete);
+  const shown = Object.fromEntries(DEFAULT_PDF_SECTION_ORDER.map((id) => [id, pages.sections.includes(id)])) as Record<PDFSectionId, boolean>;
+  return { ...pages, ...buildPdfLayout(order, pages.pending ? shown : visibility, extraTocItems, attachedPdfs) };
+}

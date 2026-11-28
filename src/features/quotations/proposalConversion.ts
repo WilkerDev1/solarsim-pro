@@ -3,6 +3,7 @@ import type { EnergyCalculationMode } from '../../../shared/applicationFeatures'
 import { useSimulationStore } from '../../store/useSimulationStore';
 import type { SimulationStore } from '../../store/types';
 import { localIsoDate } from '../../utils/localDate';
+import { proposalActionBlock } from '../../domain/proposalCompleteness';
 import { newDocumentCompany } from './issuer';
 import { createAndOpenQuotation } from './newQuotation';
 import { convertProposalToQuotation, type ConversionBlocks, type OmittedDocument, type ProposalSourceContext } from './proposalSource';
@@ -40,6 +41,9 @@ export function createQuotationFromProposal(projectId: string, blocks: Conversio
   const project = state.projects.find((p) => p.id === projectId);
   if (!project) return { ok: false, error: 'La propuesta ya no está disponible.' };
   if (project.isDeleted) return { ok: false, error: 'La propuesta está en la papelera: restáurala para convertirla.' };
+  // F2b (ADR 0009): una propuesta incompleta no se convierte (los importes saldrían de cifras que el motor rellenó).
+  const block = proposalActionBlock(project);
+  if (block.blocked) return { ok: false, error: `La propuesta está incompleta. ${block.reason}` };
   const conversion = convertProposalToQuotation(project, blocks, proposalConversionContext(state, project.companyProfileId, localIsoDate(), calculationMode), () => `line-${crypto.randomUUID()}`);
   if (!conversion.ok) return { ok: false, error: conversion.error };
   const created = createAndOpenQuotation(conversion.value);
