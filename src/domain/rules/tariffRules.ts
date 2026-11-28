@@ -1,0 +1,153 @@
+/**
+ * Reglas de tarifa del dock, ahora en el dominio (F2b; ADR 0004, «Reglas del dock en el dominio»). Puras: el dock las llama
+ * para armar su parche y la transacción (`editIntents.ts`) las aplica cuando un lote por ruta trae solo la intención
+ * («cambia la distribuidora a X»), así el asistente, los agentes y el dock dejan el mismo proyecto.
+ *
+ * - Distribuidora: mapea el código de tarifa, pone el precio de referencia con su fila y el perfil de carga recomendado
+ *   (salvo perfil manual).
+ * - Tarifa: precio de referencia con su fila y perfil recomendado (salvo perfil manual).
+ * - «Aplicar tarifa oficial»: precio de referencia de la distribuidora y la tarifa actuales, con su fila.
+ * - Perfil de carga: un perfil fija el consumo diurno (35/75/90 %); «Manual» solo marca el perfil; el deslizador deja el
+ *   perfil en manual.
+ */
+import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../../data/rdTariffs';
+import { proposalBillingTariff } from '../../../shared/tariffBilling';
+import { resolveNetMeteringRegime } from '../../../shared/netMetering';
+import { resolveDopRate } from '../../../shared/projectDefaults';
+import { getRecommendedLoadProfile } from '../../engine/solarEngine';
+import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../types';
+import { mapTariffCodeOnDistributorChange, type UtilityDistributor } from '../../types/tariffs';
+import { resolveGridConnection } from '../../../shared/gridConnection';
+
+type TariffMatrix = Parameters<typeof getReferenceEnergyRateUSD>[0];
+
+/** Consumo mensual (kWh) con que se calcula la tarifa de referencia si la propuesta no tiene meses. */
+export const DEFAULT_MONTHLY_CONSUMPTION_KWH = 900;
+
+export function averageMonthlyConsumption(project: Pick<ProjectSimulation, 'monthlyConsumption'>): number {
+  const months = project.monthlyConsumption;
+  return months && months.length > 0 ? months.reduce((a, b) => a + b, 0) / months.length : DEFAULT_MONTHLY_CONSUMPTION_KWH;
+}
+
+export const currentDistributor = (rates: Pick<UtilityRates, 'distributor'>): UtilityDistributor =>
+  (rates.distributor as UtilityDistributor) || 'EDESUR';
+
+export const currentTariffCode = (rates: Pick<UtilityRates, 'distributor' | 'tariffCode'>): string =>
+  rates.tariffCode || (currentDistributor(rates) === 'CEPM' ? 'RBT-1' : 'BTS2');
+
+export interface ReferenceInput {
+  matrix: TariffMatrix | undefined | null;
+  avgMonthlyConsumption: number;
+  dopExchangeRate?: number;
+}
+
+/** Precio oficial de referencia en USD para una distribuidora y tarifa. */
+export function referenceRate(input: ReferenceInput, distributor: UtilityDistributor | string, tariffCode: string): number {
+  return getReferenceEnergyRateUSD(
+    input.matrix || DEFAULT_RD_TARIFF_MATRIX,
+    distributor,
+    tariffCode,
+    input.avgMonthlyConsumption,
+    resolveDopRate(input.dopExchangeRate)
+  );
+}
+
+/**
+ * Precio de referencia con su procedencia y la fila de la tarifa (bloques y cargo fijo) de la matriz activa: con ellos la
+ * propuesta se factura por bloques en el régimen SIE-007-2026 (`shared/tariffBilling.ts`). Sin fila exacta, `billingTariff`
+ * queda vacío y se valora con el escalar.
+ */
+export function referenceRatesPatch(input: ReferenceInput, distributor: UtilityDistributor | string, tariffCode: string): Pick<UtilityRates, 'energyCostPerKWh' | 'energyRateSource' | 'billingTariff'> {
+  return {
+    energyCostPerKWh: referenceRate(input, distributor, tariffCode),
+    energyRateSource: 'reference',
+    billingTariff: referenceBillingTariff(input.matrix || DEFAULT_RD_TARIFF_MATRIX, distributor, tariffCode),
+  };
+}
+
+/**
+ * ¿Está aplicada la tarifa oficial? En SIE-007-2026 con red manda la procedencia (`reference` con su fila válida), que es
+ * lo que decide la factura por bloques: un precio tecleado que coincide por casualidad no cuenta, y la referencia sigue
+ * aplicada aunque cambien el consumo medio o la tasa. En el resto (régimen anterior, aislado), la igualdad numérica.
+ */
+export function isReferenceApplied(rates: Partial<UtilityRates>, reference: number): boolean {
+  if (resolveNetMeteringRegime(rates.netMeteringRegime) === 'sie007_2026' && resolveGridConnection(rates) !== 'off_grid') {
+    return rates.energyRateSource === 'reference' && proposalBillingTariff(rates) !== undefined;
+  }
+  return isMatchingReference(rates.energyCostPerKWh, reference);
+}
+
+export const isMatchingReference = (energyCostPerKWh: number | undefined, reference: number): boolean =>
+  Math.abs((energyCostPerKWh || 0) - reference) < 0.001;
+
+export interface TariffChangePlan {
+  rates: Partial<UtilityRates>;
+  /** null cuando el perfil es manual o no hay forma de escribir specs: el perfil no se toca. */
+  specs: Partial<SystemSpecs> | null;
+}
+
+/** Perfil de carga recomendado para una tarifa y un consumo medio. */
+export function recommendedProfileSpecs(tariffCode: string, avgMonthlyConsumption: number): Partial<SystemSpecs> {
+  const rec = getRecommendedLoadProfile(tariffCode, avgMonthlyConsumption);
+  return { daytimeLoadRatio: rec.daytimeRatio, daytimeSelfConsumptionRatio: rec.daytimeRatio, loadProfilePreset: rec.preset };
+}
+
+export interface ChangeContext extends ReferenceInput {
+  rates: Pick<UtilityRates, 'distributor' | 'tariffCode'>;
+  loadProfilePreset?: SystemSpecs['loadProfilePreset'];
+  canWriteSpecs: boolean;
+}
+
+const shouldRecommendProfile = (ctx: ChangeContext) => ctx.canWriteSpecs && ctx.loadProfilePreset !== 'custom';
+
+/** Al cambiar la distribuidora: mapea el código de tarifa, recalcula la referencia y el perfil recomendado. */
+export function planDistributorChange(ctx: ChangeContext, newDistributor: UtilityDistributor): TariffChangePlan {
+  const mappedCode = mapTariffCodeOnDistributorChange(currentDistributor(ctx.rates), newDistributor, currentTariffCode(ctx.rates));
+  return {
+    rates: { distributor: newDistributor, tariffCode: mappedCode, ...referenceRatesPatch(ctx, newDistributor, mappedCode) },
+    specs: shouldRecommendProfile(ctx) ? recommendedProfileSpecs(mappedCode, ctx.avgMonthlyConsumption) : null,
+  };
+}
+
+/** Al cambiar la tarifa: recalcula la referencia y el perfil recomendado (salvo perfil manual). */
+export function planTariffChange(ctx: ChangeContext, newCode: string): TariffChangePlan {
+  return {
+    rates: { tariffCode: newCode, ...referenceRatesPatch(ctx, currentDistributor(ctx.rates), newCode) },
+    specs: shouldRecommendProfile(ctx) ? recommendedProfileSpecs(newCode, ctx.avgMonthlyConsumption) : null,
+  };
+}
+
+/** «Aplicar tarifa oficial»: precio de referencia de la distribuidora y tarifa actuales, con su fila. */
+export function planApplyReference(ctx: ChangeContext): Partial<UtilityRates> {
+  return referenceRatesPatch(ctx, currentDistributor(ctx.rates), currentTariffCode(ctx.rates));
+}
+
+/** Perfiles de carga del dock: «Manual» (`custom`) conserva el consumo diurno. */
+export type LoadProfileChoice = 'residential' | 'commercial' | 'industrial' | 'custom';
+/** Consumo diurno (%) de cada perfil. */
+export const LOAD_PROFILE_DAYTIME_PCT = { residential: 35, commercial: 75, industrial: 90 } as const;
+
+/** Cambios de specs al elegir un perfil; «Manual» solo marca el preset y conserva el slider. */
+export function loadProfileChange(preset: LoadProfileChoice): Partial<SystemSpecs> {
+  const ratio = preset !== 'custom' && preset in LOAD_PROFILE_DAYTIME_PCT ? LOAD_PROFILE_DAYTIME_PCT[preset] : null;
+  return ratio === null
+    ? { loadProfilePreset: 'custom' }
+    : { daytimeLoadRatio: ratio, daytimeSelfConsumptionRatio: ratio, loadProfilePreset: preset };
+}
+
+/** El slider siempre deja el perfil en manual. */
+export function daytimeSliderChange(value: number): Partial<SystemSpecs> {
+  return { daytimeLoadRatio: value, daytimeSelfConsumptionRatio: value, loadProfilePreset: 'custom' };
+}
+
+/** Contexto de los planes de tarifa a partir de la propuesta (lo que arma `RatesFields`). */
+export function tariffChangeContext(project: ProjectSimulation, matrix: TariffMatrix | undefined | null, dopExchangeRate: number): ChangeContext {
+  return {
+    matrix,
+    avgMonthlyConsumption: averageMonthlyConsumption(project),
+    dopExchangeRate,
+    rates: project.rates,
+    loadProfilePreset: project.specs?.loadProfilePreset,
+    canWriteSpecs: true,
+  };
+}

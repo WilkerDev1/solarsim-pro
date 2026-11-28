@@ -15,6 +15,7 @@ import { normalizeSupplyAlternativePatch } from '../../shared/offGridSupply';
 import { tariffMatrixKey } from '../../shared/tariffRules';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTariffs';
 import type { GlobalTariffMatrix, UtilityDistributor } from '../types/tariffs';
+import type { GenericPriceLookup } from './rules/equipmentRules';
 
 /**
  * Edición de proyecto (ADR 0004): la única regla para aplicar un cambio de specs, tarifas, cliente, consumo o
@@ -53,6 +54,11 @@ export interface ProjectEditContext {
   equipmentCatalog: readonly SolarEquipmentItem[];
   /** Matriz tarifaria activa: de ella sale la fila y el precio de referencia al cambiar de tarifa. Sin ella, la de fábrica. */
   tariffMatrix?: GlobalTariffMatrix | null;
+  /**
+   * Precio genérico efectivo de un equipo (ADR 0006), para elegir un modelo del catálogo por ruta como lo hace el dock. Sin
+   * sesión (modo local) no se pasa y no hay genérico.
+   */
+  genericPriceFor?: GenericPriceLookup;
 }
 
 const distributorKey = (value: unknown): string => (typeof value === 'string' ? value.trim().toUpperCase() : '');

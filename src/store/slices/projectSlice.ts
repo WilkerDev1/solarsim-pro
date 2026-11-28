@@ -13,6 +13,7 @@ import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { SimulationSlice, ProjectSlice, SimulationStore, type CommitProjectEditsResult } from '../types';
 import { applyProjectEdits, editBatchFingerprint } from '../../domain/projectEditTransaction';
+import { effectiveGenericPrice, priceFeatureActive } from './equipmentPriceSlice';
 import { ProjectSimulation, SystemSpecs } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
@@ -247,6 +248,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     // ADR 0004: las reglas viven en el dominio (applyProjectEdits → applyProjectEditPlan); aquí solo se persiste, sincroniza y deshace.
     const result = applyProjectEdits(before, edits, {
       equipmentCatalog: state.equipmentCatalog, tariffMatrix: state.tariffMatrix,
+      // Elegir un modelo por ruta usa el precio genérico efectivo, como el selector del dock (sin sesión, apagado).
+      genericPriceFor: (equipmentId) => (priceFeatureActive(state) ? effectiveGenericPrice(state, equipmentId) : null),
       calculationMode: energyCalculationMode(effectiveFeatureSettings(state)),
     }, { validation: options.validation, metrics: options.metrics });
     if (!result.ok) return result;
