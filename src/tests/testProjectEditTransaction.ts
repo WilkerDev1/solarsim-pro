@@ -10,7 +10,7 @@ import { applyProjectEdits, editsFromPatch, type ProjectFieldEdit } from '../dom
 import { RD_PROVINCES } from '../data/rdProvinces';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
-import { executeForAssistant } from '../features/agentTools/registry';
+import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { useSimulationStore as store } from '../store/useSimulationStore';
 import { EMPTY_UNDO_HISTORY } from '../store/undo/projectUndoJournal';
@@ -23,6 +23,8 @@ import { buildCatalogSelectionUpdate } from '../components/simulator/params/logi
 import { probeStore, settleUndoDebounce } from './support/storeProbe';
 import type { ProjectSimulation } from '../types';
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipment';
+/** Resultado de la herramienta tal como lo leen estas suites (la unión del registro se estrecha por `status`; aquí ya se comprueba `activityId`). */
+const applyTool = (call: Parameters<typeof executeAgentTool>[0], ctx: Parameters<typeof executeAgentTool>[1]) => executeAgentTool(call, ctx) as Promise<{ status: string; activityId?: string; data?: any }>;
 
 // ── Datos ────────────────────────────────────────────────────────────────────────────────────
 const offer = (id: string, supplierName: string, priceUSD: number): EquipmentSupplierPrice => ({ id, supplierName, priceUSD, updatedAt: '2026-01-01' });
@@ -232,7 +234,7 @@ const AFTER = { systemCapacityKWp: 5.9, annualProductionKWh: 9783.6, energyCover
   reset(charProject, { ...DEFAULT_AGENT_POLICY, internal: { read: 'allow', draft: 'allow', guarded: 'allow' } });
   const panel = defaultCatalog.find((e) => e.type === 'panel')!;
   const inverter = defaultCatalog.find((e) => e.type === 'inverter')!;
-  const legacy = await executeForAssistant({ name: 'propose_project_update', args: { id: charProject.id, title: 'Equipos y tarifa', edits: [
+  const legacy = await applyTool({ name: 'propose_project_update', args: { id: charProject.id, title: 'Equipos y tarifa', edits: [
     { section: 'specs', field: 'panels', valueJson: JSON.stringify([{ id: panel.id, count: 10, unitPriceUSD: 100 }]) },
     { section: 'specs', field: 'inverters', valueJson: JSON.stringify([{ id: inverter.id, count: 1, unitPriceUSD: 1500 }]) },
     { section: 'client', field: 'distributor', valueJson: '"EDENORTE"' },

@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { parseDatasheetWithGemini, DATASHEET_RESPONSE_SCHEMA } from '../services/geminiDatasheetService';
 import { GeminiPriceCatalogService, PRICE_CATALOG_RESPONSE_SCHEMA } from '../services/geminiPriceCatalogService';
 import { GeminiTariffService } from '../services/geminiTariffService';
-import { MAX_INLINE_FILE_BASE64, MAX_INLINE_FILE_BYTES, base64LengthFor, type GeminiTransport } from '../../shared/geminiTransport';
+import { type GeminiTransport } from './support/restFixture';
+import { MAX_INLINE_FILE_BASE64, MAX_INLINE_FILE_BYTES, base64LengthFor } from '../services/llm/structuredPolicy';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { clientFromTransport } from './support/clientFromTransport';
 

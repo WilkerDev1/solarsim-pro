@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { useSimulationStore as store } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
-import { buildProjectFromDraft } from '../store/slices/aiSlice';
+import { buildProjectFromDraft } from '../domain/proposalDraft';
 import { prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { proposalDatasheets } from '../utils/proposalDatasheets';
 import { detachedCatalogIdentity, resolveGroupCatalogItem } from '../utils/equipmentGroups';

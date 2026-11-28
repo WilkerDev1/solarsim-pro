@@ -3,7 +3,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ChatMessage } from '../features/assistant/components/ChatMessage';
 import { ChatComposer } from '../features/assistant/components/ChatComposer';
-import { reusableUserText, isMissingKeyError, replyScrollTarget } from '../features/assistant/chatUi';
+import { isMissingKeyError, replyScrollTarget } from '../features/assistant/chatUi';
 
 
 
@@ -25,15 +25,14 @@ import { reusableUserText, isMissingKeyError, replyScrollTarget } from '../featu
   assert.match(key, /Abrir ajustes de IA/);
   assert.equal(isMissingKeyError('Configura una API Key de Google Gemini en Ajustes.'), true);
   assert.equal(isMissingKeyError('Gemini no devolvió datos.'), false);
-  assert.equal(reusableUserText('Cotiza esto\n\n📎 factura.pdf, foto.jpg'), 'Cotiza esto', 'attachment line is not reused as text');
 }
 
-// C5/C7. The field keeps focus while busy (readOnly + aria-busy) and the resting composer is quiet.
+// C5/C7. The field stays editable (and focused) while busy (aria-busy; F6: no read-only mode, writing queues) and the resting composer is quiet.
 {
   const base = { id: 'c', label: 'Mensaje', onChange() {}, onSubmit() {}, onCancel() {}, onPickFiles() {}, placeholder: 'Describe la propuesta…', accept: '.pdf', attachments: [] };
   const busy = renderToStaticMarkup(React.createElement(ChatComposer, { ...base, value: 'hola', busy: true, canSend: false }));
   const area = busy.match(/<textarea[^>]*>/)?.[0] || '';
-  assert.match(area, /readOnly=""|readonly=""/);
+  assert.doesNotMatch(area, /readOnly=""|readonly=""/, 'writing while busy queues the message: never read-only');
   assert.match(area, /aria-busy="true"/);
   assert.doesNotMatch(area, /\sdisabled=""/);
   const idle = renderToStaticMarkup(React.createElement(ChatComposer, { ...base, value: '', busy: false, canSend: false, disabledReason: 'Configura Gemini para enviar.' }));

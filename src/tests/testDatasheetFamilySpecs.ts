@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseDatasheetWithGemini, DATASHEET_RESPONSE_SCHEMA } from "../services/geminiDatasheetService";
 import { normalizeDatasheetResponse, planDatasheetImport, datasheetTitle, estimateMaxPvPowerKW, refreshMaxPvEstimate } from "../utils/datasheetImport";
-import type { GeminiTransport } from "../../shared/geminiTransport";
+import { type GeminiTransport } from './support/restFixture';
 import { clientFromTransport } from "./support/clientFromTransport";
 
 // Fichas de familia con transporte sintético: cada variante recibe sus valores; los comunes se reparten.

@@ -31,40 +31,6 @@
   outline: 2px solid #70dbb4;
   outline-offset: 3px;
 }
-.proposal-resize-handle {
-  position: absolute;
-  right: -5px;
-  top: 0;
-  bottom: 0;
-  width: 10px;
-  cursor: col-resize;
-  touch-action: none;
-  z-index: 2;
-  border: 0;
-  background: transparent;
-}
-.proposal-resize-handle::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 4px;
-  width: 2px;
-  background: transparent;
-}
-.proposal-resize-handle:hover::after,
-.proposal-resize-handle:focus-visible::after {
-  background: #70dbb4;
-}
-.proposal-conversation {
-  position: relative;
-}
-.proposal-workspace .proposal-body {
-  grid-template-columns: var(--pw-chat-width, minmax(330px, 30%)) minmax(0, 1fr);
-}
-.proposal-workspace .proposal-chat-scroll {
-  padding: 24px;
-}
 .proposal-note-details {
   font-size: 12px;
   color: #bac7d8;
@@ -72,10 +38,6 @@
 }
 .proposal-note-details summary {
   cursor: pointer;
-}
-.proposal-context-choice {
-  font-size: 12px !important;
-  padding: 12px 20px !important;
 }
 .assistant-widget {
   position: fixed;
@@ -162,86 +124,6 @@
   overflow: auto;
   padding: 20px 16px;
 }
-.assistant-widget-error {
-  color: #ffb5bd;
-  font-size: 13px;
-  line-height: 1.6;
-  margin-bottom: 10px;
-}
-.assistant-result {
-  border: 1px solid var(--assistant-border);
-  border-radius: 10px;
-  padding: 12px;
-  margin-top: 10px;
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-  line-height: 1.5;
-}
-.assistant-result-content {
-  min-width: 0;
-  flex: 1;
-}
-.assistant-result h3 {
-  font-size: 13px;
-  font-weight: 600;
-  margin: 0 0 4px;
-}
-.assistant-result p {
-  color: #bac7d8;
-  margin: 0 0 8px;
-}
-.assistant-result button {
-  border: 1px solid #52647b;
-  background: #26374d;
-  color: #eef3fb;
-  padding: 5px 9px;
-  border-radius: 7px;
-  font-size: 12px;
-  margin: 4px 4px 0 0;
-}
-.assistant-result button:disabled {
-  opacity: 0.5;
-}
-.assistant-changes {
-  display: grid;
-  gap: 8px;
-  margin-top: 8px;
-}
-.assistant-changes dt {
-  font-size: 11px;
-  color: #bac7d8;
-}
-.assistant-changes dd {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.assistant-subject {
-  margin: 6px 0 0;
-  font-size: 12px;
-}
-.assistant-subject[data-outside] {
-  padding: 6px 8px;
-  border: 1px solid #d9a441;
-  border-radius: 8px;
-  background: rgba(217, 164, 65, 0.14);
-  color: #f6d58e;
-}
-.assistant-preview {
-  max-width: 100%;
-  max-height: 220px;
-  object-fit: contain;
-  border: 1px solid #52647b;
-  border-radius: 8px;
-}
-.assistant-pdf-preview {
-  width: 100%;
-  height: 260px;
-  border: 1px solid #52647b;
-  border-radius: 8px;
-  margin-top: 8px;
-}
 .assistant-widget ::selection {
   background: #215b4b;
   color: #fff;
@@ -250,18 +132,7 @@
   scrollbar-color: #52647b #18212d;
   scrollbar-width: thin;
 }
-@media (max-width: 1100px) {
-  .proposal-workspace .proposal-body {
-    grid-template-columns: var(--pw-chat-width, 300px) minmax(0, 1fr);
-  }
-}
 @media (max-width: 760px) {
-  .proposal-resize-handle {
-    display: none;
-  }
-  .proposal-workspace .proposal-body {
-    grid-template-columns: 1fr;
-  }
   .assistant-widget {
     right: 12px;
     bottom: 12px;
@@ -271,52 +142,19 @@
   }
 }
 
-.assistant-asset-download {
-  display: inline-block;
-  margin-top: 8px;
-  color: #8ee6c3;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  font-size: 12px;
-}
-.assistant-asset-download:focus-visible {
-  outline: 2px solid #70dbb4;
-  outline-offset: 3px;
-}
-
 .assistant-message-text p { margin: 0 0 0.5rem; }
 .assistant-message-text p:last-child { margin-bottom: 0; }
 .assistant-message-text ul, .assistant-message-text ol { margin: 0 0 0.5rem 1.1rem; padding: 0; }
 .assistant-message-text ul { list-style: disc; }
 .assistant-message-text ol { list-style: decimal; }
 .assistant-message-text code { font-family: ui-monospace, monospace; font-size: 0.85em; padding: 0 0.25rem; border-radius: 0.25rem; background: rgb(148 163 184 / 0.18); }
-.assistant-audit-filter { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; margin: 0.25rem 0 0.5rem; color: #bac7d8; }
-.assistant-audit-filter select { background: #243247; color: #f1f5fb; border: 1px solid var(--assistant-border); border-radius: 0.375rem; padding: 0.125rem 0.375rem; font-size: 0.75rem; }
-.assistant-audit-list { list-style: none; margin: 0; padding: 0; max-height: 18rem; overflow-y: auto; display: grid; gap: 0.375rem; }
-.assistant-audit-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem; align-items: start; font-size: 0.75rem; line-height: 1.35; }
-.assistant-audit-badge { font-weight: 600; border-radius: 0.375rem; padding: 0 0.375rem; background: #2e3e54; color: #dbe5f1; }
-.assistant-audit-list li[data-severity='error'] .assistant-audit-badge { background: #5b2430; color: #ffc9d0; }
-.assistant-audit-list li[data-severity='warning'] .assistant-audit-badge { background: #5a4419; color: #ffe2a3; }
-/* Listado compacto de resultados largos (búsquedas): filas de una línea con su acción; un equipo se despliega en su tarjeta. */
-.assistant-result-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.assistant-result-list > li + li { border-top: 1px solid var(--assistant-border); }
-.assistant-result-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0; }
-.assistant-result-row-text { flex: 1; min-width: 0; display: grid; }
-.assistant-result-row-text strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.assistant-result-row-text small { color: #bac7d8; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.assistant-result .assistant-result-row button { margin: 0; flex: none; }
-.assistant-result-list .assistant-result { margin: 0 0 0.5rem; }
-.assistant-result .assistant-result-more { margin-top: 0.375rem; }
-.assistant-result.assistant-result-fold { display: block; padding: 8px 12px; }
-.assistant-result-fold > summary { cursor: pointer; color: #bac7d8; font-size: 12px; }
-.assistant-result-fold[open] > summary { margin-bottom: 0.25rem; }
 label.assistant-icon { cursor: pointer; }
 
 /* ── Conversación tipo chat (ambos asistentes; azul marino en ambos temas) ─────────────────────────
    Tokens locales del chat: fondo #121b28, panel #192536, texto #f1f5fa, secundario #bccbdd (≈9:1 sobre
    el fondo), borde #40536b, verde #75e4bc. Bloqueo #ffc9d0 sobre #3b202d (≈10:1) y confirmar #ffe2a3
    sobre #3a2d12 (≈11:1). Los selectores llevan el ámbito para ganar a los estilos base de botones. */
-:is(.proposal-conversation, .assistant-widget) {
+.assistant-widget {
   --chat-bg: #121b28;
   --chat-panel: #192536;
   --chat-raised: #1d2b3f;
@@ -337,25 +175,8 @@ label.assistant-icon { cursor: pointer; }
   --chat-info-border: #46607f;
   --chat-info-text: #cfe0f3;
 }
-.proposal-workspace .proposal-chat-scroll,
 .assistant-widget-log {
   padding: 20px 20px 28px;
-}
-.proposal-chat-header {
-  padding: 14px 20px 12px;
-  border-bottom: 1px solid var(--chat-border);
-  display: grid;
-  gap: 10px;
-}
-.proposal-body .proposal-chat-header h3 { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
-.proposal-body .proposal-chat-header small { display: block; margin-top: 2px; font-size: 12px; color: var(--chat-muted); }
-.proposal-body .proposal-chat-header .proposal-context-choice {
-  border: 1px solid var(--chat-border);
-  border-bottom: 1px solid var(--chat-border);
-  background: var(--chat-panel);
-  border-radius: 10px;
-  padding: 8px 10px !important;
-  gap: 8px;
 }
 
 /* Turnos */
@@ -377,7 +198,6 @@ label.assistant-icon { cursor: pointer; }
   padding: 0;
   color: var(--chat-text);
 }
-.assistant-message-main { min-width: 0; }
 .assistant-avatar {
   width: 26px;
   height: 26px;
@@ -431,7 +251,6 @@ label.assistant-icon { cursor: pointer; }
   color: var(--chat-muted);
 }
 .assistant-sent-files span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
-.assistant-message .assistant-result { margin-top: 12px; background: var(--chat-panel); }
 
 /* Pensando */
 .chat-thinking { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; margin: 0 0 16px; font-size: 14px; color: var(--chat-text); }
@@ -453,10 +272,10 @@ label.assistant-icon { cursor: pointer; }
 /* Estado vacío */
 .chat-empty { padding: 12px 0 8px; color: var(--chat-text); }
 .chat-empty-mark { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #163b32; color: var(--chat-green); margin-bottom: 14px; }
-:is(.proposal-body, .assistant-widget) .chat-empty h3 { font-size: 18px; font-weight: 650; letter-spacing: -0.015em; margin: 0 0 6px; }
-:is(.proposal-body, .assistant-widget) .chat-empty p { font-size: 13px; color: var(--chat-muted); line-height: 1.6; margin: 0 0 16px; }
+.assistant-widget .chat-empty h3 { font-size: 18px; font-weight: 650; letter-spacing: -0.015em; margin: 0 0 6px; }
+.assistant-widget .chat-empty p { font-size: 13px; color: var(--chat-muted); line-height: 1.6; margin: 0 0 16px; }
 .chat-suggestions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-:is(.proposal-conversation, .assistant-widget) .chat-suggestions button {
+.assistant-widget .chat-suggestions button {
   width: 100%;
   justify-content: flex-start;
   text-align: left;
@@ -471,69 +290,10 @@ label.assistant-icon { cursor: pointer; }
   min-height: 0;
   cursor: pointer;
 }
-:is(.proposal-conversation, .assistant-widget) .chat-suggestions button:hover { background: var(--chat-raised); border-color: var(--chat-green); }
-
-/* Avisos agrupados del borrador */
-.proposal-digest { margin: 4px 0 20px; border: 1px solid var(--chat-border); background: #162131; border-radius: 12px; overflow: hidden; color: var(--chat-text); }
-.proposal-digest > header { padding: 14px 14px 12px; }
-.proposal-body .proposal-digest h3 { font-size: 15px; font-weight: 650; }
-.proposal-body .proposal-digest > header p { margin-top: 4px; font-size: 13px; color: var(--chat-muted); line-height: 1.5; }
-.proposal-digest-group { border-top: 1px solid var(--chat-border); }
-.proposal-digest-group > summary {
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 650;
-}
-.proposal-digest-group > summary::-webkit-details-marker { display: none; }
-.proposal-digest-group > summary:focus-visible { outline: 2px solid var(--chat-green); outline-offset: -2px; }
-.proposal-digest-group > summary:hover { background: rgb(255 255 255 / 0.04); }
-.proposal-digest-chevron { margin-left: auto; color: var(--chat-muted); transition: transform 0.15s ease; }
-.proposal-digest-group[open] .proposal-digest-chevron { transform: rotate(180deg); }
-.proposal-digest-group[data-tier='blocking'] > summary svg:first-child { color: var(--chat-block-text); }
-.proposal-digest-group[data-tier='confirm'] > summary svg:first-child { color: var(--chat-warn-text); }
-.proposal-digest-group[data-tier='info'] > summary svg:first-child { color: var(--chat-info-text); }
-.proposal-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.proposal-digest-group[data-tier='blocking'] .proposal-count { background: var(--chat-block-bg); color: var(--chat-block-text); border: 1px solid var(--chat-block-border); }
-.proposal-digest-group[data-tier='confirm'] .proposal-count { background: var(--chat-warn-bg); color: var(--chat-warn-text); border: 1px solid var(--chat-warn-border); }
-.proposal-digest-group[data-tier='info'] .proposal-count { background: var(--chat-info-bg); color: var(--chat-info-text); border: 1px solid var(--chat-info-border); }
-.proposal-digest-group ul { list-style: none; margin: 0; padding: 0 12px 12px; display: grid; gap: 8px; }
-.proposal-digest-group li { padding: 9px 12px; border-radius: 8px; border-left: 3px solid; font-size: 13px; line-height: 1.5; }
-.proposal-digest-group[data-tier='blocking'] li { background: var(--chat-block-bg); border-color: #ff8e9c; color: #ffe3e7; }
-.proposal-digest-group[data-tier='confirm'] li { background: var(--chat-warn-bg); border-color: #f0b85a; color: #fff0d2; }
-.proposal-digest-group[data-tier='info'] li { background: var(--chat-info-bg); border-color: #7fa6d1; color: #e2ecf8; }
-.proposal-body .proposal-digest-group li p { line-height: 1.5; }
-.proposal-conversation .proposal-digest .proposal-digest-link {
-  margin-top: 8px;
-  min-height: 28px;
-  padding: 3px 10px;
-  gap: 6px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  background: rgb(0 0 0 / 0.22);
-  border: 1px solid rgb(255 255 255 / 0.3);
-  color: #fff;
-}
-.proposal-conversation .proposal-digest .proposal-digest-link:hover { background: rgb(0 0 0 / 0.4); border-color: #fff; }
+.assistant-widget .chat-suggestions button:hover { background: var(--chat-raised); border-color: var(--chat-green); }
 
 /* Ir al final */
-:is(.proposal-conversation, .assistant-widget) .chat-scroll-latest {
+.assistant-widget .chat-scroll-latest {
   align-self: center;
   position: relative;
   z-index: 3;
@@ -552,7 +312,7 @@ label.assistant-icon { cursor: pointer; }
   align-items: center;
   cursor: pointer;
 }
-:is(.proposal-conversation, .assistant-widget) .chat-scroll-latest:hover { background: #fff; }
+.assistant-widget .chat-scroll-latest:hover { background: #fff; }
 
 /* Compositor */
 .chat-composer { padding: 12px 16px 14px; border-top: 1px solid var(--chat-border); background: var(--chat-bg); color: var(--chat-text); }
@@ -566,7 +326,7 @@ label.assistant-icon { cursor: pointer; }
 .chat-composer-box:focus-within { border-color: var(--chat-green); box-shadow: 0 0 0 3px rgb(117 228 188 / 0.2); }
 .chat-composer-box[data-dragging] { border-style: dashed; border-color: var(--chat-green); background: #1b3330; }
 .chat-composer-box[data-busy] { background: var(--chat-panel); }
-:is(.proposal-body, .assistant-widget) .chat-composer textarea {
+.assistant-widget .chat-composer textarea {
   display: block;
   width: 100%;
   min-height: 24px;
@@ -582,9 +342,9 @@ label.assistant-icon { cursor: pointer; }
   line-height: 1.5;
   border-radius: 0;
 }
-:is(.proposal-body, .assistant-widget) .chat-composer textarea:focus-visible { outline: none; }
-:is(.proposal-body, .assistant-widget) .chat-composer textarea::placeholder { color: #a9b9cc; opacity: 1; }
-:is(.proposal-body, .assistant-widget) .chat-composer textarea:disabled { color: var(--chat-muted); cursor: progress; }
+.assistant-widget .chat-composer textarea:focus-visible { outline: none; }
+.assistant-widget .chat-composer textarea::placeholder { color: #a9b9cc; opacity: 1; }
+.assistant-widget .chat-composer textarea:disabled { color: var(--chat-muted); cursor: progress; }
 .chat-composer-chips { list-style: none; margin: 2px 0 4px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .chat-composer-chips li {
   display: inline-flex;
@@ -600,7 +360,7 @@ label.assistant-icon { cursor: pointer; }
   color: var(--chat-text);
 }
 .chat-composer-chips span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
-:is(.proposal-conversation, .assistant-widget) .chat-composer-chips button {
+.assistant-widget .chat-composer-chips button {
   width: 22px;
   height: 22px;
   min-height: 0;
@@ -613,10 +373,10 @@ label.assistant-icon { cursor: pointer; }
   place-items: center;
   cursor: pointer;
 }
-:is(.proposal-conversation, .assistant-widget) .chat-composer-chips button:hover { background: #3a4f6b; color: #fff; }
+.assistant-widget .chat-composer-chips button:hover { background: #3a4f6b; color: #fff; }
 .chat-composer-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
 .chat-composer-hint { flex: 1; min-width: 0; font-size: 12px; color: var(--chat-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-:is(.proposal-conversation, .assistant-widget) .chat-composer .chat-icon-button {
+.assistant-widget .chat-composer .chat-icon-button {
   width: 34px;
   height: 34px;
   min-height: 0;
@@ -629,8 +389,8 @@ label.assistant-icon { cursor: pointer; }
   place-items: center;
   cursor: pointer;
 }
-:is(.proposal-conversation, .assistant-widget) .chat-composer .chat-icon-button:hover:not(:disabled) { background: #2a3b52; color: #fff; }
-:is(.proposal-conversation, .assistant-widget) .chat-composer .chat-send {
+.assistant-widget .chat-composer .chat-icon-button:hover:not(:disabled) { background: #2a3b52; color: #fff; }
+.assistant-widget .chat-composer .chat-send {
   width: 36px;
   height: 36px;
   min-height: 0;
@@ -645,11 +405,11 @@ label.assistant-icon { cursor: pointer; }
   cursor: pointer;
   opacity: 1;
 }
-:is(.proposal-conversation, .assistant-widget) .chat-composer .chat-send:hover:not(:disabled) { background: #9cf0d2; }
-:is(.proposal-conversation, .assistant-widget) .chat-composer .chat-send:disabled { background: #2b3b52; color: #8ea3bb; cursor: not-allowed; opacity: 1; }
-:is(.proposal-conversation, .assistant-widget) .chat-composer .chat-stop { background: var(--chat-text); color: var(--chat-bg); }
-:is(.proposal-conversation, .assistant-widget) .chat-composer .chat-stop:hover { background: #fff; }
-:is(.proposal-conversation, .assistant-widget) .chat-composer :is(.chat-send, .chat-icon-button):focus-visible { outline: 2px solid var(--chat-green); outline-offset: 2px; }
+.assistant-widget .chat-composer .chat-send:hover:not(:disabled) { background: #9cf0d2; }
+.assistant-widget .chat-composer .chat-send:disabled { background: #2b3b52; color: #8ea3bb; cursor: not-allowed; opacity: 1; }
+.assistant-widget .chat-composer .chat-stop { background: var(--chat-text); color: var(--chat-bg); }
+.assistant-widget .chat-composer .chat-stop:hover { background: #fff; }
+.assistant-widget .chat-composer :is(.chat-send, .chat-icon-button):focus-visible { outline: 2px solid var(--chat-green); outline-offset: 2px; }
 .chat-notice {
   font-size: 13px;
   line-height: 1.5;
@@ -661,7 +421,7 @@ label.assistant-icon { cursor: pointer; }
   color: var(--chat-text);
 }
 .chat-notice[data-tone='error'] { background: var(--chat-block-bg); border-color: var(--chat-block-border); color: #ffe3e7; }
-:is(.proposal-conversation, .assistant-widget) .chat-notice button {
+.assistant-widget .chat-notice button {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -686,7 +446,7 @@ label.assistant-icon { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .chat-dots i, .chat-step-spinner { animation: none; }
   .chat-dots i { opacity: 0.8; }
-  .chat-composer-box, .proposal-digest-chevron { transition: none; }
+  .chat-composer-box { transition: none; }
 }
 
 /* Vista del documento: la barra de edición fija ocupa ~64–136px desde arriba (cabecera 64 + padding 32 + barra);
@@ -699,30 +459,23 @@ label.assistant-icon { cursor: pointer; }
    8.61:1 sobre #192536; destino #9fe9cd 11.04:1; icono de enviar deshabilitado #a9b9cc/#2b3b52 5.67:1;
    barra de desplazamiento #6b7f99/#121b28 4.22:1. */
 .chat-log-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
-.chat-log-wrap>.proposal-chat-scroll,.chat-log-wrap>.assistant-widget-log{flex:1;min-height:0}
+.chat-log-wrap>.assistant-widget-log {flex:1;min-height:0}
 .chat-log-wrap::after{content:'';position:absolute;left:0;right:8px;bottom:0;height:24px;background:linear-gradient(transparent,var(--chat-bg));pointer-events:none}
-:is(.proposal-conversation,.assistant-widget) .chat-log-wrap .chat-scroll-latest{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);margin:0;z-index:4}
-.proposal-chat-scroll,.assistant-widget-log{scrollbar-width:thin;scrollbar-color:#6b7f99 transparent;container-type:inline-size;container-name:chatlog}
-.proposal-chat-scroll:focus-visible,.assistant-widget-log:focus-visible{outline:2px solid var(--chat-green);outline-offset:-2px}
-
-/* C9 — cabecera de una línea y avatar en la línea del autor (texto a todo el ancho). */
-.proposal-chat-header{padding:10px 16px;gap:8px}
-.proposal-chat-title{display:flex;align-items:baseline;gap:8px;min-width:0}
-.proposal-body .proposal-chat-title h3{white-space:nowrap}
-.proposal-body .proposal-chat-title small{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.assistant-widget .chat-log-wrap .chat-scroll-latest {position:absolute;left:50%;bottom:12px;transform:translateX(-50%);margin:0;z-index:4}
+.assistant-widget-log {scrollbar-width:thin;scrollbar-color:#6b7f99 transparent;container-type:inline-size;container-name:chatlog}
+.assistant-widget-log:focus-visible {outline:2px solid var(--chat-green);outline-offset:-2px}
 .assistant-message-assistant{display:block}
 .assistant-message-author{margin:0 0 4px;gap:6px}
 .assistant-message-author .assistant-avatar{width:20px;height:20px}
-.assistant-message-text,.assistant-message .proposal-digest{max-width:68ch}
-@container chatlog (max-width:400px){.proposal-workspace .proposal-chat-scroll{padding-inline:16px}}
+.assistant-message-text {max-width:68ch}
 
 /* C1 — acciones por turno (28×28, visibles al pasar o enfocar; atenuadas en reposo). */
 .chat-msg-actions{display:flex;gap:2px;margin-top:4px;opacity:.55;transition:opacity .12s ease}
 .assistant-message:hover .chat-msg-actions,.chat-msg-actions:focus-within{opacity:1}
 .assistant-message-user .chat-msg-actions{justify-content:flex-end;margin:4px -6px -6px 0}
-:is(.proposal-conversation,.assistant-widget) .chat-msg-action{width:28px;height:28px;min-height:0;padding:0;border:0;border-radius:8px;background:transparent;color:var(--chat-muted);display:inline-grid;place-items:center;cursor:pointer}
-:is(.proposal-conversation,.assistant-widget) .chat-msg-action:hover{background:var(--chat-raised);color:#fff}
-:is(.proposal-conversation,.assistant-widget) .chat-msg-action:focus-visible{outline:2px solid var(--chat-green);outline-offset:1px}
+.assistant-widget .chat-msg-action {width:28px;height:28px;min-height:0;padding:0;border:0;border-radius:8px;background:transparent;color:var(--chat-muted);display:inline-grid;place-items:center;cursor:pointer}
+.assistant-widget .chat-msg-action:hover {background:var(--chat-raised);color:#fff}
+.assistant-widget .chat-msg-action:focus-visible {outline:2px solid var(--chat-green);outline-offset:1px}
 
 /* C2 — error como turno: titular legible, detalle técnico plegado y salida. */
 .assistant-message-error .assistant-message-text{color:var(--chat-text)}
@@ -730,53 +483,22 @@ label.assistant-icon { cursor: pointer; }
 .chat-error-details summary{cursor:pointer}
 .chat-error-details p{margin:4px 0 0;overflow-wrap:anywhere;font-family:ui-monospace,monospace;font-size:11.5px}
 .chat-error-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-:is(.proposal-conversation,.assistant-widget) .chat-error-actions button{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:650;cursor:pointer}
-:is(.proposal-conversation,.assistant-widget) .chat-error-actions .chat-error-primary{background:var(--chat-green);border:0;color:var(--chat-green-ink)}
-:is(.proposal-conversation,.assistant-widget) .chat-error-actions .chat-error-secondary{background:transparent;border:1px solid var(--chat-control-border);color:var(--chat-text)}
-
-/* C3 — digest: cabecera con chips y progreso; filas compactas neutras con borde de gravedad. */
-.assistant-message .proposal-digest{margin:12px 0 4px}
-.proposal-digest{background:var(--chat-panel)}
-.proposal-digest>header{padding:12px 12px 10px;display:grid;gap:8px}
-.proposal-digest-chips{display:flex;flex-wrap:wrap;gap:6px}
-.proposal-digest-chip{font-size:12px;font-weight:650;padding:2px 9px;border-radius:999px;border:1px solid}
-.proposal-digest-chip[data-tier=blocking]{background:var(--chat-block-bg);color:var(--chat-block-text);border-color:var(--chat-block-border)}
-.proposal-digest-chip[data-tier=confirm]{background:var(--chat-warn-bg);color:var(--chat-warn-text);border-color:var(--chat-warn-border)}
-.proposal-digest-chip[data-tier=info]{background:var(--chat-info-bg);color:var(--chat-info-text);border-color:var(--chat-info-border)}
-.proposal-digest-progress{display:flex;align-items:center;gap:8px}
-.proposal-digest-progress>span{flex:1;height:4px;border-radius:999px;background:#2b3b52;overflow:hidden}
-.proposal-digest-progress i{display:block;height:100%;background:var(--chat-green);transition:width .2s ease}
-.proposal-body .proposal-digest-progress small,.proposal-digest-progress small{font-size:12px;color:var(--chat-muted);white-space:nowrap;font-variant-numeric:tabular-nums}
-.proposal-digest-group>summary{padding:8px 12px}
-.proposal-digest-group ul{padding:0 8px 8px;gap:4px}
-.proposal-digest-group[data-tier] li{background:transparent;color:#e6edf6;border-left:3px solid;border-radius:0 6px 6px 0;padding:6px 8px 6px 10px;display:grid;gap:4px}
-.proposal-digest-group[data-tier=blocking] li{border-color:#ff8e9c}
-.proposal-digest-group[data-tier=confirm] li{border-color:#f0b85a}
-.proposal-digest-group[data-tier=info] li{border-color:#7fa6d1}
-.proposal-digest-group li:hover{background:rgb(255 255 255 / .04)}
-.proposal-digest-group li p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px}
-.proposal-conversation .proposal-digest .proposal-digest-link,.proposal-digest .proposal-digest-link{justify-self:start;margin:0;min-height:24px;padding:2px 8px;gap:4px;border-radius:6px;font-size:12px;font-weight:600;background:transparent;border:0;color:#9fe9cd;cursor:pointer}
-.proposal-conversation .proposal-digest .proposal-digest-link:hover{background:rgb(117 228 188 / .12);border:0;text-decoration:underline}
-.proposal-digest-link span{max-width:18ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-:is(.proposal-conversation,.assistant-widget) .proposal-digest-more{margin:0 12px 10px;min-height:28px;padding:2px 8px;border:0;background:transparent;color:#9fe9cd;font-size:12px;font-weight:600;cursor:pointer}
-:is(.proposal-conversation,.assistant-widget) .proposal-digest-more:hover{text-decoration:underline}
-@container chatlog (min-width:520px){
-  .proposal-digest-group[data-tier] li{grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:12px}
-  .proposal-digest .proposal-digest-link{justify-self:end}
-}
+.assistant-widget .chat-error-actions button {display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:650;cursor:pointer}
+.assistant-widget .chat-error-actions .chat-error-primary {background:var(--chat-green);border:0;color:var(--chat-green-ink)}
+.assistant-widget .chat-error-actions .chat-error-secondary {background:transparent;border:1px solid var(--chat-control-border);color:var(--chat-text)}
 
 /* C7 — compositor en reposo: ayuda sólo con texto y foco; anillo más sobrio; enviar deshabilitado legible. */
 .chat-composer-box:focus-within{box-shadow:0 0 0 3px rgb(117 228 188 / .12)}
 .chat-composer-hint-keys{opacity:0;transition:opacity .12s ease}
 .chat-composer-box:focus-within .chat-composer-hint-keys{opacity:1}
-:is(.proposal-conversation,.assistant-widget) .chat-composer .chat-send:disabled{color:#a9b9cc}
-:is(.proposal-conversation,.assistant-widget) .chat-composer textarea[readonly]{color:var(--chat-muted);cursor:progress}
+.assistant-widget .chat-composer .chat-send:disabled {color:#a9b9cc}
 
 /* C10/C11 — estado vacío con acción real y aviso de configuración dentro. */
-:is(.proposal-conversation,.assistant-widget) .chat-suggestions .chat-suggestion-action{display:flex;align-items:center;gap:8px;border-color:#2c6b58;background:#163b32;color:#d9fbef;font-weight:600}
+.assistant-widget .chat-suggestions .chat-suggestion-action {display:flex;align-items:center;gap:8px;border-color:#2c6b58;background:#163b32;color:#d9fbef;font-weight:600}
 .chat-empty .chat-notice{margin-bottom:12px}
 
-@media (prefers-reduced-motion: reduce){.chat-msg-actions,.chat-composer-hint-keys,.proposal-digest-progress i{transition:none}}
+@media (prefers-reduced-motion: reduce){.chat-msg-actions,
+.chat-composer-hint-keys {transition:none}}
 
 /* ── Panel completo del asistente único (F5b) ──────────────────────────────────────────────────────────────────────────
    Acoplado: el mismo .assistant-widget en el flujo de la fila de la app (columna derecha), sin sombra ni radio, con un

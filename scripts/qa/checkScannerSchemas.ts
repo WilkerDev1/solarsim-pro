@@ -9,7 +9,7 @@
 // Sale con código 1 si algún modelo rechaza algún esquema (400), con 2 si falta la clave o un argumento y con 3 si la prueba
 // no se pudo hacer (clave inválida, cuota, 403, modelo inexistente, 5xx, plazo o red). Una salida truncada o con JSON
 // inválido no cuenta como rechazo: la API admitió el esquema.
-import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../shared/geminiTransport';
+import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../src/services/llm/models';
 import { createGeminiLlmClient } from '../../src/services/llm/geminiAdapter';
 import { isLlmError } from '../../src/services/llm/errors';
 import { DATASHEET_RESPONSE_SCHEMA } from '../../src/services/geminiDatasheetService';

@@ -5,7 +5,7 @@ import { SyncService, PingResult } from '../../../services/syncService';
 import { ShareProposalService } from '../../../services/shareProposalService';
 import { DEFAULT_POPULAR_MODELS } from '../../../services/llm/models';
 import { listAvailableGeminiModels } from '../../../services/llm/listModels';
-import { DEFAULT_GEMINI_MODEL } from '../../../../shared/geminiTransport';
+import { DEFAULT_GEMINI_MODEL } from '../../../services/llm/models';
 import { GeminiModelInfo } from '../../../types/aiInvoice';
 import {
   Sparkles,
@@ -69,7 +69,7 @@ export const IntegrationsSection: React.FC = () => {
 
     setIsDetectingModels(true);
     try {
-      // Mismo camino en Electron y en web: el puerto LlmClient (el IPC list-gemini-models se retira en F6).
+      // Mismo camino en Electron y en web: el puerto LlmClient.
       const result = await listAvailableGeminiModels(key);
 
       if (result.success && result.models && result.models.length > 0) {

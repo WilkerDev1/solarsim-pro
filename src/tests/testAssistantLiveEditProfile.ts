@@ -66,7 +66,7 @@ const decide = (source: AgentSource, patch: Partial<AgentPermissionRequest> = {}
 assert.equal(DEFAULT_AGENT_POLICY.appAssistantProfile, 'live-edit', 'el asistente de la app edita en vivo por defecto (decisión nº 4)');
 assert.equal(decide('app-assistant'), 'apply', 'un precio dentro de una propuesta: en vivo desde el asistente de la app');
 assert.equal(decide('mcp'), 'confirm', 'la misma operación desde un agente externo: confirmación, como hoy');
-assert.equal(decide('proposal-assistant'), 'confirm', 'el asistente de propuestas (legado) no tiene el perfil');
+assert.equal(decide('proposal-assistant'), 'confirm', 'la fuente antigua (solo historial, ya no ejecuta) no tiene el perfil');
 assert.equal(decide('app-assistant', { scope: 'shared' }), 'confirm', 'lo compartido se confirma también en la app');
 assert.equal(decide('mcp', { scope: 'shared' }), 'confirm', 'y fuera de ella');
 assert.equal(decide('app-assistant', { undoable: false }), 'confirm', 'lo que no se puede deshacer se confirma');
@@ -90,11 +90,11 @@ assert.equal(decide('app-assistant', {}, internal({ draft: 'deny', guarded: 'all
 assert.equal(decide('app-assistant', {}, internal({ draft: 'deny', guarded: 'allow' }, 'confirm')), 'apply');
 assert.equal(decide('app-assistant', {}, internal({ draft: 'deny', guarded: 'confirm' })), 'deny');
 assert.equal(decide('app-assistant', {}, internal({ draft: 'deny', guarded: 'confirm' }, 'confirm')), 'confirm');
-// Lo que ya existía no cambia: bypass explícito, sus excepciones y el clic de «Aplicar» del asistente de propuestas.
+// Lo que ya existía no cambia: bypass explícito y sus excepciones.
 const externalBypass: AgentPolicy = { ...DEFAULT_AGENT_POLICY, external: { read: 'allow', draft: 'allow', guarded: 'allow' } };
 assert.equal(decide('mcp', { scope: 'shared' }, externalBypass), 'apply', 'bypass explícito');
 assert.equal(decide('mcp', { scope: 'shared', undoable: false }, externalBypass), 'confirm', 'bypass nunca salta lo que no se deshace');
-assert.equal(decide('proposal-assistant', { kind: 'draft', scope: 'shared' }, internal({ draft: 'confirm' })), 'apply', 'el clic «Aplicar» del modal es la confirmación');
+assert.equal(decide('proposal-assistant', { kind: 'draft', scope: 'shared' }, internal({ draft: 'confirm' })), 'confirm', 'invertida en F6: ya no existe el clic «Aplicar» del modal que valía de confirmación');
 assert.equal(decide('app-assistant', { kind: 'draft', scope: 'shared' }, internal({ draft: 'confirm' })), 'confirm');
 assert.equal(decide('mcp', { kind: 'read', scope: 'shared' }, { ...DEFAULT_AGENT_POLICY, external: { read: 'deny', draft: 'allow', guarded: 'confirm' } }), 'deny');
 // Lo guardado: sin el campo, edición en vivo; el perfil nunca se hereda a los agentes externos.

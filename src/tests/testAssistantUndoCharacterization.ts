@@ -8,12 +8,15 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
-import { executeForAssistant } from '../features/agentTools/registry';
+import { executeAgentTool } from '../features/agentTools/registry';
+import { applyDraftForTest } from './support/applyDraft';
 import { assistantOwner } from '../features/assistant/tools';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
 import { buildAITariffContext } from '../utils/aiTariffContext';
 import { probeStore, settleUndoDebounce } from './support/storeProbe';
 import { EMPTY_UNDO_HISTORY } from '../store/undo/projectUndoJournal';
+/** Resultado de la herramienta tal como lo leen estas suites (la unión del registro se estrecha por `status`; aquí ya se comprueba `activityId`). */
+const applyTool = (call: Parameters<typeof executeAgentTool>[0], ctx: Parameters<typeof executeAgentTool>[1]) => executeAgentTool(call, ctx) as Promise<{ status: string; activityId?: string; data?: any }>;
 
 const store = useSimulationStore;
 const s = () => store.getState();
@@ -39,7 +42,7 @@ const undoSteps = (id: string) => s().undoHistory.journals[id]?.undo.length ?? 0
 // ── (a) Deshacer la actividad del agente tras una edición manual intermedia ────────────────────────────────────────────────
 reset();
 s().setActiveProject(original.id, 'simulator');
-const agent = await executeForAssistant(coverageEdit(90), ctx());
+const agent = await applyTool(coverageEdit(90), ctx());
 assert(agent.activityId, 'el borrador del asistente se aplica en vivo y queda en la actividad');
 assert.equal(coverageOf(original.id), 90);
 await settleUndoDebounce();
@@ -71,7 +74,7 @@ assert.equal(s().agentActivity.find((e) => e.id === agent.activityId)?.status, '
 // de la propuesta) no bloquea el deshacer del agente, y este tampoco lo revierte.
 reset();
 s().setActiveProject(original.id, 'simulator');
-const agent2 = await executeForAssistant(coverageEdit(85), ctx());
+const agent2 = await applyTool(coverageEdit(85), ctx());
 s().setProjectStatus(original.id, 'Final');
 assert.equal(s().undoAgentActivity(agent2.activityId!).success, true);
 assert.equal(s().projects.find((p) => p.id === original.id)?.status, 'Final', 'el estado manual sobrevive al deshacer del agente');
@@ -134,13 +137,13 @@ assert.notEqual(copyCode, BENCHMARK_PROJECT.client.projectId, 'distinto del del 
 assert.equal(coverageOf(copyId), 70, 'invertida en F2a1: no recibe un estado anterior del original');
 assert.equal(coverageOf(original.id), 70, 'el original no se toca');
 
-// (b3) Asistente de propuestas (`applyExtractedInvoice` con propuesta nueva): desde F2a1 también siembra su base.
+// (b3) Borrador de IA con propuesta nueva (`buildProjectFromDraft`, el pipeline de create_proposal; antes lo aplicaba el modal retirado en F6): desde F2a1 también siembra su base.
 await openWithHistory();
 const draft = normalizeProposalDraft({ clientName: 'Desde factura', province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS1', averageMonthlyKWh: 700,
   panels: [{ equipmentId: panel.id, quantity: 12 }], inverters: [{ equipmentId: inverter.id, quantity: 1 }], batteries: [], hasBattery: false,
   commercial: { priceBasis: 'purchase', markupPct: null, marginOnSalePct: null, installationUnitPriceUSD: null, installationTotalUSD: null, customItems: [], customDiscounts: [] } },
 catalog, { province: 'Santiago', annualSpecificYieldKWhPerKWp: 1500, tariffReference: buildAITariffContext(s().tariffMatrix) });
-s().applyExtractedInvoice(draft, true);
+applyDraftForTest(draft);
 const fromInvoice = s().getActiveProject();
 assert.equal(fromInvoice.client.name, 'Desde factura');
 assert.equal(s().canUndo, false, 'invertida en F2a1: Ctrl+Z deshabilitado');
@@ -152,7 +155,7 @@ assert.notEqual(invoiceCoverage, 80);
 
 // (b4) El agente crea con `create_proposal` sin activar la propuesta (invariante «los agentes no navegan»): no hay Ctrl+Z cruzado.
 await openWithHistory();
-const made = await executeForAssistant({ name: 'create_proposal', args: { clientName: 'Del agente', distributor: 'EDENORTE', tariffCode: 'BTS1', averageMonthlyKWh: 700,
+const made = await applyTool({ name: 'create_proposal', args: { clientName: 'Del agente', distributor: 'EDENORTE', tariffCode: 'BTS1', averageMonthlyKWh: 700,
   panels: [{ catalogItemId: panel.id, count: 12 }], inverters: [{ catalogItemId: inverter.id, count: 1 }] } }, ctx());
 const madeId = (made.data as { proposalId: string }).proposalId;
 assert.equal(s().activeProjectId, original.id, 'crear con el agente no cambia la propuesta abierta');

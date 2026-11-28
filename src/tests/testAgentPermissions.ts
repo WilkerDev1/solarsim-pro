@@ -4,9 +4,7 @@ import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCa
 import type { LegacyProjectSpecs } from '../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_AGENT_POLICY, normalizeAgentPolicy } from '../store/slices/agentSlice';
-import { executeAgentTool, executeForAssistant } from '../features/agentTools/registry';
-import { AssistantRunError, runAssistant } from '../features/assistant/service';
-import type { GeminiTransport } from '../../shared/geminiTransport';
+import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
 import { captureWorkspace, emptyWorkspace } from '../store/sync/organizationWorkspace';
@@ -151,19 +149,7 @@ assert.equal(store.getState().confirmAgentAction(offPending.actionId).success, t
 assert.equal(store.getState().getActiveProject().rates.targetCoveragePct, 64);
 assert.equal((await executeAgentTool({ name: 'search_projects', args: {} }, internal())).status, 'error', 'the in-app assistant still honours its switch');
 
-// 15. A model failure after an applied change still reports it with its undo card.
-reset();
-let round = 0;
-const failingAfterApply: GeminiTransport = async () => (round++ === 0
-  ? { candidates: [{ finishReason: 'STOP', content: { role: 'model', parts: [{ functionCall: { name: 'propose_project_update', args: { id: project.id, title: 'Cobertura 81', edits: [{ section: 'rates', field: 'targetCoveragePct', valueJson: '81' }] } } }] } }] }
-  : { candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: '...' }] } }] });
-const runOwner = assistantOwner();
-await assert.rejects(
-  () => runAssistant({ apiKey: 'synthetic', model: 'synthetic', prompt: 'Cobertura 81', history: [], signal: new AbortController().signal, transport: failingAfterApply,
-    execute: (call) => executeForAssistant(call, { source: 'app-assistant', owner: runOwner }) }),
-  (error: unknown) => error instanceof AssistantRunError && error.applied.length === 1 && /ya se aplicaron/.test(error.message)
-);
-assert.equal(store.getState().getActiveProject().rates.targetCoveragePct, 81);
+// 15. (Un fallo del modelo tras un cambio aplicado conserva el cambio y su deshacer: lo cubre testAssistantLoop sobre el bucle nuevo.)
 
 // 16. Pricing edits of a proposal are "guarded": they wait for confirmation even when drafts apply freely.
 reset();

@@ -1,6 +1,6 @@
 # ADR 0008: Puerto LlmClient propio sobre el SDK oficial @google/genai
 
-Estado: aceptado (2026-11-27). Primera fase (F1a) del asistente único: puerto, adaptador, doble de pruebas y listado de modelos. Los escáneres (F1b) ya usan el puerto; el bucle del asistente (F4) se migra después; `shared/geminiTransport.ts` sigue vivo para `electron/ai` hasta F6.
+Estado: aceptado (2026-11-27). Primera fase (F1a) del asistente único: puerto, adaptador, doble de pruebas y listado de modelos. Los escáneres (F1b) ya usan el puerto; el bucle del asistente (F4) se migra después; `shared/geminiTransport.ts` y `electron/ai` se retiraron en F6 ([ADR 0013](0013-eliminacion-del-camino-antiguo.md)).
 
 ## Contexto
 
@@ -18,7 +18,7 @@ Estado: aceptado (2026-11-27). Primera fase (F1a) del asistente único: puerto, 
    - Llamada automática a funciones desactivada; declaraciones por `parametersJsonSchema` (el mismo JSON Schema que valida el registro); nunca `temperature`, `topP` ni `topK`.
    - `fetch` inyectable por `httpOptions.fetch`.
 3. **Versión exacta** `3.6.1` (sin `^`) en `dependencies`, con `package-lock.json` en el mismo cambio. Cada subida se prueba contra la prueba de contrato.
-4. **En el renderer.** El puerto corre donde hoy corren el asistente flotante y los escáneres. `electron/` no importa el SDK ni directa ni transitivamente: no puede acabar en `dist-electron/main.cjs`. El catálogo de modelos (`src/services/llm/models.ts`) no importa el SDK porque `electron/ai` lo reexporta hasta F6.
+4. **En el renderer.** El puerto corre donde hoy corren el asistente flotante y los escáneres. `electron/` no importa el SDK ni directa ni transitivamente: no puede acabar en `dist-electron/main.cjs`. El catálogo y las constantes de modelo (`src/services/llm/models.ts`) no importan el SDK: los usan Ajustes, el almacén (migración del modelo guardado) y los escáneres sin cargar el adaptador. Desde F6 `electron/` no alcanza nada de `src/services/llm/` (lo vigila `testLlmBoundary`).
 5. **Pruebas sin red.** La prueba de contrato (`testLlmAdapterContract`) inspecciona con un `fetch` falso lo que el SDK manda de verdad: URL `v1beta`, clave en `x-goog-api-key` y nunca en la URL, `alt=sse` en streaming, una sola petición ante 429 y 503, ninguna continuación automática, motivo de cancelación antes y a mitad de stream, cuerpo sin muestreo, firmas y partes opacas intactas, y 403 de permiso distinto de clave inválida. `transportAsFetch` convierte los fixtures REST actuales (`GeminiTransport`) en ese `fetch`; `ScriptedLlm`/`FakeLlmClient` implementa el puerto con un guion para probar bucle y escáneres. Ambos viven en `src/tests/support/`. `testLlmBoundary` guarda la frontera por imports.
 
 ## Alternativas descartadas
@@ -32,7 +32,7 @@ Estado: aceptado (2026-11-27). Primera fase (F1a) del asistente único: puerto, 
 ## Consecuencias
 
 - El bundle del renderer crece con el SDK web; las cifras de cada cambio van en su PR.
-- `shared/geminiTransport.ts` y su excepción en AGENTS.md siguen hasta F6, que retira `electron/ai`, el IPC `parse-invoice-with-ai`, `list-gemini-models` y `geminiInvoiceService.ts` en el mismo cambio.
+- F6 retiró `shared/geminiTransport.ts` (y su excepción en AGENTS.md), `electron/ai`, los canales IPC `parse-invoice-with-ai`, `cancel-ai-request` y `list-gemini-models` y `geminiInvoiceService.ts` en el mismo cambio.
 - Los escáneres (F1b: tarifas, fichas y listas de precios) piden la salida estructurada por `LlmClient.structured` con un esquema JSON cada uno. Modelo de reserva, recuperación de MAX_TOKENS, reintento de JSON mal formado y plazo global no están en el adaptador sino en `src/services/llm/structuredPolicy.ts` (`requestStructured`), reutilizable sobre el puerto y probada con `ScriptedLlm`; el adaptador se carga bajo demanda (`scannerClient.ts`) y no engorda el bundle principal ([escáneres](../AI_SCANNERS_SPECIFICATION.md#transporte-cancelación-y-credenciales)).
 - Ajustes → IA lista los modelos por el puerto (todas las páginas) en Electron y en web.
 - `scripts/qa/checkToolDeclarations.ts` comprueba a mano, con una clave real y fuera de CI, que la API acepta todas las declaraciones de `shared/agentTools/definitions.ts` ([QA](../QA.md#ensayos-fuera-de-npm-test)).

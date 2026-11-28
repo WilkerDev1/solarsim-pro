@@ -1,7 +1,7 @@
 // Soporte de pruebas (no entra en el bundle: solo lo importan suites de src/tests).
 // Convierte un fixture REST con la firma de `GeminiTransport` (url, cuerpo JSON, cabeceras, plazo, señal) en un `fetch`
 // falso para el adaptador del SDK: así F1b y F4 reutilizan los fixtures actuales sin red real.
-import type { GeminiTransport } from '../../../shared/geminiTransport';
+import { type GeminiTransport } from './restFixture';
 import type { LlmFetch } from '../../services/llm/types';
 
 /** Lo que vio el fetch falso en cada petición. */

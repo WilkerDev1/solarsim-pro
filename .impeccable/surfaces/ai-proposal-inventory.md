@@ -1,4 +1,6 @@
-# Asistente de propuestas e inventario
+# Asistente de propuestas (retirado) e inventario
+
+> **Nota de F6.** El modal «Asistente de propuestas» (`proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx`) se retiró del código; lo que este documento dice de su geometría, revisión por pestañas y chat lateral es historia. Sigue vigente lo del inventario (`EquipmentManagerSettingsTab.tsx`) y el modal de fichas técnicas.
 
 Extensión code-led del mundo Operate existente. Fuente: `proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. PRODUCT.md define ingeniería de propuestas dominicanas y escritorio mínimo 1024×700; el usuario confirmó revisión humana antes de aplicar.
 

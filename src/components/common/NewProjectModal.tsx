@@ -85,6 +85,12 @@ export const NewProjectModal: React.FC = () => {
 
   if (!isNewProjectModalOpen) return null;
 
+  const openAssistantFromModal = () => {
+    closeNewProjectModal();
+    const projectName = name;
+    void import('../../features/assistant/assistantEntry').then(({ openAssistant }) => openAssistant('new-project', { projectName }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -164,10 +170,14 @@ export const NewProjectModal: React.FC = () => {
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs overflow-y-auto min-h-0">
           {/* Atajo al asistente único (F5b): cierra este modal y abre el chat con «Crea una propuesta» (y el nombre, si lo hay) */}
           <div
-            onClick={() => {
-              closeNewProjectModal();
-              const projectName = name;
-              void import('../../features/assistant/assistantEntry').then(({ openAssistant }) => openAssistant('new-project', { projectName }));
+            role="button"
+            tabIndex={0}
+            onClick={openAssistantFromModal}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openAssistantFromModal();
+              }
             }}
             className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all duration-200 group ${
               isDark

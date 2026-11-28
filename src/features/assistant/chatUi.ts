@@ -1,30 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { findAgentTool } from '../../../shared/agentTools/definitions';
 
 /** Teclado del compositor: Enter envía, Shift+Enter salta línea; nunca envía durante una composición IME. */
 export function composerKeyAction(e: { key: string; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean; isComposing: boolean }): 'send' | null {
   if (e.key !== 'Enter' || e.isComposing) return null;
   if (e.ctrlKey || e.metaKey) return 'send';
   return e.shiftKey || e.altKey ? null : 'send';
-}
-
-/**
- * Esc en el compositor. Sin cola (el modal antiguo) detiene la respuesta, como siempre. Con cola (asistente único, F5b) el
- * campo sigue editable mientras trabaja y Esc se pulsa para cosas de escribir (cerrar un autocompletado, un IME): nunca
- * detiene el turno; Detener queda solo en su botón. Un Esc de composición (IME) nunca detiene.
- */
-export function composerEscapeAction(e: { busy: boolean; queueWhileBusy: boolean; isComposing: boolean }): 'stop' | null {
-  return e.busy && !e.queueWhileBusy && !e.isComposing ? 'stop' : null;
-}
-
-/** Nombre legible de una herramienta para el progreso por pasos (título declarado o el nombre técnico). */
-export function toolStepLabel(name: string): string {
-  return findAgentTool(name)?.title || name.replace(/_/g, ' ');
-}
-
-/** Texto reutilizable de un turno del usuario: sin la línea de adjuntos («📎 …») que añade el chat general. */
-export function reusableUserText(text: string): string {
-  return text.replace(/\n*📎[^\n]*$/u, '').trim();
 }
 
 /** Errores que piden configurar la clave (salida: Ajustes de IA) frente a fallos recuperables con reintento. */
@@ -65,8 +45,8 @@ export function useAutoGrow(ref: RefObject<HTMLTextAreaElement>, value: string, 
 }
 
 /** Arrastrar sobre el compositor: siempre se consume el evento; sólo se acepta cuando se puede adjuntar. */
-export function composerDropEffect(state: { busy: boolean; attachDisabled?: boolean }): 'copy' | 'none' {
-  return state.busy || state.attachDisabled ? 'none' : 'copy';
+export function composerDropEffect(state: { attachDisabled?: boolean }): 'copy' | 'none' {
+  return state.attachDisabled ? 'none' : 'copy';
 }
 
 /** `dragleave` también salta al pasar a un hijo: sólo cuenta cuando el puntero sale del contenedor. */
@@ -196,34 +176,6 @@ export function useStickToBottom(ref: RefObject<HTMLElement>, deps: unknown[]) {
   return { onScroll, away, scrollToBottom, controller };
 }
 
-/** Paso del reintento: enviar cuando el campo ya refleja el texto; descartar si cambió (transformado o editado). */
-export function resendStep(pending: string | null, prompt: string, busy: boolean): 'send' | 'drop' | 'wait' {
-  if (pending === null || busy) return 'wait';
-  return prompt === pending ? 'send' : 'drop';
-}
-
-/**
- * Reintentar con el envío existente: pone el texto en el compositor y, cuando el estado ya lo refleja,
- * llama al mismo `send` que el botón Enviar (sin lógica de servicio nueva). Si el campo no queda con ese
- * texto (lo transformó `setPrompt` o la persona lo editó) el reintento se descarta: nunca se envía solo después.
- */
-export function useResend(prompt: string, setPrompt: (text: string) => void, send: () => void, busy: boolean) {
-  const [pending, setPending] = useState<string | null>(null);
-  useEffect(() => {
-    const step = resendStep(pending, prompt, busy);
-    if (step === 'wait') return;
-    setPending(null);
-    if (step === 'send') send();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, prompt, busy]);
-  return (text: string) => {
-    if (busy) return;
-    if (prompt === text) { send(); return; }
-    setPending(text);
-    setPrompt(text);
-  };
-}
-
 /** Anuncio único para lectores de pantalla: pensando, respuesta lista, detenido o error. */
 export function useChatAnnouncement(busy: boolean, outcome: () => string) {
   const [message, setMessage] = useState('');
@@ -248,6 +200,3 @@ export function useElapsedSeconds(active: boolean) {
   }, [active]);
   return seconds;
 }
-
-/** Texto del compositor tras un envío fallido antes de salir: vuelve el enviado, salvo que la persona ya haya escrito otra cosa. */
-export const restoreComposerText = (current: string, sent: string): string => (current.trim() ? current : sent);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { buildProjectFromDraft } from '../store/slices/aiSlice';
+import { buildProjectFromDraft } from '../domain/proposalDraft';
 import type { ExtractedInvoiceData } from '../types/aiInvoice';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { DEFAULT_LOCAL_COMPANY } from '../types/companyProfile';

@@ -27,7 +27,7 @@ Client suites are plain `tsx` scripts that exit non-zero on failure. `scripts/te
 ```
 React views ─▶ Zustand slices ─▶ pure engines (src/engine)
      │               └─▶ services (HTTP) ─▶ Hono API (server/) ─▶ PostgreSQL
-     └─▶ preload IPC ─▶ electron/ (AI calls, window/print, updater)
+     └─▶ preload IPC ─▶ electron/ (window/print, updater, local MCP)
 services ─▶ Worker (workers/share-viewer) ─▶ KV
 remote AI ─▶ mcp-remote (own CT, stateless) ─▶ Hono API (agent tokens ssm_…)
 shared/  = portable TS contracts used by client, API and Worker

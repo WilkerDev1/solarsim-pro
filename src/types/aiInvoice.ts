@@ -138,9 +138,3 @@ export interface GeminiModelInfo {
   isRecommended?: boolean;
   rateLimitNote?: string;
 }
-
-export interface AISettings {
-  apiKey: string;
-  model: string;
-  customInstructions?: string;
-}

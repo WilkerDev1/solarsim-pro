@@ -35,8 +35,6 @@ export interface NativePlan {
   title: string;
   changes: AgentChange[];
   targetType: 'project' | 'equipment' | 'client';
-  /** Texto de la tarjeta de confirmación cuando el genérico por tipo de destino no basta. */
-  impact?: string;
   execute(): NativeExecution;
 }
 

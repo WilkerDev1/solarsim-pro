@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import {normalizeProposalDraft,PROPOSAL_JSON_SCHEMA} from '../../shared/aiProposal';
-import {requestGeminiJson,GeminiRequestError} from '../../shared/geminiTransport';
 import {buildAITariffContext} from '../utils/aiTariffContext';
 import {createAIProposalBase,prepareProposalDraftProject} from '../utils/proposalDraftProject';
 import {calculateProjectFinancialSummary} from '../engine/financeEngine';
 import {BENCHMARK_PROJECT} from '../engine/referenceCase';
 import {useSimulationStore} from '../store/useSimulationStore';
-import {buildProjectFromDraft} from '../store/slices/aiSlice';
+import {buildProjectFromDraft} from '../domain/proposalDraft';
 const state=useSimulationStore.getState();
 const catalog=structuredClone(state.equipmentCatalog);
 const panel=catalog.find(e=>e.type==='panel')!,inverter=catalog.find(e=>e.type==='inverter')!;
@@ -34,7 +33,7 @@ assert.equal(prepared.financials.customItems?.[0].unitPriceUSD,25);
 assert.equal(prepared.financials.customDiscounts?.[0].value,10);
 const original={...state};
 useSimulationStore.setState({equipmentCatalog:catalog,projects:[],activeProjectId:'',syncSettings:{...state.syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
-// El proyecto se construye con buildProjectFromDraft (sobrevive a F6); que applyExtractedInvoice escriba lo mismo en el store se prueba en testLegacyProposalAssistantApplyExtractedInvoice.
+// El proyecto se construye con buildProjectFromDraft (el pipeline de create_proposal).
 const builtProject=buildProjectFromDraft(useSimulationStore.getState(),again,true);
 assert('project' in builtProject,'error' in builtProject?builtProject.error:'');
 const applied=builtProject.project;
@@ -50,17 +49,8 @@ assert.equal(normalizeProposalDraft({...again,commercial:{...again.commercial,cu
 assert.equal(normalizeProposalDraft({...again,commercial:{marginOnSalePct:100}},catalog,context).requiresReview,true);
 assert.equal(normalizeProposalDraft({...again,panels:[{...again.panels![0],unitPriceUSD:-1}]},catalog,context).requiresReview,true);
 assert.equal(normalizeProposalDraft({...again,commercial:{customDiscounts:[{description:'Bad',type:'percentage',value:101,target:'general'}]}},catalog,context).requiresReview,true);
-let calls=0;
-const recovered=await requestGeminiJson({apiKey:'synthetic',model:'gemini-3.8-flash',body:{generationConfig:{maxOutputTokens:16384}}},async(_url,body:any)=>{
- calls++;assert.equal(body.generationConfig.thinkingConfig.thinkingLevel,'low');
- assert.equal(body.generationConfig.maxOutputTokens,calls===1?16384:32768);
- return {candidates:[{finishReason:calls===1?'MAX_TOKENS':'STOP',content:{parts:[{text:'{}'}]}}]};
-});assert.equal(calls,2);assert(recovered.modelWarning);
-calls=0;await assert.rejects(()=>requestGeminiJson({apiKey:'synthetic',body:{generationConfig:{maxOutputTokens:8192}}},async()=>{calls++;return {candidates:[{finishReason:'MAX_TOKENS'}]};}),/Reduce/);assert.equal(calls,2);
-calls=0;await assert.rejects(()=>requestGeminiJson({apiKey:'synthetic',body:{}},async()=>{calls++;if(calls===1)throw new GeminiRequestError('transient',503);return {candidates:[{finishReason:'MAX_TOKENS'}]};}),/Reduce/);assert.equal(calls,2,'transient plus truncation cannot create third paid request');
-calls=0;await assert.rejects(()=>requestGeminiJson({apiKey:'synthetic',body:{}},async()=>{calls++;throw new GeminiRequestError('quota',429);}),/quota/);assert.equal(calls,1);
-await requestGeminiJson({apiKey:'synthetic',model:'gemini-2.5-flash',body:{}},async(_url,body:any)=>{assert.equal(body.generationConfig.thinkingConfig.thinkingBudget,1024);assert.equal(body.generationConfig.thinkingConfig.thinkingLevel,undefined);return {candidates:[{finishReason:'STOP'}]};});
-console.log('Commercial overrides, clean defaults, shared preview/application and bounded MAX_TOKENS recovery passed.');
+// (la recuperación acotada de MAX_TOKENS y el modelo de reserva viven en testStructuredPolicy, sobre el puerto LlmClient)
+console.log('Commercial overrides, clean defaults, shared preview/application passed.');
 const bad=normalizeProposalDraft({...input,panels:[{equipmentId:panel.id,quantity:1.5,unitPriceUSD:-1}],commercial:{marginOnSalePct:100}},catalog,context);
 const badAgain=normalizeProposalDraft(bad,catalog,context);
 assert.equal(badAgain.requiresReview,true,'invalid edits must remain invalid across normalization');

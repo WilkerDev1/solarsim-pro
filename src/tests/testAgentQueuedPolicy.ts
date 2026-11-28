@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
-import { executeAgentTool, executeForAssistant } from '../features/agentTools/registry';
+import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 
 const store = useSimulationStore;
@@ -68,16 +68,18 @@ reset(); setPolicy('app-assistant', 'confirm', 'confirm');
 const created = await executeAgentTool(createClient, ctxs['app-assistant']());
 store.getState().confirmAgentAction((created as { actionId: string }).actionId);
 const target = store.getState().clients[0];
-const delClient = await executeForAssistant({ name: 'delete_client', args: { id: target.id } }, ctxs['app-assistant']());
-assert(delClient.action, 'a confirmable action is returned');
-assert.equal(delClient.action.targetType, 'client');
-assert.match(delClient.action.impact || '', /directorio de clientes/);
-assert.doesNotMatch(delClient.action.impact || '', /propuesta|simulador/i);
-const trashCard = await executeForAssistant(trash, ctxs['app-assistant']());
-assert.equal(trashCard.action?.targetType, 'project');
-assert.doesNotMatch(trashCard.action?.impact || '', /simulador/i);
+// (el panel pinta la cola de confirmaciones: título y cambios de cada plan, con el destino real en `plan.targetType`)
+const pendingOf = (outcome: { status: string; actionId?: string }) => store.getState().pendingAgentActions.find((a) => a.id === outcome.actionId)!;
+const delClient = await executeAgentTool({ name: 'delete_client', args: { id: target.id } }, ctxs['app-assistant']());
+assert.equal(delClient.status, 'pending_confirmation', 'a confirmable action is queued');
+assert.equal((pendingOf(delClient).plan as { targetType: string }).targetType, 'client');
+assert.equal(pendingOf(delClient).tool, 'delete_client');
+assert.match(pendingOf(delClient).title, /Cliente Cola/);
+const trashCard = await executeAgentTool(trash, ctxs['app-assistant']());
+assert.equal((pendingOf(trashCard).plan as { targetType: string }).targetType, 'project');
+assert.match(pendingOf(trashCard).title, /papelera/i);
 reset(); setPolicy('app-assistant', 'confirm', 'confirm');
-const template = await executeForAssistant({ name: 'save_document_text_to_company_template', args: { proposalId: project.id } }, ctxs['app-assistant']()).catch(() => undefined);
-if (template?.action) assert.match(template.action.impact || '', /plantilla/);
+const template = await executeAgentTool({ name: 'save_document_text_to_company_template', args: { proposalId: project.id } }, ctxs['app-assistant']());
+if (template.status === 'pending_confirmation') assert.equal(pendingOf(template).tool, 'save_document_text_to_company_template');
 
 console.log('testAgentQueuedPolicy: ok');

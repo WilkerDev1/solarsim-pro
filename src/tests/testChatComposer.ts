@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { offsetWithin, resendStep, composerKeyAction, toolStepLabel, createStickController, fitTextarea, composerDropEffect, leavesContainer, shouldRefocusComposer, createStopLatch } from '../features/assistant/chatUi';
+import { offsetWithin, composerKeyAction, createStickController, fitTextarea, composerDropEffect, leavesContainer, shouldRefocusComposer, createStopLatch } from '../features/assistant/chatUi';
 import { ChatComposer, ChatThinking, ChatSuggestions } from '../features/assistant/components/ChatComposer';
 import { ChatMessage } from '../features/assistant/components/ChatMessage';
 
@@ -39,8 +39,6 @@ assert.match(thinking, /Buscar equipos[\s\S]*Abrir propuesta/);
 assert.match(thinking, /data-state="done"[\s\S]*data-state="active"/, 'previous steps done, last one active');
 const suggestions = renderToStaticMarkup(React.createElement(ChatSuggestions, { title: '¿Qué necesitas?', items: ['Uno', 'Dos'], onPick() {} }));
 assert.equal((suggestions.match(/<button/g) || []).length, 2);
-assert.equal(toolStepLabel('open_proposal'), 'Abrir propuesta');
-assert.equal(toolStepLabel('tool_that_does_not_exist'), 'tool that does not exist');
 
 // 4. Turns: user bubble with file chips; assistant identity; error variant announced with text.
 const user = renderToStaticMarkup(React.createElement(ChatMessage, { role: 'user', text: 'Cotiza esto', files: ['a.pdf'] }));
@@ -94,14 +92,6 @@ assert.match(timed, /<span[^>]*aria-hidden="true"[^>]*>[^<]*12 s<\/span>|<span[^
   assert.equal(offsetWithin(box(100, 0), box(100)), 0);
 }
 
-// 6d. Retry steps: send when the field shows the text, drop when it was transformed or edited, wait while busy.
-{
-  assert.equal(resendStep(null, 'x', false), 'wait');
-  assert.equal(resendStep('hola', 'hola', false), 'send');
-  assert.equal(resendStep('hola', 'Hola.', false), 'drop', 'a transformed prompt is never sent on its own later');
-  assert.equal(resendStep('hola', 'hola', true), 'wait');
-}
-
 // 7. Textarea fit: height and overflow come from one helper (also used on panel resize).
 {
   const el = (scrollHeight: number) => ({ scrollHeight, style: { height: '', overflowY: '' } });
@@ -112,9 +102,9 @@ assert.match(timed, /<span[^>]*aria-hidden="true"[^>]*>[^<]*12 s<\/span>|<span[^
 }
 
 // 8. Drag and drop: the drop is always swallowed (Electron would navigate to the file); leave ignores children.
-assert.equal(composerDropEffect({ busy: false, attachDisabled: false }), 'copy');
-assert.equal(composerDropEffect({ busy: true, attachDisabled: false }), 'none');
-assert.equal(composerDropEffect({ busy: false, attachDisabled: true }), 'none');
+assert.equal(composerDropEffect({ attachDisabled: false }), 'copy');
+assert.equal(composerDropEffect({}), 'copy');
+assert.equal(composerDropEffect({ attachDisabled: true }), 'none');
 const box = { contains: (n: unknown) => n === 'child' };
 assert.equal(leavesContainer(box, 'child'), false);
 assert.equal(leavesContainer(box, 'outside'), true);

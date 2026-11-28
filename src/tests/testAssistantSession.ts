@@ -527,12 +527,11 @@ reset({ equipmentCatalog: structuredClone(DEFAULT_EQUIPMENT_CATALOG).map((item) 
   assert.ok(!/ncompleta/.test(details(edited)), 'sin «Incompleta» en un turno que solo cambia la cobertura');
 }
 
-// ── 10. Frontera: la sesión y el bucle no usan el transporte ni el bucle antiguos; el panel pinta la sesión nueva ─────────
+// ── 10. Frontera: la sesión y el bucle no usan el proceso principal ni el SDK directo; el panel pinta la sesión nueva ─────────
 const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8');
 for (const file of ['../features/assistant/session/agentLoop.ts', '../features/assistant/session/assistantSession.ts', '../features/assistant/session/invoiceExtraction.ts']) {
   const text = read(file);
-  assert.ok(!/requestGeminiJson|GeminiTransport|geminiResponseText|electronAPI|executeForAssistant|from '\.\.\/service'|useAppAssistant|@google\/genai/.test(text), `${file}: sin el camino antiguo ni el SDK directo`);
-  assert.ok(!/shared\/geminiTransport/.test(text), `${file}: ni siquiera las constantes del transporte antiguo (F6 lo borra): van por services/llm/models`);
+  assert.ok(!/electronAPI|@google\/genai/.test(text), `${file}: sin el proceso principal ni el SDK directo (el camino antiguo lo vigila testNoLegacyAssistantPath)`);
 }
 assert.ok(/subscribe\(\(\) => \{[^}]*syncOwner\(\)[^}]*syncEnabled\(\)/.test(read('../features/assistant/session/assistantSession.ts')), 'la sesión única sigue al interruptor del asistente');
 const panel = read('../features/assistant/components/AppAssistant.tsx');

@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import {normalizeProposalDraft,requestedModelMatches,buildProposalRequest} from '../../shared/aiProposal';
-import {processExtractedInvoice} from '../utils/aiProposalNormalization';
 import {buildAITariffContext} from '../utils/aiTariffContext';
 import {useSimulationStore} from '../store/useSimulationStore';
-import {buildProjectFromDraft} from '../store/slices/aiSlice';
+import {buildProjectFromDraft} from '../domain/proposalDraft';
 import {calculateMonthlySolarProduction,getMonthlySolarProductionFactors} from '../engine/solarEngine';
 import {calculateCostMatrixSummary,calculateProjectFinancialSummary} from '../engine/financeEngine';
-import {createAIProposalBase,prepareProposalDraftProject,proposalReconciliationIssues} from '../utils/proposalDraftProject';
+import {createAIProposalBase,prepareProposalDraftProject} from '../utils/proposalDraftProject';
 import {BENCHMARK_PROJECT} from '../engine/referenceCase';
 import type {SolarEquipmentItem} from '../types/equipment';
 const row=(id:string,type:any,brand:string,displayName:string,extra:any):SolarEquipmentItem=>({id,type,brand,displayName,modelSeries:displayName,createdAt:'',updatedAt:'',...extra});
@@ -47,10 +46,10 @@ assert.deepEqual(measured.monthlyConsumptionKWh,Array(12).fill(300));
 const ambiguous=normalizeProposalDraft({...raw,commercial:{...raw.commercial,priceBasis:'unknown'}},catalog,context);
 assert(ambiguous.requiresReview);
 assert(normalizeProposalDraft(ambiguous,catalog,context).requiresReview);
-const parsed=processExtractedInvoice(JSON.stringify({...raw,responseKind:'draft',assistantMessage:'Seleccioné los modelos de la misma marca y potencia.'}),{dopExchangeRate:60.5,equipmentCatalog:catalog,context});
+const parsed=normalizeProposalDraft({...raw,dopExchangeRate:60,responseKind:'draft',assistantMessage:'Seleccioné los modelos de la misma marca y potencia.'},catalog,context);
 assert.equal(parsed.dopExchangeRate,60,'document FX takes precedence over default; USD untouched');
 assert.equal(parsed.panels![0].unitPriceUSD,100.8);
-const discussion=processExtractedInvoice(JSON.stringify({responseKind:'discussion',assistantMessage:'¿Estos importes son costos de compra o venta?'}),{equipmentCatalog:catalog,context});
+const discussion=normalizeProposalDraft({responseKind:'discussion',assistantMessage:'¿Estos importes son costos de compra o venta?'},catalog,context);
 assert.equal(discussion.responseKind,'discussion');
 assert.equal(discussion.assistantMessage,'¿Estos importes son costos de compra o venta?');
 const request=buildProposalRequest({projectRequirementsText:'Baja sólo el precio Huawei.',equipmentCatalog:catalog,context:{...context,currentDraft:normalized,conversation:[{role:'user',text:'Son costos de compra.'},{role:'assistant',text:'Conservo el recargo del35%.'}]}});
@@ -61,7 +60,7 @@ console.log('Conversation, generic model names, document costs/FX, theoretical p
 
 const previous=useSimulationStore.getState();
 useSimulationStore.setState({projects:[],activeProjectId:'',equipmentCatalog:catalog,syncSettings:{...previous.syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
-// El proyecto se construye con buildProjectFromDraft (sobrevive a F6); que applyExtractedInvoice lo escriba en el store se prueba en testLegacyProposalAssistantApplyExtractedInvoice.
+// El proyecto se construye con buildProjectFromDraft (el pipeline de create_proposal; aplicarlo al store lo hacía el modal retirado en F6).
 const built=buildProjectFromDraft(useSimulationStore.getState(),normalized,true);
 assert('project' in built,'theoretical draft survives store revalidation and is actually built');
 const committed=built.project;
@@ -98,5 +97,3 @@ assert(invalidFx.requiresReview);assert(normalizeProposalDraft(invalidFx,catalog
 const invalidTotals=normalizeProposalDraft({...raw,commercial:{...raw.commercial,sourceTotals:'bad'}},catalog,context);
 assert(invalidTotals.requiresReview);assert(normalizeProposalDraft(invalidTotals,catalog,context).requiresReview);
 
-assert.equal(proposalReconciliationIssues(normalized,calculateProjectFinancialSummary(project,'legacy')).length,0);
-assert(proposalReconciliationIssues({...normalized,commercial:{...normalized.commercial,sourceTotals:{saleUSD:1}}},calculateProjectFinancialSummary(project,'legacy')).length===1);

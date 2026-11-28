@@ -8,7 +8,7 @@ import { hydrateSimulationStore } from '../store/persistence/hydrateSimulationSt
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { SyncService } from '../services/syncService';
-import { GeminiRequestError, type GeminiTransport } from '../../shared/geminiTransport';
+import { GeminiRequestError, type GeminiTransport } from './support/restFixture';
 import { LlmError } from '../services/llm/errors';
 import { clientFromTransport } from './support/clientFromTransport';
 

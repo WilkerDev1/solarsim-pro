@@ -1,16 +1,11 @@
-// Listado de modelos a través del puerto LlmClient (Ajustes → IA), y compatibilidad de la reexportación que usan
-// electron/ai y las suites antiguas.
+// Listado de modelos a través del puerto LlmClient (Ajustes → IA).
 import assert from 'node:assert/strict';
-import { DEFAULT_POPULAR_MODELS, geminiModelInfos, mapGeminiModels } from '../services/llm/models';
+import { DEFAULT_POPULAR_MODELS, geminiModelInfos } from '../services/llm/models';
 import { listAvailableGeminiModels } from '../services/llm/listModels';
-import * as legacy from '../services/geminiInvoiceService';
 import { createGeminiLlmClient } from '../services/llm/geminiAdapter';
 import { LlmError } from '../services/llm/errors';
 import { ScriptedLlm } from './support/scriptedLlm';
 import { transportAsFetch, type RecordedRequest } from './support/transportAsFetch';
-
-assert.equal(legacy.DEFAULT_POPULAR_MODELS, DEFAULT_POPULAR_MODELS, 'geminiInvoiceService re-exports the same presets');
-assert.equal(legacy.mapGeminiModels, mapGeminiModels, 'and the same REST mapper (electron/ai compiles unchanged)');
 
 const models = [
   { id: 'gemini-4-hydrogen', name: 'models/gemini-4-hydrogen', displayName: 'Gemini 4 Hydrogen', supportedActions: ['generateContent'] },
@@ -19,13 +14,12 @@ const models = [
   { id: 'gemini-embedding', name: 'models/gemini-embedding', supportedActions: ['embedContent'] },
   { id: 'imagen-4', name: 'models/imagen-4', supportedActions: ['predict'] },
 ];
-// El filtro y el marcado de recomendados son los mismos por el puerto que por la vía REST.
+// El filtro (solo texto, sin imagen ni voz) y el marcado de recomendados.
 const infos = geminiModelInfos(models);
 assert.deepEqual(infos.map((m) => m.id), ['gemini-4-hydrogen', 'gemini-3.8-flash']);
 assert.equal(infos[0].name, 'Gemini 4 Hydrogen');
 assert.equal(infos[1].name, 'gemini-3.8-flash', 'without displayName the id is the label');
 assert(infos.every((m) => m.isRecommended), 'documented presets stay recommended');
-assert.deepEqual(mapGeminiModels({ models: models.map((m) => ({ name: m.name, displayName: m.displayName, supportedGenerationMethods: m.supportedActions })) }), infos);
 
 // Éxito: el puerto devuelve los modelos de la cuenta.
 {
@@ -68,4 +62,4 @@ assert.deepEqual(mapGeminiModels({ models: models.map((m) => ({ name: m.name, di
   assert.equal(result.models, DEFAULT_POPULAR_MODELS);
 }
 
-console.log('Model listing through the LlmClient port (filters, presets, errors, legacy re-export) passed.');
+console.log('Model listing through the LlmClient port (filters, presets, errors) passed.');

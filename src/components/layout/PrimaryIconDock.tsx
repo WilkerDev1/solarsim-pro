@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
-import { DEFAULT_GEMINI_MODEL } from "../../../shared/geminiTransport";
+import { DEFAULT_GEMINI_MODEL } from "../../services/llm/models";
 import { useShallow } from 'zustand/react/shallow';
 import {
   Sun,
@@ -302,7 +302,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
                   </button>
                 </div>
 
-                {/* Opción 1: el asistente único (F5b; antes abría el modal del asistente de propuestas, que se retira en F6) */}
+                {/* Opción 1: el asistente único */}
                 <button
                   onClick={() => {
                     beforeNavigate?.();
