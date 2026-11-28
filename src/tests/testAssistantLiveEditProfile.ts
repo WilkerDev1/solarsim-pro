@@ -85,6 +85,11 @@ assert.equal(decide('app-assistant', {}, draftConfirmBypass), 'apply', 'precio d
 assert.equal(decide('app-assistant', {}, internal({ draft: 'confirm', guarded: 'allow' }, 'confirm')), 'apply', 'igual que con el perfil «confirmar»');
 assert.equal(decide('app-assistant', { kind: 'draft' }, draftConfirmBypass), 'confirm', 'un borrador con «Pedir confirmación» se confirma');
 assert.equal(decide('app-assistant', { undoable: false }, draftConfirmBypass), 'confirm', 'el bypass nunca salta lo que no se deshace');
+// Excepción deliberada (ADR 0010 §1): con borradores en «Bloquear», en vivo bloquea aunque «confirmar» aplicaría o pediría confirmación.
+assert.equal(decide('app-assistant', {}, internal({ draft: 'deny', guarded: 'allow' })), 'deny', 'borradores bloqueados: el perfil no lo salta');
+assert.equal(decide('app-assistant', {}, internal({ draft: 'deny', guarded: 'allow' }, 'confirm')), 'apply');
+assert.equal(decide('app-assistant', {}, internal({ draft: 'deny', guarded: 'confirm' })), 'deny');
+assert.equal(decide('app-assistant', {}, internal({ draft: 'deny', guarded: 'confirm' }, 'confirm')), 'confirm');
 // Lo que ya existía no cambia: bypass explícito, sus excepciones y el clic de «Aplicar» del asistente de propuestas.
 const externalBypass: AgentPolicy = { ...DEFAULT_AGENT_POLICY, external: { read: 'allow', draft: 'allow', guarded: 'allow' } };
 assert.equal(decide('mcp', { scope: 'shared' }, externalBypass), 'apply', 'bypass explícito');
@@ -164,6 +169,42 @@ const blocked = await executeAssistantToolset({ name: 'edit_proposal', args: { p
 assert.equal(blocked.status, 'error');
 assert.equal(blocked.error?.code, 'denied');
 assert.equal(JSON.stringify(projectOf().specs.saleMarginMultiplier), JSON.stringify(base.specs.saleMarginMultiplier));
+
+reset();
+// Renombrar o redimensionar un equipo con precio también deja ese precio sin procedencia (el modelo ya no es el de la oferta):
+// se confirma en la app. Cambiar solo la cantidad sigue en vivo.
+const pricedPanels = (projectOf().specs.panels ?? []).map((g) => ({ ...g, unitPriceUSD: 120, priceSource: 'supplier' as const }));
+const pricedInverters = (projectOf().specs.inverters ?? []).map((g) => ({ ...g, unitPriceUSD: 1500, priceSource: 'supplier' as const }));
+const pricedBatteries = (projectOf().specs.batteries ?? []).map((g) => ({ ...g, unitPriceUSD: 2100, priceSource: 'supplier' as const }));
+store.setState({ projects: s().projects.map((p) => (p.id === base.id ? { ...p, specs: { ...p.specs, hasBattery: true, panels: pricedPanels, inverters: pricedInverters, batteries: pricedBatteries } } : p)) });
+for (const [path, valueJson] of [
+  ['specs.panels[0].brandModel', '"Panel libre 700 W"'],
+  ['specs.panels[0].powerW', '700'],
+  ['specs.inverters[0].brandModel', '"Huawei SUN2000 50KTL"'],
+  ['specs.inverters[0].powerKW', '50'],
+  ['specs.batteries[0].brandModel', '"Tesla Powerwall 3"'],
+  ['specs.batteries[0].capacityKWh', '40'],
+] as const) {
+  const frozenSpecs = JSON.stringify(projectOf().specs);
+  const renamed = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: [{ op: 'set', path, valueJson }] } }, ctx('app-assistant'));
+  assert.equal(renamed.status, 'pending_confirmation', `${path}: equipo con precio cambiado desde la app, confirmación (${JSON.stringify(renamed.error ?? renamed.status)})`);
+  assert.equal(JSON.stringify(projectOf().specs), frozenSpecs, `${path}: pendiente, nada escrito`);
+  const external = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: [{ op: 'set', path, valueJson }] } }, ctx('mcp'));
+  assert.equal(external.status, 'pending_confirmation', `${path}: desde un agente externo, como antes`);
+}
+store.setState({ pendingAgentActions: [] });
+// La tasa de cambio y la mano de obra son parámetros comerciales que dicta el usuario, como el margen: en vivo (ADR 0010 §3).
+for (const [path, valueJson] of [['specs.dopExchangeRate', '62'], ['specs.installationUnitPriceUSD', '0.15']] as const) {
+  const commercial = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: [{ op: 'set', path, valueJson }] } }, ctx('app-assistant'));
+  assert.equal(commercial.status, 'applied', `${path}: ${JSON.stringify(commercial.error ?? commercial.status)}`);
+  assert.equal(s().pendingAgentActions.length, 0);
+}
+const recount = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: [{ op: 'set', path: 'specs.panels[0].count', valueJson: String(projectOf().specs.panels![0].count + 1) }] } }, ctx('app-assistant'));
+assert.equal(recount.status, 'applied', `cambiar la cantidad sigue en vivo (${JSON.stringify(recount.error ?? recount.status)})`);
+// Sin precio en el grupo, renombrar no deja ningún precio sin procedencia: en vivo.
+store.setState({ projects: s().projects.map((p) => (p.id === base.id ? { ...p, specs: { ...p.specs, panels: (p.specs.panels ?? []).map((g) => ({ ...g, unitPriceUSD: undefined, priceSource: undefined })) } } : p)) });
+const renamedUnpriced = await executeAssistantToolset({ name: 'edit_proposal', args: { proposalId: base.id, ops: [{ op: 'set', path: 'specs.panels[0].brandModel', valueJson: '"Panel sin precio"' }] } }, ctx('app-assistant'));
+assert.equal(renamedUnpriced.status, 'applied', JSON.stringify(renamedUnpriced.error ?? renamedUnpriced.status));
 
 // ── 3. Lo compartido o sin deshacer pide confirmación en ambas superficies ─────────────────────────────────────────────────
 reset();

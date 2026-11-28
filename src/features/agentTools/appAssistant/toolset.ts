@@ -90,8 +90,9 @@ async function runOwn(handler: NativeHandler, definition: AgentToolDefinition, a
   const guarded = (name === 'edit_proposal' && operationsTouchPricing(args.ops)) || (name === 'undo_change' && undoNeedsConfirmation(args));
   const effective: AgentToolDefinition = guarded ? { ...definition, kind: 'guarded' } : definition;
   // Dentro de una propuesta y con deshacer: el perfil «edición en vivo» decide (solo para el asistente de la app).
-  // Un costo de equipo escrito a mano no sale de la transacción: se confirma también en la app (operationsSetManualPrice).
-  const scope: AgentToolScope = (name === 'edit_proposal' && !operationsSetManualPrice(args.ops)) || (name === 'undo_change' && undoStaysInProposal(args)) ? 'proposal' : 'shared';
+  // Un costo de equipo escrito a mano, o un equipo con precio renombrado o redimensionado, no sale de la transacción: se
+  // confirma también en la app (operationsSetManualPrice).
+  const scope: AgentToolScope = (name === 'edit_proposal' && !operationsSetManualPrice(args.ops, proposalOf(name, args))) || (name === 'undo_change' && undoStaysInProposal(args)) ? 'proposal' : 'shared';
   let preview: ToolPayload | undefined;
   const capture: NativeHandler = async (a, c) => {
     const result = await handler(a, c);
