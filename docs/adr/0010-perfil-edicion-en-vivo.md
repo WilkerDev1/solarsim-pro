@@ -69,5 +69,5 @@ La bandera queda **apagada** en F3b: encender hoy el asistente expondría a todo
 
 - El criterio de aceptación del plan se cumple: la misma llamada `edit_proposal` con un precio se aplica en vivo desde el asistente de la app y queda pendiente desde un agente externo; lo compartido se confirma en ambas; `propose_project_update` y las copias doradas (`AGENT_RULES_ES`, las 12 herramientas remotas) no cambian. Lo fija `testAssistantLiveEditProfile`.
 - Hasta F4 nada declara el conjunto nuevo al modelo: el asistente flotante de hoy sigue con `propose_project_update` y confirma precios como siempre.
-- Ajustes → Agentes no muestra todavía un selector del perfil: el campo existe y se guarda, y lo expone F5b con el panel nuevo (con su ⓘ). El resaltado en vivo del cambio es de F5a.
+- Ajustes → Agentes no muestra todavía un selector del perfil: el campo existe y se guarda, y lo expone F5b con el panel nuevo (con su ⓘ). El resaltado en vivo del cambio (F5a) ya está: [docs/QA.md](../QA.md#feedback-en-vivo-del-asistente-f5a).
 - Un plan nuevo que solo cambie una propuesta y tenga deshacer puede pasar `scope: 'proposal'` a `runNativeTool`; nada más cambia de decisión sin pasar por `permissionProfile.ts`.
