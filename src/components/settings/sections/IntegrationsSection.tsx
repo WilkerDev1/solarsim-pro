@@ -3,10 +3,8 @@ import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SyncService, PingResult } from '../../../services/syncService';
 import { ShareProposalService } from '../../../services/shareProposalService';
-import {
-  fetchAvailableGeminiModels,
-  DEFAULT_POPULAR_MODELS,
-} from '../../../services/geminiInvoiceService';
+import { DEFAULT_POPULAR_MODELS } from '../../../services/llm/models';
+import { listAvailableGeminiModels } from '../../../services/llm/listModels';
 import { DEFAULT_GEMINI_MODEL } from '../../../../shared/geminiTransport';
 import { GeminiModelInfo } from '../../../types/aiInvoice';
 import {
@@ -71,12 +69,8 @@ export const IntegrationsSection: React.FC = () => {
 
     setIsDetectingModels(true);
     try {
-      let result: { success: boolean; error?: string; models?: GeminiModelInfo[] };
-      if (window.electronAPI?.listGeminiModels) {
-        result = await window.electronAPI.listGeminiModels(key);
-      } else {
-        result = await fetchAvailableGeminiModels(key);
-      }
+      // Mismo camino en Electron y en web: el puerto LlmClient (el IPC list-gemini-models se retira en F6).
+      const result = await listAvailableGeminiModels(key);
 
       if (result.success && result.models && result.models.length > 0) {
         // Combinar con metadatos descriptivos
