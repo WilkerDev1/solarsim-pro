@@ -24,7 +24,6 @@ import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis } from '../../
 interface EnergyAnalysisTabProps {
   project: ProjectSimulation;
   summary: FinancialSummaryResult;
-  openAIInvoiceModal: () => void;
   updateMonthlyConsumption: (index: number, value: number) => void;
   updateAllMonthlyConsumption?: (value: number) => void;
   setMonthlyConsumption?: (monthlyConsumption: number[], lockAutoPanels?: boolean) => void;
@@ -52,7 +51,6 @@ export function energyTableLabels(comparable: boolean, showSelfConsumption: bool
 export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
   project,
   summary,
-  openAIInvoiceModal,
   updateMonthlyConsumption,
   updateAllMonthlyConsumption,
   setMonthlyConsumption,
@@ -307,12 +305,13 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
         <div className="bg-[#14532d] text-white px-4 py-2.5 font-bold text-xs uppercase tracking-wider flex flex-wrap justify-between items-center gap-2">
           <span className="flex flex-wrap items-center gap-2">{labels.heading}{isConsumptionEstimated(project) && <span className="text-amber-200"><EstimatedConsumptionHint /></span>}</span>
           <button
-            onClick={openAIInvoiceModal}
+            // F5b: abre el asistente único con el selector de archivo (antes, el modal del asistente de propuestas).
+            onClick={() => void import('../../../features/assistant/assistantEntry').then(({ openAssistant }) => openAssistant('invoice'))}
             className="bg-white/10 hover:bg-white/20 border border-white/30 text-amber-300 hover:text-amber-200 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
-            title="Escanear factura eléctrica EDE con IA para autocompletar consumo y cliente"
+            title="Adjunta la factura eléctrica en el asistente para autocompletar consumo y cliente"
           >
             <Sparkles className="w-3.5 h-3.5 fill-amber-300" />
-            <span>Autocompletar con Factura EDE (IA)</span>
+            <span>Autocompletar con factura (asistente)</span>
           </button>
         </div>
         <div className="overflow-x-auto">

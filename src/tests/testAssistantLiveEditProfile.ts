@@ -5,7 +5,7 @@
 //  · Lo compartido o sin deshacer (catálogo, ofertas, clientes, estado y decisión comercial, papelera, borrados) se confirma
 //    en ambas superficies.
 //  · propose_project_update (MCP) no cambia: con un precio sigue quedando pendiente; las copias doradas no se tocan.
-//  · El encendido del asistente flotante: migración de una sola vez, escrita y probada, apagada por una bandera que F4/F5b enciende.
+//  · El encendido del asistente flotante: migración de una sola vez, escrita en F3b y encendida en F5b (APP_ASSISTANT_ON_BY_DEFAULT).
 import assert from 'node:assert/strict';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -304,14 +304,17 @@ const legacyExternal = await executeAgentTool({
 assert.equal(legacyExternal.status, 'pending_confirmation', JSON.stringify(legacyExternal));
 assert.equal(JSON.stringify(projectOf().specs.saleMarginMultiplier), JSON.stringify(base.specs.saleMarginMultiplier), 'pendiente: nada escrito');
 
-// ── 6. Encender el asistente flotante: una sola vez, detrás de una bandera que F4/F5b enciende ───────────────────────────
-assert.equal(APP_ASSISTANT_ON_BY_DEFAULT, false, 'F3b deja la migración escrita y apagada: encenderla antes de F4 expondría el asistente a medias');
+// ── 6. Encender el asistente flotante: una sola vez, con la bandera que F5b enciende (invertido en F5b) ────────────────────
+assert.equal(APP_ASSISTANT_ON_BY_DEFAULT, true, 'F5b enciende el asistente por defecto con el panel completo');
+const off = { onByDefault: false };
 assert.equal(APP_ASSISTANT_DEFAULTS_VERSION, 1);
 const on = { onByDefault: true };
-// Con la bandera apagada: lo de hoy (solo `true` enciende) y la marca NO se estampa, para que la migración corra al encenderla.
-assert.deepEqual(migrateAppAssistantEnabled({ appAssistantEnabled: false }), { appAssistantEnabled: false, appAssistantEnabledChosenByUser: false, appAssistantDefaultsVersion: 0 });
-assert.deepEqual(migrateAppAssistantEnabled({ appAssistantEnabled: true }), { appAssistantEnabled: true, appAssistantEnabledChosenByUser: false, appAssistantDefaultsVersion: 0 });
-assert.equal(migrateAppAssistantEnabled({ appAssistantEnabled: 'yes' }).appAssistantEnabled, false);
+// Con la bandera apagada (la de F3b/F4, por si se vuelve atrás): solo `true` enciende y la marca NO se estampa.
+assert.deepEqual(migrateAppAssistantEnabled({ appAssistantEnabled: false }, off), { appAssistantEnabled: false, appAssistantEnabledChosenByUser: false, appAssistantDefaultsVersion: 0 });
+assert.deepEqual(migrateAppAssistantEnabled({ appAssistantEnabled: true }, off), { appAssistantEnabled: true, appAssistantEnabledChosenByUser: false, appAssistantDefaultsVersion: 0 });
+assert.equal(migrateAppAssistantEnabled({ appAssistantEnabled: 'yes' }, off).appAssistantEnabled, false);
+// Sin opciones manda la bandera de F5b: el `false` heredado se enciende una vez.
+assert.equal(migrateAppAssistantEnabled({ appAssistantEnabled: false }).appAssistantEnabled, true);
 // Con la bandera encendida: el `false` heredado (o ausente) pasa a encendido UNA vez y queda la marca.
 const first = migrateAppAssistantEnabled({ appAssistantEnabled: false }, on);
 assert.deepEqual(first, { appAssistantEnabled: true, appAssistantEnabledChosenByUser: false, appAssistantDefaultsVersion: APP_ASSISTANT_DEFAULTS_VERSION });
@@ -323,7 +326,7 @@ assert.equal(migrateAppAssistantEnabled({ ...first, appAssistantEnabled: false }
 assert.equal(migrateAppAssistantEnabled({ appAssistantEnabled: false, appAssistantEnabledChosenByUser: true }, on).appAssistantEnabled, false);
 assert.equal(migrateAppAssistantEnabled({ appAssistantEnabled: true, appAssistantEnabledChosenByUser: true }, on).appAssistantEnabled, true);
 
-// El interruptor registra la elección, se persiste y la hidratación la respeta (con la bandera de hoy, apagada).
+// El interruptor registra la elección, se persiste y la hidratación la respeta (con la bandera de F5b, encendida).
 reset();
 store.setState({ appAssistantEnabled: false, appAssistantEnabledChosenByUser: false, appAssistantDefaultsVersion: 0 });
 s().setAppAssistantEnabled(true);
@@ -335,19 +338,24 @@ assert.equal(persisted.appAssistantEnabledChosenByUser, true, 'la elección se g
 assert.equal(persisted.appAssistantDefaultsVersion, 0, 'la marca se guarda');
 const reloaded = structuredClone(persisted) as unknown as SimulationStore;
 hydrateSimulationStore(reloaded);
-assert.equal(reloaded.appAssistantEnabled, false);
+assert.equal(reloaded.appAssistantEnabled, false, 'un apagado elegido con el interruptor sigue apagado');
 assert.equal(reloaded.appAssistantEnabledChosenByUser, true);
-// Un estado guardado antiguo (sin los campos nuevos) arranca como hoy: apagado y sin marca.
+// Criterio de aceptación de F5b: un estado guardado antiguo (sin registro de elección ni marca) arranca ENCENDIDO.
 const legacyRaw = structuredClone(persisted);
 delete legacyRaw.appAssistantEnabledChosenByUser;
 delete legacyRaw.appAssistantDefaultsVersion;
-const legacy = legacyRaw as unknown as SimulationStore;
+const legacy = structuredClone(legacyRaw) as unknown as SimulationStore;
 hydrateSimulationStore(legacy);
-assert.equal(legacy.appAssistantEnabled, false, 'hasta F4/F5b nadie se enciende solo');
+assert.equal(legacy.appAssistantEnabled, true, 'un estado guardado antiguo arranca con el asistente encendido (invertido en F5b)');
 assert.equal(legacy.appAssistantEnabledChosenByUser, false);
-assert.equal(legacy.appAssistantDefaultsVersion, 0);
+assert.equal(legacy.appAssistantDefaultsVersion, APP_ASSISTANT_DEFAULTS_VERSION, 'y queda la marca: la migración no vuelve a correr');
+// Instalación nueva (nada guardado): el valor de fábrica ya es encendido.
+const fresh = structuredClone(serializeSimulationStore(store.getInitialState())) as unknown as SimulationStore;
+assert.equal(fresh.appAssistantEnabled, true, 'de fábrica, encendido');
+hydrateSimulationStore(fresh);
+assert.equal(fresh.appAssistantEnabled, true);
 
-// El ciclo completo con la bandera encendida (la que F4/F5b enciende): guardado antiguo con `false` → hidratar → encendido y
+// El ciclo completo con la bandera encendida (la de F5b): guardado antiguo con `false` → hidratar → encendido y
 // marca → el usuario lo apaga → guardar → rehidratar → sigue apagado.
 const onHydrate = { appAssistantOnByDefault: true };
 const oldInstall = structuredClone(legacyRaw) as Record<string, unknown>;

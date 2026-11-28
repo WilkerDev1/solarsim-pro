@@ -14,7 +14,7 @@ import type { ClientRecord } from '../../types/client';
 import '../clients/client-link.css';
 
 export const NewProjectModal: React.FC = () => {
-  const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, openAIInvoiceModal, sidebarTheme, clients, linkProposalToClient, updateClient } = useSimulationStore(useShallow((s) => ({ isNewProjectModalOpen: s.isNewProjectModalOpen, closeNewProjectModal: s.closeNewProjectModal, createNewProject: s.createNewProject, openAIInvoiceModal: s.openAIInvoiceModal, sidebarTheme: s.sidebarTheme, clients: s.clients, linkProposalToClient: s.linkProposalToClient, updateClient: s.updateClient })));
+  const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, sidebarTheme, clients, linkProposalToClient, updateClient } = useSimulationStore(useShallow((s) => ({ isNewProjectModalOpen: s.isNewProjectModalOpen, closeNewProjectModal: s.closeNewProjectModal, createNewProject: s.createNewProject, sidebarTheme: s.sidebarTheme, clients: s.clients, linkProposalToClient: s.linkProposalToClient, updateClient: s.updateClient })));
   const isDark = sidebarTheme === 'dark';
 
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -162,11 +162,12 @@ export const NewProjectModal: React.FC = () => {
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs overflow-y-auto min-h-0">
-          {/* AI Invoice Scan Shortcut */}
+          {/* Atajo al asistente único (F5b): cierra este modal y abre el chat con «Crea una propuesta» (y el nombre, si lo hay) */}
           <div
             onClick={() => {
               closeNewProjectModal();
-              openAIInvoiceModal();
+              const projectName = name;
+              void import('../../features/assistant/assistantEntry').then(({ openAssistant }) => openAssistant('new-project', { projectName }));
             }}
             className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all duration-200 group ${
               isDark
@@ -186,7 +187,7 @@ export const NewProjectModal: React.FC = () => {
                   </span>
                 </h4>
                 <p className="text-[10px] opacity-80">
-                  Usa una descripción o documentos y revisa el borrador antes de crear.
+                  Pídela en el chat, con o sin factura: la crea y la abre en el simulador.
                 </p>
               </div>
             </div>

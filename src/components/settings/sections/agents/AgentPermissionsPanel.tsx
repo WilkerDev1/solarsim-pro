@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
 import type { AgentPolicy, AgentPolicySource, AgentSourcePolicy } from '../../../../store/slices/agentSlice';
+import { InfoTip } from '../../../simulator/params/ui/InfoTip';
 
 const SOURCES: { key: AgentPolicySource; title: string; description: string }[] = [
   { key: 'internal', title: 'Asistentes de la aplicación', description: 'Asistente de propuestas y asistente general.' },
@@ -54,6 +55,26 @@ export const AgentPermissionsPanel: React.FC = () => {
                   )}
                 </label>
               ))}
+              {source.key === 'internal' && (
+                // Perfil del asistente general (ADR 0010): solo lo lee la fuente app-assistant; nunca los agentes externos.
+                <label className="block">
+                  <span className="flex items-center gap-1 text-sm font-medium text-slate-800 dark:text-zinc-200">
+                    Cambios dentro de una propuesta (asistente general)
+                    <InfoTip
+                      label="Qué cambia el perfil"
+                      text={'Edición en vivo: precios, margen, extras y descuentos de la propuesta se aplican al momento, con el antes y después y deshacer.\nPedir confirmación: esos cambios esperan a que los confirmes en la tarjeta.\nEn los dos casos, lo compartido (catálogo, ofertas, estados, papelera y borrados) se confirma, salvo que en «Cambios sensibles» elijas «Aplicar sin preguntar (bypass)», el modo sin confirmación; lo que no se puede deshacer se confirma siempre. Este perfil no cambia lo que piden los agentes externos.'}
+                    />
+                  </span>
+                  <select
+                    value={policy.appAssistantProfile}
+                    onChange={(e) => setAgentPolicy({ appAssistantProfile: e.target.value === 'confirm' ? 'confirm' : 'live-edit' })}
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
+                  >
+                    <option value="live-edit">Edición en vivo, con deshacer</option>
+                    <option value="confirm">Pedir confirmación para precios</option>
+                  </select>
+                </label>
+              )}
             </div>
           </div>
         ))}

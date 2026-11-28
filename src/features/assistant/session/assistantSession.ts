@@ -15,6 +15,14 @@
  * en la propuesta nueva y se lo dice al modelo en el mismo resultado.
  *
  * El texto en streaming vive aquí, no en el store de la simulación: un fragmento no dispara los selectores del simulador.
+ *
+ * Panel completo (F5b): se puede escribir mientras trabaja. `send` con un turno en curso deja el mensaje en cola
+ * (`queued`, varios se juntan en uno) y el bucle cede al terminar el paso en curso (`shouldYield`): el turno se cierra
+ * `yielded` con las llamadas ejecutadas y su resultado real, y el mensaje encolado va como turno siguiente. Stop nunca
+ * entrega nada: lo encolado vuelve al compositor (delante de lo escrito después). Cada respuesta de herramienta con cambios
+ * deja su tarjeta (`changeCards`, la entrada de ChangeCard de F5a) y cada creación la suya (`createdProposals`); Deshacer
+ * anota su fallo (`undoErrors`) y `undoTurn` deshace todo el turno. `unseen` marca lo que terminó con el panel cerrado (la
+ * insignia).
  */
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { DEFAULT_GEMINI_MODEL, FALLBACK_GEMINI_MODEL } from '../../../services/llm/models';
@@ -24,6 +32,7 @@ import { listAssistantToolset, executeAssistantToolset, type AssistantToolRespon
 import { appAssistantToolDefinitions } from '../../agentTools/appAssistant/definitions';
 import { buildSystemInstruction } from '../../agentTools/appAssistant/instructions';
 import { setAssistantToolPorts, type ProposalView } from '../../agentTools/appAssistant/ports';
+import { undoAssistantActivity } from '../../agentTools/appAssistant/handlers';
 import {
   initialTurnState, reduceTurnEvent, toolResponseEvents, turnSummary, type AssistantTurnEvent, type TurnState,
 } from '../../agentTools/appAssistant/turnEvents';
@@ -32,7 +41,10 @@ import { assistantOwner } from '../tools';
 import { assistantProjectId } from '../assistantScope';
 import { CHAT_FILE_LIMITS, forgetChatFiles, getChatFile, registerChatFile, toBase64, type ChatFile } from '../chatFiles';
 import { closedTurnProblems, runAgentLoop, type LoopError, type LoopLimits, type LoopOutcome } from './agentLoop';
+import { changeCardInputFromResponse, type ChangeCardInput } from '../../assistantFeedback/changeCardModel';
+import { dockHighlightStore } from '../../../store/dockHighlightStore';
 import { extractInvoiceWithLlm } from './invoiceExtraction';
+import { createdProposalCard, turnUndoTargets, type CreatedProposalCardView } from '../panelState';
 
 export interface SessionUserMessage {
   id: string;
@@ -63,8 +75,24 @@ export interface SessionAssistantMessage {
   resolutions?: Record<string, string>;
   /** Cambios deshechos desde el panel (activityId → true). */
   undone?: Record<string, boolean>;
+  /** Deshacer que falló desde el panel (activityId → motivo): la tarjeta lo muestra. */
+  undoErrors?: Record<string, string>;
+  /** De esos, los que fallan para siempre (la propuesta cambió después o ya no existe): no se vuelven a ofrecer. */
+  undoBlocked?: Record<string, boolean>;
+  /** Último fallo de «Deshacer todo el turno», junto al botón (se borra al deshacer algo del turno). */
+  undoTurnError?: string;
+  /** Tarjetas «Propuesta creada» de las `create_proposal` aplicadas del turno. */
+  createdProposals?: { callId: string; card: CreatedProposalCardView }[];
+  /** Tarjetas de cambio (ChangeCard de F5a) de las respuestas de herramientas del turno, en orden de llamada. */
+  changeCards?: { callId: string; input: ChangeCardInput }[];
 }
 export type SessionMessage = SessionUserMessage | SessionAssistantMessage;
+
+/** Mensaje escrito mientras el asistente trabaja: se entrega al terminar el paso en curso. */
+export interface QueuedMessage {
+  text: string;
+  files: readonly ChatFile[];
+}
 
 export interface AssistantSessionState {
   owner: string;
@@ -78,6 +106,14 @@ export interface AssistantSessionState {
   composerError: string;
   panelOpen: boolean;
   expanded: boolean;
+  /** Mensaje en cola mientras trabaja (`null` si no hay). */
+  queued: QueuedMessage | null;
+  /** Algo terminó con el panel cerrado (respuesta o cambios sin ver): la insignia del botón. */
+  unseen: boolean;
+  /** Ancho elegido de la columna acoplada (sin él, el de fábrica). */
+  panelWidth?: number;
+  /** Una entrada («Autocompletar con factura») pidió abrir el selector de archivos al abrir el panel. */
+  filePickerRequested: boolean;
 }
 
 export interface AssistantSessionDeps {
@@ -93,12 +129,17 @@ export interface AssistantSessionDeps {
 export interface AssistantSession {
   getState(): AssistantSessionState;
   subscribe(listener: () => void): () => void;
-  /** Envía `text` (o el borrador) como un turno nuevo. Resuelve cuando el turno se cierra. */
+  /**
+   * Envía `text` (o el borrador) como un turno nuevo y resuelve cuando se cierra (también los encolados detrás). Con un
+   * turno en curso no espera: lo deja en cola y se entrega al terminar el paso en curso.
+   */
   send(text?: string): Promise<void>;
   /** «Continuar» tras un límite: un turno propio que no reenvía el mensaje anterior. */
   continueTurn(): Promise<void>;
-  /** Stop: cierra el turno en curso sin dejar llamadas a medias y sin reenviar nada. */
+  /** Stop: cierra el turno en curso sin dejar llamadas a medias y sin reenviar nada; lo encolado vuelve al compositor. */
   cancel(): void;
+  /** Saca el mensaje de la cola y lo devuelve al compositor (sin detener el turno). */
+  unqueue(): void;
   /** Nueva conversación. */
   reset(): void;
   /** Descarta la sesión si cambió el espacio de trabajo o la sesión de la cuenta. */
@@ -108,11 +149,17 @@ export interface AssistantSession {
   setDraft(text: string): void;
   setPanelOpen(open: boolean): void;
   setExpanded(expanded: boolean): void;
+  setPanelWidth(width: number | undefined): void;
+  /** Pide abrir el selector de archivos cuando el panel esté listo (lo consume el panel). */
+  requestFilePicker(): void;
+  consumeFilePickerRequest(): void;
   addFiles(list: ReadonlyArray<Pick<File, 'name' | 'arrayBuffer'>>): Promise<void>;
   removeFile(id: string): void;
   confirmPending(actionId: string): { success: boolean; error?: string };
   rejectPending(actionId: string): void;
   undoActivity(activityId: string): { success: boolean; error?: string };
+  /** «Deshacer todo el turno»: revierte los cambios aún aplicados del turno (`turnUndoTargets`), del más reciente al primero. */
+  undoTurn(turnId: string): { success: boolean; error?: string; undone: number };
   /** Historial del modelo (turnos cerrados). */
   history(): readonly LlmContent[];
   /** Conecta los puertos de F3a (navegación y lectura de facturas) a esta sesión. */
@@ -140,6 +187,14 @@ let turnCounter = 0;
 const defaultTurnId = () => `turn-${Date.now().toString(36)}-${(turnCounter++).toString(36)}`;
 let messageCounter = 0;
 const messageId = () => `m-${Date.now().toString(36)}-${(messageCounter++).toString(36)}`;
+
+/** Lo que llena una propuesta recién creada (cliente, tarifa, consumo y equipos): lo que destaca el dock al abrirla. */
+const CREATED_PROPOSAL_HIGHLIGHTS = [
+  { path: 'client.name', label: 'Cliente' }, { path: 'rates.distributor', label: 'Distribuidora' }, { path: 'monthlyConsumption[0]', label: 'Consumo' },
+  { path: 'specs.panels[0].count', label: 'Paneles' }, { path: 'specs.inverters[0].count', label: 'Inversores' },
+] as const;
+
+const toolKind = (name: string) => appAssistantToolDefinitions().find((d) => d.name === name)?.kind;
 
 /** Nombre legible de una herramienta del conjunto (su título declarado). */
 export function assistantToolLabel(name: string): string {
@@ -193,6 +248,7 @@ export function localTurnSummaryText(turn: TurnState, outcome: LoopOutcome, tool
   const pending = summary.pendingConfirmations.length ? ` ${summary.pendingConfirmations.length === 1 ? 'Un cambio espera' : `${summary.pendingConfirmations.length} cambios esperan`} tu confirmación.` : '';
   switch (outcome) {
     case 'cancelled': return `Detenido. ${done}${pending}`;
+    case 'yielded': return `Pausé aquí para leer tu mensaje. ${done}${pending}`;
     case 'step_limit': return `Llegué al límite de ${toolCount} pasos de este turno. ${done}${pending} Puedo continuar si me lo pides.`;
     case 'time_limit': return `Se agotó el tiempo de este turno. ${done}${pending} Puedo continuar si me lo pides.`;
     case 'failed': return `No pude terminar${error ? `: ${error.message.replace(/[.\s]+$/, '')}` : ''}. ${done}${pending}`;
@@ -205,6 +261,7 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
   const ownerNow = () => (deps.owner ?? assistantOwner)();
   let state: AssistantSessionState = {
     owner: ownerNow(), messages: [], busy: false, draft: '', files: [], loadingFiles: 0, composerError: '', panelOpen: false, expanded: false,
+    queued: null, unseen: false, filePickerRequested: false,
   };
   let history: LlmContent[] = [];
   const listeners = new Set<() => void>();
@@ -230,7 +287,7 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     forgetChatFiles([...sessionFiles]);
     sessionFiles.clear();
     history = [];
-    set({ messages: [], busy: false, draft: '', files: [], loadingFiles: 0, composerError: '' });
+    set({ messages: [], busy: false, draft: '', files: [], loadingFiles: 0, composerError: '', queued: null, unseen: false });
   };
 
   const syncOwner = () => {
@@ -252,7 +309,33 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     return { settings: s.defaultSimulationSettings, ...(project ? { project } : {}) };
   };
 
-  async function runTurn(text: string, files: readonly ChatFile[]): Promise<void> {
+  /** Adjuntos que se descartan porque no caben: se olvidan (no quedan registrados hasta «Nueva conversación»). */
+  const forgetFiles = (list: readonly ChatFile[]) => {
+    if (!list.length) return;
+    forgetChatFiles(list.map((f) => f.id));
+    for (const f of list) sessionFiles.delete(f.id);
+  };
+  const tooManyFiles = (kept: number, total: number) => `Máximo tres archivos por mensaje: quedan ${kept} de ${total}.`;
+
+  /** Más adjuntos de los que caben en un mensaje (solo pasa al devolver la cola): no se envía hasta quitar los que sobran. */
+  const removeExtraFiles = (total: number) => `Máximo tres archivos por mensaje: quita ${total - CHAT_FILE_LIMITS.maxFiles} para enviar.`;
+
+  /**
+   * Devuelve lo encolado al compositor (Stop, apagado): primero lo encolado, que se escribió antes. No se descarta ningún
+   * adjunto: si entre la cola y el compositor pasan de tres, se quedan todos y el envío espera a que se quiten los que sobran.
+   */
+  const returnQueueToComposer = () => {
+    const queued = state.queued;
+    if (!queued) return;
+    const all = [...queued.files, ...state.files];
+    set({
+      queued: null, draft: joinText(queued.text, state.draft), files: all,
+      ...(all.length > CHAT_FILE_LIMITS.maxFiles ? { composerError: removeExtraFiles(all.length) } : {}),
+    });
+  };
+
+  /** `fromQueue`: el texto y los archivos salen de la cola, así que el compositor (lo que se escribe ahora) no se toca. */
+  async function runTurn(text: string, files: readonly ChatFile[], fromQueue = false): Promise<void> {
     const owner = state.owner;
     const myGeneration = generation;
     const turnId = (deps.newTurnId ?? defaultTurnId)();
@@ -273,13 +356,13 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     if (!apiKey) {
       const error = { code: 'missing_key', message: 'Configura una API Key de Google Gemini en Ajustes → IA para conversar con el asistente.' };
       assistant = { ...assistant, outcome: 'failed', error, retryText: text, turn: reduceTurnEvent(assistant.turn, { type: 'recoverable_error', code: error.code, message: error.message, recoverable: false }) };
-      set({ messages: [...state.messages, userMessage, assistant], draft: '' });
+      set({ messages: [...state.messages, userMessage, assistant], busy: false, ...(fromQueue ? {} : { draft: '' }), ...(state.panelOpen ? {} : { unseen: true }) });
       return;
     }
 
     const abort = new AbortController();
     controller = abort;
-    set({ messages: [...state.messages, userMessage, assistant], busy: true, draft: '', files: [], composerError: '' });
+    set({ messages: [...state.messages, userMessage, assistant], busy: true, ...(fromQueue ? {} : { draft: '', files: [], composerError: '' }) });
     // Lo que el turno aplicó o dejó incompleto, para el resumen (`missing`) y para decidir si se ofrece reintentar.
     const incomplete = new Map<string, string[]>();
     const knownBefore = new Map<string, Set<string>>();
@@ -316,6 +399,8 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
         signal: abort.signal,
         limits: deps.limits,
         sleep: deps.sleep,
+        // Escribir mientras trabaja: el turno cede al terminar el paso en curso.
+        shouldYield: () => !!state.queued,
         liveContext: liveAppContext,
         thinking: thinkingFor,
         closingText: (outcome, error) => localTurnSummaryText(assistant.turn, outcome, toolCount, error),
@@ -349,6 +434,9 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
           const data = response.data as { openSimulator?: boolean; next?: string } | undefined;
           if (call.name === 'create_proposal' && response.status === 'applied' && response.proposalId && data?.openSimulator && !signal.aborted && !stale() && assistantEnabled()) {
             navigateToProposal({ proposalId: response.proposalId, view: 'simulator' });
+            // La creación no pasa por un lote por ruta: el dock destaca aquí las secciones que llenó (F5a; las rutas sin ancla
+            // no destacan nada).
+            dockHighlightStore.publish(response.proposalId, response.changes.length ? response.changes.map((c) => ({ path: c.path, label: c.label })) : CREATED_PROPOSAL_HIGHLIGHTS);
             const { next: _next, ...rest } = data;
             response = {
               ...response,
@@ -364,7 +452,17 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
             incomplete.set(response.proposalId, after.complete ? [] : after.reasons.map((r) => r.message).filter((m) => !already.has(m)));
           }
           const project = response.proposalId ? store().projects.find((p) => p.id === response.proposalId) : undefined;
+          const knownAssumptions = assistant.turn.assumptions.length;
           reduce(toolResponseEvents(call.callId, response, { ...(project ? { project } : {}), args: call.args }));
+          // La tarjeta de cambio (F5a) con los datos reales de la respuesta: diff, resultados antes/después, avisos y los
+          // supuestos que esta llamada declaró. Una consulta no tiene tarjeta; un error solo si la herramienta escribe.
+          const title = typeof call.args.title === 'string' && call.args.title.trim() ? call.args.title.trim() : assistantToolLabel(call.name);
+          const card = response.duplicate ? null : changeCardInputFromResponse(response, { title, assumptions: assistant.turn.assumptions.slice(knownAssumptions) });
+          if (card && (card.status !== 'error' || toolKind(call.name) !== 'read'))
+            update((m) => ({ ...m, changeCards: [...(m.changeCards ?? []), { callId: call.callId, input: card }] }));
+          // La creación no tiene diff por ruta: su tarjeta es «Propuesta creada» (equipos y cifras del motor si está completa).
+          const created = response.duplicate ? null : createdProposalCard(response);
+          if (created) update((m) => ({ ...m, createdProposals: [...(m.createdProposals ?? []), { callId: call.callId, card: created }] }));
           // Las tarjetas son de la interfaz: el modelo recibe la forma común sin ellas.
           const { cards: _cards, ...body } = response;
           return body as unknown as Record<string, unknown>;
@@ -408,7 +506,8 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     } finally {
       if (controller === abort) controller = undefined;
       if (activeTurn === turnRef) activeTurn = undefined;
-      if (!stale()) set({ busy: false });
+      // Con un mensaje en cola el turno siguiente arranca enseguida: `busy` no baja (nadie puede colar otro envío en medio).
+      if (!stale()) set({ busy: !!state.queued && !abort.signal.aborted, ...(state.panelOpen ? {} : { unseen: true }) });
     }
   }
 
@@ -420,20 +519,55 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
     },
     async send(input) {
       syncOwner();
-      if (state.busy || state.loadingFiles > 0) return;
+      if (state.loadingFiles > 0) return;
       const text = (input ?? state.draft).trim();
       if (!text) return;
-      const files = [...state.files];
-      await runTurn(text, files);
+      if (state.busy) {
+        // Escribir mientras trabaja: a la cola (varios mensajes se juntan); se entrega al terminar el paso en curso. Los
+        // adjuntos que no caben en el mensaje encolado se quedan en el compositor, con su aviso (nunca se pierden).
+        const previous = state.queued;
+        const all = [...(previous?.files ?? []), ...state.files];
+        const queuedFiles = all.slice(0, CHAT_FILE_LIMITS.maxFiles);
+        const left = all.slice(CHAT_FILE_LIMITS.maxFiles);
+        set({
+          queued: { text: previous ? `${previous.text}\n\n${text}` : text, files: queuedFiles },
+          files: left, composerError: left.length ? tooManyFiles(queuedFiles.length, all.length) : '', ...(input === undefined ? { draft: '' } : {}),
+        });
+        return;
+      }
+      if (state.files.length > CHAT_FILE_LIMITS.maxFiles) { set({ composerError: removeExtraFiles(state.files.length) }); return; }
+      const myGeneration = generation;
+      let next: QueuedMessage = { text, files: [...state.files] };
+      let fromQueue = false;
+      for (;;) {
+        await runTurn(next.text, next.files, fromQueue);
+        if (myGeneration !== generation) return;
+        const queued = state.queued;
+        if (!queued) { if (state.busy && !controller) set({ busy: false }); return; }
+        // Apagado en Ajustes mientras esperaba: no se envía; vuelve al compositor.
+        if (!assistantEnabled()) { returnQueueToComposer(); set({ busy: false }); return; }
+        set({ queued: null });
+        next = { text: queued.text, files: [...queued.files] };
+        fromQueue = true;
+      }
     },
-    continueTurn() { return session.send(CONTINUE_PROMPT); },
-    cancel() { if (state.busy) controller?.abort('stop'); },
+    continueTurn() { return state.busy ? Promise.resolve() : session.send(CONTINUE_PROMPT); },
+    cancel() {
+      if (!state.busy) return;
+      // Stop no entrega nada: ni reenvía el mensaje del turno ni el encolado, que vuelve al compositor.
+      returnQueueToComposer();
+      controller?.abort('stop');
+    },
+    unqueue: returnQueueToComposer,
     reset: clearAll,
     syncOwner,
     syncEnabled,
     setDraft: (draft) => { if (draft !== state.draft) set({ draft }); },
-    setPanelOpen: (panelOpen) => { if (panelOpen !== state.panelOpen) set({ panelOpen }); },
+    setPanelOpen: (panelOpen) => { if (panelOpen !== state.panelOpen || (panelOpen && state.unseen)) set({ panelOpen, ...(panelOpen ? { unseen: false } : {}) }); },
     setExpanded: (expanded) => { if (expanded !== state.expanded) set({ expanded }); },
+    setPanelWidth: (panelWidth) => { if (panelWidth !== state.panelWidth) set({ panelWidth }); },
+    requestFilePicker: () => set({ filePickerRequested: true }),
+    consumeFilePickerRequest: () => { if (state.filePickerRequested) set({ filePickerRequested: false }); },
     async addFiles(list) {
       set({ composerError: '' });
       const selected = Array.from(list);
@@ -456,7 +590,10 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
       }
     },
     removeFile(id) {
-      set({ files: state.files.filter((f) => f.id !== id) });
+      const files = state.files.filter((f) => f.id !== id);
+      // Quitados los que sobraban, el aviso de «quita N» ya no aplica.
+      const fixed = files.length <= CHAT_FILE_LIMITS.maxFiles && /^Máximo tres archivos por mensaje: quita /.test(state.composerError);
+      set({ files, ...(fixed ? { composerError: '' } : {}) });
     },
     confirmPending(actionId) {
       const message = state.messages.find((m): m is SessionAssistantMessage => m.role === 'assistant' && m.turn.pendingConfirmations.some((p) => p.actionId === actionId));
@@ -471,12 +608,41 @@ export function createAssistantSession(initial: AssistantSessionDeps = {}): Assi
       if (message) patchMessage(message.id, (m) => ({ ...m, resolutions: { ...m.resolutions, [actionId]: 'rejected' } }));
     },
     undoActivity(activityId) {
-      const result = store().undoAgentActivity(activityId);
-      if (result.success) {
-        const message = state.messages.find((m): m is SessionAssistantMessage => m.role === 'assistant' && Object.values(m.turn.tools).some((call) => call.activityId === activityId));
-        if (message) patchMessage(message.id, (m) => ({ ...m, undone: { ...m.undone, [activityId]: true } }));
+      const result = undoAssistantActivity(activityId);
+      const message = state.messages.find((m): m is SessionAssistantMessage => m.role === 'assistant' && (
+        Object.values(m.turn.tools).some((call) => call.activityId === activityId) || !!m.changeCards?.some((c) => c.input.activityId === activityId
+          // Un cambio confirmado desde la tarjeta: su actividad la dice la cola de confirmaciones.
+          || (!!c.input.actionId && store().pendingAgentActions.find((a) => a.id === c.input.actionId)?.activityId === activityId))));
+      // También el fallo: la tarjeta lo muestra (sin él, el botón fallaría en silencio); el permanente deja de ofrecerse.
+      if (message) patchMessage(message.id, (m) => {
+        if (result.success) {
+          const { [activityId]: _e, ...undoErrors } = m.undoErrors ?? {};
+          const { [activityId]: _b, ...undoBlocked } = m.undoBlocked ?? {};
+          return { ...m, undone: { ...m.undone, [activityId]: true }, undoErrors, undoBlocked, undoTurnError: undefined };
+        }
+        return {
+          ...m, undoErrors: { ...m.undoErrors, [activityId]: result.error || 'No se pudo deshacer.' },
+          undoBlocked: result.permanent ? { ...m.undoBlocked, [activityId]: true } : m.undoBlocked,
+        };
+      });
+      return { success: result.success, ...(result.error ? { error: result.error } : {}) };
+    },
+    undoTurn(turnId) {
+      let undone = 0;
+      const message = () => state.messages.find((m): m is SessionAssistantMessage => m.role === 'assistant' && m.id === turnId);
+      const fail = (error: string | undefined) => {
+        const text = error || 'No se pudo deshacer.';
+        // El fallo queda junto al botón; si fue permanente, el cambio sale de la lista y, con menos de dos, el botón se retira.
+        if (message()) patchMessage(turnId, (m) => ({ ...m, undoTurnError: text }));
+        return { success: false, undone, error: text };
+      };
+      for (const id of turnUndoTargets(turnId, store().agentActivity, message()?.undoBlocked)) {
+        const result = session.undoActivity(id);
+        if (!result.success) return fail(undone ? `Se deshicieron ${undone} cambios; el resto no: ${result.error}` : result.error);
+        undone++;
       }
-      return result;
+      if (!undone) return fail('No queda nada de este turno que deshacer.');
+      return { success: true, undone };
     },
     history: () => history,
     connectPorts() {

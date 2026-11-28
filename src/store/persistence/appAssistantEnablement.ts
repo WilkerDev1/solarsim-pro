@@ -1,9 +1,9 @@
 /**
  * Encendido del asistente flotante (F3b, ADR 0010). Puro.
  *
- * Hoy `appAssistantEnabled` es `false` de fábrica y se guarda SIEMPRE (serializeSimulationStore), así que en cada
- * instalación ese `false` ya está escrito: cambiar el valor de fábrica no enciende a nadie, y un `false` guardado no dice si
- * el usuario lo apagó o nunca lo tocó. Por eso:
+ * Hasta F4, `appAssistantEnabled` era `false` de fábrica y se guarda SIEMPRE (serializeSimulationStore), así que en las
+ * instalaciones de antes ese `false` ya está escrito: cambiar el valor de fábrica no enciende a nadie, y un `false` guardado
+ * no dice si el usuario lo apagó o nunca lo tocó. Por eso:
  *
  * - Desde F3b el interruptor de Ajustes registra la elección (`appAssistantEnabledChosenByUser`), y la marca
  *   `appAssistantDefaultsVersion` dice que la migración ya corrió en esta instalación.
@@ -12,13 +12,14 @@
  * - Con la bandera apagada (F3b) se comporta como siempre (solo `true` enciende) y NO estampa la marca, para que la
  *   migración corra cuando la bandera se encienda.
  *
- * La bandera sigue apagada a propósito: F4 dejó el bucle nuevo con un panel mínimo, y encenderlo para todos antes del panel
- * completo (F5b) los expondría a un asistente a medias. La enciende F5b, junto con su registro en
- * `shared/applicationFeatures.ts` (M6).
+ * F5b la enciende con el panel completo: un estado guardado antiguo (sin registro de elección ni marca) arranca encendido
+ * una vez, y quien lo apague después con el interruptor se queda apagado. La función no se registra en
+ * `shared/applicationFeatures.ts` (la 2.11.0 es solo de cliente y `shared/` no se toca): es una preferencia de este equipo,
+ * no una política de la organización (ADR 0010).
  */
 
-/** La enciende F5b (F4 la deja apagada). Mientras sea `false`, nadie se enciende solo. */
-export const APP_ASSISTANT_ON_BY_DEFAULT = false;
+/** Encendida en F5b. Con `false` (la de F3b/F4), nadie se enciende solo. */
+export const APP_ASSISTANT_ON_BY_DEFAULT = true;
 /** Versión de la migración del encendido; la marca guardada `appAssistantDefaultsVersion` la iguala al correr. */
 export const APP_ASSISTANT_DEFAULTS_VERSION = 1;
 

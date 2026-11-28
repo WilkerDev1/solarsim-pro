@@ -1,8 +1,15 @@
-// Panel mínimo de F4: lo que hizo un turno, como listas de texto sencillas (la tarjeta de diff rica, las anclas y el resaltado
-// del dock son de F5a). Lee el estado del turno de la sesión (`TurnState` de F3c) y llama a la sesión para confirmar,
-// rechazar o deshacer.
+// Lo que hizo un turno en el panel del asistente (F5b): una tarjeta de cambio (ChangeCard de F5a) por respuesta de herramienta,
+// con los datos reales de la respuesta (diff, resultados del motor antes/después, avisos y supuestos), y Deshacer,
+// Confirmar y Rechazar conectados a la sesión; una tarjeta «Propuesta creada» por creación; y «Deshacer todo el turno» con
+// dos o más cambios deshacibles. Debajo, lo que no es de una tarjeta: supuestos sueltos, qué falta (sin repetir lo que ya dice
+// una tarjeta), qué falló, el modelo de respaldo y «Continuar». Lee el estado del turno de la sesión (`TurnState` de F3c,
+// `changeCards`, `createdProposals`) y, con `live`, la actividad y la cola de confirmaciones del store.
 import React from 'react';
-import { ArrowRight, Check, Undo2, X } from 'lucide-react';
+import { ArrowRight, Undo2 } from 'lucide-react';
+import { ChangeCard } from '../../assistantFeedback/ChangeCard';
+import { createdProposalStatus, pendingValidUntil, turnChangeCards, turnUndoTargets, type CreatedProposalCardView, type TurnDetailsLive } from '../panelState';
+
+export type { TurnDetailsLive } from '../panelState';
 import type { SessionAssistantMessage } from '../session/assistantSession';
 import { assistantToolLabel } from '../session/assistantSession';
 import { assistantValueLabel } from '../labels';
@@ -23,13 +30,45 @@ export function formatChangeValue(value: unknown): string {
   return label.length > 80 ? `${label.slice(0, 77)}…` : label;
 }
 
-const MAX_CHANGES = 8;
-
 export interface TurnDetailsActions {
   confirmPending(actionId: string): void;
   rejectPending(actionId: string): void;
   undo(activityId: string): void;
+  /** «Deshacer todo el turno» (sin él no se ofrece). */
+  undoTurn?(turnId: string): void;
   continueTurn(): void;
+}
+
+/**
+ * Tarjeta «Propuesta creada»: equipos y, solo si está completa, las cifras del motor (nunca ceros de una incompleta). Si la
+ * creación se deshizo o la propuesta está en la papelera, lo dice y no muestra cifras.
+ */
+function CreatedProposalCard({ card, status }: { card: CreatedProposalCardView; status: 'live' | 'undone' | 'trashed' }) {
+  if (status !== 'live')
+    return (
+      <section className="assistant-created-card" data-created-proposal={status} aria-label={`Propuesta creada: ${card.name}`}>
+        <h3>{status === 'undone' ? 'Creación deshecha' : 'Propuesta en la papelera'} <small>{card.name}</small></h3>
+        <p className="assistant-created-pending">
+          {status === 'undone' ? 'La propuesta pasó a la papelera.' : 'Ya no está entre tus propuestas.'}{' '}
+          <InfoTip label="Cómo recuperarla" text="Puedes restaurarla desde la papelera de propuestas." />
+        </p>
+      </section>
+    );
+  return (
+    <section className="assistant-created-card" data-created-proposal={card.metrics ? 'complete' : 'incomplete'} aria-label={`Propuesta creada: ${card.name}`}>
+      <h3>Propuesta creada <small>{card.name}</small></h3>
+      {card.equipment.length > 0 && <p className="assistant-created-equipment">{card.equipment.join(' · ')}</p>}
+      {card.metrics ? (
+        <dl>
+          {card.metrics.map((m) => (
+            <div key={m.label}><dt>{m.label}</dt><dd>{m.value}</dd></div>
+          ))}
+        </dl>
+      ) : card.reasons.length > 0 ? (
+        <p className="assistant-created-pending">Propuesta incompleta: sin resultados todavía <InfoTip label="Qué falta en la propuesta" text={card.reasons.join(' ')} /></p>
+      ) : null}
+    </section>
+  );
 }
 
 /** Llamadas del turno en curso como pasos legibles (para «Pensando…»). */
@@ -41,75 +80,61 @@ export function turnSteps(message: SessionAssistantMessage): string[] {
   });
 }
 
-export function AssistantTurnDetails({ message, busy, actions }: { message: SessionAssistantMessage; busy: boolean; actions: TurnDetailsActions }) {
+const validUntilText = (iso: string) => `Vale hasta las ${new Date(iso).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}; después hay que pedirla de nuevo.`;
+
+export function AssistantTurnDetails({ message, busy, actions, live }: { message: SessionAssistantMessage; busy: boolean; actions: TurnDetailsActions; live?: TurnDetailsLive }) {
   const { turn } = message;
   const summary = turn.summary;
   if (!summary) return null;
-  const changes = summary.changes;
-  const undoable = turn.toolOrder.map((id) => turn.tools[id]).filter((call) => call.status === 'applied' && call.activityId && call.changes.length);
+  const cards = turnChangeCards(message, live);
+  const created = message.createdProposals ?? [];
+  // Los supuestos y los motivos de «incompleta» que ya muestra una tarjeta no se repiten abajo.
+  const inCards = new Set(cards.flatMap(({ input }) => (input.assumptions ?? []).map((a) => `${a.source}:${a.key}`)));
+  const looseAssumptions = summary.assumptions.filter((a) => !inCards.has(`${a.source}:${a.key}`));
+  const shownReasons = new Set([
+    ...cards.flatMap(({ input }) => (input.results?.after && !input.results.after.complete ? input.results.after.reasons.map((r) => r.message) : [])),
+    ...created.flatMap(({ card }) => card.reasons),
+  ]);
+  const missing = summary.missing.filter((reason) => !shownReasons.has(reason));
   const failed = summary.failedTools.map(assistantToolLabel);
-  const empty = !changes.length && !summary.pendingConfirmations.length && !summary.assumptions.length && !undoable.length;
-  if (empty && !failed.length && !summary.missing.length && !message.canContinue && !message.modelNotice) return null;
+  const undoAll = live ? turnUndoTargets(message.id, live.agentActivity, message.undoBlocked).length : 0;
+  if (!cards.length && !created.length && !looseAssumptions.length && !failed.length && !missing.length && !message.canContinue && !message.modelNotice) return null;
   return (
     <div className="assistant-turn-details">
-      {changes.length > 0 && (
-        <section aria-label="Cambios aplicados">
-          <h3>Cambios</h3>
-          <ul className="assistant-turn-list">
-            {changes.slice(0, MAX_CHANGES).map((change, index) => (
-              <li key={`${change.proposalId ?? ''}:${change.path}:${index}`}>
-                <span className="assistant-turn-label">{change.label}</span>{' '}
-                <span>{formatChangeValue(change.before)} → {formatChangeValue(change.after)}</span>
-                {change.derived && <span className="assistant-turn-muted"> (recalculado)</span>}
-              </li>
-            ))}
-            {changes.length > MAX_CHANGES && <li className="assistant-turn-muted">y {changes.length - MAX_CHANGES} más</li>}
-          </ul>
-        </section>
-      )}
-      {undoable.length > 0 && (
-        <div className="assistant-turn-actions">
-          {undoable.map((call) => message.undone?.[call.activityId!]
-            ? <span key={call.callId} className="assistant-turn-muted"><Check size={12} aria-hidden /> {assistantToolLabel(call.name)}: deshecho</span>
-            : (
-              <button key={call.callId} type="button" disabled={busy} onClick={() => actions.undo(call.activityId!)}>
-                <Undo2 size={12} aria-hidden /> Deshacer {assistantToolLabel(call.name).toLowerCase()}
-              </button>
-            ))}
-        </div>
-      )}
-      {summary.pendingConfirmations.map((pending) => {
-        const resolution = message.resolutions?.[pending.actionId];
+      {created.map(({ callId, card }) => <CreatedProposalCard key={callId} card={card} status={createdProposalStatus(message, callId, card.proposalId, live)} />)}
+      {cards.map(({ callId, input }) => {
+        const until = input.status === 'pending_confirmation' && input.actionId ? pendingValidUntil(input.actionId, live) : undefined;
         return (
-          <section key={pending.actionId} className="assistant-turn-pending" aria-label="Cambio por confirmar">
-            <h3>{pending.title}</h3>
-            {pending.changes.length > 0 && (
-              <ul className="assistant-turn-list">
-                {pending.changes.slice(0, MAX_CHANGES).map((change, index) => <li key={index}><span className="assistant-turn-label">{change.label}</span> {change.value}</li>)}
-              </ul>
-            )}
-            {resolution ? (
-              <p className="assistant-turn-muted">{resolution === 'applied' ? 'Aplicado.' : resolution === 'rejected' ? 'Descartado.' : resolution}</p>
-            ) : (
-              <div className="assistant-turn-actions">
-                <button type="button" disabled={busy} onClick={() => actions.confirmPending(pending.actionId)}><Check size={12} aria-hidden /> Confirmar</button>
-                <button type="button" disabled={busy} onClick={() => actions.rejectPending(pending.actionId)}><X size={12} aria-hidden /> Descartar</button>
-              </div>
-            )}
-          </section>
+          <React.Fragment key={callId}>
+            <ChangeCard
+              input={input}
+              // Deshacer espera a que el turno termine (el modelo podría estar usando ese cambio); confirmar o rechazar no.
+              busy={busy && input.status === 'applied'}
+              onUndo={input.activityId ? () => actions.undo(input.activityId!) : undefined}
+              onConfirm={input.actionId ? () => actions.confirmPending(input.actionId!) : undefined}
+              onReject={input.actionId ? () => actions.rejectPending(input.actionId!) : undefined}
+            />
+            {until && <p className="assistant-turn-validity">Confirmación pendiente <InfoTip label="Hasta cuándo vale" text={validUntilText(until)} /></p>}
+          </React.Fragment>
         );
       })}
-      {summary.assumptions.length > 0 && (
+      {undoAll >= 2 && actions.undoTurn && (
+        <div className="assistant-turn-actions">
+          <button type="button" disabled={busy} onClick={() => actions.undoTurn?.(message.id)}><Undo2 size={12} aria-hidden /> Deshacer todo el turno</button>
+          {message.undoTurnError && <p className="assistant-turn-undo-error" role="alert">{message.undoTurnError}</p>}
+        </div>
+      )}
+      {looseAssumptions.length > 0 && (
         <section aria-label="Supuestos">
           <h3>Supuse</h3>
           <ul className="assistant-turn-list">
-            {summary.assumptions.map((a) => <li key={`${a.source}:${a.key}`}>{a.label}: {formatChangeValue(a.value)}</li>)}
+            {looseAssumptions.map((a) => <li key={`${a.source}:${a.key}`}>{a.label}: {formatChangeValue(a.value)}</li>)}
           </ul>
         </section>
       )}
-      {(summary.missing.length > 0 || failed.length > 0 || message.modelNotice) && (
+      {(missing.length > 0 || failed.length > 0 || message.modelNotice) && (
         <p className="assistant-turn-notes">
-          {summary.missing.length > 0 && <span>Propuesta incompleta <InfoTip label="Qué falta en la propuesta" text={summary.missing.join(' ')} /></span>}
+          {missing.length > 0 && <span>Propuesta incompleta <InfoTip label="Qué falta en la propuesta" text={missing.join(' ')} /></span>}
           {failed.length > 0 && <span>Sin completar: {failed.join(', ')}</span>}
           {message.modelNotice && <span>Modelo de respaldo <InfoTip label="Modelo de respaldo" text={message.modelNotice} /></span>}
         </p>

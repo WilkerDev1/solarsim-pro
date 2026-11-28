@@ -777,3 +777,83 @@ label.assistant-icon { cursor: pointer; }
 .chat-empty .chat-notice{margin-bottom:12px}
 
 @media (prefers-reduced-motion: reduce){.chat-msg-actions,.chat-composer-hint-keys,.proposal-digest-progress i{transition:none}}
+
+/* ── Panel completo del asistente único (F5b) ──────────────────────────────────────────────────────────────────────────
+   Acoplado: el mismo .assistant-widget en el flujo de la fila de la app (columna derecha), sin sombra ni radio, con un
+   divisor a la izquierda que se arrastra. El ancho lo pone el componente (assistantPanelLayout, entre 280 y 720 px). */
+.assistant-widget.assistant-docked {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  z-index: 20;
+  height: 100%;
+  flex-shrink: 0;
+  display: flex;
+  background: #18212d;
+  border-left: 1px solid var(--assistant-border);
+}
+.assistant-docked .assistant-widget-panel,
+.assistant-docked .assistant-widget-panel.assistant-expanded {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.assistant-dock-resize {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 1;
+  touch-action: none;
+}
+.assistant-dock-resize:hover,
+.assistant-dock-resize:focus-visible { background: #70dbb4; outline: none; }
+/* Insignia discreta del botón: un punto (trabajando: claro que respira; sin ver: ámbar). */
+.assistant-fab { position: relative; }
+.assistant-fab-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid #087b58;
+  background: #f6c768;
+}
+.assistant-fab-badge[data-kind='working'] { background: #b6f3dc; animation: assistant-badge-breathe 1.6s ease-in-out infinite; }
+@keyframes assistant-badge-breathe { 50% { opacity: 0.45; } }
+/* Mensaje escrito mientras trabaja: en cola hasta terminar el paso en curso. */
+.assistant-queued {
+  margin: 8px 0 0 auto;
+  width: fit-content;
+  max-width: 88%;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  border: 1px dashed var(--assistant-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #d6e0ec;
+}
+.assistant-queued p { margin: 0; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.assistant-queued-label { color: #bac7d8; }
+.assistant-queued button {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+  border: 1px solid #52647b;
+  background: #26374d;
+  color: #eef3fb;
+  border-radius: 7px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+@media (prefers-reduced-motion: reduce) { .assistant-fab-badge[data-kind='working'] { animation: none; } }
