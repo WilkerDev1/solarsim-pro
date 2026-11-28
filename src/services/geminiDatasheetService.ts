@@ -1,9 +1,7 @@
 import { ExtractedDatasheetData } from "../types/equipment";
-import {
-  MAX_INLINE_FILE_BASE64,
-  requestGeminiStructured,
-  type GeminiTransport,
-} from "../../shared/geminiTransport";
+import { MAX_INLINE_FILE_BASE64, requestStructured } from "./llm/structuredPolicy";
+import { createScannerClient } from "./llm/scannerClient";
+import type { LlmClient } from "./llm/types";
 import { normalizeDatasheetResponse } from "../utils/datasheetImport";
 
 const DATASHEET_EXTRACTION_SYSTEM_INSTRUCTION = `Eres un ingeniero eléctrico y fotovoltaico experto en análisis de fichas técnicas (datasheets) de fabricantes de equipos solares y almacenamiento (paneles fotovoltaicos, inversores y baterías BESS).
@@ -74,10 +72,10 @@ REGLAS DE EXTRACCIÓN CRÍTICAS:
 
 La respuesta se valida contra el esquema JSON de la solicitud: devuelve sólo esos campos.`;
 
-const NUMBER = { type: "NUMBER" } as const;
-const STRING = { type: "STRING" } as const;
+const NUMBER = { type: "number" } as const;
+const STRING = { type: "string" } as const;
 // Specs a variant can carry. `familySpecs` accepts the same keys (minus identity) for values common to the whole sheet.
-type SpecProperty = { type: "NUMBER" | "STRING"; description?: string; nullable?: boolean };
+type SpecProperty = { type: "number" | "string" | readonly ["number", "null"]; description?: string };
 /** Where each easily-omitted value sits in a typical datasheet; the model skips unlabeled optional fields. */
 const SPEC_DESCRIPTIONS: Record<string, string> = {
   efficiencyPct: "PANEL: eficiencia del módulo en % (fila 'Module Efficiency STC (%)' / 'Eficiencia del módulo' de la tabla STC; un valor por columna de modelo, ej. 22.36). null si no es un panel o no aparece.",
@@ -104,9 +102,9 @@ const SPEC_PROPERTIES: Record<string, SpecProperty> = {
       "dodPct", "batteryEfficiencyPct", "cycles", "maxChargeCurrentA", "weightKg", "lengthMm", "widthMm", "heightMm"].map((key) => [
       key,
       {
-        ...NUMBER,
+        // JSON Schema: un campo que la ficha puede no publicar admite null (en el dialecto OpenAPI antiguo era `nullable`).
+        type: NULLABLE_REQUIRED.includes(key) ? (["number", "null"] as const) : NUMBER.type,
         ...(SPEC_DESCRIPTIONS[key] ? { description: SPEC_DESCRIPTIONS[key] } : {}),
-        ...(NULLABLE_REQUIRED.includes(key) ? { nullable: true } : {}),
       },
     ]),
   ),
@@ -116,21 +114,21 @@ const SPEC_PROPERTIES: Record<string, SpecProperty> = {
   dimensions: STRING,
 };
 const { powerW: _p, powerKW: _k, capacityKWh: _c, capacityAh: _a, ...FAMILY_SPEC_PROPERTIES } = SPEC_PROPERTIES;
-/** Structured output: the model can only return these keys; unknown values are simply omitted. */
+/** Structured output (JSON Schema): the model can only return these keys; unknown values are simply omitted. */
 export const DATASHEET_RESPONSE_SCHEMA = {
-  type: "OBJECT",
+  type: "object",
   properties: {
-    equipmentType: { type: "STRING", enum: ["panel", "inverter", "battery"] },
+    equipmentType: { type: "string", enum: ["panel", "inverter", "battery"] },
     brand: STRING,
     modelSeries: STRING,
     documentTitle: STRING,
     category: STRING,
     specsSummary: STRING,
-    familySpecs: { type: "OBJECT", properties: FAMILY_SPEC_PROPERTIES },
+    familySpecs: { type: "object", properties: FAMILY_SPEC_PROPERTIES },
     variants: {
-      type: "ARRAY",
+      type: "array",
       items: {
-        type: "OBJECT",
+        type: "object",
         properties: {
           modelCode: STRING,
           displayName: STRING,
@@ -151,7 +149,7 @@ export async function parseDatasheetWithGemini(
   customModel?: string,
   onProgress?: (status: string) => void,
   signal?: AbortSignal,
-  transport?: GeminiTransport,
+  client?: LlmClient,
 ): Promise<ExtractedDatasheetData> {
   const apiKey =
     customApiKey?.trim() ||
@@ -168,33 +166,30 @@ export async function parseDatasheetWithGemini(
   if (!cleanBase64 || cleanBase64.length > MAX_INLINE_FILE_BASE64)
     throw new Error("La ficha técnica está vacía o supera 20 MB.");
   onProgress?.("Analizando variantes y especificaciones de la ficha…");
-  const result = await requestGeminiStructured({
-    apiKey: apiKey || "",
-    model: customModel,
+  const llm = client ?? await createScannerClient(apiKey || "");
+  const result = await requestStructured({
+    client: llm,
     signal,
     invalidMessage:
       "Gemini devolvió datos incompletos o JSON inválido. No se aplicó ningún cambio.",
-    body: {
+    request: {
+      model: customModel,
+      systemInstruction: DATASHEET_EXTRACTION_SYSTEM_INSTRUCTION,
       contents: [
         {
           role: "user",
           parts: [
             {
+              type: "text",
               text: `Analiza la ficha técnica ${JSON.stringify(fileName)}. Extrae cada variante identificable. Campos desconocidos: omitir. No inventes datos.`,
             },
-            { inlineData: { mimeType, data: cleanBase64 } },
+            { type: "inlineData", mimeType, data: cleanBase64 },
           ],
         },
       ],
-      systemInstruction: {
-        parts: [{ text: DATASHEET_EXTRACTION_SYSTEM_INSTRUCTION }],
-      },
-      generationConfig: {
-        temperature: 0.1,
-        responseSchema: DATASHEET_RESPONSE_SCHEMA,
-      },
+      schema: DATASHEET_RESPONSE_SCHEMA,
     },
-  }, transport);
+  });
   if (result.modelWarning) onProgress?.(result.modelWarning);
   return normalizeDatasheetResponse(result.data);
 }

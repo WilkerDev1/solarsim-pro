@@ -35,6 +35,8 @@ export interface LlmErrorDetails {
   reason?: unknown;
   finishReason?: LlmFinishReason;
   blockReason?: string;
+  /** `malformed_response` de una salida estructurada sin texto visible (vacía o solo razonamiento): no es JSON inválido. */
+  emptyOutput?: boolean;
   cause?: unknown;
   message?: string;
 }
@@ -46,6 +48,7 @@ export class LlmError extends Error {
   readonly reason?: unknown;
   readonly finishReason?: LlmFinishReason;
   readonly blockReason?: string;
+  readonly emptyOutput?: boolean;
   constructor(kind: LlmErrorKind, details: LlmErrorDetails = {}) {
     const base = details.message ?? MESSAGES[kind];
     super(kind === 'bad_request' && details.serverMessage ? `${base} ${details.serverMessage}` : base, { cause: details.cause });
@@ -56,6 +59,7 @@ export class LlmError extends Error {
     this.reason = details.reason;
     this.finishReason = details.finishReason;
     this.blockReason = details.blockReason;
+    this.emptyOutput = details.emptyOutput;
   }
 }
 

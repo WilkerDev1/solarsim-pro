@@ -8,6 +8,7 @@ import { useSimulationStore } from "../store/useSimulationStore";
 import { GeminiPriceCatalogService } from "../services/geminiPriceCatalogService";
 import type { SolarEquipmentItem } from "../types/equipment";
 import type { GeminiTransport } from "../../shared/geminiTransport";
+import { clientFromTransport } from "./support/clientFromTransport";
 
 async function main() {
   const old: SolarEquipmentItem = {
@@ -225,7 +226,7 @@ async function main() {
   };
   {
     const prices = await GeminiPriceCatalogService.scanAndMatchPriceCatalog({
-      transport,
+      client: clientFromTransport(transport),
       fileBase64: "YQ==",
       mimeType: "application/pdf",
       fileName: "QA.pdf",

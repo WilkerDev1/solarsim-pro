@@ -1,4 +1,4 @@
-/** Synthetic transport and local data only: no Gemini/server writes. */
+/** Modelo falso en el puerto LlmClient y datos locales: sin Gemini ni escrituras en servidores. */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppAssistant } from '../../../src/features/assistant/components/AppAssistant';
@@ -7,7 +7,7 @@ import { useSimulationStore } from '../../../src/store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../../../src/engine/referenceCase';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../../../src/data/defaultEquipmentCatalog';
 import { featureScope } from '../../../shared/applicationFeatures';
-import type { GeminiTransport } from '../../../shared/geminiTransport';
+import type { LlmClient, LlmContent, LlmPart, LlmRequest, LlmResponse } from '../../../src/services/llm/types';
 import '../../../src/index.css';
 const id = 'qa-assistant-project';
 const project = {
@@ -74,65 +74,61 @@ if (new URLSearchParams(location.search).has('assets')) {
     },
   });
 }
-const transport: GeminiTransport = async (_url, body: any) => {
-  const last = body.contents.at(-1).parts[0];
-  if (last.functionResponse)
-    return {
-      candidates: [
-        {
-          finishReason: 'STOP',
-          content: {
-            parts: [
-              {
-                text:
-                  last.functionResponse.response.result?.status ===
-                  'pending_confirmation'
-                    ? 'Preparé el cambio. Confírmalo para recalcular la simulación.'
-                    : last.functionResponse.response.result?.status === 'applied'
-                      ? 'Listo: **cobertura al 90 %**. Puedes deshacerlo desde la tarjeta.'
-                      : last.functionResponse.name === 'audit_catalog'
-                        ? '## Auditoría\n- Revisa los equipos **sin precio**.\n- Vincula *fichas técnicas* faltantes.\n\nDetalle en la tarjeta.'
-                        : 'Aquí tienes los datos actuales de la aplicación. Puedes abrir la propuesta o revisar un equipo.',
-              },
-            ],
-          },
-        },
-      ],
-    };
-  const text = last.text || '';
-  const call = /90/.test(text)
-    ? {
-        name: 'propose_project_update',
-        args: {
-          id,
-          title: 'Cobertura objetivo de 90%',
-          edits: [
-            { section: 'rates', field: 'targetCoveragePct', valueJson: '90' },
-          ],
-        },
-      }
-    : /audit/i.test(text)
-      ? { name: 'audit_catalog', args: {} }
-    : /equipo/i.test(text)
-      ? {
-          name: 'search_equipment',
-          args: {
-            query: new URLSearchParams(location.search).has('assets')
-              ? 'CS6.1-72TB-590'
-              : '',
-            unavailableOnly: true,
-          },
-        }
-      : { name: 'get_simulation', args: { id } };
-  return {
-    candidates: [
-      {
-        finishReason: 'STOP',
-        content: { role: 'model', parts: [{ functionCall: call }] },
-      },
-    ],
-  };
+// Modelo falso en el puerto LlmClient (F4): sin red ni clave real. Un guion mínimo por palabras clave del mensaje.
+const lastUserText = (contents: LlmContent[]) => {
+  const user = [...contents].reverse().find((c) => c.role === 'user' && c.parts.some((p) => p.type === 'text'));
+  const part = user?.parts.find((p) => p.type === 'text');
+  return part && part.type === 'text' ? part.text : '';
 };
+function reply(request: LlmRequest): LlmResponse {
+  const last = request.contents.at(-1)!;
+  const fr = last.parts.find((p) => p.type === 'functionResponse');
+  let parts: LlmPart[];
+  if (fr && fr.type === 'functionResponse') {
+    const status = String(fr.response.status);
+    const text = status === 'pending_confirmation'
+      ? 'Preparé el cambio. Confírmalo en la tarjeta para aplicarlo.'
+      : fr.name === 'create_proposal' && status === 'applied'
+        ? 'Listo: **creé la propuesta** y la abrí en el simulador. Supuse 1.000 kWh/mes estimados; con una factura ajusto el consumo real.'
+        : status === 'applied'
+          ? 'Listo: **cobertura al 90 %**. Puedes deshacerlo desde el chat.'
+          : status === 'error'
+            ? `No pude hacerlo: ${String((fr.response.error as { message?: string } | undefined)?.message ?? 'error')}`
+            : 'Aquí tienes los datos actuales de la aplicación.';
+    parts = [{ type: 'text', text }];
+  } else {
+    const text = lastUserText(request.contents);
+    const active = useSimulationStore.getState().activeProjectId || id;
+    const call = /crea/i.test(text)
+      ? { id: 'qa-create', name: 'create_proposal', args: {} }
+      : /90/.test(text)
+        ? { id: 'qa-edit', name: 'edit_proposal', args: { proposalId: active, title: 'Cobertura objetivo de 90%', ops: [{ op: 'set', path: 'rates.targetCoveragePct', valueJson: '90' }] } }
+        : /equipo/i.test(text)
+          ? { id: 'qa-search', name: 'search_equipment', args: { query: '' } }
+          : { id: 'qa-state', name: 'get_proposal_state', args: { proposalId: active } };
+    parts = [{ type: 'functionCall', call }];
+  }
+  return {
+    model: request.model, content: { role: 'model', parts }, finishReason: 'stop',
+    text: parts.map((p) => (p.type === 'text' ? p.text : '')).join(''),
+    functionCalls: parts.flatMap((p) => (p.type === 'functionCall' ? [p.call] : [])),
+  };
+}
+const fakeLlm: LlmClient = {
+  async generate(request) { return reply(request); },
+  async *stream(request) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const response = reply(request);
+    for (const part of response.content.parts) {
+      if (part.type === 'text') yield { type: 'text', text: part.text };
+      if (part.type === 'functionCall') yield { type: 'functionCall', call: part.call };
+    }
+    yield { type: 'done', response };
+  },
+  async structured() { throw new Error('La fixture no lee facturas.'); },
+  async listModels() { return []; },
+};
+const llmClientFactory = () => fakeLlm;
 function Fixture() {
   const s = useSimulationStore();
   return (
@@ -145,7 +141,7 @@ function Fixture() {
         color: s.sidebarTheme === 'dark' ? '#edf2f8' : '#182230',
       }}
     >
-      <h1>QA sintética · Asistente experimental</h1>
+      <h1>QA sintética · Asistente (sesión y bucle de F4)</h1>
       <p>
         Propuesta: {s.getActiveProject().client.name} · Cobertura:{' '}
         {s.getActiveProject().rates.targetCoveragePct}%
@@ -168,7 +164,7 @@ function Fixture() {
       {!new URLSearchParams(location.search).has('assets') && (
         <ApplicationFeaturesSection />
       )}
-      <AppAssistant transport={transport} />
+      <AppAssistant llmClientFactory={llmClientFactory} />
     </div>
   );
 }

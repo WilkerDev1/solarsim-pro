@@ -1,6 +1,7 @@
 // F0 (caracterización): la lógica de montaje del panel flotante como funciones puras (sin DOM simulado, decisión del plan).
-// La clave del panel (`assistantPanelKey`) decide cuándo React remonta `AssistantPanel`: remontar aborta el turno en curso y
-// vacía la conversación (estado local de `useAppAssistant`). Hoy la clave cambia al abrir o crear otra propuesta.
+// La clave del panel (`assistantPanelKey`) decide cuándo React remonta `AssistantPanel`. Hasta F4 remontar abortaba el turno y
+// vaciaba la conversación (estado local de `useAppAssistant`); desde F4 ambos viven en la sesión fuera de React y remontar no
+// pierde nada (testAssistantSession). Hoy la clave aún cambia al abrir o crear otra propuesta: eso es lo que invierte F5b.
 import assert from 'node:assert/strict';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -23,8 +24,8 @@ assert.equal(assistantProjectId('pdf-preview', 'p-1'), 'p-1');
 assert.equal(assistantProjectId('dashboard', 'p-1'), undefined, 'en el panel general no hay propuesta abierta aunque exista una activa');
 assert.equal(assistantProjectId('simulator', ''), undefined);
 
-// 3. Con el store real: abrir o crear una propuesta desde el panel general CAMBIA la clave (se remonta el panel y se pierde la conversación).
-// Se invierte en F5b: la conversación pasará a vivir fuera del árbol con clave y sobrevivirá a abrir la propuesta que el propio asistente crea.
+// 3. Con el store real: abrir o crear una propuesta desde el panel general CAMBIA la clave (se remonta el panel; desde F4 la
+// conversación ya no se pierde porque vive en la sesión). Se invierte en F5b: la clave quedará solo por espacio/sesión.
 const store = useSimulationStore;
 const a = { ...structuredClone(BENCHMARK_PROJECT), id: 'key-a', syncStatus: 'local_only' as const };
 store.setState({ appAssistantEnabled: true, workspaceScope: 'local', projects: [a], activeProjectId: a.id, activeView: 'dashboard', sessionGeneration: 0,

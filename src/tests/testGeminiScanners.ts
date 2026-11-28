@@ -5,6 +5,7 @@ import { GeminiPriceCatalogService, PRICE_CATALOG_RESPONSE_SCHEMA } from '../ser
 import { GeminiTariffService } from '../services/geminiTariffService';
 import { MAX_INLINE_FILE_BASE64, MAX_INLINE_FILE_BYTES, base64LengthFor, type GeminiTransport } from '../../shared/geminiTransport';
 import type { SolarEquipmentItem } from '../types/equipment';
+import { clientFromTransport } from './support/clientFromTransport';
 
 // Synthetic transport injected into every scanner: structured output, Gemini 4 request policy and the no-repair JSON rule.
 const bodies: any[] = [];
@@ -17,19 +18,21 @@ const transport: GeminiTransport = async (url, body, headers) => {
   bodies.push(structuredClone(body));
   return { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: reply }] } }] };
 };
+const client = clientFromTransport(transport);
 const catalog = [{ id: 'bat-weco', type: 'battery', brand: 'WeCo', displayName: 'Batería WeCo 16K0-LV (16.06kWh)', modelSeries: '16K0-LV', capacityKWh: 16.06, supplierPrices: [] }] as unknown as SolarEquipmentItem[];
 const scanPrices = (extra: Record<string, unknown> = {}) => GeminiPriceCatalogService.scanAndMatchPriceCatalog({
-  fileBase64: 'QQ==', mimeType: 'application/pdf', fileName: 'lista.pdf', apiKey: 'synthetic-key', currentCatalog: catalog, dopExchangeRate: 60, existingSuppliers: ['Proveedor QA'], transport, ...extra,
+  fileBase64: 'QQ==', mimeType: 'application/pdf', fileName: 'lista.pdf', apiKey: 'synthetic-key', currentCatalog: catalog, dopExchangeRate: 60, existingSuppliers: ['Proveedor QA'], client, ...extra,
 });
 
 // Ficha técnica.
 reply = JSON.stringify({ equipmentType: 'battery', brand: 'WeCo', variants: [{ modelCode: '16K0-LV', displayName: 'Batería WeCo 16K0-LV (16.06kWh)', capacityKWh: 16.06 }] });
-const sheet = await parseDatasheetWithGemini('data:application/pdf;base64,QQ==', 'application/pdf', 'weco.pdf', 'synthetic-key', undefined, undefined, undefined, transport);
+const sheet = await parseDatasheetWithGemini('data:application/pdf;base64,QQ==', 'application/pdf', 'weco.pdf', 'synthetic-key', undefined, undefined, undefined, client);
 assert.equal(sheet.variants[0].capacityKWh, 16.06);
 let body = bodies.at(-1);
 assert.equal(body.generationConfig.responseMimeType, 'application/json');
-assert.deepEqual(body.generationConfig.responseSchema, DATASHEET_RESPONSE_SCHEMA);
-assert.deepEqual(body.generationConfig.thinkingConfig, { thinkingLevel: 'low' });
+assert.deepEqual(body.generationConfig.responseJsonSchema, DATASHEET_RESPONSE_SCHEMA, 'salida estructurada por JSON Schema (responseJsonSchema)');
+assert.equal(body.generationConfig.responseSchema, undefined, 'ya no se usa el dialecto OpenAPI');
+assert.deepEqual(body.generationConfig.thinkingConfig, { thinkingLevel: 'LOW' });
 assert.equal(body.generationConfig.temperature, undefined, 'Gemini 4 ignores sampling parameters');
 assert(!body.systemInstruction.parts[0].text.includes('"variants": ['), 'the schema replaces the JSON shape in the prompt');
 
@@ -61,7 +64,7 @@ reply = JSON.stringify({ detectedSupplierName: 'Proveedor QA', currencyDetected:
 ] });
 await scanPrices();
 body = bodies.at(-1);
-assert.deepEqual(body.generationConfig.responseSchema, PRICE_CATALOG_RESPONSE_SCHEMA);
+assert.deepEqual(body.generationConfig.responseJsonSchema, PRICE_CATALOG_RESPONSE_SCHEMA);
 assert(!('action' in (PRICE_CATALOG_RESPONSE_SCHEMA.properties.items.items.properties as Record<string, unknown>)), 'action is not requested from the model');
 const prompt = body.contents[0].parts[0].text as string;
 assert(!/TASA DE CAMBIO|1 USD =/.test(prompt), 'no rate in the prompt: the model must not convert');
@@ -82,7 +85,7 @@ await assert.rejects(scanPrices(), (error: Error) => /otra moneda \(EUR\)/.test(
 reply = 'Aquí tienes: {"detectedSupplierName":"X","currencyDetected":"USD","items":[]} ¿algo más?';
 await assert.rejects(scanPrices(), /No se aplicó ningún precio/);
 reply = '{"resolutionCode":';
-await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QQ==', mimeType: 'application/pdf', apiKey: 'synthetic-key', transport }), /No se aplicaron tarifas/);
+await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QQ==', mimeType: 'application/pdf', apiKey: 'synthetic-key', client }), /No se aplicaron tarifas/);
 
 // Tamaño: exactamente 20 MiB con relleno cabe; el siguiente bloque base64 se rechaza antes de llamar al modelo
 // (la longitud base64 solo distingue bloques de 3 bytes).
@@ -92,11 +95,11 @@ assert(Buffer.alloc(MAX_INLINE_FILE_BYTES + 3).toString('base64').length > MAX_I
 const tooBig = 'A'.repeat(MAX_INLINE_FILE_BASE64 + 4);
 const before = urls.length;
 await assert.rejects(scanPrices({ fileBase64: tooBig }), /20 MB/);
-await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: tooBig, mimeType: 'application/pdf', apiKey: 'synthetic-key', transport }), /20 MB/);
-await assert.rejects(parseDatasheetWithGemini(tooBig, 'application/pdf', 'grande.pdf', 'synthetic-key', undefined, undefined, undefined, transport), /20 MB/);
+await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: tooBig, mimeType: 'application/pdf', apiKey: 'synthetic-key', client }), /20 MB/);
+await assert.rejects(parseDatasheetWithGemini(tooBig, 'application/pdf', 'grande.pdf', 'synthetic-key', undefined, undefined, undefined, client), /20 MB/);
 assert.equal(urls.length, before, 'size is validated before any billed request');
 reply = JSON.stringify({ equipmentType: 'battery', brand: 'WeCo', variants: [{ displayName: 'Exacta', capacityKWh: 16 }] });
-await parseDatasheetWithGemini('A'.repeat(MAX_INLINE_FILE_BASE64), 'application/pdf', 'exacta.pdf', 'synthetic-key', undefined, undefined, undefined, transport);
+await parseDatasheetWithGemini('A'.repeat(MAX_INLINE_FILE_BASE64), 'application/pdf', 'exacta.pdf', 'synthetic-key', undefined, undefined, undefined, client);
 assert.equal(urls.length, before + 1, 'a 20 MiB document is accepted');
 
 console.log('Scanners share injected transport, structured output, local currency rules and strict JSON parsing (synthetic only).');

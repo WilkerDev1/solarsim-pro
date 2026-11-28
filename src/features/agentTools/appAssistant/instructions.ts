@@ -11,7 +11,8 @@
  *     lista cerrada (`assumptions.ts`), nunca inventa precios, español y breve. Las cifras citadas salen de las constantes.
  *
  * Los agentes externos (`mcp`) reciben solo la capa 1 mientras el contrato esté congelado: es lo que el MCP local anuncia hoy.
- * El asistente flotante antiguo sigue con `ASSISTANT_SYSTEM_PROMPT` hasta que F4 lo cambie por `buildSystemInstruction`.
+ * Desde F4 el asistente flotante usa `buildSystemInstruction('app-assistant', …)`; `ASSISTANT_SYSTEM_PROMPT` queda solo para el
+ * camino antiguo (`service.ts`) hasta F6.
  */
 import type { AgentToolDefinition, AgentToolKind } from '../../../../shared/agentTools/types';
 import { AGENT_RULES_ES } from '../../../../shared/agentTools/rules';
